@@ -10,7 +10,7 @@ const MENU_VIEWS = [
   { key: 'weather', tab: 'Weather', label: 'Weather Report', icon: 'Wind', desc: 'Wind, park & air by game' },
 ]
 
-function ViewMenu({ view, onView, onOpenGuide }) {
+function ViewMenu({ view, onView, onOpenGuide, onOpenHowTo }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
   useEffect(() => {
@@ -67,6 +67,20 @@ function ViewMenu({ view, onView, onOpenGuide }) {
             role="menuitem"
             className="vm-item"
             onClick={() => {
+              onOpenHowTo()
+              setOpen(false)
+            }}
+          >
+            <Icon name="Target" size={16} />
+            <span className="vm-txt">
+              <b>How to Pick</b>
+              <span className="dim">Full HR-selection playbook</span>
+            </span>
+          </button>
+          <button
+            role="menuitem"
+            className="vm-item"
+            onClick={() => {
               onOpenGuide()
               setOpen(false)
             }}
@@ -83,7 +97,7 @@ function ViewMenu({ view, onView, onOpenGuide }) {
   )
 }
 
-export default function Filters({ value, onChange, gradeCounts, games, badgeCounts, watchCount, view, onView, onOpenGuide }) {
+export default function Filters({ value, onChange, gradeCounts, games, badgeCounts, watchCount, view, onView, onOpenGuide, onOpenHowTo }) {
   const v = value
   const liveMode = useLiveMode()
   const [open, setOpen] = useState(false)
@@ -114,7 +128,7 @@ export default function Filters({ value, onChange, gradeCounts, games, badgeCoun
             <Icon name="Activity" size={15} />
             Results
           </button>
-          <ViewMenu view={view} onView={onView} onOpenGuide={onOpenGuide} />
+          <ViewMenu view={view} onView={onView} onOpenGuide={onOpenGuide} onOpenHowTo={onOpenHowTo} />
         </div>
 
         {view === 'results' ? null : (

@@ -15,6 +15,7 @@ import PlayerDrawer from './components/PlayerDrawer.jsx'
 import ParlaySlip from './components/ParlaySlip.jsx'
 import Legend from './components/Legend.jsx'
 import Guide from './components/Guide.jsx'
+import HowToPick from './components/HowToPick.jsx'
 import Skeleton from './components/Skeleton.jsx'
 import BackToTop from './components/BackToTop.jsx'
 import Icon from './components/Icon.jsx'
@@ -44,6 +45,7 @@ export default function App() {
   const [selectedId, setSelectedId] = useState(null)
   const [showLegend, setShowLegend] = useState(false)
   const [showGuide, setShowGuide] = useState(false)
+  const [showHowTo, setShowHowTo] = useState(false)
   const [watchlist, setWatchlist] = useState(() => new Set(store.load('watchlist', [])))
   const [slipIds, setSlipIds] = useState(() => store.load('slip', []))
   const [autoRefresh, setAutoRefresh] = useState(() => store.load('autoRefresh', false))
@@ -109,14 +111,15 @@ export default function App() {
   useEffect(() => {
     const onKey = (e) => {
       if (e.key === 'Escape') {
-        if (showGuide) setShowGuide(false)
+        if (showHowTo) setShowHowTo(false)
+        else if (showGuide) setShowGuide(false)
         else if (showLegend) setShowLegend(false)
         else if (selectedId) setSelectedId(null)
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [selectedId, showLegend, showGuide])
+  }, [selectedId, showLegend, showGuide, showHowTo])
 
   const patch = useCallback((p) => setFilters((f) => ({ ...f, ...p })), [])
 
@@ -270,6 +273,7 @@ export default function App() {
           view={view}
           onView={setView}
           onOpenGuide={() => setShowGuide(true)}
+          onOpenHowTo={() => setShowHowTo(true)}
         />
       </div>
 
@@ -343,6 +347,7 @@ export default function App() {
       )}
       {showLegend && <Legend onClose={() => setShowLegend(false)} />}
       {showGuide && <Guide onClose={() => setShowGuide(false)} />}
+      {showHowTo && <HowToPick onClose={() => setShowHowTo(false)} />}
       <BackToTop />
     </div>
     </LiveModeContext.Provider>

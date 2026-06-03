@@ -430,6 +430,7 @@ button.th:hover {
   text-align: right;
 }
 .col-grade {
+  display: flex;
   justify-content: center;
 }
 
@@ -2033,7 +2034,7 @@ button.th:hover {
 
 .silo-row {
   position: relative;
-  padding: 8px 12px 9px;
+  padding: 11px 12px 13px;
   border-bottom: 1px solid var(--border-soft);
   cursor: pointer;
   transition: background 0.13s;
@@ -3691,4 +3692,41 @@ button.th:hover {
 @keyframes hrGlow {
   0%, 100% { text-shadow: 0 0 5px rgba(255, 59, 48, 0.5), 0 0 1px rgba(255, 59, 48, 0.85); }
   50% { text-shadow: 0 0 13px rgba(255, 59, 48, 0.95), 0 0 4px rgba(255, 59, 48, 0.9); }
+}
+
+/* ============ How to Pick ============ */
+.htp-step {
+  margin-bottom: 15px;
+}
+.htp-list {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.htp-list li {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+.htp-check {
+  list-style: none;
+  margin: 6px 0 10px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.htp-check li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text);
+}
+.htp-check li svg {
+  color: var(--good);
+  flex-shrink: 0;
+  margin-top: 2px;
 }
