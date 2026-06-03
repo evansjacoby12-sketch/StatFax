@@ -3517,7 +3517,7 @@ button.th:hover {
 
 /* ============ Guide modal ============ */
 .guide-modal {
-  max-width: 560px;
+  width: 560px; /* base .modal keeps max-width:94vw so it fits phones */
 }
 .guide-list {
   display: flex;
