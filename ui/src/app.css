@@ -3920,14 +3920,19 @@ button.th:hover {
 }
 .zone-side-head {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
+  align-items: flex-start;
   gap: 8px;
-  flex-wrap: wrap;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 .zone-side-label { font-weight: 600; font-size: 13px; }
 .zone-metrics { display: flex; flex-wrap: wrap; gap: 5px; }
+/* Selected metric/pitch filter pops amber so the active lens is obvious. */
+.zone-metrics .badge-toggle.on {
+  border-color: var(--prime);
+  color: var(--prime);
+  background: color-mix(in srgb, var(--prime) 12%, transparent);
+}
 
 .zone-grid {
   display: grid;
