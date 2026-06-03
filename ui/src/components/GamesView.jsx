@@ -3,6 +3,7 @@ import { GradeChip, BadgeRow, ProbBar } from './atoms.jsx'
 import { teamColor, teamLogo, hexToRgba, readableOn, playerHeadshot } from '../lib/teams.js'
 import { pct, num, gameTime } from '../lib/format.js'
 import { gradeColor } from '../lib/badges.js'
+import { HOT_HEAT } from '../lib/constants.js'
 import { compass } from '../lib/weather.js'
 
 export default function GamesView({ games, batters, onSelect, selectedId, watchlist, slip, onToggleWatch, onToggleSlip }) {
@@ -130,7 +131,7 @@ function Silo({ team, batters, ...ctx }) {
   return (
     <div className="silo" style={{ '--tc': color }}>
       <div className="silo-head" style={{ background: hexToRgba(color, 0.16) }}>
-        {logo && <img className="silo-logo" src={logo} alt="" loading="lazy" />}
+        {logo && <img className="silo-logo" src={logo} alt={`${team?.name || team?.abbr || ''} logo`} loading="lazy" />}
         <span className="silo-team" style={{ color: readableOn('#11161f') }}>
           {team?.abbr}
         </span>
@@ -187,7 +188,7 @@ function SiloBatter({ b, onSelect, selectedId, watchlist, slip, onToggleWatch, o
         </div>
         <div className="sb-line2">
           <GradeChip grade={b.grade} size="sm" score={b.score} />
-          {b.heatIndex >= 58 && (
+          {b.heatIndex >= HOT_HEAT && (
             <span className="sb-heat" title={`Heat index ${b.heatIndex}/100`}>
               <Icon name="Flame" size={10} />
               {b.heatIndex}

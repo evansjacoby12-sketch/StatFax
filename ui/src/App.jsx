@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, useCallback, useRef, useLayoutEffect } from 'react'
 import { loadSlate, normName } from './lib/data.js'
 import { GRADE_ORDER, BADGES } from './lib/badges.js'
+import { HOT_HEAT, DESC_BY_DEFAULT, DEFAULT_FILTERS } from './lib/constants.js'
 import * as store from './lib/storage.js'
 import Header from './components/Header.jsx'
 import Filters from './components/Filters.jsx'
@@ -17,20 +18,6 @@ import './app.css'
 
 const AUTO_REFRESH_MS = 60_000
 
-const HOT_HEAT = 58 // heatIndex ≥ this counts as a "hot bat"
-
-const DEFAULT_FILTERS = {
-  q: '',
-  grades: new Set(GRADE_ORDER),
-  gamePk: '',
-  confirmedOnly: false,
-  watchedOnly: false,
-  hotOnly: false,
-  badge: '',
-  sort: 'hrProbability',
-  dir: 'desc',
-}
-
 // Restore the durable slice of the filter state (not search / game / badge).
 function initialFilters() {
   const saved = store.load('filters', null)
@@ -45,8 +32,6 @@ function initialFilters() {
     hotOnly: !!saved.hotOnly,
   }
 }
-
-const DESC_BY_DEFAULT = new Set(['hrProbability', 'score', 'rating', 'heat', 'edge', 'expectedHRs'])
 
 export default function App() {
   const [state, setState] = useState({ status: 'loading', data: null, error: null })

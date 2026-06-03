@@ -1,16 +1,8 @@
 import { useState } from 'react'
 import Icon from './Icon.jsx'
 import { GRADE_ORDER, gradeColor, BADGES } from '../lib/badges.js'
+import { SORTS } from '../lib/constants.js'
 import { hexA } from './atoms.jsx'
-
-const SORTS = [
-  { key: 'hrProbability', label: 'HR Probability' },
-  { key: 'score', label: 'Model Score' },
-  { key: 'heat', label: 'Heat Index' },
-  { key: 'edge', label: 'Market Edge' },
-  { key: 'battingOrder', label: 'Lineup Spot' },
-  { key: 'name', label: 'Name' },
-]
 
 export default function Filters({ value, onChange, gradeCounts, games, badgeCounts, watchCount, view, onView }) {
   const v = value
@@ -209,5 +201,3 @@ function gameLabel(games, pk) {
   const g = games.find((x) => String(x.gamePk) === String(pk))
   return g ? `${g.awayTeam.abbr} @ ${g.homeTeam.abbr}` : 'Game'
 }
-
-export { SORTS }
