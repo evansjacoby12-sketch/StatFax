@@ -1,16 +1,20 @@
 // OddsPapi (https://oddspapi.io) → MLB home-run prop odds for the slate.
 //
-// Reads the key from process.env.ODDS_API_KEY (set as a GitHub Actions secret;
-// never commit it). Returns:
-//   { status, odds, books, debug }
-// where `odds` is keyed by MLB gamePk in the exact shape the UI's data.js
-// expects:
+// Reads the key from process.env.ODDS_API_KEY (GitHub Actions secret; never
+// commit it). Returns { status, odds, books, debug } where `odds` is keyed by
+// MLB gamePk in the shape the UI's data.js expects:
 //   odds[gamePk] = { books: { <book>: { "First Last": { american, decimal, link } } } }
 //
-// Everything is best-effort + null-safe: any failure degrades to an empty odds
-// map with a status string, so the slate (and the board) keep working
-// model-first. `debug` carries first-run diagnostics (discovered ids + small
-// raw samples) so the response shapes can be verified from the deployed slate.
+// All best-effort + null-safe: any failure → empty odds + a status string, so
+// the board keeps working model-first. `debug` carries first-run diagnostics
+// (discovered ids + small raw samples) so shapes can be verified from the slate.
+//
+// OddsPapi shapes (confirmed from live responses):
+//   /sports   → [{ sportId, slug, sportName }]
+//   /markets  → [{ marketId, marketName, playerProp, sportId, outcomes:[{outcomeId,outcomeName}] }]
+//   /fixtures → [{ fixtureId, participant1Name, participant2Name, sportId, hasOdds, ... }]
+//   /odds     → { bookmakerOdds: { <book>: { markets: { <marketId>: { outcomes: { <id>:
+//                 { players: { <pid>: { playerName, price, active } } } } } } } } }
 
 const BASE = 'https://api.oddspapi.io/v4'
 const BOOKS = ['fanduel', 'draftkings']
@@ -23,12 +27,13 @@ async function get(path, params, key) {
   return r.json()
 }
 
-// Many list endpoints may wrap the array under a key — normalize to an array.
-const asArray = (x) => (Array.isArray(x) ? x : x?.data || x?.results || x?.items || x?.fixtures || x?.markets || x?.sports || [])
+const asArray = (x) =>
+  Array.isArray(x) ? x : x?.data || x?.results || x?.items || x?.fixtures || x?.markets || x?.sports || []
 
 const decToAmerican = (d) => (!d || d <= 1 ? null : d >= 2 ? Math.round((d - 1) * 100) : Math.round(-100 / (d - 1)))
 
 const normTeam = (s) => String(s || '').toLowerCase().replace(/[^a-z]/g, '')
+const nickname = (full) => normTeam(String(full || '').split(/\s+/).pop())
 // "Cunningham, Cade" → "Cade Cunningham"; leaves "First Last" untouched.
 const flipName = (n) => {
   const s = String(n || '').trim()
@@ -39,51 +44,39 @@ const flipName = (n) => {
   return s
 }
 
-// Best-effort extraction of [home, away] team names from an OddsPapi fixture.
-function fixtureTeams(f) {
-  const pick = (...vals) => vals.find((v) => typeof v === 'string' && v.trim())
-  let home = pick(f.homeTeam?.name, f.home?.name, f.homeName, typeof f.home === 'string' ? f.home : null, f.participants?.[0]?.name, f.competitors?.[0]?.name)
-  let away = pick(f.awayTeam?.name, f.away?.name, f.awayName, typeof f.away === 'string' ? f.away : null, f.participants?.[1]?.name, f.competitors?.[1]?.name)
-  if ((!home || !away) && typeof f.name === 'string') {
-    const m = f.name.split(/\s+(?:vs\.?|@|-)\s+/i)
-    if (m.length === 2) {
-      home = home || m[1] // "Away vs Home" or "Home vs Away" — order unknown, match is order-insensitive anyway
-      away = away || m[0]
-    }
-  }
-  return [home, away]
-}
-
 export async function fetchHrOdds(games = [], dateStr) {
   const key = process.env.ODDS_API_KEY
   const debug = { provider: 'oddspapi' }
   if (!key) return { status: 'no_key', odds: {}, books: [], debug }
 
   try {
-    // 1) Baseball/MLB sportId
+    // 1) Baseball sportId
     const sports = asArray(await get('/sports', {}, key))
-    const baseball = sports.find((s) => /base\s?ball|mlb/i.test(s.name || s.title || ''))
-    const sportId = baseball?.id ?? baseball?.sportId ?? baseball?.key
+    debug.sportCount = sports.length
+    const baseball = sports.find((s) => /base\s?ball/i.test(s.sportName || s.slug || s.name || ''))
+    const sportId = baseball?.sportId ?? baseball?.id
     debug.sportId = sportId
-    debug.sampleSport = sports[0]
+    if (!sportId) debug.sportsList = sports.map((s) => `${s.sportId}:${s.slug || s.sportName}`).slice(0, 80)
 
-    // 2) Home-run market id
+    // 2) Home-run player-prop market id
     let markets = asArray(await get('/markets', sportId ? { sportId } : {}, key).catch(() => []))
-    if (!markets.length) markets = asArray(await get('/markets', {}, key).catch(() => []))
-    const hrMarket = markets.find((m) => /home\s?run/i.test(m.name || m.title || ''))
-    const hrId = hrMarket?.id ?? hrMarket?.marketId ?? hrMarket?.key
+    debug.marketCount = markets.length
+    const hrCands = markets.filter((m) => /home\s?run/i.test(m.marketName || m.name || ''))
+    debug.hrCandidates = hrCands.map((m) => `${m.marketId}:${m.marketName}${m.playerProp ? ' (prop)' : ''}`)
+    const hrMarket =
+      hrCands.find((m) => m.playerProp && /hit a home run|to record/i.test(m.marketName || '')) ||
+      hrCands.find((m) => m.playerProp) ||
+      hrCands[0]
+    const hrId = hrMarket?.marketId ?? hrMarket?.id
     debug.hrMarketId = hrId
-    debug.hrMarketName = hrMarket?.name || hrMarket?.title
-    debug.sampleMarket = markets[0]
+    debug.hrMarketName = hrMarket?.marketName
 
-    // 3) Today's MLB fixtures
+    // 3) Today's baseball fixtures
     const fixtures = asArray(await get('/fixtures', { sportId, from: dateStr, to: dateStr }, key))
     debug.fixtureCount = fixtures.length
-    debug.sampleFixture = fixtures[0]
 
-    // Order-insensitive team-pair → gamePk lookup (full name + nickname).
+    // Order-insensitive team-pair → gamePk (full name + nickname).
     const byPair = new Map()
-    const nickname = (full) => normTeam(String(full).split(/\s+/).pop())
     for (const g of games) {
       const h = g.homeTeam?.name, a = g.awayTeam?.name
       if (!h || !a) continue
@@ -91,17 +84,25 @@ export async function fetchHrOdds(games = [], dateStr) {
       byPair.set([nickname(h), nickname(a)].sort().join('|'), g.gamePk)
     }
 
+    const teamsOf = (f) => [
+      f.participant1Name || f.homeTeam?.name || f.home?.name || f.home,
+      f.participant2Name || f.awayTeam?.name || f.away?.name || f.away,
+    ]
+
     const odds = {}
     let matched = 0, priced = 0
     for (const f of fixtures) {
       if (f.hasOdds === false) continue
-      const [home, away] = fixtureTeams(f)
-      if (!home || !away) continue
+      const [t1, t2] = teamsOf(f)
+      if (!t1 || !t2) continue
       const gamePk =
-        byPair.get([normTeam(home), normTeam(away)].sort().join('|')) ??
-        byPair.get([nickname(home), nickname(away)].sort().join('|'))
+        byPair.get([normTeam(t1), normTeam(t2)].sort().join('|')) ??
+        byPair.get([nickname(t1), nickname(t2)].sort().join('|'))
       if (gamePk == null) continue
-      const fid = f.id ?? f.fixtureId
+      matched++
+      if (!debug.sampleFixture) debug.sampleFixture = f
+
+      const fid = f.fixtureId ?? f.id
       let payload
       try {
         payload = await get('/odds', { fixtureId: fid, bookmakers: BOOKS.join(','), oddsFormat: 'decimal' }, key)
@@ -109,10 +110,9 @@ export async function fetchHrOdds(games = [], dateStr) {
         debug.oddsError = String(e)
         continue
       }
-      if (!debug.sampleOdds) debug.sampleOdds = JSON.parse(JSON.stringify(payload)) // captured once for shape verification
+      if (!debug.sampleOdds) debug.sampleOdds = payload // captured once for shape verification
       const bmo = payload?.bookmakerOdds || payload?.data?.bookmakerOdds
-      if (!bmo) continue
-      matched++
+      if (!bmo || hrId == null) continue
 
       const booksOut = {}
       for (const [book, bdata] of Object.entries(bmo)) {
@@ -137,7 +137,7 @@ export async function fetchHrOdds(games = [], dateStr) {
 
     debug.matchedFixtures = matched
     debug.pricedPlayers = priced
-    const status = priced > 0 ? 'ok' : sportId && hrId ? 'no_props' : 'discovery_failed'
+    const status = priced > 0 ? 'ok' : sportId && hrId != null ? (matched ? 'no_props' : 'no_match') : 'discovery_failed'
     return { status, odds, books: BOOKS, debug }
   } catch (e) {
     debug.error = String(e)
