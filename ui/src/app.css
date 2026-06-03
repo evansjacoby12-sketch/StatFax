@@ -3582,3 +3582,15 @@ button.th:hover {
   font-size: 11.5px;
   margin-top: 16px;
 }
+
+/* Modals: top-anchor on phones (with safe-area inset) so the title + close are
+   never tucked under the status bar / notch, and use the full usable height. */
+@media (max-width: 560px) {
+  .modal {
+    top: calc(env(safe-area-inset-top, 0px) + 12px);
+    transform: translateX(-50%);
+    max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 24px);
+    padding: 18px 16px;
+    animation: none;
+  }
+}

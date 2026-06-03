@@ -67,7 +67,7 @@ export default function Guide({ onClose }) {
           {GRADE_ORDER.map((g) => {
             const c = gradeColor(g)
             return (
-              <span key={g} className="grade-chip" style={{ color: c, borderColor: hexA(c, 0.45), background: hexA(c, 0.12) }}>
+              <span key={g} className="grade-chip grade-md" style={{ color: c, borderColor: hexA(c, 0.45), background: hexA(c, 0.12) }}>
                 {g}
               </span>
             )

@@ -42,7 +42,7 @@ export default function Legend({ onClose }) {
             const c = gradeColor(g.label)
             return (
               <div className="legend-grade" key={g.label}>
-                <span className="grade-chip" style={{ color: c, borderColor: hexA(c, 0.45), background: hexA(c, 0.12) }}>
+                <span className="grade-chip grade-md" style={{ color: c, borderColor: hexA(c, 0.45), background: hexA(c, 0.12) }}>
                   {g.label}
                 </span>
                 <span className="legend-grade-min mono">score ≥ {g.min}</span>
