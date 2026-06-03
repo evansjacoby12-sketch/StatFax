@@ -3594,3 +3594,51 @@ button.th:hover {
     animation: none;
   }
 }
+
+/* ============ Results: top-tier HR feed ============ */
+.hr-feed {
+  list-style: none;
+  margin: 0 0 6px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-height: 380px;
+  overflow-y: auto;
+}
+.hr-feed-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 6px;
+  border-radius: 8px;
+}
+.hr-feed-row:hover {
+  background: var(--card-2);
+}
+.hr-feed-date {
+  flex-shrink: 0;
+  width: 40px;
+  font-size: 11px;
+}
+.hr-feed-photo {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--card-2);
+  border: 1px solid var(--border);
+}
+.hr-feed-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hr-feed .grade-chip {
+  flex-shrink: 0;
+}

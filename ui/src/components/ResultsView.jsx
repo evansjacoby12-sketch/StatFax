@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import Icon from './Icon.jsx'
 import { pct, num } from '../lib/format.js'
 import { GRADE_ORDER, gradeColor } from '../lib/badges.js'
+import { GradeChip } from './atoms.jsx'
+import { playerHeadshot } from '../lib/teams.js'
 
 // Mann–Whitney AUC (ranking quality), tie-aware.
 function computeAuc(rows) {
@@ -83,6 +85,11 @@ export default function ResultsView({ meta }) {
   const m = meta.modelMetrics
   const reliability = m?.reliability || []
 
+  // Every PRIME/STRONG graded pick that actually homered, newest first.
+  const topHRs = rows
+    .filter((r) => (r.grade === 'PRIME' || r.grade === 'STRONG') && r.homered)
+    .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : (b.score ?? 0) - (a.score ?? 0)))
+
   return (
     <div className="results">
       <div className="results-kpis">
@@ -117,6 +124,28 @@ export default function ResultsView({ meta }) {
           <p className="chart-cap dim">Predicted vs actual HR rate. On the dashed line = perfectly calibrated.</p>
         </section>
       </div>
+
+      <section className="results-card">
+        <h3 className="section-title">
+          <Icon name="Flame" size={14} /> Top-tier home runs
+          <span className="dim" style={{ fontWeight: 400, marginLeft: 6 }}>· {topHRs.length} PRIME/STRONG cashed</span>
+        </h3>
+        {topHRs.length ? (
+          <ul className="hr-feed">
+            {topHRs.map((r, i) => (
+              <li className="hr-feed-row" key={`${r.playerId}-${r.date}-${i}`}>
+                <span className="hr-feed-date mono dim">{r.date.slice(5)}</span>
+                <img className="hr-feed-photo" src={playerHeadshot(r.playerId, 64)} alt="" loading="lazy" />
+                <span className="hr-feed-name">{r.name || `#${r.playerId}`}</span>
+                <GradeChip grade={{ label: r.grade, color: gradeColor(r.grade) }} size="sm" score={r.score} />
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="chart-cap dim">No PRIME or STRONG picks have homered in the reconciled window yet.</p>
+        )}
+        <p className="chart-cap dim">Every PRIME &amp; STRONG graded pick that homered, newest first. LEAN and SKIP are hidden.</p>
+      </section>
 
       <section className="results-card">
         <h3 className="section-title"><Icon name="Clock" size={14} /> Daily track record</h3>
