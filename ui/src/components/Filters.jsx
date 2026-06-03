@@ -21,10 +21,16 @@ export default function Filters({ value, onChange, gradeCounts, games, badgeCoun
     else next.add(g)
     onChange({ grades: next })
   }
+  const toggleBadge = (key) => {
+    const next = new Set(v.badges)
+    if (next.has(key)) next.delete(key)
+    else next.add(key)
+    onChange({ badges: next })
+  }
   // Count of active "secondary" filters tucked behind the disclosure.
   const activeMore =
-    (v.gamePk ? 1 : 0) + (v.confirmedOnly ? 1 : 0) + (v.watchedOnly ? 1 : 0) + (v.hotOnly ? 1 : 0) + (v.badge ? 1 : 0)
-  const badgeDef = BADGES.find((b) => b.key === v.badge)
+    (v.gamePk ? 1 : 0) + (v.confirmedOnly ? 1 : 0) + (v.watchedOnly ? 1 : 0) + (v.hotOnly ? 1 : 0) + v.badges.size
+  const badgeDefs = BADGES.filter((b) => v.badges.has(b.key))
 
   return (
     <div className="filters">
@@ -126,7 +132,18 @@ export default function Filters({ value, onChange, gradeCounts, games, badgeCoun
           {v.confirmedOnly && <FilterChip label="Confirmed" onClear={() => onChange({ confirmedOnly: false })} />}
           {v.watchedOnly && <FilterChip label="Watchlist" onClear={() => onChange({ watchedOnly: false })} />}
           {v.hotOnly && <FilterChip label="Hot bats" icon="Flame" onClear={() => onChange({ hotOnly: false })} />}
-          {badgeDef && <FilterChip label={badgeDef.label} icon={badgeDef.lucide} onClear={() => onChange({ badge: '' })} />}
+          {badgeDefs.map((bd) => (
+            <FilterChip
+              key={bd.key}
+              label={bd.label}
+              icon={bd.lucide}
+              onClear={() => {
+                const next = new Set(v.badges)
+                next.delete(bd.key)
+                onChange({ badges: next })
+              }}
+            />
+          ))}
         </div>
       )}
 
@@ -181,15 +198,15 @@ export default function Filters({ value, onChange, gradeCounts, games, badgeCoun
             <span className="badges-row-label">
               <Icon name="SlidersHorizontal" size={12} /> Signals
             </span>
-            <button className={`badge-toggle ${!v.badge ? 'on' : ''}`} onClick={() => onChange({ badge: '' })}>
+            <button className={`badge-toggle ${!v.badges.size ? 'on' : ''}`} onClick={() => onChange({ badges: new Set() })}>
               Any
             </button>
             {BADGES.map((b) => (
               <button
                 key={b.key}
-                className={`badge-toggle ${v.badge === b.key ? 'on' : ''}`}
-                onClick={() => onChange({ badge: v.badge === b.key ? '' : b.key })}
-                style={v.badge === b.key ? { color: b.color, borderColor: 'color-mix(in srgb,' + b.color + ' 45%, transparent)' } : undefined}
+                className={`badge-toggle ${v.badges.has(b.key) ? 'on' : ''}`}
+                onClick={() => toggleBadge(b.key)}
+                style={v.badges.has(b.key) ? { color: b.color, borderColor: 'color-mix(in srgb,' + b.color + ' 45%, transparent)' } : undefined}
                 title={b.desc}
               >
                 <Icon name={b.lucide} size={12} />
