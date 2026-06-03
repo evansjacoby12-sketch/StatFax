@@ -23,6 +23,14 @@ import './app.css'
 
 const AUTO_REFRESH_MS = 60_000
 
+// Each view is its own page via a URL hash (#board, #pitchers, …) — bookmarkable
+// and back/forward navigable. Hash routing works as-is on static hosting.
+const VIEWS = new Set(['board', 'games', 'pitchers', 'weather', 'results'])
+const viewFromHash = () => {
+  const h = (typeof location !== 'undefined' ? location.hash : '').replace(/^#\/?/, '')
+  return VIEWS.has(h) ? h : null
+}
+
 // Restore the durable slice of the filter state (not search / game / badge).
 function initialFilters() {
   const saved = store.load('filters', null)
@@ -51,7 +59,7 @@ export default function App() {
   const [watchlist, setWatchlist] = useState(() => new Set(store.load('watchlist', [])))
   const [slipIds, setSlipIds] = useState(() => store.load('slip', []))
   const [autoRefresh, setAutoRefresh] = useState(() => store.load('autoRefresh', false))
-  const [view, setView] = useState(() => store.load('view', 'board'))
+  const [view, setView] = useState(() => viewFromHash() || store.load('view', 'board'))
   const [liveScores, setLiveScores] = useState(() => store.load('liveScores', true))
   const topbarRef = useRef(null)
 
@@ -69,7 +77,19 @@ export default function App() {
   useEffect(() => store.save('watchlist', [...watchlist]), [watchlist])
   useEffect(() => store.save('slip', slipIds), [slipIds])
   useEffect(() => store.save('autoRefresh', autoRefresh), [autoRefresh])
-  useEffect(() => store.save('view', view), [view])
+  useEffect(() => {
+    store.save('view', view)
+    if (viewFromHash() !== view) location.hash = view // reflect the view in the URL
+  }, [view])
+  // Back/forward or a pasted #view URL drives the view.
+  useEffect(() => {
+    const onHash = () => {
+      const v = viewFromHash()
+      if (v) setView(v)
+    }
+    window.addEventListener('hashchange', onHash)
+    return () => window.removeEventListener('hashchange', onHash)
+  }, [])
   useEffect(() => store.save('liveScores', liveScores), [liveScores])
 
   // Publish the sticky chrome height so the board column-header can stick right
@@ -276,8 +296,6 @@ export default function App() {
           watchCount={watchlist.size}
           view={view}
           onView={setView}
-          onOpenGuide={() => setShowGuide(true)}
-          onOpenHowTo={() => setShowHowTo(true)}
         />
       </div>
 

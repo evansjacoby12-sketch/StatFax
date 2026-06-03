@@ -2451,26 +2451,25 @@ button.th:hover {
   .filters-spacer {
     display: none;
   }
-  /* Board · Games · Results · More(menu) share the row evenly; chevron pinned
-     at the right end. (Pitchers/Weather moved into the More menu.) */
+  /* Five tabs (Board · Games · Pitchers · Weather · Results) — let the toggle
+     scroll horizontally and keep the filters chevron pinned at the right end. */
   .view-toggle {
     order: 1;
     flex: 1 1 auto;
     min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
   }
-  .view-toggle > .view-btn,
-  .view-toggle > .view-menu {
-    flex: 1 1 0;
-    min-width: 0;
+  .view-toggle::-webkit-scrollbar {
+    display: none;
   }
   .view-toggle .view-btn {
-    padding: 0 6px;
-    gap: 4px;
+    flex: 0 0 auto;
+    padding: 0 9px;
+    gap: 5px;
     font-size: 12px;
     white-space: nowrap;
-  }
-  .view-menu-btn {
-    width: 100%;
   }
   .more-btn {
     order: 2;
