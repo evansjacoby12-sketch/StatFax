@@ -3730,3 +3730,39 @@ button.th:hover {
   flex-shrink: 0;
   margin-top: 2px;
 }
+
+/* Circular HR-probability gauge (board) */
+.prob-ring {
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+.prob-ring-hole {
+  width: calc(100% - 7px);
+  height: calc(100% - 7px);
+  border-radius: 50%;
+  background: var(--panel);
+  display: grid;
+  place-items: center;
+}
+.prob-ring-val {
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* Error-boundary fallback (never blank the screen on a crash) */
+.crash { min-height: 100dvh; display: grid; place-items: center; padding: 24px; }
+.crash-card { max-width: 460px; text-align: center; }
+.crash-card h2 { margin: 0 0 8px; font-size: 18px; }
+.crash-reload {
+  margin: 14px 0; padding: 9px 18px; border-radius: 10px;
+  border: 1px solid var(--prime); background: rgba(0, 212, 255, 0.12);
+  color: var(--prime); font-weight: 700; cursor: pointer;
+}
+.crash-err {
+  margin-top: 12px; padding: 10px; border-radius: 8px;
+  background: var(--card-2); color: var(--bad); font-size: 12px;
+  white-space: pre-wrap; text-align: left; overflow: auto;
+}

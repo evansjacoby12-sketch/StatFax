@@ -62,6 +62,26 @@ export function ProbBar({ value, max = 0.28, color = 'var(--prime)', showLabel =
   )
 }
 
+// Circular 0–100 HR-probability gauge. The ring fills to value×100 (HR% tops out
+// near ~31), and the center shows the whole-number percent; grade color.
+export function ProbRing({ value, color = 'var(--prime)', size = 46 }) {
+  const has = value != null && !Number.isNaN(value)
+  const pctVal = Math.max(0, Math.min(100, (value || 0) * 100))
+  return (
+    <div
+      className="prob-ring"
+      style={{ width: size, height: size, background: `conic-gradient(${color} ${pctVal * 3.6}deg, var(--card-2) 0)` }}
+      title={has ? `HR probability ${pct(value, 1)}` : 'No probability'}
+    >
+      <div className="prob-ring-hole">
+        <span className="prob-ring-val mono" style={{ color }}>
+          {has ? Math.round(pctVal) : '—'}
+        </span>
+      </div>
+    </div>
+  )
+}
+
 export function BadgeRow({ batter, max = 99 }) {
   const badges = activeBadges(batter).slice(0, max)
   if (!badges.length) return null

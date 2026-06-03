@@ -22,6 +22,24 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      // Self-heal a stale-cached index.html: if a content-hashed asset fails to
+      // load (deleted by a newer deploy), reload once bypassing cache instead of
+      // sitting on a blank page.
+      window.addEventListener(
+        'error',
+        function (e) {
+          var t = e && e.target
+          if (t && (t.tagName === 'SCRIPT' || t.tagName === 'LINK') && /\/assets\//.test(t.src || t.href || '')) {
+            if (!sessionStorage.getItem('sfStaleReload')) {
+              sessionStorage.setItem('sfStaleReload', '1')
+              location.replace(location.pathname + '?_r=' + Date.now())
+            }
+          }
+        },
+        true,
+      )
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

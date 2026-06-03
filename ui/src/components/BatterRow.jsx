@@ -1,5 +1,5 @@
 import Icon from './Icon.jsx'
-import { GradeChip, ProbBar, BadgeRow } from './atoms.jsx'
+import { GradeChip, ProbRing, BadgeRow } from './atoms.jsx'
 import { pct, num, signedPct, american } from '../lib/format.js'
 import { gradeColor } from '../lib/badges.js'
 import { useLiveMode } from '../lib/liveMode.js'
@@ -98,7 +98,7 @@ export default function BatterRow({
       </div>
 
       <div className="col-prob">
-        <ProbBar value={b.hrProbability} color={color} />
+        <ProbRing value={b.hrProbability} color={color} />
       </div>
 
       <div className="col-xhr mono" title="Expected HRs this game">
