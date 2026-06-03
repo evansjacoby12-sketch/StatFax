@@ -2451,8 +2451,8 @@ button.th:hover {
   .filters-spacer {
     display: none;
   }
-  /* Five tabs (Board · Games · Pitchers · Weather · Results) — let the toggle
-     scroll horizontally and keep the filters chevron pinned at the right end. */
+  /* Five tabs (Board · Games · Pitchers · Weather · Results) scroll
+     horizontally on their own full-width line. */
   .view-toggle {
     order: 1;
     flex: 1 1 auto;
@@ -2471,8 +2471,9 @@ button.th:hover {
     font-size: 12px;
     white-space: nowrap;
   }
+  /* The "more filters" chevron pairs with the sort select on the bottom line. */
   .more-btn {
-    order: 2;
+    order: 6;
     flex: 0 0 auto;
   }
   .search {
@@ -2486,7 +2487,7 @@ button.th:hover {
   }
   .filters > .filters-row > .select-wrap {
     order: 5;
-    flex: 1 1 100%;
+    flex: 1 1 auto;
   }
   .filters > .filters-row > .select-wrap select {
     width: 100%;
