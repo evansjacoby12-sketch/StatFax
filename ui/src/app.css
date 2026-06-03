@@ -383,7 +383,7 @@
   margin-top: 14px;
   border: 1px solid var(--border-soft);
   border-radius: var(--radius);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.012), transparent);
+  background: var(--card);
 }
 .board-head,
 .board-row {
@@ -460,7 +460,7 @@ button.th:hover {
   flex-direction: column;
 }
 .board-row {
-  min-height: 62px;
+  min-height: 68px;
   border-bottom: 1px solid var(--border-soft);
   cursor: pointer;
   position: relative;
@@ -622,22 +622,22 @@ button.th:hover {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  border-radius: 7px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  border-radius: 6px;
   border: 1px solid;
 }
 .grade-md {
   font-size: 11px;
-  padding: 4px 9px;
+  padding: 3px 8px;
 }
 .grade-sm {
   font-size: 10px;
-  padding: 2px 7px;
+  padding: 2px 6px;
 }
 .grade-lg {
   font-size: 13px;
-  padding: 5px 13px;
+  padding: 4px 11px;
 }
 
 /* prob bar */
@@ -721,12 +721,12 @@ button.th:hover {
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  font-size: 10.5px;
+  font-size: 10px;
   font-weight: 600;
-  padding: 2px 6px;
-  border-radius: 6px;
+  padding: 2px 5px;
+  border-radius: 5px;
   border: 1px solid;
-  background: color-mix(in srgb, currentColor 8%, transparent);
+  background: color-mix(in srgb, currentColor 7%, transparent);
   white-space: nowrap;
 }
 
