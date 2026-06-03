@@ -178,7 +178,7 @@ function SiloBatter({ b, onSelect, selectedId, watchlist, slip, onToggleWatch, o
       <div className="sb-content">
         <div className="sb-line1">
           {b.battingOrder ? <span className="sb-order mono">{b.battingOrder}</span> : <span className="sb-order mono dim">–</span>}
-          <span className="sb-name">{b.name}</span>
+          <span className={`sb-name ${hrToday ? 'hr-glow' : ''}`}>{b.name}</span>
           <span className="bathand">{b.batSide}</span>
           {hrToday && (
             <span className="hr-tag sm" title="Already homered">

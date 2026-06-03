@@ -59,7 +59,8 @@ function PitcherCard({ entry, onSelect, selectedId, watchlist, slip }) {
   const hand = pitcher.hand ? `${pitcher.hand}HP` : null
 
   const matchup = game ? `${game.awayTeam?.abbr} @ ${game.homeTeam?.abbr}` : null
-  const live = useLiveMode() && game?.isLive
+  const liveMode = useLiveMode()
+  const live = liveMode && game?.isLive
 
   return (
     <section className="pcard" style={{ '--tc': color }}>
@@ -121,7 +122,7 @@ function PitcherCard({ entry, onSelect, selectedId, watchlist, slip }) {
                 }}
               >
                 <span className="ptarget-ord mono">{b.battingOrder || '–'}</span>
-                <span className="ptarget-name">
+                <span className={`ptarget-name ${liveMode && b.liveContext?.isHRThisGame ? 'hr-glow' : ''}`}>
                   {b.name}
                   <span className="bathand">{b.batSide}</span>
                   {watchlist?.has(b.id) && <Icon name="Star" size={10} />}

@@ -130,7 +130,7 @@ function DrawerHeader({ b, color, onClose, watched, inSlip, onToggleWatch, onTog
         />
         <div className="drawer-title">
         <div className="drawer-name-row">
-          <h2>{b.name}</h2>
+          <h2 className={liveMode && b.liveContext?.isHRThisGame ? 'hr-glow' : ''}>{b.name}</h2>
           <span className="bathand-lg">{b.batSide}HB</span>
           <GradeChip grade={b.grade} size="lg" />
         </div>

@@ -56,7 +56,7 @@ export default function BatterRow({
 
       <div className="col-batter">
         <div className="batter-line1">
-          <span className="batter-name">{b.name}</span>
+          <span className={`batter-name ${hrToday ? 'hr-glow' : ''}`}>{b.name}</span>
           <span className="bathand">{b.batSide}</span>
           {b.battingOrder ? <span className="order-pill mono">#{b.battingOrder}</span> : null}
           {b.lineupConfirmed ? (

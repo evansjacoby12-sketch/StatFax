@@ -3677,3 +3677,18 @@ button.th:hover {
   border-color: color-mix(in srgb, var(--prime) 45%, transparent);
   background: rgba(0, 212, 255, 0.1);
 }
+
+/* Name glows red when a batter has already homered today (live mode). */
+.hr-glow {
+  color: #ff3b30 !important;
+  text-shadow: 0 0 7px rgba(255, 59, 48, 0.65), 0 0 2px rgba(255, 59, 48, 0.9);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .hr-glow {
+    animation: hrGlow 1.7s ease-in-out infinite;
+  }
+}
+@keyframes hrGlow {
+  0%, 100% { text-shadow: 0 0 5px rgba(255, 59, 48, 0.5), 0 0 1px rgba(255, 59, 48, 0.85); }
+  50% { text-shadow: 0 0 13px rgba(255, 59, 48, 0.95), 0 0 4px rgba(255, 59, 48, 0.9); }
+}

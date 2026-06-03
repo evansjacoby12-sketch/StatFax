@@ -5,6 +5,7 @@ import { interpretWind, stadiumFor } from '../lib/wind.js'
 import { compass, skyLabel } from '../lib/weather.js'
 import { pct, num, signedPct, gameTime } from '../lib/format.js'
 import { teamColor, teamLogo, hexToRgba } from '../lib/teams.js'
+import { useLiveMode } from '../lib/liveMode.js'
 
 // Weather Report — one card per game, ranked by how much tonight's park + air
 // helps home runs. Wind gets the real OUT/IN verdict (engine port). Reuses the
@@ -82,6 +83,7 @@ function WindDial({ wind }) {
 }
 
 function WeatherCard({ g, onSelect, selectedId }) {
+  const liveMode = useLiveMode()
   const { game, weather: w, wind, envFactor, parkHR, stadium } = g
   const homeC = teamColor(game?.homeTeam?.id)
   const awayC = teamColor(game?.awayTeam?.id)
@@ -165,7 +167,7 @@ function WeatherCard({ g, onSelect, selectedId }) {
               }}
             >
               <span className="ptarget-ord mono">{b.battingOrder || '–'}</span>
-              <span className="ptarget-name">
+              <span className={`ptarget-name ${liveMode && b.liveContext?.isHRThisGame ? 'hr-glow' : ''}`}>
                 {b.name}
                 <span className="bathand">{b.batSide}</span>
                 {b.parkWeatherHandDelta != null && (
