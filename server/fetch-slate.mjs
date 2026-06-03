@@ -145,6 +145,7 @@ import { fileURLToPath } from 'node:url';
 import { buildModel } from './build-model.mjs';
 import { buildZoneMatchupForGame, primeFromPriorCache as primeZoneCache, dumpCache as dumpZoneCache } from './fetch-zone-matchup.mjs';
 import { fetchHourlyForecast } from './weather.mjs';
+import { fetchHrOdds } from './odds.mjs';
 import umpireFactorsRaw from '../src/sports/mlb/data/umpire-factors.json' with { type: 'json' };
 
 // Resolve a name → HR multiplier (1.0 default). Wrapped in a function so we
@@ -3160,12 +3161,20 @@ async function main() {
   }
 
   // 9) Assemble final payload
+  // Market HR-prop odds (OddsPapi) — best-effort; no key → empty + 'no_key'.
+  const oddsResult = await fetchHrOdds(games, date);
+  console.log(`[odds] status=${oddsResult.status} priced=${oddsResult.debug?.pricedPlayers ?? 0} matched=${oddsResult.debug?.matchedFixtures ?? 0} hrMarket=${oddsResult.debug?.hrMarketId ?? '?'}`);
+
   const payload = {
     version:     4,
     generatedAt: startedAt.toISOString(),
     finishedAt:  new Date().toISOString(),
     date,
     games,
+    odds:        oddsResult.odds,
+    oddsStatus:  oddsResult.status,
+    oddsBooks:   oddsResult.books,
+    _oddsDebug:  oddsResult.debug,
     lineupsByGame,
     rosterByTeam,
     batterStats,
@@ -3240,6 +3249,7 @@ async function main() {
       withH2H:              Object.keys(h2h).length,
       withCatcherFraming:   Object.keys(catcherFraming).length,
       scoredBatters:        Object.keys(scoredBatters).length,
+      oddsPlayerCount:      oddsResult.debug?.pricedPlayers ?? 0,
       // Calibration snapshot — what multipliers were applied to today's
       // scoring run. samples<1500 = bootstrapping; ready:true = active.
       calibration: {

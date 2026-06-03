@@ -54,7 +54,9 @@ jobs:
       - name: Tests
         run: npm test
 
-      - name: Generate slate (live MLB + Savant; no keys)
+      - name: Generate slate (live MLB + Savant; OddsPapi if key present)
+        env:
+          ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
         run: |
           npm run build-model
           npm run slate
