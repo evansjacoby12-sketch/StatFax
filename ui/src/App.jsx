@@ -213,7 +213,7 @@ export default function App() {
     const { sort, dir } = filters
     const mul = dir === 'asc' ? 1 : -1
     const get = (b) => {
-      if (sort === 'name') return b.name?.toLowerCase() || ''
+      if (sort === 'zone') return b.zoneMatchup?.zoneRating ?? null
       if (sort === 'edge') return b.edge
       if (sort === 'heat') return b.heatIndex
       return b[sort]
