@@ -12,6 +12,7 @@ import PitchersView from './components/PitchersView.jsx'
 import WeatherView from './components/WeatherView.jsx'
 import ResultsView from './components/ResultsView.jsx'
 import PlayerDrawer from './components/PlayerDrawer.jsx'
+import ZoneView from './components/ZoneView.jsx'
 import ParlaySlip from './components/ParlaySlip.jsx'
 import Legend from './components/Legend.jsx'
 import Guide from './components/Guide.jsx'
@@ -53,6 +54,7 @@ export default function App() {
   const [refreshing, setRefreshing] = useState(false)
   const [filters, setFilters] = useState(initialFilters)
   const [selectedId, setSelectedId] = useState(null)
+  const [zoneId, setZoneId] = useState(null)
   const [showLegend, setShowLegend] = useState(false)
   const [showGuide, setShowGuide] = useState(false)
   const [showHowTo, setShowHowTo] = useState(false)
@@ -133,7 +135,8 @@ export default function App() {
   useEffect(() => {
     const onKey = (e) => {
       if (e.key === 'Escape') {
-        if (showHowTo) setShowHowTo(false)
+        if (zoneId) setZoneId(null)
+        else if (showHowTo) setShowHowTo(false)
         else if (showGuide) setShowGuide(false)
         else if (showLegend) setShowLegend(false)
         else if (selectedId) setSelectedId(null)
@@ -141,7 +144,7 @@ export default function App() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [selectedId, showLegend, showGuide, showHowTo])
+  }, [selectedId, showLegend, showGuide, showHowTo, zoneId])
 
   const patch = useCallback((p) => setFilters((f) => ({ ...f, ...p })), [])
 
@@ -239,6 +242,10 @@ export default function App() {
   const selected = useMemo(
     () => (selectedId != null ? all.find((b) => b.id === selectedId) || null : null),
     [all, selectedId],
+  )
+  const zoneBatter = useMemo(
+    () => (zoneId != null ? all.find((b) => b.id === zoneId) || null : null),
+    [all, zoneId],
   )
 
   if (state.status === 'loading') {
@@ -365,8 +372,10 @@ export default function App() {
           inSlip={slipSet.has(selected.id)}
           onToggleWatch={toggleWatch}
           onToggleSlip={toggleSlip}
+          onOpenZone={(bb) => setZoneId(bb.id)}
         />
       )}
+      {zoneBatter && <ZoneView batter={zoneBatter} onClose={() => setZoneId(null)} />}
       {showLegend && <Legend onClose={() => setShowLegend(false)} />}
       {showGuide && <Guide onClose={() => setShowGuide(false)} />}
       {showHowTo && <HowToPick onClose={() => setShowHowTo(false)} />}

@@ -108,6 +108,10 @@ export async function loadSlate() {
       // Boolean signal: tonight's park × weather × handedness env boosts HR.
       // parkWeatherHandFactor is a multiplier (1.0 = neutral); flag a ≥5% boost.
       wxEdge: (b.parkWeatherHandFactor ?? 1) >= 1.05,
+      // Pitch-type matchup data for the Zone page: the batter's own arsenal
+      // (SLG/RV/Whiff per pitch) and the opposing starter's mix (usage% + shape).
+      arsenal: d.batterArsenal?.[b.playerId] || null,
+      pitchMix: pitcherId ? d.pitcherPitchMix?.[pitcherId] || null : null,
     }
   })
 

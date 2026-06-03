@@ -68,7 +68,7 @@ function useCountUp(target, ms = 550) {
   return v
 }
 
-export default function PlayerDrawer({ batter: b, onClose, watched, inSlip, onToggleWatch, onToggleSlip }) {
+export default function PlayerDrawer({ batter: b, onClose, watched, inSlip, onToggleWatch, onToggleSlip, onOpenZone }) {
   const trapRef = useFocusTrap()
   const liveMode = useLiveMode()
   if (!b) return null
@@ -100,6 +100,7 @@ export default function PlayerDrawer({ batter: b, onClose, watched, inSlip, onTo
         <div className="drawer-body">
           <HeroNumbers b={b} color={color} />
           <ScoutReport b={b} />
+          <ZoneTeaser b={b} onOpen={onOpenZone} />
           <PaCurve b={b} color={color} />
           <Why b={b} />
           <StatsSection b={b} />
@@ -632,6 +633,67 @@ function TechReasons({ b }) {
           </li>
         ))}
       </ul>
+    </Section>
+  )
+}
+
+// Compact zone-matchup preview — two mini heatmaps (batter ISO + pitcher
+// location) with matched zones ringed. Clicking opens the full Zone page.
+function zoneHeat(t) {
+  if (t == null || Number.isNaN(t)) return 'var(--card-2)'
+  return `hsl(${220 - 200 * t} ${45 + 35 * t}% ${18 + 22 * t}%)`
+}
+function MiniGrid({ grid, metric, matched }) {
+  const vals = grid.map((c) => c?.[metric]).filter((v) => Number.isFinite(v))
+  const min = vals.length ? Math.min(...vals) : 0
+  const max = vals.length ? Math.max(...vals) : 1
+  return (
+    <div className="zmini-grid">
+      {grid.map((c, i) => {
+        const v = c?.[metric]
+        const t = Number.isFinite(v) && max > min ? (v - min) / (max - min) : null
+        return (
+          <span
+            key={i}
+            className={`zmini-cell ${matched?.includes(i) ? 'matched' : ''}`}
+            style={{ background: zoneHeat(t) }}
+          />
+        )
+      })}
+    </div>
+  )
+}
+function ZoneTeaser({ b, onOpen }) {
+  const z = b?.zoneMatchup
+  if (!z || !z.batter?.grid || !z.pitcher?.grid) return null
+  const matched = z.matchedZones?.length || 0
+  return (
+    <Section title="Zone matchup" icon="Crosshair">
+      <button className="zone-teaser" onClick={() => onOpen?.(b)} aria-label="Open full zone matchup">
+        <div className="zteaser-grids">
+          <div className="zteaser-one">
+            <MiniGrid grid={z.batter.grid} metric="iso" matched={z.matchedZones} />
+            <span className="zteaser-cap dim">Batter ISO</span>
+          </div>
+          <div className="zteaser-one">
+            <MiniGrid grid={z.pitcher.grid} metric="freq" matched={z.matchedZones} />
+            <span className="zteaser-cap dim">Pitcher loc</span>
+          </div>
+        </div>
+        <div className="zteaser-meta">
+          <div className="zteaser-rating">
+            <span className="mono">{num(z.zoneRating, 1)}</span>
+            <span className="dim">zone rating</span>
+          </div>
+          <div className="zteaser-matched dim">
+            {matched} matched zone{matched === 1 ? '' : 's'}
+            {z.badge === 'ZONE_MASTER' && <span className="zone-master-tag"> · ZONE MASTER</span>}
+          </div>
+          <span className="zteaser-cta">
+            Full matchup <Icon name="ChevronRight" size={14} />
+          </span>
+        </div>
+      </button>
     </Section>
   )
 }

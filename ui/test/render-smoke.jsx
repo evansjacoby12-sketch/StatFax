@@ -16,6 +16,7 @@ import PitchersView from '../src/components/PitchersView.jsx'
 import WeatherView from '../src/components/WeatherView.jsx'
 import ResultsView from '../src/components/ResultsView.jsx'
 import PlayerDrawer from '../src/components/PlayerDrawer.jsx'
+import ZoneView from '../src/components/ZoneView.jsx'
 import ParlaySlip from '../src/components/ParlaySlip.jsx'
 import Guide from '../src/components/Guide.jsx'
 import HowToPick from '../src/components/HowToPick.jsx'
@@ -95,6 +96,25 @@ function mkBatter(id, name, homered) {
     liveContext: homered
       ? { isHRThisGame: true, abCount: 3, expectedRemainingABs: 1, nearMissHR: 0, currentInning: 5, runDiff: 1, pullRisk: false }
       : null,
+    zoneMatchup: {
+      batter: {
+        id,
+        hand: 'R',
+        grid: Array.from({ length: 9 }, (_, i) => ({ iso: 0.1 + i * 0.05, slg: 0.3 + i * 0.05, avg: 0.25, obp: 0.3, ops: 0.6 + i * 0.05, ev: 88 + i, count: 3 + i, hrCount: i % 3 === 0 ? 1 : 0 })),
+        sampleBIP: 40,
+      },
+      pitcher: {
+        id: 10,
+        hand: 'L',
+        grid: Array.from({ length: 9 }, (_, i) => ({ freq: 0.05 + i * 0.02, count: 10 + i, hrCount: i % 4 === 0 ? 1 : 0, whiffPct: 0.1 + i * 0.02, hardHitPct: 0.3 + i * 0.03, xwoba: 0.3 + i * 0.02, contacts: 5 + i })),
+      },
+      matchedZones: [4, 8],
+      zoneRating: 1.9,
+      badge: 'ZONE_MASTER',
+      matchupAgainst: 'starter',
+    },
+    arsenal: { fastballSlg: 0.5, breakingSlg: 0.3, offspeedSlg: 0.45, ffSlg: 0.6, slSlg: 0.3, chSlg: 0.45, ffWhiff: 18, slWhiff: 30, chWhiff: 25, bestPitch: { name: '4-Seam', slg: 0.6 } },
+    pitchMix: { fastballPct: 52, breakingPct: 28, offspeedPct: 20, ffPct: 52, slPct: 28, chPct: 20, shape: { ff: { speed: 95, whiff: 20 }, sl: { speed: 85, whiff: 32 }, ch: { speed: 87, whiff: 26 } } },
   }
 }
 SYNTH.scoredBatters['1'] = mkBatter(1, 'Aaron Judge', true)
@@ -142,6 +162,7 @@ for (const mode of [true, false]) {
   add(`PlayerDrawer.live[${tag}]`, <PlayerDrawer batter={live} onClose={noop} watched={false} inSlip={false} onToggleWatch={noop} onToggleSlip={noop} />)
   add(`PlayerDrawer.normal[${tag}]`, <PlayerDrawer batter={normal} onClose={noop} watched onToggleWatch={noop} onToggleSlip={noop} />)
 }
+add('ZoneView', <ZoneView batter={live} onClose={noop} />)
 add('ResultsView', <ResultsView meta={meta} />)
 add('ParlaySlip', <ParlaySlip legs={batters.slice(0, 2)} onRemove={noop} onClear={noop} onSelect={noop} />)
 add('Guide', <Guide onClose={noop} />)
