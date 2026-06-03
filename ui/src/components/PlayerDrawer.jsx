@@ -116,6 +116,7 @@ export default function PlayerDrawer({ batter: b, onClose, watched, inSlip, onTo
 }
 
 function DrawerHeader({ b, color, onClose, watched, inSlip, onToggleWatch, onToggleSlip }) {
+  const liveMode = useLiveMode()
   return (
     <div className="drawer-head" style={{ background: `linear-gradient(180deg, ${hexA(color, 0.16)}, transparent)` }}>
       <button className="drawer-close icon-btn" onClick={onClose} aria-label="Close">
