@@ -545,6 +545,8 @@ button.th:hover {
   position: relative;
   transition: background 0.15s;
   text-align: left;
+  /* Subtle team-color backdrop per player (20% over the dark board). */
+  background: color-mix(in srgb, var(--team, transparent) 20%, transparent);
 }
 .board-row::before {
   content: '';
@@ -558,14 +560,14 @@ button.th:hover {
   transition: opacity 0.15s;
 }
 .board-row:hover {
-  background: var(--hover);
+  background: color-mix(in srgb, var(--team, var(--hover)) 32%, transparent);
 }
 .board-row:hover::before,
 .board-row.selected::before {
   opacity: 1;
 }
 .board-row.selected {
-  background: color-mix(in srgb, var(--row-accent) 9%, transparent);
+  background: color-mix(in srgb, var(--team, var(--row-accent)) 34%, transparent);
 }
 .board-row:last-child {
   border-bottom: none;
