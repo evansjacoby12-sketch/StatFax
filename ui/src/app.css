@@ -3782,3 +3782,25 @@ button.th:hover {
   position: relative;
   display: flex;
 }
+
+/* Mobile: make the secondary filter controls fill the row so left + right edges
+   line up with the grade pills / sort (was ragged content-width). */
+@media (max-width: 560px) {
+  .fp-controls .select-wrap {
+    flex: 1 1 100%;
+  }
+  .fp-controls .toggle-btn {
+    flex: 1 1 0;
+    min-width: 0;
+    justify-content: center;
+  }
+  .badges-row-label {
+    flex: 1 1 100%;
+    margin-right: 0;
+    margin-bottom: 2px;
+  }
+  .badges-row .badge-toggle {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+}
