@@ -39,10 +39,11 @@ npm test             # (repo root) engine + UI logic tests — node --test, no d
 
 ## What's on the board
 
-- **Two views** (toggle, persisted): a **ranked board** and a **game-by-game**
+- **Three views** (toggle, persisted): a **ranked board**, a **game-by-game**
   view — each game a card with team logos + color-gradient backdrop, live
-  score/inning, starters, and two per-team **silos** of batters. All filters,
-  sort, watchlist, parlay, and the drawer work in both.
+  score/inning, starters, and two per-team **silos** of batters — and a
+  **Results** track-record view (see below). All filters, sort, watchlist,
+  parlay, and the drawer work in the board and games views.
 - **Ranked leaderboard** — sort by HR probability, model score, rating, lineup
   spot, name, or market edge. Filter by grade (PRIME / STRONG / LEAN / SKIP),
   game, signal badge, confirmed-lineup-only, or free-text search.
@@ -58,8 +59,9 @@ npm test             # (repo root) engine + UI logic tests — node --test, no d
   market table (model edge vs FanDuel / DraftKings, with bet links).
 - **Live "HR" tag** — batters who have already homered in an in-progress game are
   flagged right on the board (from `liveContext.isHRThisGame`).
-- **Model panel** (click the Brier pill) — Brier / log-loss vs baseline, a
-  reliability diagram, and per-grade accuracy.
+- **Results view** (click the Brier pill, or the Results tab) — the model's
+  track record: discrimination (AUC), top-decile hit rate, Brier vs baseline, a
+  reliability diagram, per-grade accuracy, and a per-day breakdown.
 - **Watchlist** — star any batter (row or drawer); filter to "Watchlist".
 - **Parlay builder** — add legs with the `+` on a row (or the drawer button); a
   bottom-right slip shows combined model probability, parlay price (or model-fair
@@ -81,7 +83,8 @@ ui/
       format.js         number / odds / date formatters
       badges.js         grade + badge + eli5-icon vocabulary
     components/
-      Header, Filters, BatterTable/Row, PlayerDrawer, ModelPanel, atoms, Icon
+      Header, Filters, BatterTable/Row, GamesView, PlayerDrawer, ResultsView,
+      ParlaySlip, Legend, atoms, Icon
     index.css           dark-OLED design tokens (Inter + JetBrains Mono)
     app.css             component styles
 ```

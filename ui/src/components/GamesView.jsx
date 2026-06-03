@@ -170,7 +170,7 @@ function SiloBatter({ b, onSelect, selectedId, watchlist, slip, onToggleWatch, o
       }}
       style={{ '--row-accent': color }}
     >
-      <img className="sb-avatar" src={playerHeadshot(b.playerId, 96)} alt="" loading="lazy" />
+      <img className="sb-avatar" src={playerHeadshot(b.playerId, 96)} alt={b.name} loading="lazy" />
       <div className="sb-content">
         <div className="sb-line1">
           {b.battingOrder ? <span className="sb-order mono">{b.battingOrder}</span> : <span className="sb-order mono dim">–</span>}
