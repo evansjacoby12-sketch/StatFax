@@ -426,8 +426,8 @@ button.th:hover {
 .col-xhr,
 .col-rating,
 .col-edge {
-  justify-content: flex-end;
-  text-align: right;
+  justify-content: center;
+  text-align: center;
 }
 .col-grade {
   display: flex;
@@ -622,7 +622,7 @@ button.th:hover {
 /* prob bar */
 .col-prob {
   display: flex;
-  justify-content: flex-end;
+  justify-content: center;
 }
 .probbar {
   display: flex;
@@ -653,7 +653,7 @@ button.th:hover {
 .col-xhr {
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  align-items: center;
   font-size: 13px;
   font-weight: 600;
 }
@@ -666,7 +666,7 @@ button.th:hover {
 .col-rating {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: center;
   gap: 7px;
 }
 .rating-meter {
@@ -711,12 +711,12 @@ button.th:hover {
 
 .col-edge {
   display: flex;
-  justify-content: flex-end;
+  justify-content: center;
 }
 .edge-cell {
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  align-items: center;
   line-height: 1.15;
 }
 .edge-val {
@@ -3742,14 +3742,6 @@ button.th:hover {
 .prob-ring .pr-val {
   font-size: 15px;
   font-weight: 700;
-}
-/* Right-aligned sortable headers: put the sort icon left of the label so the
-   label hugs the right edge and lines up over the right-aligned numbers. */
-.th.col-prob svg,
-.th.col-xhr svg,
-.th.col-rating svg,
-.th.col-edge svg {
-  order: -1;
 }
 
 /* Error-boundary fallback (never blank the screen on a crash) */
