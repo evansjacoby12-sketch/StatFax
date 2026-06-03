@@ -2431,12 +2431,24 @@ button.th:hover {
   .filters-spacer {
     display: none;
   }
+  /* Tabs fill the row and share width; the chevron rides at the right end of
+     the SAME row instead of wrapping onto its own line. */
   .view-toggle {
     order: 1;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .view-toggle .view-btn {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 0 7px;
+    gap: 5px;
+    font-size: 12px;
+    white-space: nowrap;
   }
   .more-btn {
     order: 2;
-    margin-left: auto;
+    flex: 0 0 auto;
   }
   .search {
     order: 3;
