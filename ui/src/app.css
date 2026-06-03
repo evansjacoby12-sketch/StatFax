@@ -36,6 +36,15 @@
   top: 0;
   z-index: 30;
 }
+/* When the filters panel is expanded the sticky chrome can grow taller than the
+   viewport (especially on phones), and a sticky box taller than the screen
+   visibly jumps/shifts whenever the list below it reflows — e.g. the moment you
+   tap a signal. While the panel is open, drop out of sticky so the whole bar
+   scrolls with the page in normal flow; collapsed, it pins as before. Browsers
+   without :has() simply keep the prior sticky behavior — no regression. */
+.topbar:has(.filters-panel) {
+  position: static;
+}
 
 /* ============ Header ============ */
 .header {
