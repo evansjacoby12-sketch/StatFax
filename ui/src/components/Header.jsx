@@ -10,6 +10,8 @@ export default function Header({
   onOpenLegend,
   autoRefresh,
   onToggleAuto,
+  liveScores = true,
+  onToggleLive,
   refreshing,
   gradeCounts = {},
   total = 0,
@@ -77,6 +79,20 @@ export default function Header({
           <Icon name="Clock" size={13} />
           <span>{timeAgo(meta.generatedAt)}</span>
         </div>
+
+        <button
+          className={`toggle-btn live-btn ${liveScores ? 'on' : ''}`}
+          onClick={onToggleLive}
+          title={
+            liveScores
+              ? 'Live scores & innings shown — tap for a clean pregame look'
+              : 'Pregame look (scores hidden) — tap to show live scores'
+          }
+          aria-pressed={liveScores}
+        >
+          <Icon name={liveScores ? 'Activity' : 'Clock'} size={14} className={liveScores ? 'spin-pulse' : ''} />
+          {liveScores ? 'Live' : 'Pregame'}
+        </button>
 
         <button
           className={`toggle-btn auto-btn ${autoRefresh ? 'on' : ''}`}

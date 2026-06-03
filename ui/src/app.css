@@ -2543,12 +2543,14 @@ button.th:hover {
   }
 }
 @media (max-width: 440px) {
-  .auto-btn {
+  .auto-btn,
+  .live-btn {
     gap: 0;
     padding: 0 11px;
     font-size: 0;
   }
-  .auto-btn svg {
+  .auto-btn svg,
+  .live-btn svg {
     font-size: 14px;
   }
 }

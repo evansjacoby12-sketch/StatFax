@@ -4,6 +4,7 @@ import { GradeChip, ScoreRing, ProbBar, Stat } from './atoms.jsx'
 import { groupPitchers, pitchUsage } from '../lib/pitchers.js'
 import { pct, num, rate, gameTime } from '../lib/format.js'
 import { teamColor, teamLogo, playerHeadshot, hexToRgba } from '../lib/teams.js'
+import { useLiveMode } from '../lib/liveMode.js'
 
 // Pitcher Plan — one card per starting pitcher: vulnerability verdict, the
 // lineup ranked as HR targets, pitch mix, and splits + fatigue. Reads the
@@ -58,7 +59,7 @@ function PitcherCard({ entry, onSelect, selectedId, watchlist, slip }) {
   const hand = pitcher.hand ? `${pitcher.hand}HP` : null
 
   const matchup = game ? `${game.awayTeam?.abbr} @ ${game.homeTeam?.abbr}` : null
-  const live = game?.isLive
+  const live = useLiveMode() && game?.isLive
 
   return (
     <section className="pcard" style={{ '--tc': color }}>

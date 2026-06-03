@@ -3,6 +3,7 @@ import { loadSlate, normName } from './lib/data.js'
 import { GRADE_ORDER, BADGES } from './lib/badges.js'
 import { HOT_HEAT, DESC_BY_DEFAULT, DEFAULT_FILTERS } from './lib/constants.js'
 import * as store from './lib/storage.js'
+import { LiveModeContext } from './lib/liveMode.js'
 import Header from './components/Header.jsx'
 import Filters from './components/Filters.jsx'
 import BatterTable from './components/BatterTable.jsx'
@@ -44,6 +45,7 @@ export default function App() {
   const [slipIds, setSlipIds] = useState(() => store.load('slip', []))
   const [autoRefresh, setAutoRefresh] = useState(() => store.load('autoRefresh', false))
   const [view, setView] = useState(() => store.load('view', 'board'))
+  const [liveScores, setLiveScores] = useState(() => store.load('liveScores', true))
   const topbarRef = useRef(null)
 
   // Persist the durable bits.
@@ -61,6 +63,7 @@ export default function App() {
   useEffect(() => store.save('slip', slipIds), [slipIds])
   useEffect(() => store.save('autoRefresh', autoRefresh), [autoRefresh])
   useEffect(() => store.save('view', view), [view])
+  useEffect(() => store.save('liveScores', liveScores), [liveScores])
 
   // Publish the sticky chrome height so the board column-header can stick right
   // below it — robust to the filter bar wrapping at any width.
@@ -231,6 +234,7 @@ export default function App() {
   const { data } = state
 
   return (
+    <LiveModeContext.Provider value={liveScores}>
     <div className="app">
       <div className="topbar" ref={topbarRef}>
         <Header
@@ -245,6 +249,8 @@ export default function App() {
           onOpenLegend={() => setShowLegend(true)}
           autoRefresh={autoRefresh}
           onToggleAuto={() => setAutoRefresh((v) => !v)}
+          liveScores={liveScores}
+          onToggleLive={() => setLiveScores((v) => !v)}
           refreshing={refreshing}
           gradeCounts={gradeCounts}
           total={all.length}
@@ -327,5 +333,6 @@ export default function App() {
       {showLegend && <Legend onClose={() => setShowLegend(false)} />}
       <BackToTop />
     </div>
+    </LiveModeContext.Provider>
   )
 }

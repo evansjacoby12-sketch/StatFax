@@ -5,6 +5,7 @@ import { pct, num, gameTime } from '../lib/format.js'
 import { gradeColor } from '../lib/badges.js'
 import { HOT_HEAT } from '../lib/constants.js'
 import { compass } from '../lib/weather.js'
+import { useLiveMode } from '../lib/liveMode.js'
 
 export default function GamesView({ games, batters, onSelect, selectedId, watchlist, slip, onToggleWatch, onToggleSlip }) {
   // Group the (already filtered + sorted) batters by game, then by side.
@@ -43,7 +44,8 @@ export default function GamesView({ games, batters, onSelect, selectedId, watchl
 }
 
 function GameStatus({ g }) {
-  if (g.isLive) {
+  const liveMode = useLiveMode()
+  if (liveMode && g.isLive) {
     return (
       <div className="gc-status live">
         <span className="live-dot" />
@@ -71,9 +73,10 @@ function TeamHead({ team, pitcher, score, showScore, align }) {
 }
 
 function GameCard({ game: g, groups, idx = 0, ...ctx }) {
+  const liveMode = useLiveMode()
   const awayC = teamColor(g.awayTeam?.id)
   const homeC = teamColor(g.homeTeam?.id)
-  const showScore = g.isLive || g.isFinal
+  const showScore = liveMode && (g.isLive || g.isFinal)
   return (
     <section className="game-card" style={{ '--i': Math.min(idx, 12) }}>
       <header
@@ -156,7 +159,7 @@ function SiloBatter({ b, onSelect, selectedId, watchlist, slip, onToggleWatch, o
     e.stopPropagation()
     fn(b)
   }
-  const hrToday = b.liveContext?.isHRThisGame
+  const hrToday = useLiveMode() && b.liveContext?.isHRThisGame
   return (
     <div
       className={`silo-row ${selectedId === b.id ? 'selected' : ''}`}

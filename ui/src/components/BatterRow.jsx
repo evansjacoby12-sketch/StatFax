@@ -2,6 +2,7 @@ import Icon from './Icon.jsx'
 import { GradeChip, ProbBar, BadgeRow } from './atoms.jsx'
 import { pct, num, signedPct, american } from '../lib/format.js'
 import { gradeColor } from '../lib/badges.js'
+import { useLiveMode } from '../lib/liveMode.js'
 
 export default function BatterRow({
   batter: b,
@@ -19,8 +20,9 @@ export default function BatterRow({
   }
   const g = b.grade?.label || 'SKIP'
   const color = b.grade?.color || gradeColor(g)
-  const live = b.game?.isLive
-  const hrToday = b.liveContext?.isHRThisGame
+  const liveMode = useLiveMode()
+  const live = liveMode && b.game?.isLive
+  const hrToday = liveMode && b.liveContext?.isHRThisGame
   const topReason = b.reasons?.[0]
   const edge = b.edge
 

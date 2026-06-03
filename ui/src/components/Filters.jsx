@@ -2,10 +2,12 @@ import { useState } from 'react'
 import Icon from './Icon.jsx'
 import { GRADE_ORDER, gradeColor, BADGES } from '../lib/badges.js'
 import { SORTS } from '../lib/constants.js'
+import { useLiveMode } from '../lib/liveMode.js'
 import { hexA } from './atoms.jsx'
 
 export default function Filters({ value, onChange, gradeCounts, games, badgeCounts, watchCount, view, onView }) {
   const v = value
+  const liveMode = useLiveMode()
   const [open, setOpen] = useState(false)
   const toggleGrade = (g) => {
     const next = new Set(v.grades)
@@ -130,7 +132,7 @@ export default function Filters({ value, onChange, gradeCounts, games, badgeCoun
                 {games.map((g) => (
                   <option key={g.gamePk} value={g.gamePk}>
                     {g.awayTeam.abbr} @ {g.homeTeam.abbr}
-                    {g.isLive ? ' · LIVE' : ''}
+                    {liveMode && g.isLive ? ' · LIVE' : ''}
                   </option>
                 ))}
               </select>

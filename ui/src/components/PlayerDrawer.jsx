@@ -7,6 +7,7 @@ import { bookLabel } from '../lib/data.js'
 import { compass, skyLabel } from '../lib/weather.js'
 import { playerHeadshot, teamColor } from '../lib/teams.js'
 import { toolGrades, heatBreakdown, scoutVerdict, gradeLabel } from '../lib/scout.js'
+import { useLiveMode } from '../lib/liveMode.js'
 
 // Focus-trap + restore-focus for the slide-over (accessibility).
 function useFocusTrap() {
@@ -68,6 +69,7 @@ function useCountUp(target, ms = 550) {
 
 export default function PlayerDrawer({ batter: b, onClose, watched, inSlip, onToggleWatch, onToggleSlip }) {
   const trapRef = useFocusTrap()
+  const liveMode = useLiveMode()
   if (!b) return null
   const g = b.grade?.label || 'SKIP'
   const color = b.grade?.color || gradeColor(g)
@@ -104,7 +106,7 @@ export default function PlayerDrawer({ batter: b, onClose, watched, inSlip, onTo
           <EnvSection b={b} />
           <PitcherSection b={b} />
           <OddsSection b={b} />
-          {b.game?.isLive && <LiveSection b={b} />}
+          {liveMode && b.game?.isLive && <LiveSection b={b} />}
           <TechReasons b={b} />
         </div>
       </aside>
