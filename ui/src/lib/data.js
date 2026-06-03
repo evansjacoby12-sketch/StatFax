@@ -106,8 +106,8 @@ export async function loadSlate() {
       // primaryPitchEdge.passes). Surfaced as the "Pitch Edge" badge/filter.
       pitchEdge: b.primaryPitchEdge?.passes === true,
       // Boolean signal: tonight's park × weather × handedness env boosts HR.
-      // Derived from the engine's combined env delta. Surfaced as "Wx Edge".
-      wxEdge: (b.parkWeatherHandDelta ?? 0) >= 0.04,
+      // parkWeatherHandFactor is a multiplier (1.0 = neutral); flag a ≥5% boost.
+      wxEdge: (b.parkWeatherHandFactor ?? 1) >= 1.05,
     }
   })
 

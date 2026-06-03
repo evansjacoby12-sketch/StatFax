@@ -45,7 +45,7 @@ function groupWeather(batters) {
       .slice()
       .sort(
         (a, b) =>
-          (b.parkWeatherHandDelta ?? -1) - (a.parkWeatherHandDelta ?? -1) ||
+          (b.parkWeatherHandFactor ?? 0) - (a.parkWeatherHandFactor ?? 0) ||
           (b.hrProbability ?? 0) - (a.hrProbability ?? 0),
       )
     return e
@@ -170,8 +170,8 @@ function WeatherCard({ g, onSelect, selectedId }) {
               <span className={`ptarget-name ${liveMode && b.liveContext?.isHRThisGame ? 'hr-glow' : ''}`}>
                 {b.name}
                 <span className="bathand">{b.batSide}</span>
-                {b.parkWeatherHandDelta != null && (
-                  <span className="ptarget-h2h dim">{signedPct(b.parkWeatherHandDelta, 0)} air</span>
+                {b.parkWeatherHandFactor != null && (
+                  <span className="ptarget-h2h dim">{signedPct(b.parkWeatherHandFactor - 1, 0)} air</span>
                 )}
               </span>
               <GradeChip grade={b.grade} size="sm" score={b.score} />

@@ -58,14 +58,6 @@ const STEPS = [
       'Cautionary: Cold, Home/Road Drag (weak split). Use the Signals filter to surface, e.g., “Pitch Edge + WX Edge” bats.',
     ],
   },
-  {
-    icon: 'Percent',
-    title: '7 · Check the market (when priced)',
-    points: [
-      'When book odds are loaded, the Edge column = model probability vs the best price. Positive edge = the model thinks the bat is underpriced (value).',
-      'The drawer’s market table shows each book’s odds + bet links. The model leads; odds are a secondary confirmation, not the driver.',
-    ],
-  },
 ]
 
 const CHECKLIST = [
@@ -75,7 +67,6 @@ const CHECKLIST = [
   'Bandbox / favorable park + wind out or hot',
   'Real power (ISO / barrel%) and not Cold',
   'Two or more signals stacked',
-  'Positive market edge (if odds are loaded)',
 ]
 
 export default function HowToPick({ onClose }) {

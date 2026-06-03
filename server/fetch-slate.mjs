@@ -3167,11 +3167,14 @@ async function main() {
   // hides live scores/innings but the model's recent-form stats (and Heat Index)
   // legitimately absorb today's in-progress results on each refresh (a player who
   // homers mid-game gets hotter). To make the board a stable pre-first-pitch
-  // snapshot, once a batter's game is Live/Final we restore his last pregame
-  // model/form values, keeping only liveContext fresh. State persists across cron
-  // runs via Actions cache (keyed by date; a new day starts clean).
+  // snapshot, once a batter's game is LIVE we restore his last pregame model/form
+  // values, keeping only liveContext fresh. FINAL games are left untouched — the
+  // earlier "Settle FINAL games" pass intentionally zeroes finished non-homerers,
+  // and restoring their pregame score would float them back to the top of the
+  // board. State persists across cron runs via Actions cache (keyed by date).
   try {
-    const startedByGame = new Map(games.map(g => [g.gamePk, g.isLive || g.isFinal]));
+    const liveByGame  = new Map(games.map(g => [g.gamePk, g.isLive  === true]));
+    const finalByGame = new Map(games.map(g => [g.gamePk, g.isFinal === true]));
     let prior = null;
     try { if (existsSync(FREEZE_OUT_PATH)) prior = JSON.parse(readFileSync(FREEZE_OUT_PATH, 'utf8')); } catch {}
     const priorByKey = prior && prior.date === date ? (prior.byKey || {}) : {};
@@ -3181,18 +3184,20 @@ async function main() {
       if (!key.includes('-')) continue; // bare-id alias points at the SAME object
       const row = scoredBatters[key];
       if (!row || row.playerId == null) continue;
-      const started = startedByGame.get(row.gamePk) === true;
-      if (!started) {
-        const { liveContext, ...rest } = row; // snapshot true pre-first-pitch values
+      const live  = liveByGame.get(row.gamePk)  === true;
+      const final = finalByGame.get(row.gamePk) === true;
+      if (!live && !final) {
+        const { liveContext, ...rest } = row; // pregame: snapshot pre-first-pitch values
         nextByKey[key] = rest;
         stored++;
-      } else if (priorByKey[key]) {
+      } else if (live && priorByKey[key]) {
         const lc = row.liveContext;
-        Object.assign(row, priorByKey[key]); // restore frozen model/form fields
+        Object.assign(row, priorByKey[key]); // live: restore frozen model/form fields
         if (lc !== undefined) row.liveContext = lc; // keep live context fresh
-        nextByKey[key] = priorByKey[key]; // carry forward so it stays frozen
+        nextByKey[key] = priorByKey[key]; // carry forward while still live
         frozen++;
       }
+      // final games: leave the settled values; drop the freeze entry.
     }
     mkdirSync(dirname(FREEZE_OUT_PATH), { recursive: true });
     writeFileSync(FREEZE_OUT_PATH, JSON.stringify({ date, byKey: nextByKey }));

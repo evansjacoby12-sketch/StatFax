@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useCallback, useRef, useLayoutEffect } from 'react'
 import { loadSlate, normName } from './lib/data.js'
 import { GRADE_ORDER, BADGES } from './lib/badges.js'
-import { HOT_HEAT, DESC_BY_DEFAULT, DEFAULT_FILTERS } from './lib/constants.js'
+import { HOT_HEAT, DESC_BY_DEFAULT, DEFAULT_FILTERS, SORTS } from './lib/constants.js'
 import * as store from './lib/storage.js'
 import { LiveModeContext } from './lib/liveMode.js'
 import Header from './components/Header.jsx'
@@ -30,7 +30,9 @@ function initialFilters() {
   return {
     ...DEFAULT_FILTERS,
     grades: new Set(Array.isArray(saved.grades) ? saved.grades : GRADE_ORDER),
-    sort: saved.sort || DEFAULT_FILTERS.sort,
+    // Validate against current sort options (a persisted, since-removed key like
+    // 'edge' would leave the dropdown blank and silently break sorting).
+    sort: SORTS.some((s) => s.key === saved.sort) ? saved.sort : DEFAULT_FILTERS.sort,
     dir: saved.dir || DEFAULT_FILTERS.dir,
     confirmedOnly: !!saved.confirmedOnly,
     watchedOnly: !!saved.watchedOnly,

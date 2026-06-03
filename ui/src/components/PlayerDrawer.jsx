@@ -473,8 +473,8 @@ function EnvSection({ b }) {
             k="Park·Wx·Hand"
             v={b.parkWeatherHandFactor != null ? `${num(b.parkWeatherHandFactor, 3)}×` : '—'}
           />
-          {b.parkWeatherHandDelta != null && (
-            <Cell k="Env delta" v={signedPct(b.parkWeatherHandDelta, 1)} />
+          {b.parkWeatherHandFactor != null && (
+            <Cell k="Env delta" v={signedPct(b.parkWeatherHandFactor - 1, 1)} />
           )}
         </div>
       )}

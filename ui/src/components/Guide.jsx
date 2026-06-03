@@ -17,7 +17,7 @@ const TOOLS = [
   ['Activity', 'Live / Pregame', 'Flip the whole board between live scores + innings and a clean pregame projection look.'],
   ['Radio', 'Auto', 'Soft-refresh the slate every 60s for live games — filters and selection survive.'],
   ['Star', 'Watchlist', 'Star any batter (row or drawer), then filter to just your list.'],
-  ['Plus', 'Parlay', 'Add legs with the + on a row; the slip shows combined model probability, price, and edge.'],
+  ['Plus', 'Parlay', 'Add legs with the + on a row; the slip shows combined model probability and model-fair price.'],
 ]
 
 export default function Guide({ onClose }) {
@@ -33,8 +33,7 @@ export default function Guide({ onClose }) {
             <Icon name="Info" size={18} /> Guide
           </h2>
           <div className="model-sub dim">
-            StatFax ranks every hitter by the model’s own home-run probability — a pure model board, with market
-            odds as secondary enrichment.
+            StatFax ranks every hitter by the model’s own home-run probability — a pure model board.
           </div>
         </div>
 
@@ -61,7 +60,7 @@ export default function Guide({ onClose }) {
         <p className="guide-p dim">
           Each row leads with the engine’s <b>grade</b> and its <b>HR probability</b> (calibrated chance of ≥1 HR
           today), plus the model’s top reason. Tap any row for the full drawer — score breakdown, Statcast, the
-          opposing pitcher, weather, career H2H, and the market table.
+          opposing pitcher, weather, career H2H, and recent starts.
         </p>
         <div className="guide-grades">
           {GRADE_ORDER.map((g) => {
