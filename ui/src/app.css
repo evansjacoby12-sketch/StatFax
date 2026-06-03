@@ -2547,6 +2547,12 @@ button.th:hover {
   border-radius: 5px;
   padding: 0 5px;
 }
+/* Keep the count's width reserved when there's no active filter, so toggling a
+   filter on/off never changes the button width (which would reflow the wrapping
+   filter row and make the button jump to another line on narrow screens). */
+.more-btn .badge-toggle-n.is-empty {
+  visibility: hidden;
+}
 .filters-panel {
   width: 100%;
   margin-top: 11px;

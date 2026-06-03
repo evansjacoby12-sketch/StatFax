@@ -95,7 +95,10 @@ export default function Filters({ value, onChange, gradeCounts, games, badgeCoun
         >
           <Icon name="SlidersHorizontal" size={14} />
           Filters
-          {activeMore > 0 && <span className="badge-toggle-n mono">{activeMore}</span>}
+          {/* Always rendered (hidden when zero) so the button width — and thus
+              its place in the wrapping filter row — never shifts when a filter
+              becomes active. */}
+          <span className={`badge-toggle-n mono${activeMore > 0 ? '' : ' is-empty'}`}>{activeMore || 0}</span>
           <Icon name={open ? 'ChevronUp' : 'ChevronDown'} size={13} />
         </button>
         </>
