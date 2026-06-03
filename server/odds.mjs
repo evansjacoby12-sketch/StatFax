@@ -104,8 +104,12 @@ export async function fetchHrOdds(games = [], dateStr) {
       f.participant2Name || f.awayTeam?.name || f.away?.name || f.away,
     ]
 
+    // Books pull HR props once a game starts, so only pregame fixtures carry
+    // them — track which MLB games have already started.
+    const startedByGame = new Map(games.map((g) => [g.gamePk, g.isLive || g.isFinal]))
+
     const odds = {}
-    let matched = 0, priced = 0
+    let matched = 0, pregameMatched = 0, priced = 0
     for (const f of fixtures) {
       if (f.hasOdds === false) continue
       const [t1, t2] = teamsOf(f)
@@ -115,7 +119,8 @@ export async function fetchHrOdds(games = [], dateStr) {
         byPair.get([nickname(t1), nickname(t2)].sort().join('|'))
       if (gamePk == null) continue
       matched++
-      if (!debug.sampleFixture) debug.sampleFixture = f
+      const pregame = startedByGame.get(gamePk) !== true
+      if (pregame) pregameMatched++
 
       const fid = f.fixtureId ?? f.id
       let payload
@@ -125,9 +130,25 @@ export async function fetchHrOdds(games = [], dateStr) {
         debug.oddsError = String(e)
         continue
       }
-      if (!debug.sampleOdds) debug.sampleOdds = payload // captured once for shape verification
       const bmo = payload?.bookmakerOdds || payload?.data?.bookmakerOdds
       if (!bmo || hrId == null) continue
+
+      // Diagnostics: capture the HR market structure from a PREGAME fixture (the
+      // one that should actually carry the player prop) so the shapes are visible.
+      if (pregame && !debug.captured) {
+        const fb = Object.values(bmo)[0] || {}
+        debug.captured = true
+        debug.oddsMarketKeys = Object.keys(fb.markets || {}).slice(0, 90)
+        debug.hrMarketPresent = !!fb.markets?.[hrId]
+        debug.hrMarketSample = fb.markets?.[hrId] || null
+        let fpn = null
+        outer: for (const bb of Object.values(bmo))
+          for (const m of Object.values(bb.markets || {}))
+            for (const o of Object.values(m.outcomes || {}))
+              for (const p of Object.values(o.players || {}))
+                if (p.playerName) { fpn = p.playerName; break outer }
+        debug.firstPlayerName = fpn
+      }
 
       const booksOut = {}
       for (const [book, bdata] of Object.entries(bmo)) {
@@ -138,11 +159,15 @@ export async function fetchHrOdds(games = [], dateStr) {
           const oname = String(outcome.name || outcome.outcomeName || outcome.label || '').toLowerCase()
           if (/\b(no|under)\b/.test(oname)) continue // want "to hit a HR" / Over 0.5 / Yes
           for (const p of Object.values(outcome.players || {})) {
-            if (p.active === false) continue
+            if (p.active === false || !p.playerName) continue // skip game markets (null name)
             const decimal = Number(p.price)
+            const american = p.priceAmerican != null ? parseInt(p.priceAmerican, 10) : decToAmerican(decimal)
             if (!Number.isFinite(decimal) || decimal <= 1) continue
-            players[flipName(p.playerName)] = { american: decToAmerican(decimal), decimal, link: p.link || null }
-            priced++
+            const name = flipName(p.playerName)
+            if (!players[name]) {
+              players[name] = { american, decimal, link: p.betslip || p.link || null }
+              priced++
+            }
           }
         }
         if (Object.keys(players).length) booksOut[book] = players
@@ -151,8 +176,14 @@ export async function fetchHrOdds(games = [], dateStr) {
     }
 
     debug.matchedFixtures = matched
+    debug.pregameMatched = pregameMatched
     debug.pricedPlayers = priced
-    const status = priced > 0 ? 'ok' : sportId && hrId != null ? (matched ? 'no_props' : 'no_match') : 'discovery_failed'
+    const status =
+      priced > 0 ? 'ok'
+      : !(sportId && hrId != null) ? 'discovery_failed'
+      : !matched ? 'no_match'
+      : !pregameMatched ? 'all_games_started'
+      : 'no_props'
     return { status, odds, books: BOOKS, debug }
   } catch (e) {
     debug.error = String(e)
