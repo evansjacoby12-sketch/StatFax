@@ -71,9 +71,24 @@ export async function fetchHrOdds(games = [], dateStr) {
     debug.hrMarketId = hrId
     debug.hrMarketName = hrMarket?.marketName
 
-    // 3) Today's baseball fixtures
-    const fixtures = asArray(await get('/fixtures', { sportId, from: dateStr, to: dateStr }, key))
+    // 3) MLB tournament (the sport has many leagues — narrow to MLB)
+    const tournaments = asArray(await get('/tournaments', sportId ? { sportId } : {}, key).catch(() => []))
+    debug.tournamentCount = tournaments.length
+    const mlb = tournaments.find((t) => /\bmlb\b|major league baseball/i.test(t.tournamentName || t.name || t.slug || ''))
+    const mlbId = mlb?.tournamentId ?? mlb?.id
+    debug.mlbTournamentId = mlbId
+    debug.mlbTournamentName = mlb?.tournamentName || mlb?.name
+    if (!mlbId) debug.tournamentsList = tournaments.map((t) => `${t.tournamentId ?? t.id}:${t.tournamentName || t.slug}`).slice(0, 40)
+
+    // 4) Today's fixtures — prefer the MLB tournament, fall back to sport-wide.
+    const tomorrow = new Date(new Date(dateStr + 'T12:00:00Z').getTime() + 864e5).toISOString().slice(0, 10)
+    let fixtures = asArray(
+      await get('/fixtures', { ...(mlbId ? { tournamentId: mlbId } : { sportId }), from: dateStr, to: tomorrow }, key),
+    )
+    if (!fixtures.length && mlbId) fixtures = asArray(await get('/fixtures', { sportId, from: dateStr, to: tomorrow }, key).catch(() => []))
     debug.fixtureCount = fixtures.length
+    debug.sampleFixtureRaw = fixtures[0]
+    debug.fixtureTeamsSample = fixtures.slice(0, 12).map((f) => `${f.participant1Name} vs ${f.participant2Name} [${f.startTime || ''}]`)
 
     // Order-insensitive team-pair → gamePk (full name + nickname).
     const byPair = new Map()
