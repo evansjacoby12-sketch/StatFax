@@ -69,5 +69,30 @@ step if you want to serve the snapshot to a UI.
   Vite + React "model board" that reads `dist/daily.json` directly
   (`cd ui && npm install && npm run dev`).
 
+## Capturing inputs (held-out counterfactual re-scoring)
+
+`daily.json` stores model **outputs** (the final score/grade), not the inputs
+that produced them — so you can't subtract a term (e.g. the old "Due" bonus)
+from a historical row and re-score it. To do *true* held-out counterfactuals,
+the slate freezes the exact `scoreBatter()` argument list for every batter:
+
+```bash
+npm run slate        # writes dist/daily.json + dist/inputs-<date>.json
+npm run lab:score    # re-scores that corpus with the CURRENT engine, offline
+```
+
+`dist/inputs-<date>.json` is an array of `{ id, name, gamePk, args:[…] }`, where
+`args` is the 27-argument bundle spread straight back into `scoreBatter()`.
+`lab:score` reads `dist/` (freshest local run) **and** `model-lab/data/` (pulled
+history), bundles the engine, and re-scores every record with zero network — so
+the fork loop is: edit `ProbabilityEngine.js` → `npm run lab:score` → diff scores.
+
+To build a **multi-day** held-out set, accumulate the dated files in
+`model-lab/data/` (they're gitignored and persist locally): copy each run's
+`dist/inputs-<date>.json` there, or publish the file next to `daily.json` and
+pull it. Joining `inputs-<date>.json` (by `id`/`gamePk`) to the reconciled
+outcomes in `backtest-log.json` is what lets you compute a real AUC/Brier delta
+for any engine change.
+
 Originated from HRSauce; this copy is standalone and has no git history, no
 remote, no commits required.

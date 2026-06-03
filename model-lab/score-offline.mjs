@@ -13,12 +13,22 @@
  * Until then this just proves the offline engine bundles + runs.
  */
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
+import { resolve, dirname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildModel } from '../server/build-model.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DATA = resolve(__dirname, 'data');
+// dist/ holds the freshest local run (`npm run slate`); model-lab/data/ holds
+// the pulled history (`npm run lab:pull`). Read both so the engine fork loop
+// works straight after a slate, without a pull step.
+const DIST = resolve(__dirname, '../dist');
+const corpusIn = (dir) =>
+  existsSync(dir)
+    ? readdirSync(dir)
+        .filter((f) => /^inputs-.*\.json$/.test(f))
+        .map((f) => resolve(dir, f))
+    : [];
 
 // 1) Bundle src/sports/mlb/logic/ProbabilityEngine.js → server/.build/model.mjs.
 await buildModel();
@@ -30,19 +40,22 @@ if (typeof engine.scoreBatter !== 'function') {
   process.exit(1);
 }
 
-// 2) Re-score the recorded input corpus, if present.
-const files = existsSync(DATA) ? readdirSync(DATA).filter((f) => /^inputs-.*\.json$/.test(f)) : [];
+// 2) Re-score the recorded input corpus, if present. De-dupe by filename,
+//    preferring model-lab/data/ (the curated/pulled copy) over dist/.
+const byName = new Map();
+for (const p of [...corpusIn(DIST), ...corpusIn(DATA)]) byName.set(basename(p), p);
+const files = [...byName.values()];
 if (!files.length) {
-  console.log('\nNo data/inputs-*.json corpus yet — see README "Capturing inputs".');
-  console.log('The offline engine is ready: once a corpus exists, this re-scores it with no API calls,');
-  console.log('so you can A/B engine variants on identical inputs.');
+  console.log('\nNo inputs-*.json corpus yet (looked in dist/ and model-lab/data/) — see README "Capturing inputs".');
+  console.log('Run `npm run slate` to write dist/inputs-<date>.json, then re-run this.');
+  console.log('Once a corpus exists, this re-scores it with no API calls, so you can A/B engine variants on identical inputs.');
   process.exit(0);
 }
 
 let n = 0, sum = 0, nan = 0;
 const out = [];
 for (const f of files) {
-  const corpus = JSON.parse(readFileSync(resolve(DATA, f), 'utf8'));
+  const corpus = JSON.parse(readFileSync(f, 'utf8'));
   for (const row of corpus) {
     let res;
     try { res = engine.scoreBatter(...row.args); } catch { nan++; continue; }

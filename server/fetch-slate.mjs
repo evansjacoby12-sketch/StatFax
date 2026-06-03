@@ -2153,6 +2153,12 @@ async function main() {
   // the NaN fallback. Attached to the snapshot under `_nanDebug` and capped
   // so the JSON doesn't balloon if every batter trips.
   const nanDebug = [];
+  // Per-batter scoreBatter() input bundles, frozen so model-lab/score-offline.mjs
+  // can re-score any engine variant on byte-identical inputs — true held-out
+  // counterfactual re-scoring (e.g. "what did pulling the Due bonus actually do
+  // to AUC/Brier?"). Written to dist/inputs-<date>.json. See README "Capturing
+  // inputs". Kept out of daily.json to keep the device payload lean.
+  const inputCorpus = [];
 
   for (const game of games) {
     const venueStadium = findStadium(game.venueName);
@@ -2267,7 +2273,11 @@ async function main() {
         const recentBarrelForBatter = recentBarrels[id] ?? null;
         const veloTrendForPitcher   = opposingPitcher ? (pitcherVeloTrend[opposingPitcher.id] ?? null) : null;
 
-        const result = scoreBatter(
+        // Build the argument list once so it's a single source of truth: we
+        // spread it into scoreBatter() now AND freeze the same array into the
+        // input corpus below, guaranteeing the offline re-scorer sees exactly
+        // what the live run scored (no drift between call site and corpus).
+        const scoreArgs = [
           batter,
           opposingPitcher,
           pd?.splits ?? null,
@@ -2295,7 +2305,12 @@ async function main() {
           oppCatcherFramingRuns,  // opposing catcher's framing runs (HR suppression)
           recentBarrelForBatter,  // batter's last ~14d batted-ball quality
           veloTrendForPitcher,    // opposing starter fastball velo trend
-        );
+        ];
+        const result = scoreBatter(...scoreArgs);
+        // Freeze inputs for every scored batter (NaN rows included — they're the
+        // ones worth replaying). Keyed by playerId + gamePk so it joins back to
+        // the reconciled outcome log for held-out scoring.
+        inputCorpus.push({ id, name: batter.name, gamePk: game.gamePk, args: scoreArgs });
 
         // Sanity net: if some upstream input made it past our guards and the
         // composite came back non-finite, fall back to the (always-finite)
@@ -3363,6 +3378,19 @@ async function main() {
   writeFileSync(OUT_PATH, JSON.stringify(payload));
   const sizeKB = (JSON.stringify(payload).length / 1024).toFixed(1);
   console.log(`[slate] wrote ${OUT_PATH} (${sizeKB} KB) — took ${((Date.now() - startedAt.getTime()) / 1000).toFixed(1)}s`);
+
+  // Freeze this run's scoreBatter() inputs alongside the slate so the offline
+  // lab (`npm run lab:score`) can re-score engine variants on identical inputs.
+  // Separate file — never embedded in daily.json — so the device payload stays
+  // lean. Non-fatal: a corpus write failure must never break the slate.
+  try {
+    const inputsPath = resolve(__dirname, `../dist/inputs-${date}.json`);
+    const json = JSON.stringify(inputCorpus);
+    writeFileSync(inputsPath, json);
+    console.log(`[slate] wrote ${inputCorpus.length} input bundles → dist/inputs-${date}.json (${(json.length / 1024).toFixed(0)} KB)`);
+  } catch (e) {
+    console.warn(`[slate] could not write input corpus (non-fatal): ${e.message}`);
+  }
 
   // Persist calibration state so tomorrow's cron run reads it back.
   // calibration.json is what setActiveCalibration() consumes at startup.
