@@ -351,10 +351,7 @@ export default function App() {
       </main>
 
       <footer className="foot">
-        <span className="dim">
-          StatFax brain v{data.meta.version} · scored {data.meta.stats?.scoredBatters} batters across{' '}
-          {data.games.length} games
-        </span>
+        <span className="dim">StatFax</span>
       </footer>
 
       <ParlaySlip
