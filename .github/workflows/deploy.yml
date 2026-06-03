@@ -48,6 +48,15 @@ jobs:
           key: backtest-log-${{ github.run_id }}
           restore-keys: backtest-log-
 
+      # Per-day pregame freeze (keeps started-game batters at pre-first-pitch
+      # model/form values). Same unique-key-saves / restore-by-prefix pattern.
+      - name: Restore pregame freeze
+        uses: actions/cache@v4
+        with:
+          path: dist/pregame-freeze.json
+          key: pregame-freeze-${{ github.run_id }}
+          restore-keys: pregame-freeze-
+
       - name: Install brain deps
         run: npm install
 

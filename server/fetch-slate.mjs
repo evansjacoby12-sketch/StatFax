@@ -138,7 +138,7 @@
  * @property {number}  hrCount   HR markers in this zone (currently always 0; see fetcher TODO).
  */
 
-import { writeFileSync, mkdirSync, existsSync } from 'node:fs';
+import { writeFileSync, mkdirSync, existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -163,6 +163,10 @@ const OUT_PATH  = resolve(__dirname, '../dist/daily.json');
 // The next cron run reads these back as priorCalibration + priorBacktestLog.
 const CALIBRATION_OUT_PATH = resolve(__dirname, '../dist/calibration.json');
 const BACKTEST_OUT_PATH    = resolve(__dirname, '../dist/backtest-log.json');
+// Per-day "pregame freeze": once a batter's game starts we keep serving his
+// pre-first-pitch model/form values. Persisted across cron runs via the same
+// Actions cache mechanism as the backtest log.
+const FREEZE_OUT_PATH      = resolve(__dirname, '../dist/pregame-freeze.json');
 const ZONE_CACHE_OUT_PATH  = resolve(__dirname, '../dist/zone-cache.json');
 const MLB_BASE  = 'https://statsapi.mlb.com/api/v1';
 const MLB_V11   = 'https://statsapi.mlb.com/api/v1.1';
@@ -3158,6 +3162,44 @@ async function main() {
       patched++;
     }
     if (patched) console.warn(`[calib] safety-net: backfilled ${patched} null/NaN hrProbability row(s)`);
+  }
+
+  // 8.9) Pregame freeze. The Live/Pregame view toggle is display-only — it
+  // hides live scores/innings but the model's recent-form stats (and Heat Index)
+  // legitimately absorb today's in-progress results on each refresh (a player who
+  // homers mid-game gets hotter). To make the board a stable pre-first-pitch
+  // snapshot, once a batter's game is Live/Final we restore his last pregame
+  // model/form values, keeping only liveContext fresh. State persists across cron
+  // runs via Actions cache (keyed by date; a new day starts clean).
+  try {
+    const startedByGame = new Map(games.map(g => [g.gamePk, g.isLive || g.isFinal]));
+    let prior = null;
+    try { if (existsSync(FREEZE_OUT_PATH)) prior = JSON.parse(readFileSync(FREEZE_OUT_PATH, 'utf8')); } catch {}
+    const priorByKey = prior && prior.date === date ? (prior.byKey || {}) : {};
+    const nextByKey = {};
+    let stored = 0, frozen = 0;
+    for (const key of Object.keys(scoredBatters)) {
+      if (!key.includes('-')) continue; // bare-id alias points at the SAME object
+      const row = scoredBatters[key];
+      if (!row || row.playerId == null) continue;
+      const started = startedByGame.get(row.gamePk) === true;
+      if (!started) {
+        const { liveContext, ...rest } = row; // snapshot true pre-first-pitch values
+        nextByKey[key] = rest;
+        stored++;
+      } else if (priorByKey[key]) {
+        const lc = row.liveContext;
+        Object.assign(row, priorByKey[key]); // restore frozen model/form fields
+        if (lc !== undefined) row.liveContext = lc; // keep live context fresh
+        nextByKey[key] = priorByKey[key]; // carry forward so it stays frozen
+        frozen++;
+      }
+    }
+    mkdirSync(dirname(FREEZE_OUT_PATH), { recursive: true });
+    writeFileSync(FREEZE_OUT_PATH, JSON.stringify({ date, byKey: nextByKey }));
+    console.log(`[freeze] ${stored} pregame snapshotted, ${frozen} started-game batters frozen to pre-first-pitch`);
+  } catch (e) {
+    console.warn('[freeze] skipped:', e.message);
   }
 
   // 9) Assemble final payload
