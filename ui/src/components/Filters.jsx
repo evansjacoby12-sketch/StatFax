@@ -9,6 +9,11 @@ export default function Filters({ value, onChange, gradeCounts, games, badgeCoun
   const v = value
   const liveMode = useLiveMode()
   const [open, setOpen] = useState(false)
+  // Search / grade pills / sort / more-filters apply to the ranked batter list,
+  // so they only make sense on Board & Games. Pitchers, Weather, and Results
+  // are their own views (Weather has its own sort/filter bar) and show the full
+  // slate — keep this row to just the view tabs there.
+  const showFilters = view === 'board' || view === 'games'
   const toggleGrade = (g) => {
     const next = new Set(v.grades)
     if (next.has(g)) next.delete(g)
@@ -46,7 +51,7 @@ export default function Filters({ value, onChange, gradeCounts, games, badgeCoun
           </button>
         </div>
 
-        {view === 'results' ? null : (
+        {showFilters ? (
         <>
         <label className="search">
           <Icon name="Search" size={15} />
@@ -110,11 +115,11 @@ export default function Filters({ value, onChange, gradeCounts, games, badgeCoun
           {activeMore > 0 && <span className="more-count mono">{activeMore}</span>}
         </button>
         </>
-        )}
+        ) : null}
       </div>
 
       {/* Active secondary filters stay visible as removable chips even when collapsed */}
-      {view !== 'results' && !open && activeMore > 0 && (
+      {showFilters && !open && activeMore > 0 && (
         <div className="active-chips">
           {v.gamePk && (
             <FilterChip label={gameLabel(games, v.gamePk)} onClear={() => onChange({ gamePk: '' })} />
@@ -126,7 +131,7 @@ export default function Filters({ value, onChange, gradeCounts, games, badgeCoun
         </div>
       )}
 
-      {view !== 'results' && open && (
+      {showFilters && open && (
         <div className="filters-panel">
           <div className="filters-row fp-controls">
             <div className="select-wrap" title="Filter by game">

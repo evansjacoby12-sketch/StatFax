@@ -304,7 +304,7 @@ export default function App() {
           <ResultsView meta={data.meta} />
         ) : view === 'pitchers' ? (
           <PitchersView
-            batters={filtered}
+            batters={all}
             onSelect={(b) => setSelectedId(b.id)}
             selectedId={selectedId}
             watchlist={watchlist}
@@ -312,7 +312,7 @@ export default function App() {
           />
         ) : view === 'weather' ? (
           <WeatherView
-            batters={filtered}
+            batters={all}
             onSelect={(b) => setSelectedId(b.id)}
             selectedId={selectedId}
           />
