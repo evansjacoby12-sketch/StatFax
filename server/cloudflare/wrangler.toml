@@ -1,0 +1,31 @@
+# Cloudflare Worker: statfax-cron
+# ───────────────────────────────
+# Fires every 10 minutes and pokes the slate-cron GitHub workflow via
+# repository_dispatch. See ./README.md for deployment.
+
+name                = "statfax-cron"
+main                = "src/worker.js"
+compatibility_date  = "2026-05-26"
+
+# Cron schedule — Cloudflare's cron syntax matches GitHub's:
+# "every 10 minutes, every hour, every day". Cloudflare honors this
+# reliably (unlike GitHub Actions' free-tier scheduled-event trigger,
+# which is why this Worker exists).
+[triggers]
+crons = ["*/10 * * * *"]
+
+# Non-secret config — change here without rotating secrets.
+[vars]
+GITHUB_REPO = "evansjacoby12-sketch/HRSauce"
+EVENT_TYPE  = "slate-refresh"
+
+# Secrets (set via `wrangler secret put` — NEVER commit values here):
+#   GITHUB_TOKEN  — fine-grained PAT with Actions: write on this repo
+#
+#   Generate at: https://github.com/settings/personal-access-tokens
+#     Repository access:    "Only select repositories" → HRSauce
+#     Repository permissions → Contents:  Read and write   (what repository_dispatch needs)
+#     Repository permissions → Metadata:  Read-only        (always required)
+#     Expiration:            longest available (or no-expiry org policy)
+#
+#   Then:  cd server/cloudflare && wrangler secret put GITHUB_TOKEN

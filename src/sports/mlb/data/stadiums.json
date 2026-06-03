@@ -1,0 +1,824 @@
+{
+  "stadiums": [
+    {
+      "team": "ARI",
+      "name": "Chase Field",
+      "lat": 33.4455,
+      "lon": -112.0667,
+      "bearing": 0,
+      "elevationFt": 1086,
+      "type": "Retractable",
+      "parkFactor": 0.907,
+      "parkFactorL": 0.899,
+      "parkFactorR": 0.915,
+      "homePlateLatLon": [
+        33.4455,
+        -112.0667
+      ],
+      "centerFieldLatLon": [
+        33.446596,
+        -112.0667
+      ],
+      "roofOpenRate": 0.67,
+      "fences": {
+        "lfLine": 330,
+        "lfGap": 374,
+        "cf": 407,
+        "rfGap": 374,
+        "rfLine": 334
+      }
+    },
+    {
+      "team": "ATL",
+      "name": "Truist Park",
+      "lat": 33.8908,
+      "lon": -84.4678,
+      "bearing": 152,
+      "elevationFt": 1050,
+      "type": "Open",
+      "parkFactor": 0.996,
+      "parkFactorL": 0.97,
+      "parkFactorR": 1.02,
+      "homePlateLatLon": [
+        33.8908,
+        -84.4678
+      ],
+      "centerFieldLatLon": [
+        33.889832,
+        -84.46718
+      ],
+      "fences": {
+        "lfLine": 335,
+        "lfGap": 385,
+        "cf": 400,
+        "rfGap": 375,
+        "rfLine": 325
+      }
+    },
+    {
+      "team": "BAL",
+      "name": "Camden Yards",
+      "lat": 39.2839,
+      "lon": -76.6217,
+      "bearing": 32,
+      "elevationFt": 36,
+      "type": "Open",
+      "parkFactor": 1.092,
+      "parkFactorL": 1.036,
+      "parkFactorR": 1.149,
+      "homePlateLatLon": [
+        39.2839,
+        -76.6217
+      ],
+      "centerFieldLatLon": [
+        39.28483,
+        -76.620949
+      ],
+      "fences": {
+        "lfLine": 333,
+        "lfGap": 373,
+        "cf": 400,
+        "rfGap": 373,
+        "rfLine": 318
+      }
+    },
+    {
+      "team": "BOS",
+      "name": "Fenway Park",
+      "lat": 42.3467,
+      "lon": -71.0972,
+      "bearing": 46,
+      "elevationFt": 20,
+      "type": "Open",
+      "parkFactor": 0.915,
+      "parkFactorL": 0.919,
+      "parkFactorR": 0.911,
+      "homePlateLatLon": [
+        42.3467,
+        -71.0972
+      ],
+      "centerFieldLatLon": [
+        42.347462,
+        -71.096133
+      ],
+      "fences": {
+        "lfLine": 310,
+        "lfGap": 379,
+        "cf": 390,
+        "rfGap": 380,
+        "rfLine": 302,
+        "lfWallHt": 37
+      }
+    },
+    {
+      "team": "CHC",
+      "name": "Wrigley Field",
+      "lat": 41.9484,
+      "lon": -87.6553,
+      "bearing": 36,
+      "elevationFt": 600,
+      "type": "Open",
+      "parkFactor": 0.94,
+      "parkFactorL": 0.957,
+      "parkFactorR": 0.923,
+      "homePlateLatLon": [
+        41.9484,
+        -87.6553
+      ],
+      "centerFieldLatLon": [
+        41.949287,
+        -87.654433
+      ],
+      "fences": {
+        "lfLine": 355,
+        "lfGap": 368,
+        "cf": 400,
+        "rfGap": 368,
+        "rfLine": 353
+      }
+    },
+    {
+      "team": "CWS",
+      "name": "Rate Field",
+      "lat": 41.83,
+      "lon": -87.6338,
+      "bearing": 105,
+      "elevationFt": 595,
+      "type": "Open",
+      "parkFactor": 1.003,
+      "parkFactorL": 0.996,
+      "parkFactorR": 1.01,
+      "homePlateLatLon": [
+        41.83,
+        -87.6338
+      ],
+      "centerFieldLatLon": [
+        41.829716,
+        -87.632379
+      ],
+      "fences": {
+        "lfLine": 330,
+        "lfGap": 375,
+        "cf": 400,
+        "rfGap": 375,
+        "rfLine": 335
+      }
+    },
+    {
+      "team": "CIN",
+      "name": "Great American Ball Park",
+      "lat": 39.0979,
+      "lon": -84.5076,
+      "bearing": 115,
+      "elevationFt": 490,
+      "type": "Open",
+      "parkFactor": 1.183,
+      "parkFactorL": 1.157,
+      "parkFactorR": 1.208,
+      "homePlateLatLon": [
+        39.0979,
+        -84.5076
+      ],
+      "centerFieldLatLon": [
+        39.097437,
+        -84.50632
+      ],
+      "fences": {
+        "lfLine": 328,
+        "lfGap": 379,
+        "cf": 404,
+        "rfGap": 370,
+        "rfLine": 325
+      }
+    },
+    {
+      "team": "CLE",
+      "name": "Progressive Field",
+      "lat": 41.4962,
+      "lon": -81.6852,
+      "bearing": 6,
+      "elevationFt": 660,
+      "type": "Open",
+      "parkFactor": 0.979,
+      "parkFactorL": 0.951,
+      "parkFactorR": 1.006,
+      "homePlateLatLon": [
+        41.4962,
+        -81.6852
+      ],
+      "centerFieldLatLon": [
+        41.49729,
+        -81.685047
+      ],
+      "fences": {
+        "lfLine": 325,
+        "lfGap": 370,
+        "cf": 400,
+        "rfGap": 375,
+        "rfLine": 325,
+        "lfWallHt": 19
+      }
+    },
+    {
+      "team": "COL",
+      "name": "Coors Field",
+      "lat": 39.7559,
+      "lon": -104.9942,
+      "bearing": 6,
+      "elevationFt": 5200,
+      "type": "Open",
+      "parkFactor": 1.064,
+      "parkFactorL": 1.062,
+      "parkFactorR": 1.067,
+      "homePlateLatLon": [
+        39.7559,
+        -104.9942
+      ],
+      "centerFieldLatLon": [
+        39.75699,
+        -104.994051
+      ],
+      "fences": {
+        "lfLine": 347,
+        "lfGap": 390,
+        "cf": 415,
+        "rfGap": 375,
+        "rfLine": 350
+      }
+    },
+    {
+      "team": "DET",
+      "name": "Comerica Park",
+      "lat": 42.339,
+      "lon": -83.0485,
+      "bearing": 150,
+      "elevationFt": 600,
+      "type": "Open",
+      "parkFactor": 1.035,
+      "parkFactorL": 1.026,
+      "parkFactorR": 1.043,
+      "homePlateLatLon": [
+        42.339,
+        -83.0485
+      ],
+      "centerFieldLatLon": [
+        42.33805,
+        -83.047758
+      ],
+      "fences": {
+        "lfLine": 342,
+        "lfGap": 370,
+        "cf": 412,
+        "rfGap": 365,
+        "rfLine": 330
+      }
+    },
+    {
+      "team": "HOU",
+      "name": "Daikin Park",
+      "lat": 29.7572,
+      "lon": -95.3553,
+      "bearing": 68,
+      "elevationFt": 50,
+      "type": "Retractable",
+      "parkFactor": 1.002,
+      "parkFactorL": 1.013,
+      "parkFactorR": 0.991,
+      "homePlateLatLon": [
+        29.7572,
+        -95.3553
+      ],
+      "centerFieldLatLon": [
+        29.757611,
+        -95.354129
+      ],
+      "roofOpenRate": 0,
+      "fences": {
+        "lfLine": 315,
+        "lfGap": 362,
+        "cf": 409,
+        "rfGap": 373,
+        "rfLine": 326
+      }
+    },
+    {
+      "team": "KC",
+      "name": "Kauffman Stadium",
+      "lat": 39.0517,
+      "lon": -94.4803,
+      "bearing": 45,
+      "elevationFt": 750,
+      "type": "Open",
+      "parkFactor": 0.906,
+      "parkFactorL": 0.952,
+      "parkFactorR": 0.861,
+      "homePlateLatLon": [
+        39.0517,
+        -94.4803
+      ],
+      "centerFieldLatLon": [
+        39.052475,
+        -94.479302
+      ],
+      "fences": {
+        "lfLine": 347,
+        "lfGap": 379,
+        "cf": 410,
+        "rfGap": 379,
+        "rfLine": 344
+      }
+    },
+    {
+      "team": "LAA",
+      "name": "Angel Stadium",
+      "lat": 33.8003,
+      "lon": -117.8827,
+      "bearing": 42,
+      "elevationFt": 160,
+      "type": "Open",
+      "parkFactor": 1.016,
+      "parkFactorL": 1.025,
+      "parkFactorR": 1.007,
+      "homePlateLatLon": [
+        33.8003,
+        -117.8827
+      ],
+      "centerFieldLatLon": [
+        33.801115,
+        -117.881817
+      ],
+      "fences": {
+        "lfLine": 347,
+        "lfGap": 390,
+        "cf": 396,
+        "rfGap": 370,
+        "rfLine": 350
+      }
+    },
+    {
+      "team": "LAD",
+      "name": "Dodger Stadium",
+      "lat": 34.0739,
+      "lon": -118.24,
+      "bearing": 24,
+      "elevationFt": 500,
+      "type": "Open",
+      "parkFactor": 1.093,
+      "parkFactorL": 1.118,
+      "parkFactorR": 1.068,
+      "homePlateLatLon": [
+        34.0739,
+        -118.24
+      ],
+      "centerFieldLatLon": [
+        34.074902,
+        -118.239462
+      ],
+      "fences": {
+        "lfLine": 330,
+        "lfGap": 375,
+        "cf": 400,
+        "rfGap": 375,
+        "rfLine": 330
+      }
+    },
+    {
+      "team": "MIA",
+      "name": "loanDepot park",
+      "lat": 25.7781,
+      "lon": -80.2197,
+      "bearing": 108,
+      "elevationFt": 10,
+      "type": "Retractable",
+      "parkFactor": 1.012,
+      "parkFactorL": 0.969,
+      "parkFactorR": 1.054,
+      "homePlateLatLon": [
+        25.7781,
+        -80.2197
+      ],
+      "centerFieldLatLon": [
+        25.777761,
+        -80.218542
+      ],
+      "roofOpenRate": 0.09,
+      "fences": {
+        "lfLine": 344,
+        "lfGap": 386,
+        "cf": 400,
+        "rfGap": 387,
+        "rfLine": 335
+      }
+    },
+    {
+      "team": "MIL",
+      "name": "American Family Field",
+      "lat": 43.028,
+      "lon": -87.9712,
+      "bearing": 128,
+      "elevationFt": 635,
+      "type": "Retractable",
+      "parkFactor": 1.06,
+      "parkFactorL": 1.063,
+      "parkFactorR": 1.058,
+      "homePlateLatLon": [
+        43.028,
+        -87.9712
+      ],
+      "centerFieldLatLon": [
+        43.027325,
+        -87.970018
+      ],
+      "roofOpenRate": 0.25,
+      "fences": {
+        "lfLine": 342,
+        "lfGap": 370,
+        "cf": 400,
+        "rfGap": 374,
+        "rfLine": 345
+      }
+    },
+    {
+      "team": "MIN",
+      "name": "Target Field",
+      "lat": 44.9817,
+      "lon": -93.2784,
+      "bearing": 90,
+      "elevationFt": 815,
+      "type": "Open",
+      "parkFactor": 0.99,
+      "parkFactorL": 0.991,
+      "parkFactorR": 0.99,
+      "homePlateLatLon": [
+        44.9817,
+        -93.2784
+      ],
+      "centerFieldLatLon": [
+        44.9817,
+        -93.27685
+      ],
+      "fences": {
+        "lfLine": 339,
+        "lfGap": 377,
+        "cf": 404,
+        "rfGap": 367,
+        "rfLine": 328
+      }
+    },
+    {
+      "team": "NYM",
+      "name": "Citi Field",
+      "lat": 40.7571,
+      "lon": -73.8458,
+      "bearing": 24,
+      "elevationFt": 16,
+      "type": "Open",
+      "parkFactor": 1.007,
+      "parkFactorL": 1.036,
+      "parkFactorR": 0.978,
+      "homePlateLatLon": [
+        40.7571,
+        -73.8458
+      ],
+      "centerFieldLatLon": [
+        40.758102,
+        -73.845211
+      ],
+      "fences": {
+        "lfLine": 335,
+        "lfGap": 370,
+        "cf": 408,
+        "rfGap": 375,
+        "rfLine": 330
+      }
+    },
+    {
+      "team": "NYY",
+      "name": "Yankee Stadium",
+      "lat": 40.8296,
+      "lon": -73.9262,
+      "bearing": 75,
+      "elevationFt": 55,
+      "type": "Open",
+      "parkFactor": 1.059,
+      "parkFactorL": 1.064,
+      "parkFactorR": 1.055,
+      "homePlateLatLon": [
+        40.8296,
+        -73.9262
+      ],
+      "centerFieldLatLon": [
+        40.829884,
+        -73.9248
+      ],
+      "fences": {
+        "lfLine": 318,
+        "lfGap": 399,
+        "cf": 408,
+        "rfGap": 385,
+        "rfLine": 314
+      }
+    },
+    {
+      "team": "OAK",
+      "name": "Sutter Health Park",
+      "lat": 38.5802,
+      "lon": -121.4987,
+      "bearing": 50,
+      "elevationFt": 25,
+      "type": "Open",
+      "parkFactor": 1.027,
+      "parkFactorL": 1.033,
+      "parkFactorR": 1.02,
+      "homePlateLatLon": [
+        38.5802,
+        -121.4987
+      ],
+      "centerFieldLatLon": [
+        38.580905,
+        -121.497626
+      ],
+      "fences": {
+        "lfLine": 330,
+        "lfGap": 375,
+        "cf": 403,
+        "rfGap": 368,
+        "rfLine": 325
+      }
+    },
+    {
+      "team": "PHI",
+      "name": "Citizens Bank Park",
+      "lat": 39.9061,
+      "lon": -75.1665,
+      "bearing": 14,
+      "elevationFt": 40,
+      "type": "Open",
+      "parkFactor": 1.137,
+      "parkFactorL": 1.089,
+      "parkFactorR": 1.185,
+      "homePlateLatLon": [
+        39.9061,
+        -75.1665
+      ],
+      "centerFieldLatLon": [
+        39.907164,
+        -75.166154
+      ],
+      "fences": {
+        "lfLine": 329,
+        "lfGap": 374,
+        "cf": 401,
+        "rfGap": 369,
+        "rfLine": 330
+      }
+    },
+    {
+      "team": "PIT",
+      "name": "PNC Park",
+      "lat": 40.4469,
+      "lon": -80.0057,
+      "bearing": 118,
+      "elevationFt": 730,
+      "type": "Open",
+      "parkFactor": 0.908,
+      "parkFactorL": 0.904,
+      "parkFactorR": 0.91,
+      "homePlateLatLon": [
+        40.4469,
+        -80.0057
+      ],
+      "centerFieldLatLon": [
+        40.446385,
+        -80.004428
+      ],
+      "fences": {
+        "lfLine": 325,
+        "lfGap": 389,
+        "cf": 399,
+        "rfGap": 375,
+        "rfLine": 320,
+        "rfWallHt": 21
+      }
+    },
+    {
+      "team": "SD",
+      "name": "Petco Park",
+      "lat": 32.7073,
+      "lon": -117.1573,
+      "bearing": 358,
+      "elevationFt": 60,
+      "type": "Open",
+      "parkFactor": 1.001,
+      "parkFactorL": 1.038,
+      "parkFactorR": 0.962,
+      "homePlateLatLon": [
+        32.7073,
+        -117.1573
+      ],
+      "centerFieldLatLon": [
+        32.708396,
+        -117.157345
+      ],
+      "fences": {
+        "lfLine": 336,
+        "lfGap": 386,
+        "cf": 396,
+        "rfGap": 391,
+        "rfLine": 331
+      }
+    },
+    {
+      "team": "SF",
+      "name": "Oracle Park",
+      "lat": 37.7786,
+      "lon": -122.3893,
+      "bearing": 93,
+      "elevationFt": 12,
+      "type": "Open",
+      "parkFactor": 0.902,
+      "parkFactorL": 0.909,
+      "parkFactorR": 0.894,
+      "homePlateLatLon": [
+        37.7786,
+        -122.3893
+      ],
+      "centerFieldLatLon": [
+        37.778543,
+        -122.387915
+      ],
+      "fences": {
+        "lfLine": 339,
+        "lfGap": 399,
+        "cf": 391,
+        "rfGap": 415,
+        "rfLine": 309
+      }
+    },
+    {
+      "team": "SEA",
+      "name": "T-Mobile Park",
+      "lat": 47.5914,
+      "lon": -122.332,
+      "bearing": 52,
+      "elevationFt": 134,
+      "type": "Retractable",
+      "parkFactor": 0.878,
+      "parkFactorL": 0.903,
+      "parkFactorR": 0.853,
+      "homePlateLatLon": [
+        47.5914,
+        -122.332
+      ],
+      "centerFieldLatLon": [
+        47.592075,
+        -122.330719
+      ],
+      "roofOpenRate": 0.76,
+      "fences": {
+        "lfLine": 331,
+        "lfGap": 378,
+        "cf": 401,
+        "rfGap": 381,
+        "rfLine": 326
+      }
+    },
+    {
+      "team": "STL",
+      "name": "Busch Stadium",
+      "lat": 38.6226,
+      "lon": -90.1928,
+      "bearing": 62,
+      "elevationFt": 465,
+      "type": "Open",
+      "parkFactor": 0.927,
+      "parkFactorL": 0.93,
+      "parkFactorR": 0.925,
+      "homePlateLatLon": [
+        38.6226,
+        -90.1928
+      ],
+      "centerFieldLatLon": [
+        38.623115,
+        -90.191561
+      ],
+      "fences": {
+        "lfLine": 336,
+        "lfGap": 375,
+        "cf": 400,
+        "rfGap": 375,
+        "rfLine": 335
+      }
+    },
+    {
+      "team": "TB",
+      "name": "Tropicana Field",
+      "lat": 27.7682,
+      "lon": -82.6534,
+      "bearing": 45,
+      "elevationFt": 15,
+      "type": "Fixed Dome",
+      "parkFactor": 1.024,
+      "parkFactorL": 1.047,
+      "parkFactorR": 0.999,
+      "homePlateLatLon": [
+        27.7682,
+        -82.6534
+      ],
+      "centerFieldLatLon": [
+        27.768975,
+        -82.652524
+      ],
+      "fences": {
+        "lfLine": 315,
+        "lfGap": 370,
+        "cf": 404,
+        "rfGap": 370,
+        "rfLine": 322
+      }
+    },
+    {
+      "team": "TEX",
+      "name": "Globe Life Field",
+      "lat": 32.7473,
+      "lon": -97.0828,
+      "bearing": 60,
+      "elevationFt": 545,
+      "type": "Retractable",
+      "parkFactor": 1.041,
+      "parkFactorL": 1.03,
+      "parkFactorR": 1.052,
+      "homePlateLatLon": [
+        32.7473,
+        -97.0828
+      ],
+      "centerFieldLatLon": [
+        32.747848,
+        -97.081671
+      ],
+      "roofOpenRate": 0.09,
+      "fences": {
+        "lfLine": 329,
+        "lfGap": 372,
+        "cf": 407,
+        "rfGap": 374,
+        "rfLine": 326
+      }
+    },
+    {
+      "team": "TOR",
+      "name": "Rogers Centre",
+      "lat": 43.6415,
+      "lon": -79.389,
+      "bearing": 341,
+      "elevationFt": 300,
+      "type": "Retractable",
+      "parkFactor": 0.991,
+      "parkFactorL": 1.023,
+      "parkFactorR": 0.96,
+      "homePlateLatLon": [
+        43.6415,
+        -79.389
+      ],
+      "centerFieldLatLon": [
+        43.642537,
+        -79.389493
+      ],
+      "roofOpenRate": 0.17,
+      "fences": {
+        "lfLine": 328,
+        "lfGap": 381,
+        "cf": 400,
+        "rfGap": 372,
+        "rfLine": 328
+      }
+    },
+    {
+      "team": "WSH",
+      "name": "Nationals Park",
+      "lat": 38.873,
+      "lon": -77.0074,
+      "bearing": 30,
+      "elevationFt": 40,
+      "type": "Open",
+      "parkFactor": 0.987,
+      "parkFactorL": 0.984,
+      "parkFactorR": 0.991,
+      "homePlateLatLon": [
+        38.873,
+        -77.0074
+      ],
+      "centerFieldLatLon": [
+        38.87395,
+        -77.006696
+      ],
+      "fences": {
+        "lfLine": 337,
+        "lfGap": 377,
+        "cf": 402,
+        "rfGap": 370,
+        "rfLine": 335
+      }
+    }
+  ]
+}

@@ -1,0 +1,337 @@
+import { useEffect, useMemo, useState, useCallback, useRef, useLayoutEffect } from 'react'
+import { loadSlate, normName } from './lib/data.js'
+import { GRADE_ORDER, BADGES } from './lib/badges.js'
+import * as store from './lib/storage.js'
+import Header from './components/Header.jsx'
+import Filters from './components/Filters.jsx'
+import BatterTable from './components/BatterTable.jsx'
+import GamesView from './components/GamesView.jsx'
+import ResultsView from './components/ResultsView.jsx'
+import PlayerDrawer from './components/PlayerDrawer.jsx'
+import ParlaySlip from './components/ParlaySlip.jsx'
+import Legend from './components/Legend.jsx'
+import Skeleton from './components/Skeleton.jsx'
+import BackToTop from './components/BackToTop.jsx'
+import Icon from './components/Icon.jsx'
+import './app.css'
+
+const AUTO_REFRESH_MS = 60_000
+
+const HOT_HEAT = 58 // heatIndex ≥ this counts as a "hot bat"
+
+const DEFAULT_FILTERS = {
+  q: '',
+  grades: new Set(GRADE_ORDER),
+  gamePk: '',
+  confirmedOnly: false,
+  watchedOnly: false,
+  hotOnly: false,
+  badge: '',
+  sort: 'hrProbability',
+  dir: 'desc',
+}
+
+// Restore the durable slice of the filter state (not search / game / badge).
+function initialFilters() {
+  const saved = store.load('filters', null)
+  if (!saved) return DEFAULT_FILTERS
+  return {
+    ...DEFAULT_FILTERS,
+    grades: new Set(Array.isArray(saved.grades) ? saved.grades : GRADE_ORDER),
+    sort: saved.sort || DEFAULT_FILTERS.sort,
+    dir: saved.dir || DEFAULT_FILTERS.dir,
+    confirmedOnly: !!saved.confirmedOnly,
+    watchedOnly: !!saved.watchedOnly,
+    hotOnly: !!saved.hotOnly,
+  }
+}
+
+const DESC_BY_DEFAULT = new Set(['hrProbability', 'score', 'rating', 'heat', 'edge', 'expectedHRs'])
+
+export default function App() {
+  const [state, setState] = useState({ status: 'loading', data: null, error: null })
+  const [refreshing, setRefreshing] = useState(false)
+  const [filters, setFilters] = useState(initialFilters)
+  const [selectedId, setSelectedId] = useState(null)
+  const [showLegend, setShowLegend] = useState(false)
+  const [watchlist, setWatchlist] = useState(() => new Set(store.load('watchlist', [])))
+  const [slipIds, setSlipIds] = useState(() => store.load('slip', []))
+  const [autoRefresh, setAutoRefresh] = useState(() => store.load('autoRefresh', false))
+  const [view, setView] = useState(() => store.load('view', 'board'))
+  const topbarRef = useRef(null)
+
+  // Persist the durable bits.
+  useEffect(() => {
+    store.save('filters', {
+      grades: [...filters.grades],
+      sort: filters.sort,
+      dir: filters.dir,
+      confirmedOnly: filters.confirmedOnly,
+      watchedOnly: filters.watchedOnly,
+      hotOnly: filters.hotOnly,
+    })
+  }, [filters])
+  useEffect(() => store.save('watchlist', [...watchlist]), [watchlist])
+  useEffect(() => store.save('slip', slipIds), [slipIds])
+  useEffect(() => store.save('autoRefresh', autoRefresh), [autoRefresh])
+  useEffect(() => store.save('view', view), [view])
+
+  // Publish the sticky chrome height so the board column-header can stick right
+  // below it — robust to the filter bar wrapping at any width.
+  useLayoutEffect(() => {
+    const el = topbarRef.current
+    if (!el) return
+    const apply = () => document.documentElement.style.setProperty('--chrome-h', `${el.offsetHeight}px`)
+    apply()
+    const ro = new ResizeObserver(apply)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [state.status])
+
+  const load = useCallback(async () => {
+    setRefreshing(true)
+    setState((s) => ({ ...s, status: s.data ? 'ready' : 'loading' }))
+    try {
+      const data = await loadSlate()
+      setState({ status: 'ready', data, error: null })
+    } catch (e) {
+      setState((s) => (s.data ? s : { status: 'error', data: null, error: e.message }))
+    } finally {
+      setRefreshing(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    load()
+  }, [load])
+
+  // Live auto-refresh — soft reload on an interval (no loader flicker; filters,
+  // selection, watchlist and slip all survive because they live in state by id).
+  useEffect(() => {
+    if (!autoRefresh) return
+    const t = setInterval(load, AUTO_REFRESH_MS)
+    return () => clearInterval(t)
+  }, [autoRefresh, load])
+
+  // Esc closes the topmost overlay.
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === 'Escape') {
+        if (showLegend) setShowLegend(false)
+        else if (selectedId) setSelectedId(null)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [selectedId, showLegend])
+
+  const patch = useCallback((p) => setFilters((f) => ({ ...f, ...p })), [])
+
+  const onSort = useCallback((key) => {
+    setFilters((f) => {
+      if (f.sort === key) return { ...f, dir: f.dir === 'asc' ? 'desc' : 'asc' }
+      return { ...f, sort: key, dir: DESC_BY_DEFAULT.has(key) ? 'desc' : 'asc' }
+    })
+  }, [])
+
+  const toggleWatch = useCallback((b) => {
+    setWatchlist((prev) => {
+      const next = new Set(prev)
+      next.has(b.id) ? next.delete(b.id) : next.add(b.id)
+      return next
+    })
+  }, [])
+
+  const toggleSlip = useCallback((b) => {
+    setSlipIds((prev) => (prev.includes(b.id) ? prev.filter((x) => x !== b.id) : [...prev, b.id]))
+  }, [])
+
+  const removeSlip = useCallback((id) => setSlipIds((prev) => prev.filter((x) => x !== id)), [])
+  const clearSlip = useCallback(() => setSlipIds([]), [])
+
+  const all = state.data?.batters || []
+  const slipSet = useMemo(() => new Set(slipIds), [slipIds])
+
+  // Resolve slip ids → batter objects in slip order; drop any not in this slate.
+  const slipLegs = useMemo(() => {
+    const byId = new Map(all.map((b) => [b.id, b]))
+    return slipIds.map((id) => byId.get(id)).filter(Boolean)
+  }, [all, slipIds])
+
+  const gradeCounts = useMemo(() => {
+    const c = {}
+    for (const b of all) {
+      const g = b.grade?.label || 'SKIP'
+      c[g] = (c[g] || 0) + 1
+    }
+    return c
+  }, [all])
+
+  const badgeCounts = useMemo(() => {
+    const c = {}
+    for (const b of all) for (const def of BADGES) if (b[def.key]) c[def.key] = (c[def.key] || 0) + 1
+    return c
+  }, [all])
+
+  const filtered = useMemo(() => {
+    const q = normName(filters.q)
+    let rows = all.filter((b) => {
+      if (!filters.grades.has(b.grade?.label || 'SKIP')) return false
+      if (filters.gamePk && String(b.gamePk) !== String(filters.gamePk)) return false
+      if (filters.confirmedOnly && !b.lineupConfirmed) return false
+      if (filters.watchedOnly && !watchlist.has(b.id)) return false
+      if (filters.hotOnly && (b.heatIndex ?? 0) < HOT_HEAT) return false
+      if (filters.badge && !b[filters.badge]) return false
+      if (q) {
+        const hay = normName(`${b.name} ${b.team} ${b.opponent?.abbr || ''} ${b.pitcher?.name || ''}`)
+        if (!hay.includes(q)) return false
+      }
+      return true
+    })
+
+    const { sort, dir } = filters
+    const mul = dir === 'asc' ? 1 : -1
+    const get = (b) => {
+      if (sort === 'name') return b.name?.toLowerCase() || ''
+      if (sort === 'edge') return b.edge
+      if (sort === 'heat') return b.heatIndex
+      return b[sort]
+    }
+    // Deterministic, meaningful tie-break: many picks share a probability at the
+    // flat ends of the calibration curve, so fall back to score → xHR → name.
+    const tiebreak = (a, b) =>
+      (b.score ?? 0) - (a.score ?? 0) ||
+      (b.expectedHRs ?? 0) - (a.expectedHRs ?? 0) ||
+      (a.name || '').localeCompare(b.name || '')
+    rows = rows.slice().sort((a, b) => {
+      const va = get(a)
+      const vb = get(b)
+      // nulls always last
+      const na = va == null || Number.isNaN(va)
+      const nb = vb == null || Number.isNaN(vb)
+      if (na && nb) return tiebreak(a, b)
+      if (na) return 1
+      if (nb) return -1
+      const cmp = typeof va === 'string' ? va.localeCompare(vb) * mul : (va - vb) * mul
+      return cmp !== 0 ? cmp : tiebreak(a, b)
+    })
+    return rows
+  }, [all, filters, watchlist])
+
+  const selected = useMemo(
+    () => (selectedId != null ? all.find((b) => b.id === selectedId) || null : null),
+    [all, selectedId],
+  )
+
+  if (state.status === 'loading') {
+    return <Skeleton />
+  }
+
+  if (state.status === 'error') {
+    return (
+      <div className="screen-center">
+        <div className="error-box">
+          <Icon name="TriangleAlert" size={28} />
+          <h2>Couldn't load the slate</h2>
+          <p className="dim">{state.error}</p>
+          <button className="toggle-btn on" onClick={load}>
+            <Icon name="RefreshCw" size={14} /> Retry
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  const { data } = state
+
+  return (
+    <div className="app">
+      <div className="topbar" ref={topbarRef}>
+        <Header
+          meta={data.meta}
+          counts={{
+            games: data.games.length,
+            total: all.length,
+            shown: filtered.length,
+          }}
+          onRefresh={load}
+          onOpenModel={() => setView('results')}
+          onOpenLegend={() => setShowLegend(true)}
+          autoRefresh={autoRefresh}
+          onToggleAuto={() => setAutoRefresh((v) => !v)}
+          refreshing={refreshing}
+          gradeCounts={gradeCounts}
+          total={all.length}
+        />
+
+        <Filters
+          value={filters}
+          onChange={patch}
+          gradeCounts={gradeCounts}
+          badgeCounts={badgeCounts}
+          games={data.games}
+          watchCount={watchlist.size}
+          view={view}
+          onView={setView}
+        />
+      </div>
+
+      <main className="main">
+        {view === 'results' ? (
+          <ResultsView meta={data.meta} />
+        ) : view === 'games' ? (
+          <GamesView
+            games={data.games}
+            batters={filtered}
+            onSelect={(b) => setSelectedId(b.id)}
+            selectedId={selectedId}
+            watchlist={watchlist}
+            slip={slipSet}
+            onToggleWatch={toggleWatch}
+            onToggleSlip={toggleSlip}
+          />
+        ) : (
+          <BatterTable
+            batters={filtered}
+            onSelect={(b) => setSelectedId(b.id)}
+            selectedId={selectedId}
+            sort={filters.sort}
+            dir={filters.dir}
+            onSort={onSort}
+            watchlist={watchlist}
+            slip={slipSet}
+            onToggleWatch={toggleWatch}
+            onToggleSlip={toggleSlip}
+          />
+        )}
+      </main>
+
+      <footer className="foot">
+        <span className="dim">
+          StatFax brain v{data.meta.version} · scored {data.meta.stats?.scoredBatters} batters across{' '}
+          {data.games.length} games · {data.meta.stats?.oddsPlayerCount || 0} with market odds
+        </span>
+      </footer>
+
+      <ParlaySlip
+        legs={slipLegs}
+        onRemove={removeSlip}
+        onClear={clearSlip}
+        onSelect={(b) => setSelectedId(b.id)}
+      />
+
+      {selected && (
+        <PlayerDrawer
+          batter={selected}
+          onClose={() => setSelectedId(null)}
+          watched={watchlist.has(selected.id)}
+          inSlip={slipSet.has(selected.id)}
+          onToggleWatch={toggleWatch}
+          onToggleSlip={toggleSlip}
+        />
+      )}
+      {showLegend && <Legend onClose={() => setShowLegend(false)} />}
+      <BackToTop />
+    </div>
+  )
+}

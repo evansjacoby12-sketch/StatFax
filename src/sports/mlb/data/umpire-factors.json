@@ -1,0 +1,39 @@
+{
+  "_meta": {
+    "description": "Per-umpire HR multiplier applied to the env component of scoreBatter. 1.0 = neutral. Any umpire NOT listed resolves to _default (1.0), so this is purely additive — populating it only helps.",
+    "range": "0.93-1.07. Effect is intentionally tiny: the multiplier hits only the env component (25% of the score), so the max score swing is ~+/-1.75%.",
+    "method": "v1 conservative, cross-year-validated. Per-ump HR/Game (2024) -> multiplier vs the league-average ump, deviation compressed to 30% and clamped to +/-0.07. Then filtered to ONLY umpires whose 2024 HR-direction AGREES with their 2025 Runs/Game direction (a cross-season consistency guard that drops single-year noise). 22 of ~90 active umps cleared the filter; the rest stay neutral 1.0. See server/tools/compute_umpire_factors.py.",
+    "generatedAt": "2026-06-01",
+    "todo": "Replace with our own internal join (scoredBatters x homerersByGame x homePlateUmpire) once we have ~3+ months of reconciled data, and re-derive every 30 days alongside the calibration loop. Keyed by boxscore official fullName.",
+    "sourceCandidates": [
+      "Umpire Scorecards (umpscorecards.com)",
+      "Baseball Savant umpire reports",
+      "Internal: scoredBatters x homerersByGame x umpire join, once we have history"
+    ]
+  },
+  "_default": 1.0,
+  "umpires": {
+    "Mark Carlson": 0.93,
+    "Brennan Miller": 0.947,
+    "Quinn Wolcott": 0.949,
+    "Austin Jones": 0.951,
+    "John Libka": 0.96,
+    "Jansen Visconti": 0.965,
+    "Cory Blaser": 0.969,
+    "Mike Estabrook": 0.973,
+    "Carlos Torres": 1.026,
+    "Brock Ballou": 1.03,
+    "Jordan Baker": 1.034,
+    "Lance Barrett": 1.034,
+    "Junior Valentine": 1.037,
+    "Alfonso Márquez": 1.039,
+    "Andy Fletcher": 1.045,
+    "Chad Whitson": 1.045,
+    "Vic Carapazza": 1.052,
+    "Laz Diaz": 1.053,
+    "Mark Ripperger": 1.057,
+    "Sean Barber": 1.064,
+    "Tom Hanahan": 1.07,
+    "Adrian Johnson": 1.07
+  }
+}

@@ -1,0 +1,74 @@
+name: Build slate + deploy
+
+# Free always-on hosting: run the brain's slate on a schedule, build the UI,
+# and publish the static site (UI + dist/*.json) to GitHub Pages.
+#
+# ONE-TIME SETUP: push this repo to GitHub → Settings → Pages → "Build and
+# deployment" → Source = "GitHub Actions". (Use a PUBLIC repo for unlimited
+# Actions minutes, or trim the cron for a private one.) Then open the Pages URL.
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+  schedule:
+    # Every 30 min, ~10am–1am ET (covers warmups through late games). UTC.
+    - cron: '*/30 14-23,0-5 * * *'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never run two deploys at once; let an in-progress slate finish.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # Persist the rolling reconcile/backtest log across runs (drives
+      # calibration + the Results view). Unique key always saves; restore-keys
+      # pulls the latest prior log.
+      - name: Restore backtest log
+        uses: actions/cache@v4
+        with:
+          path: dist/backtest-log.json
+          key: backtest-log-${{ github.run_id }}
+          restore-keys: backtest-log-
+
+      - name: Install brain deps
+        run: npm install
+
+      - name: Tests
+        run: npm test
+
+      - name: Generate slate (live MLB + Savant; no keys)
+        run: |
+          npm run build-model
+          npm run slate
+
+      - name: Build UI
+        run: |
+          npm --prefix ui install
+          npm --prefix ui run build
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ui/dist
+
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v4

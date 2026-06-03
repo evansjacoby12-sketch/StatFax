@@ -1,0 +1,3 @@
+# Downloaded artifacts + experiment outputs — regenerate with pull-data.mjs.
+data/
+*.out.json

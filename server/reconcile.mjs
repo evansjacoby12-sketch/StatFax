@@ -1,0 +1,375 @@
+/**
+ * reconcile.mjs — server-side calibration loop
+ *
+ * Given yesterday's published snapshot (the scored batters with their grades +
+ * active badges) and the actual game outcomes from MLB's box-score endpoints,
+ * this module builds a per-day reconciliation record and appends it to a
+ * rolling 30-day backtest log. From the aggregated log it computes per-badge
+ * and per-grade multipliers using the same math the on-device path used to
+ * use — sqrt-dampened lift ratios clamped to ±8% — and writes them out as
+ * `calibration.json` for tomorrow's cron run to load.
+ *
+ * Why on the server rather than the device:
+ *   The on-device path kept a per-user backtest log in AsyncStorage and
+ *   recomputed multipliers from that. Two users with different histories
+ *   ended up with different multipliers → different displayed scores for the
+ *   same player on the same day. The whole point of the backend snapshot is
+ *   that everyone reads the same scores. Moving calibration here keeps that
+ *   invariant intact and gives the model real empirical correction at the
+ *   same time.
+ *
+ * Boot-strap behavior:
+ *   On the very first run there's no prior log. We score with all multipliers
+ *   = 1.0, reconcile yesterday once it's available, and start filling the
+ *   log. Across ~6-7 days we accumulate enough records (MIN_SAMPLES = 1500,
+ *   ~250 batters/day) to flip `ready: true` in the calibration bundle, after
+ *   which the multipliers actually move scores.
+ */
+
+const MLB_BASE = 'https://statsapi.mlb.com/api/v1';
+const ROLLING_DAYS = 30;
+const MIN_SAMPLES_TO_CALIBRATE = 1500;
+const MAX_DELTA = 0.08;
+
+// Badges tracked for the StatRecap lift report. Direct boolean fields
+// (hot/due/cold/bullpenLegend/homeEdge/awayEdge) PLUS the three "premium"
+// badges derived from snapshot fields by activeBadgesForRow(). Day/night was
+// dropped (noise — see ProbabilityEngine) and home/away-struggles were never
+// surfaced. NOTE: these keys are tracked for REPORTING only — scoring
+// calibration applies only the badges ProbabilityEngine passes in
+// activeBadgeKeys (which excludes zone/barrel/park, since their signal is
+// already baked into the raw score), so nothing here double-counts.
+const BADGE_KEYS = ['hot', 'due', 'cold', 'bullpenLegend', 'homeEdge', 'awayEdge', 'zoneMaster', 'barrelKing', 'launchPad'];
+const GRADE_KEYS = ['PRIME', 'STRONG', 'LEAN', 'SKIP'];
+
+// The three premium badges aren't boolean row fields — derive them from the
+// same snapshot fields + thresholds the UI chips use so the lift table matches
+// exactly what users see (ZONE MASTER / BARREL KING / LAUNCH PAD).
+const DIRECT_BADGE_FIELDS = ['hot', 'due', 'cold', 'bullpenLegend', 'homeEdge', 'awayEdge'];
+function activeBadgesForRow(row) {
+  const out = DIRECT_BADGE_FIELDS.filter(k => row[k] === true);
+  if (row.zoneMatchup?.badge === 'ZONE_MASTER')                              out.push('zoneMaster');
+  if (Number.isFinite(row.barrelPctBBE)     && row.barrelPctBBE     >= 13)   out.push('barrelKing');
+  if (Number.isFinite(row.gameParkHRFactor) && row.gameParkHRFactor >= 1.10) out.push('launchPad');
+  return out;
+}
+
+async function getJson(url) {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch { return null; }
+}
+
+/**
+ * Extract the slim record we keep per prediction. Strips everything we
+ * don't need for calibration math (recent stats, savant payload, etc.) so
+ * the 30-day log stays small enough to read on every cron run.
+ *
+ * `lineupConfirmed` is preserved so reconcileDate can break down scratches
+ * by confirmation state (confirmed-then-scratched vs. unconfirmed-then-scratched).
+ */
+export function extractPredictionRecord(row) {
+  // Curated numeric FEATURE VECTOR — the model's ingredients at prediction
+  // time. Logged so that once a few weeks of reconciled outcomes accrue we can
+  // LEARN the core weights from data (a proper re-weighting of the currently
+  // hand-tuned composition) instead of hand-tuning ~60 coefficients. Compact
+  // short keys + null-on-missing keep the rolling 30-day log small.
+  const num = (x) => (Number.isFinite(x) ? +Number(x).toFixed(3) : null);
+  const ps  = row.pitcher?.season || null;
+  const feat = {
+    bs:   num(row.batterScore),                   // batter sub-score (0-88)
+    ms:   num(row.matchupScore),                  // matchup sub-score (8-100)
+    es:   num(row.envScore),                      // environment sub-score (0-100)
+    iso:  num(row.season?.iso),
+    xiso: num(row.xStats?.xISO),
+    brl:  num(row.barrelPctBBE),
+    rbrl: num(row.recentBarrel?.recentBarrelPct), // last ~14d barrel%
+    ev:   num(row.exitVelo),
+    hh:   num(row.hardHitPct),
+    la:   num(row.launchAngle),
+    phr9: num(ps?.hrPer9 ?? ps?.hr9),             // opposing starter HR/9
+    pera: num(ps?.era),
+    pk9:  num(ps?.kPer9 ?? ps?.k9),
+    vdel: num(row.opposingVeloTrend?.veloDelta),     // opposing starter velo trend
+    csw:  num(row.opposingVeloTrend?.seasonCswPct),  // opposing starter CSW%
+    park: num(row.gameParkHRFactor),
+    vig:  num(row.vegasImpliedProb),              // Vegas implied prob (when odds present)
+    ord:  num(row.battingOrder),
+    hot:  row.hot ? 1 : 0,
+    due:  row.due ? 1 : 0,
+  };
+  return {
+    feat,
+    playerId:       row.playerId,
+    name:           row.name,
+    // Log the FROZEN pre-game prediction. Once a game starts the server mutates
+    // BOTH `score` (live PA-decay, zeroed at Final) AND `grade` (re-derived from
+    // that decayed score → every batter collapses to SKIP at Final). Yesterday's
+    // PUBLISHED snapshot — which this reconcile reads — is the last run of the
+    // night, i.e. post-Final, so reading the live fields filed every player who
+    // batted under score ~0 / grade SKIP. That polluted the low buckets of the
+    // score→prob curve AND made the per-grade StatRecap read as "almost
+    // everything was a Pass" (observed: one day logged 159 of 162 picks SKIP).
+    // preGameScore + preGameGrade are the model's actual pre-game call, frozen
+    // the instant a game first goes live/Final (see fetch-slate's decay + Final
+    // blocks), and are what calibration must measure. Fall back to the live
+    // field for rows that never went live (e.g. postponed) — there it IS pregame.
+    score:          Number.isFinite(row.preGameScore) ? row.preGameScore : row.score,
+    grade:          row.preGameGrade?.label || row.preGameGrade || row.grade?.label || row.grade || null,
+    badges:         activeBadgesForRow(row),
+    lineupConfirmed: row.lineupConfirmed ?? null,
+    // Pre-game AB-by-AB sim probability. Logged so the sim-resolution blend
+    // weight (server/lib/simResolution.mjs) becomes empirically tunable once a
+    // few weeks of reconciled outcomes carry it. Snapshot stores the undecayed
+    // engine sim as simHRProb, so this is the frozen pre-game value.
+    simHRProb:      Number.isFinite(row.simHRProb) ? +Number(row.simHRProb).toFixed(4) : null,
+  };
+}
+
+/**
+ * Given a date string (YYYY-MM-DD) query MLB's box-score endpoint for every
+ * Final game and collect:
+ *   - homerers: Set<number> of playerIds with hr >= 1
+ *   - played:   Set<number> of playerIds who had any batting stats block
+ *               (i.e. at least one PA — their stats.batting object exists)
+ *
+ * Separating "played" from "homered" fixes a survivorship-bias gap: a batter
+ * who was predicted but scratched from the lineup before first pitch has no
+ * batting block and correctly lands in neither set. Without the played set,
+ * scratched batters would silently count as "predicted but didn't homer",
+ * deflating the calibrated hit rate.
+ *
+ * Returns { homerers: Set<number>, played: Set<number> }, or null on hard
+ * failure (caller treats null as "skip reconciliation for this date").
+ */
+export async function fetchHomerersForDate(date) {
+  const sched = await getJson(`${MLB_BASE}/schedule?sportId=1&date=${date}`);
+  const games = sched?.dates?.[0]?.games || [];
+  if (!games.length) return { homerers: new Set(), played: new Set() };
+
+  const homerers = new Set();
+  const played   = new Set();
+  let finalCount = 0;
+  for (const g of games) {
+    // Only count finalized games — postponed/suspended don't reconcile
+    // cleanly and would skew the rate downward.
+    if (g.status?.abstractGameState !== 'Final') continue;
+    finalCount++;
+    const bs = await getJson(`${MLB_BASE}/game/${g.gamePk}/boxscore`);
+    for (const side of ['home', 'away']) {
+      const players = bs?.teams?.[side]?.players || {};
+      for (const p of Object.values(players)) {
+        const id = p?.person?.id;
+        if (!id) continue;
+        // Any batter with a stats.batting block had at least one PA.
+        if (p?.stats?.batting) {
+          played.add(id);
+          const hr = p.stats.batting.homeRuns;
+          if (Number.isFinite(hr) && hr > 0) {
+            homerers.add(id);
+          }
+        }
+      }
+    }
+  }
+  const allFinal = games.length > 0 && finalCount === games.length;
+  console.log(`[calib] ${date}: ${finalCount}/${games.length} final games, ${homerers.size} players homered`);
+  return { homerers, played, allFinal };
+}
+
+/**
+ * Append yesterday's reconciled records to the rolling log, trim to
+ * ROLLING_DAYS, and return the new log. Idempotent — already-present dates
+ * are skipped so re-runs don't double-count.
+ */
+export function appendToLog(log, date, reconciled) {
+  const next = {
+    ...log,   // preserve top-level fields (e.g. settledDates) across appends
+    dates:   Array.from(new Set([...(log?.dates || []), date])).sort(),
+    records: { ...(log?.records || {}) },
+  };
+  if (!next.records[date]) next.records[date] = reconciled;
+  while (next.dates.length > ROLLING_DAYS) {
+    const oldest = next.dates.shift();
+    delete next.records[oldest];
+  }
+  return next;
+}
+
+/**
+ * From the full rolling log compute per-badge and per-grade multipliers.
+ *
+ *   per-badge multiplier = sqrt(with-badge HR rate / overall HR rate)
+ *                          clamped to [1 - MAX_DELTA, 1 + MAX_DELTA]
+ *
+ * Sqrt-dampens noisy small samples and the clamp keeps even a wildly
+ * over/underperforming bucket from yanking scores by more than 8% per
+ * multiplier (geometric-mean dampening in applyCalibration combines them
+ * conservatively when a batter has multiple active badges).
+ *
+ * Survivorship-bias note: records with `actuallyPlayed: false` (late lineup
+ * scratches) are EXCLUDED from all rate calculations. Including them would
+ * inflate the denominator — a batter who never stepped to the plate can't
+ * possibly homer, so counting them as "predicted, didn't homer" is a
+ * measurement artifact, not signal. Older log entries without the
+ * `actuallyPlayed` field are treated as played (backward-compatible default).
+ *
+ * Returns { samples, badges, grades, computedAt } in the exact shape
+ * setActiveCalibration() expects.
+ */
+export function computeMultipliers(log) {
+  const allRaw = (log?.dates || []).flatMap(d => log?.records?.[d] || []);
+
+  // Separate scratches from played. Legacy records (no actuallyPlayed field)
+  // default to true so the existing 30-day window isn't suddenly invalidated.
+  const scratched = allRaw.filter(r => r.actuallyPlayed === false);
+  const all       = allRaw.filter(r => r.actuallyPlayed !== false);
+
+  const totalPredictions = allRaw.length;
+  const scratchCount     = scratched.length;
+  if (totalPredictions > 0) {
+    const scratchPct = (scratchCount / totalPredictions * 100).toFixed(1);
+    console.log(`[calib] scratch rate: ${scratchCount}/${totalPredictions} predictions never played (${scratchPct}%)`);
+  }
+
+  const samples = all.length;
+  const base = { samples, badges: {}, grades: {}, computedAt: new Date().toISOString() };
+  if (!samples) return base;
+
+  const homers = all.filter(r => r.homered).length;
+  const overallRate = homers / samples;
+  if (!overallRate) return base;
+
+  // Per-badge multipliers — need 50+ samples-with-badge before we trust the
+  // signal. Tiny buckets (e.g., 3 batters with HOT + AWAY edge) would
+  // produce wild ratios. Scratched records already excluded from `all`.
+  for (const key of BADGE_KEYS) {
+    const withBadge = all.filter(r => r.badges?.includes(key));
+    if (withBadge.length < 50) continue;
+    const bRate = withBadge.filter(r => r.homered).length / withBadge.length;
+    const lift = bRate / overallRate;
+    if (!isFinite(lift) || lift <= 0) continue;
+    const dampened = Math.sqrt(lift);
+    const clamped  = Math.min(1 + MAX_DELTA, Math.max(1 - MAX_DELTA, dampened));
+    base.badges[key] = +clamped.toFixed(3);
+  }
+
+  // Per-grade — need 80+ in each grade bucket. PRIME players are rarer so
+  // we accept the slightly higher bar; SKIP is the dominant population.
+  // Scratched records already excluded from `all`.
+  for (const grade of GRADE_KEYS) {
+    const withGrade = all.filter(r => r.grade === grade);
+    if (withGrade.length < 80) continue;
+    const gRate = withGrade.filter(r => r.homered).length / withGrade.length;
+    const lift = gRate / overallRate;
+    if (!isFinite(lift) || lift <= 0) continue;
+    const dampened = Math.sqrt(lift);
+    const clamped  = Math.min(1 + MAX_DELTA, Math.max(1 - MAX_DELTA, dampened));
+    base.grades[grade] = +clamped.toFixed(3);
+  }
+
+  base.ready = samples >= MIN_SAMPLES_TO_CALIBRATE;
+  return base;
+}
+
+/**
+ * End-to-end reconcile-and-recompute for one date. Returns the updated
+ * log (caller writes it back to R2). When `yesterdayPredictions` is null
+ * we still trim/return the log without appending; that handles the case
+ * where today's first cron run already happened earlier and we no longer
+ * have access to yesterday's snapshot.
+ */
+export async function reconcileDate(date, yesterdayPredictions, priorLog) {
+  let log = priorLog || { dates: [], records: {} };
+  if (log.dates?.includes(date)) {
+    // Already reconciled this date on an earlier run today. Idempotent.
+    console.log(`[calib] ${date} already in log — skipping reconciliation`);
+    return log;
+  }
+  if (!yesterdayPredictions || !yesterdayPredictions.length) {
+    console.warn(`[calib] no predictions available for ${date} — skipping reconciliation`);
+    return log;
+  }
+  const result = await fetchHomerersForDate(date);
+  if (!result) {
+    console.warn(`[calib] failed to fetch box scores for ${date} — skipping`);
+    return log;
+  }
+  const { homerers, played } = result;
+  const reconciled = yesterdayPredictions.map(p => ({
+    ...p,
+    homered:      homerers.has(p.playerId),
+    actuallyPlayed: played.has(p.playerId),
+  }));
+  const homerCount   = reconciled.filter(r => r.homered).length;
+  const scratchCount = reconciled.filter(r => !r.actuallyPlayed).length;
+  console.log(`[calib] reconciled ${reconciled.length} predictions for ${date}, ${homerCount} hit (${(homerCount / reconciled.length * 100).toFixed(1)}% rate)`);
+
+  // Scratch breakdown by lineup confirmation state (survivorship-bias audit).
+  // Confirmed-then-scratched is more surprising/important than unconfirmed-then-scratched.
+  if (scratchCount > 0 && reconciled.some(r => r.lineupConfirmed != null)) {
+    const scratchedConfirmed   = reconciled.filter(r => !r.actuallyPlayed && r.lineupConfirmed === true).length;
+    const scratchedUnconfirmed = reconciled.filter(r => !r.actuallyPlayed && r.lineupConfirmed === false).length;
+    const scratchedUnknown     = reconciled.filter(r => !r.actuallyPlayed && r.lineupConfirmed == null).length;
+    console.log(`[calib] ${date} scratches: ${scratchCount} total — confirmed-then-scratched: ${scratchedConfirmed}, unconfirmed: ${scratchedUnconfirmed}, unknown: ${scratchedUnknown}`);
+  } else if (scratchCount > 0) {
+    console.log(`[calib] ${date} scratches: ${scratchCount} (lineupConfirmed not tracked in this snapshot)`);
+  }
+
+  return appendToLog(log, date, reconciled);
+}
+
+/**
+ * Self-healing back-sweep for late-game / transient reconcile misses.
+ *
+ * `reconcileDate` runs ONCE per date (it skips a date already in the log), so a
+ * date first reconciled while a late west-coast game was still in progress
+ * freezes those batters as misses forever — even though a home run is a fact
+ * that shows up in the box score once the game goes Final. (This is exactly
+ * what stranded a PRIME pick whose HR landed in a late AZ game: logged
+ * homered=false, never corrected, quietly deflating the measured hit rate.)
+ *
+ * Each cron run this re-checks the most recent `n` logged dates and UPGRADES
+ * any record that actually homered (false → true) + marks it played. The
+ * upgrade is MONOTONIC — never true → false — so a transient empty MLB
+ * response can't regress good data (a HR can't un-happen). Once every game on
+ * a date is Final the date is recorded in `settledDates` and never re-fetched,
+ * so steady-state cost is roughly one in-progress day's box scores per run.
+ *
+ * Returns the (mutated) log; safe to call every run.
+ */
+export async function repairRecentDays(log, n = 3) {
+  if (!log?.dates?.length) return log;
+  const settled = new Set(log.settledDates || []);
+  let totalFixed = 0;
+  for (const date of log.dates.slice(-n)) {
+    if (settled.has(date)) continue;                 // already complete — skip the fetch
+    const records = log.records?.[date];
+    if (!Array.isArray(records) || !records.length) continue;
+    const result = await fetchHomerersForDate(date).catch(() => null);
+    if (!result) continue;
+    const { homerers, played, allFinal } = result;
+    let fixed = 0;
+    for (const r of records) {
+      const pid = Number(r.playerId);
+      if (r.homered !== true && homerers.has(pid)) {
+        r.homered = true;
+        r.actuallyPlayed = true;
+        fixed++;
+      } else if (r.actuallyPlayed !== true && played.has(pid)) {
+        r.actuallyPlayed = true;                      // batted after all — not a scratch
+      }
+    }
+    if (fixed) {
+      totalFixed += fixed;
+      console.log(`[calib] repair: ${date} corrected ${fixed} late-miss record(s) → homered`);
+    }
+    // Every game Final ⇒ box-score data is complete; stop re-fetching this date.
+    if (allFinal) settled.add(date);
+  }
+  log.settledDates = [...settled].filter(d => log.dates.includes(d));   // prune to rolling window
+  if (totalFixed) console.log(`[calib] repair: upgraded ${totalFixed} false-miss record(s) across last ${n} day(s)`);
+  return log;
+}

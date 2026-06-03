@@ -1,0 +1,228 @@
+{
+  "_meta": {
+    "description": "MLB outfield wall distances at five reference points per park: LF foul line, LF-CF power alley (left-center gap), dead center, RF-CF power alley (right-center gap), RF foul line. All distances in feet. lfWallHt/rfWallHt included only for notably tall walls.",
+    "units": "feet",
+    "source": "Web-verified 2025-26 configurations. Primary sources: Wikipedia ballpark articles, MLB.com official facts & figures pages, CBS Sports / ESPN / MLB.com press releases, Royals/Orioles/Tigers official announcements. Power alleys interpolated where unpublished (marked in notes).",
+    "generatedAt": "2026-06-01",
+    "notes": "KC 2026 walls per Royals press release Jan 2026 (LF 347, alleys 379, CF 410, RF 344). BAL LF wall moved in for 2025 per Orioles announcement (373-374 range from prior 384). Dodger CF actual distance 400 ft though posted as 395 since 1973 — 400 used here. OAK uses Sutter Health Park Sacramento 2025; power alleys interpolated from Google Maps measurement published on social media (~375 LC, ~368 RC). ARI deep-alley markers at 413 are behind the posted 374 power alley signs; 374 used as standard power alley. CWS/STL/TOR power alleys sourced from MLB.com history pages and Wikipedia. SEA/TB right-center interpolated from published three-point data where five-point not found."
+  },
+  "fences": {
+    "ARI": {
+      "lfLine": 330,
+      "lfGap": 374,
+      "cf": 407,
+      "rfGap": 374,
+      "rfLine": 334
+    },
+    "ATL": {
+      "lfLine": 335,
+      "lfGap": 385,
+      "cf": 400,
+      "rfGap": 375,
+      "rfLine": 325
+    },
+    "BAL": {
+      "lfLine": 333,
+      "lfGap": 373,
+      "cf": 400,
+      "rfGap": 373,
+      "rfLine": 318,
+      "note": "LF wall moved in for 2025 to ~373-374 ft from prior 384 ft (2022-24 config). Wikipedia 2025 config: LF straight-away 373, deep-LC 376, CF 400."
+    },
+    "BOS": {
+      "lfLine": 310,
+      "lfGap": 379,
+      "cf": 390,
+      "rfGap": 380,
+      "rfLine": 302,
+      "lfWallHt": 37
+    },
+    "CHC": {
+      "lfLine": 355,
+      "lfGap": 368,
+      "cf": 400,
+      "rfGap": 368,
+      "rfLine": 353
+    },
+    "CWS": {
+      "lfLine": 330,
+      "lfGap": 375,
+      "cf": 400,
+      "rfGap": 375,
+      "rfLine": 335
+    },
+    "CIN": {
+      "lfLine": 328,
+      "lfGap": 379,
+      "cf": 404,
+      "rfGap": 370,
+      "rfLine": 325
+    },
+    "CLE": {
+      "lfLine": 325,
+      "lfGap": 370,
+      "cf": 400,
+      "rfGap": 375,
+      "rfLine": 325,
+      "lfWallHt": 19
+    },
+    "COL": {
+      "lfLine": 347,
+      "lfGap": 390,
+      "cf": 415,
+      "rfGap": 375,
+      "rfLine": 350
+    },
+    "DET": {
+      "lfLine": 342,
+      "lfGap": 370,
+      "cf": 412,
+      "rfGap": 365,
+      "rfLine": 330
+    },
+    "HOU": {
+      "lfLine": 315,
+      "lfGap": 362,
+      "cf": 409,
+      "rfGap": 373,
+      "rfLine": 326
+    },
+    "KC": {
+      "lfLine": 347,
+      "lfGap": 379,
+      "cf": 410,
+      "rfGap": 379,
+      "rfLine": 344,
+      "note": "2026 dimensions per Royals Jan 2026 press release: LF pulled in 9 ft to 347, alleys in 10 ft to 379, CF unchanged at 410, RF pulled in 9 ft to 344. Wall height reduced from 10 to 8.5 ft."
+    },
+    "LAA": {
+      "lfLine": 347,
+      "lfGap": 390,
+      "cf": 396,
+      "rfGap": 370,
+      "rfLine": 350
+    },
+    "LAD": {
+      "lfLine": 330,
+      "lfGap": 375,
+      "cf": 400,
+      "rfGap": 375,
+      "rfLine": 330,
+      "note": "CF posted as 395 on wall since 1973; actual surveyed distance is 400 ft."
+    },
+    "MIA": {
+      "lfLine": 344,
+      "lfGap": 386,
+      "cf": 400,
+      "rfGap": 387,
+      "rfLine": 335
+    },
+    "MIL": {
+      "lfLine": 342,
+      "lfGap": 370,
+      "cf": 400,
+      "rfGap": 374,
+      "rfLine": 345
+    },
+    "MIN": {
+      "lfLine": 339,
+      "lfGap": 377,
+      "cf": 404,
+      "rfGap": 367,
+      "rfLine": 328
+    },
+    "NYM": {
+      "lfLine": 335,
+      "lfGap": 370,
+      "cf": 408,
+      "rfGap": 375,
+      "rfLine": 330
+    },
+    "NYY": {
+      "lfLine": 318,
+      "lfGap": 399,
+      "cf": 408,
+      "rfGap": 385,
+      "rfLine": 314
+    },
+    "OAK": {
+      "lfLine": 330,
+      "lfGap": 375,
+      "cf": 403,
+      "rfGap": 368,
+      "rfLine": 325,
+      "note": "Sutter Health Park, Sacramento. Official: LF 330, CF 403, RF 325. Alleys interpolated from Google Maps measurement (Jon Anderson / @JonPgh, Jan 2025): LC ~375, RC ~368."
+    },
+    "PHI": {
+      "lfLine": 329,
+      "lfGap": 374,
+      "cf": 401,
+      "rfGap": 369,
+      "rfLine": 330
+    },
+    "PIT": {
+      "lfLine": 325,
+      "lfGap": 389,
+      "cf": 399,
+      "rfGap": 375,
+      "rfLine": 320,
+      "rfWallHt": 21
+    },
+    "SD": {
+      "lfLine": 336,
+      "lfGap": 386,
+      "cf": 396,
+      "rfGap": 391,
+      "rfLine": 331
+    },
+    "SF": {
+      "lfLine": 339,
+      "lfGap": 399,
+      "cf": 391,
+      "rfGap": 415,
+      "rfLine": 309
+    },
+    "SEA": {
+      "lfLine": 331,
+      "lfGap": 378,
+      "cf": 401,
+      "rfGap": 381,
+      "rfLine": 326
+    },
+    "STL": {
+      "lfLine": 336,
+      "lfGap": 375,
+      "cf": 400,
+      "rfGap": 375,
+      "rfLine": 335
+    },
+    "TB": {
+      "lfLine": 315,
+      "lfGap": 370,
+      "cf": 404,
+      "rfGap": 370,
+      "rfLine": 322
+    },
+    "TEX": {
+      "lfLine": 329,
+      "lfGap": 372,
+      "cf": 407,
+      "rfGap": 374,
+      "rfLine": 326
+    },
+    "TOR": {
+      "lfLine": 328,
+      "lfGap": 381,
+      "cf": 400,
+      "rfGap": 372,
+      "rfLine": 328
+    },
+    "WSH": {
+      "lfLine": 337,
+      "lfGap": 377,
+      "cf": 402,
+      "rfGap": 370,
+      "rfLine": 335
+    }
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "name": "statfax-model-lab",
+  "private": true,
+  "type": "module",
+  "description": "Offline lab for forking + iterating on the StatFax HR probability model.",
+  "scripts": {
+    "pull": "node pull-data.mjs",
+    "backtest": "node backtest.mjs",
+    "train": "node train-logreg.mjs",
+    "score": "node score-offline.mjs"
+  }
+}

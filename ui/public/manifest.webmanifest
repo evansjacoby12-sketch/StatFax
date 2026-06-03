@@ -1,0 +1,13 @@
+{
+  "name": "StatFax — HR Model Board",
+  "short_name": "StatFax",
+  "description": "MLB home-run prop model board",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#080b11",
+  "theme_color": "#080b11",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
