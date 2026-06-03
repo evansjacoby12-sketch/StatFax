@@ -2348,12 +2348,10 @@ button.th:hover {
 .th.sortable {
   gap: 4px;
 }
+/* No sort-hint icon on inactive headers — only the actively-sorted column shows
+   its chevron. Keeps XHR (and the rest) clean. */
 .th.sortable .sort-hint {
-  opacity: 0;
-  transition: opacity 0.15s;
-}
-.th.sortable:hover .sort-hint {
-  opacity: 0.5;
+  display: none;
 }
 
 /* ============ Game-context chips ============ */
