@@ -94,5 +94,33 @@ pull it. Joining `inputs-<date>.json` (by `id`/`gamePk`) to the reconciled
 outcomes in `backtest-log.json` is what lets you compute a real AUC/Brier delta
 for any engine change.
 
+## ⏳ Pending validation — retro-check by ~2026-06-17
+
+Three model changes shipped (2026-06-03) on **within-grade audit evidence**
+(`npm run lab:audit`), but only the first has a clean outcome-validated history:
+
+| change | evidence | status |
+|---|---|---|
+| **Due bonus removed** (`dueBonus`/`dueAndHotBonus` → 0) | due bats homer LESS; PRIME 32% vs 46% for grademates | falsified on 11d/2.6k rows ✓ |
+| **`hot` up-weight** (cap 15→20, slope 200→240) | +17.6 within STRONG, +16.2 SKIP, +8.6 LEAN | **needs held-out re-score** |
+| **`homeEdge` up-weight** (tiers 5→7, 3→5) | +8.4 PRIME, +8.0 STRONG | **needs held-out re-score** |
+
+The two up-weights shipped early on the same standard that justified killing Due,
+but were **not** confirmed against outcomes (the inputs corpus started logging
+2026-06-03, so only 1 day existed). **To-do once ~2 weeks of `dist/inputs-*.json`
+have accrued:**
+
+1. Pull/accumulate the dated input files into `model-lab/data/`.
+2. Join them (by `id`/`gamePk`) to reconciled outcomes in `backtest-log.json`.
+3. Re-score baseline vs. up-weighted engine and compare real **AUC/Brier**
+   (extend `model-lab/ab-rescore.mjs`, which already A/Bs two bundles on frozen
+   inputs — add the outcome join).
+4. If the up-weights beat baseline → keep. If not → revert (one commit each);
+   the prototype also lives isolated on branch `claude/hot-home-upweight`.
+
+`npm run lab:audit` should also be re-run as days accrue to re-police every
+signal (it's what caught Due, and currently flags `cold` as possibly too weak
+and `dayEdge`/`launchPad` as noisy).
+
 Originated from HRSauce; this copy is standalone and has no git history, no
 remote, no commits required.
