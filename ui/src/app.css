@@ -4127,3 +4127,17 @@ button.th:hover {
   .zone-grid { max-width: 100%; }
   .pitch-row { grid-template-columns: 1.2fr 1.4fr 0.6fr 0.8fr 0.6fr; font-size: 12px; gap: 5px; }
 }
+
+/* Desktop: keep the whole filter bar on a single row (search flexes to fit). */
+@media (min-width: 1080px) {
+  .filters-row {
+    flex-wrap: nowrap;
+  }
+  .filters-row > .search {
+    min-width: 0;
+    flex: 1 1 200px;
+  }
+  .view-toggle {
+    flex: none;
+  }
+}
