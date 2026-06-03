@@ -2770,8 +2770,16 @@ button.th:hover {
     font-size: 15px;
     min-width: 0;
   }
+  /* Larger, more readable board text on phones (matches a comfortable
+     pinch-zoom level by default). */
   .batter-name {
-    font-size: 15px;
+    font-size: 17px;
+  }
+  .batter-line2 {
+    font-size: 13px;
+  }
+  .team-tag {
+    font-size: 12.5px;
   }
 }
 
