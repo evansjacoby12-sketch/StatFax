@@ -56,6 +56,10 @@
   background: color-mix(in srgb, var(--bg) 78%, transparent);
   backdrop-filter: blur(14px) saturate(140%);
   border-bottom: 1px solid var(--border);
+  /* Sit above the filter bar's blur layer so the header help dropdown isn't
+     clipped behind it (each backdrop-filter creates its own stacking context). */
+  position: relative;
+  z-index: 2;
 }
 .header-left {
   display: flex;
