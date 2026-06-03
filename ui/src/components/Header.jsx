@@ -1,6 +1,66 @@
+import { useState, useRef, useEffect } from 'react'
 import Icon from './Icon.jsx'
 import { timeAgo, pct } from '../lib/format.js'
 import { GRADE_ORDER, gradeColor } from '../lib/badges.js'
+
+// Help dropdown anchored to the header info button: Guide, How to Pick, Legend.
+function HelpMenu({ onOpenGuide, onOpenHowTo, onOpenLegend }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+  useEffect(() => {
+    if (!open) return
+    const onDoc = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
+    }
+    const onKey = (e) => e.key === 'Escape' && setOpen(false)
+    document.addEventListener('mousedown', onDoc)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDoc)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [open])
+  const items = [
+    { label: 'How to Pick', desc: 'HR-selection playbook', icon: 'Target', fn: onOpenHowTo },
+    { label: 'Guide', desc: 'How the board works', icon: 'Info', fn: onOpenGuide },
+    { label: 'Legend', desc: 'Grades, signals & stats', icon: 'Trophy', fn: onOpenLegend },
+  ]
+  return (
+    <div className="help-menu" ref={ref}>
+      <button
+        className={`icon-btn ${open ? 'on' : ''}`}
+        onClick={() => setOpen((o) => !o)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        title="Help — Guide, How to Pick, Legend"
+        aria-label="Help"
+      >
+        <Icon name="Info" size={16} />
+      </button>
+      {open && (
+        <div className="view-menu-pop" role="menu">
+          {items.map((it) => (
+            <button
+              key={it.label}
+              role="menuitem"
+              className="vm-item"
+              onClick={() => {
+                it.fn()
+                setOpen(false)
+              }}
+            >
+              <Icon name={it.icon} size={16} />
+              <span className="vm-txt">
+                <b>{it.label}</b>
+                <span className="dim">{it.desc}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 export default function Header({
   meta,
@@ -15,6 +75,8 @@ export default function Header({
   refreshing,
   gradeCounts = {},
   total = 0,
+  onOpenGuide,
+  onOpenHowTo,
 }) {
   const m = meta.modelMetrics
   const brierEdge = m ? (m.baselineBrier - m.brier) / m.baselineBrier : null
@@ -104,9 +166,7 @@ export default function Header({
           Auto
         </button>
 
-        <button className="icon-btn" onClick={onOpenLegend} title="Legend — grades, signals, stats" aria-label="Legend">
-          <Icon name="Info" size={16} />
-        </button>
+        <HelpMenu onOpenGuide={onOpenGuide} onOpenHowTo={onOpenHowTo} onOpenLegend={onOpenLegend} />
 
         <button
           className={`icon-btn ${refreshing ? 'refreshing' : ''}`}

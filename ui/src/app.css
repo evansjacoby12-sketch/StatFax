@@ -3773,3 +3773,9 @@ button.th:hover {
   background: var(--card-2); color: var(--bad); font-size: 12px;
   white-space: pre-wrap; text-align: left; overflow: auto;
 }
+
+/* Help dropdown on the header info button (reuses .view-menu-pop / .vm-item) */
+.help-menu {
+  position: relative;
+  display: flex;
+}

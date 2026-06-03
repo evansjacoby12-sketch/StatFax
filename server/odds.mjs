@@ -125,7 +125,9 @@ export async function fetchHrOdds(games = [], dateStr) {
       const fid = f.fixtureId ?? f.id
       let payload
       try {
-        payload = await get('/odds', { fixtureId: fid, bookmakers: BOOKS.join(','), oddsFormat: 'decimal' }, key)
+        // verbosity=3 is required to include player-prop markets (the default
+        // detail level returns only game markets — playerName null everywhere).
+        payload = await get('/odds', { fixtureId: fid, bookmakers: BOOKS.join(','), oddsFormat: 'decimal', verbosity: 3 }, key)
       } catch (e) {
         debug.oddsError = String(e)
         continue

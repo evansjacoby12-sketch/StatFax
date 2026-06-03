@@ -62,35 +62,6 @@ function ViewMenu({ view, onView, onOpenGuide, onOpenHowTo }) {
               </span>
             </button>
           ))}
-          <div className="vm-divider" />
-          <button
-            role="menuitem"
-            className="vm-item"
-            onClick={() => {
-              onOpenHowTo()
-              setOpen(false)
-            }}
-          >
-            <Icon name="Target" size={16} />
-            <span className="vm-txt">
-              <b>How to Pick</b>
-              <span className="dim">Full HR-selection playbook</span>
-            </span>
-          </button>
-          <button
-            role="menuitem"
-            className="vm-item"
-            onClick={() => {
-              onOpenGuide()
-              setOpen(false)
-            }}
-          >
-            <Icon name="Info" size={16} />
-            <span className="vm-txt">
-              <b>Guide</b>
-              <span className="dim">How the board works</span>
-            </span>
-          </button>
         </div>
       )}
     </div>

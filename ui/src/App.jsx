@@ -261,6 +261,8 @@ export default function App() {
           refreshing={refreshing}
           gradeCounts={gradeCounts}
           total={all.length}
+          onOpenGuide={() => setShowGuide(true)}
+          onOpenHowTo={() => setShowHowTo(true)}
         />
 
         <Filters
