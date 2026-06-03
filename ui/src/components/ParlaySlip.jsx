@@ -27,7 +27,7 @@ export default function ParlaySlip({ legs, onRemove, onClear, onSelect }) {
                 <button className="slip-leg-main" onClick={() => onSelect(b)} title="Open detail">
                   <span
                     className="slip-leg-grade"
-                    style={{ background: b.grade?.color || gradeColor(b.grade?.label) }}
+                    style={{ background: gradeColor(b.grade?.label) }}
                   />
                   <span className="slip-leg-name">{b.name}</span>
                   <span className="slip-leg-team">{b.team}</span>

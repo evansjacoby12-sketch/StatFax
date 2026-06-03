@@ -73,7 +73,7 @@ export default function PlayerDrawer({ batter: b, onClose, watched, inSlip, onTo
   const liveMode = useLiveMode()
   if (!b) return null
   const g = b.grade?.label || 'SKIP'
-  const color = b.grade?.color || gradeColor(g)
+  const color = gradeColor(g)
 
   return (
     <>

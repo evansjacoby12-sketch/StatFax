@@ -3,7 +3,7 @@
 export const GRADE_ORDER = ['PRIME', 'STRONG', 'LEAN', 'SKIP']
 
 export const GRADE_COLORS = {
-  PRIME: '#00d4ff',
+  PRIME: '#f5a623',
   STRONG: '#32d74b',
   LEAN: '#ffd60a',
   SKIP: '#6b7787',

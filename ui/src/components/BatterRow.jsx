@@ -19,7 +19,7 @@ export default function BatterRow({
     fn(b)
   }
   const g = b.grade?.label || 'SKIP'
-  const color = b.grade?.color || gradeColor(g)
+  const color = gradeColor(g)
   const liveMode = useLiveMode()
   const live = liveMode && b.game?.isLive
   const hrToday = liveMode && b.liveContext?.isHRThisGame

@@ -152,7 +152,7 @@ function Silo({ team, batters, ...ctx }) {
 }
 
 function SiloBatter({ b, onSelect, selectedId, watchlist, slip, onToggleWatch, onToggleSlip }) {
-  const color = b.grade?.color || gradeColor(b.grade?.label)
+  const color = gradeColor(b.grade?.label)
   const watched = watchlist.has(b.id)
   const inSlip = slip.has(b.id)
   const stop = (fn) => (e) => {

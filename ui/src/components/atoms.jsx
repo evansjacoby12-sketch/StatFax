@@ -4,7 +4,7 @@ import { pct, rate, num } from '../lib/format.js'
 
 export function GradeChip({ grade, size = 'md', score = null }) {
   const label = grade?.label || 'SKIP'
-  const color = grade?.color || gradeColor(label)
+  const color = gradeColor(label)
   return (
     <span
       className={`grade-chip grade-${size}`}
