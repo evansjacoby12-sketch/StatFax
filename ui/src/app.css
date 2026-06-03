@@ -4176,3 +4176,50 @@ button.th:hover {
     flex: none;
   }
 }
+
+/* ============ Update available banner ============ */
+.update-banner {
+  position: fixed;
+  left: 50%;
+  bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: calc(100vw - 32px);
+  padding: 10px 10px 10px 14px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
+  border: 1px solid color-mix(in srgb, var(--prime) 45%, var(--border));
+  box-shadow: var(--shadow-lg);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  animation: ubUp 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes ubUp {
+  from { opacity: 0; transform: translate(-50%, 12px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+.update-banner .ub-spark { color: var(--prime); flex: none; }
+.ub-txt { font-size: 13px; font-weight: 600; white-space: nowrap; }
+.ub-refresh {
+  flex: none;
+  border: none;
+  border-radius: 9px;
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1a1205;
+  background: var(--prime);
+}
+.ub-refresh:hover { filter: brightness(1.06); }
+.ub-x {
+  flex: none;
+  display: inline-flex;
+  border: none;
+  background: none;
+  color: var(--text-faint);
+  padding: 4px;
+}
+.ub-x:hover { color: var(--text); }

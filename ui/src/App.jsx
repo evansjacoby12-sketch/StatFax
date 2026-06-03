@@ -19,6 +19,7 @@ import Guide from './components/Guide.jsx'
 import HowToPick from './components/HowToPick.jsx'
 import Skeleton from './components/Skeleton.jsx'
 import BackToTop from './components/BackToTop.jsx'
+import UpdateBanner from './components/UpdateBanner.jsx'
 import Icon from './components/Icon.jsx'
 import './app.css'
 
@@ -378,6 +379,7 @@ export default function App() {
       {showGuide && <Guide onClose={() => setShowGuide(false)} />}
       {showHowTo && <HowToPick onClose={() => setShowHowTo(false)} />}
       <BackToTop />
+      <UpdateBanner />
     </div>
     </LiveModeContext.Provider>
   )

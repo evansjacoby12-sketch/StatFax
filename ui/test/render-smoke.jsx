@@ -21,6 +21,7 @@ import ParlaySlip from '../src/components/ParlaySlip.jsx'
 import Guide from '../src/components/Guide.jsx'
 import HowToPick from '../src/components/HowToPick.jsx'
 import Legend from '../src/components/Legend.jsx'
+import UpdateBanner from '../src/components/UpdateBanner.jsx'
 
 const SYNTH = {
   version: 4,
@@ -168,6 +169,7 @@ add('ParlaySlip', <ParlaySlip legs={batters.slice(0, 2)} onRemove={noop} onClear
 add('Guide', <Guide onClose={noop} />)
 add('HowToPick', <HowToPick onClose={noop} />)
 add('Legend', <Legend onClose={noop} />)
+add('UpdateBanner', <UpdateBanner />)
 
 let failed = 0
 for (const [name, el] of cases) {
