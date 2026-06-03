@@ -105,6 +105,9 @@ export async function loadSlate() {
       // Boolean signal: batter mashes the pitcher's most-used pitch (slate's
       // primaryPitchEdge.passes). Surfaced as the "Pitch Edge" badge/filter.
       pitchEdge: b.primaryPitchEdge?.passes === true,
+      // Boolean signal: tonight's park × weather × handedness env boosts HR.
+      // Derived from the engine's combined env delta. Surfaced as "Wx Edge".
+      wxEdge: (b.parkWeatherHandDelta ?? 0) >= 0.04,
     }
   })
 

@@ -36,6 +36,10 @@ export default function Filters({ value, onChange, gradeCounts, games, badgeCoun
             <Icon name="Crosshair" size={15} />
             Pitchers
           </button>
+          <button className={`view-btn ${view === 'weather' ? 'on' : ''}`} onClick={() => onView('weather')} title="Weather report — wind, park & air by game">
+            <Icon name="Wind" size={15} />
+            Weather
+          </button>
           <button className={`view-btn ${view === 'results' ? 'on' : ''}`} onClick={() => onView('results')} title="Model track record">
             <Icon name="Activity" size={15} />
             Results

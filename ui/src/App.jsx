@@ -9,6 +9,7 @@ import Filters from './components/Filters.jsx'
 import BatterTable from './components/BatterTable.jsx'
 import GamesView from './components/GamesView.jsx'
 import PitchersView from './components/PitchersView.jsx'
+import WeatherView from './components/WeatherView.jsx'
 import ResultsView from './components/ResultsView.jsx'
 import PlayerDrawer from './components/PlayerDrawer.jsx'
 import ParlaySlip from './components/ParlaySlip.jsx'
@@ -278,6 +279,12 @@ export default function App() {
             selectedId={selectedId}
             watchlist={watchlist}
             slip={slipSet}
+          />
+        ) : view === 'weather' ? (
+          <WeatherView
+            batters={filtered}
+            onSelect={(b) => setSelectedId(b.id)}
+            selectedId={selectedId}
           />
         ) : view === 'games' ? (
           <GamesView

@@ -5,6 +5,7 @@ import { eli5IconName, toneColor, gradeColor } from '../lib/badges.js'
 import { pct, rate, num, signedPct, american, decimalToAmerican, ordinal } from '../lib/format.js'
 import { bookLabel } from '../lib/data.js'
 import { compass, skyLabel } from '../lib/weather.js'
+import { interpretWind } from '../lib/wind.js'
 import { playerHeadshot, teamColor } from '../lib/teams.js'
 import { toolGrades, heatBreakdown, scoutVerdict, gradeLabel } from '../lib/scout.js'
 import { useLiveMode } from '../lib/liveMode.js'
@@ -433,8 +434,16 @@ function EnvSection({ b }) {
   const hasFactors = [b.gameParkHRFactor, b.parkWeatherHandFactor].some((v) => v != null)
   if (!w && !hasFactors) return null
   const sky = skyLabel(w)
+  const wind = interpretWind(w, b.game?.homeTeam?.abbr, { roofClosed: w?.roofClosed })
   return (
     <Section title="Park & weather" icon="Wind">
+      {wind && (
+        <div className="wind-verdict-line" style={{ color: wind.tint }}>
+          <Icon name="Wind" size={13} />
+          <b>{wind.verdict}</b>
+          <span>{wind.caption}</span>
+        </div>
+      )}
       {w && (
         <div className="weather">
           <WindDial deg={w.windDirDeg} speed={w.windSpeedMph} />
