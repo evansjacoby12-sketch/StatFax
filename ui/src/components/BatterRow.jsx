@@ -2,7 +2,7 @@ import Icon from './Icon.jsx'
 import { GradeChip, ProbRing, BadgeRow } from './atoms.jsx'
 import { pct, num, signedPct, american } from '../lib/format.js'
 import { gradeColor } from '../lib/badges.js'
-import { teamColor } from '../lib/teams.js'
+import { teamLogo } from '../lib/teams.js'
 import { useLiveMode } from '../lib/liveMode.js'
 
 export default function BatterRow({
@@ -51,7 +51,11 @@ export default function BatterRow({
           e.currentTarget.parentElement?.lastElementChild?.focus()
         }
       }}
-      style={{ '--row-accent': color, '--team': teamColor(b.teamId), '--i': Math.min(rank, 24) }}
+      style={{
+        '--row-accent': color,
+        '--team-logo': teamLogo(b.teamId) ? `url(${teamLogo(b.teamId)})` : 'none',
+        '--i': Math.min(rank, 24),
+      }}
     >
       <div className="col-rank mono">{rank}</div>
 
