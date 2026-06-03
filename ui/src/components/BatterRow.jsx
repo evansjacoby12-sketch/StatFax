@@ -23,13 +23,14 @@ export default function BatterRow({
   const color = gradeColor(g)
   const liveMode = useLiveMode()
   const live = liveMode && b.game?.isLive
+  const isFinal = b.game?.isFinal
   const hrToday = liveMode && b.liveContext?.isHRThisGame
   const topReason = b.reasons?.[0]
   const edge = b.edge
 
   return (
     <div
-      className={`board-row ${selected ? 'selected' : ''}`}
+      className={`board-row ${selected ? 'selected' : ''} ${isFinal ? 'final' : ''}`}
       role="button"
       tabIndex={0}
       onClick={() => onSelect(b)}
@@ -74,6 +75,7 @@ export default function BatterRow({
               <span className="live-dot" /> LIVE
             </span>
           )}
+          {isFinal && <span className="final-tag">FINAL</span>}
           {hrToday && (
             <span className="hr-tag" title="Already homered in this game">
               <Icon name="Flame" size={10} /> HR
