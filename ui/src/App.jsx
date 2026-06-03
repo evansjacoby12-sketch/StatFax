@@ -7,6 +7,7 @@ import Header from './components/Header.jsx'
 import Filters from './components/Filters.jsx'
 import BatterTable from './components/BatterTable.jsx'
 import GamesView from './components/GamesView.jsx'
+import PitchersView from './components/PitchersView.jsx'
 import ResultsView from './components/ResultsView.jsx'
 import PlayerDrawer from './components/PlayerDrawer.jsx'
 import ParlaySlip from './components/ParlaySlip.jsx'
@@ -264,6 +265,14 @@ export default function App() {
       <main className="main">
         {view === 'results' ? (
           <ResultsView meta={data.meta} />
+        ) : view === 'pitchers' ? (
+          <PitchersView
+            batters={filtered}
+            onSelect={(b) => setSelectedId(b.id)}
+            selectedId={selectedId}
+            watchlist={watchlist}
+            slip={slipSet}
+          />
         ) : view === 'games' ? (
           <GamesView
             games={data.games}

@@ -30,6 +30,10 @@ export default function Filters({ value, onChange, gradeCounts, games, badgeCoun
             <Icon name="LayoutGrid" size={15} />
             Games
           </button>
+          <button className={`view-btn ${view === 'pitchers' ? 'on' : ''}`} onClick={() => onView('pitchers')} title="Pitcher plan — vulnerability + HR targets">
+            <Icon name="Crosshair" size={15} />
+            Pitchers
+          </button>
           <button className={`view-btn ${view === 'results' ? 'on' : ''}`} onClick={() => onView('results')} title="Model track record">
             <Icon name="Activity" size={15} />
             Results
