@@ -3325,6 +3325,26 @@ button.th:hover {
   grid-template-columns: repeat(auto-fill, minmax(440px, 1fr));
   gap: 14px;
 }
+/* Weather page control bar — sort lenses + filter toggles. */
+.wx-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+.wx-sorts,
+.wx-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.wx-filters {
+  margin-left: auto;
+}
+.wx-controls + .wx-games {
+  margin-top: 14px;
+}
 .wxcard {
   border: 1px solid var(--border-soft);
   border-radius: var(--radius);

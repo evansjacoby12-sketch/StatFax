@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import Icon from './Icon.jsx'
 import { GradeChip, ProbBar } from './atoms.jsx'
 import { interpretWind, stadiumFor } from '../lib/wind.js'
@@ -7,18 +7,92 @@ import { pct, num, signedPct, gameTime } from '../lib/format.js'
 import { teamColor, teamLogo, hexToRgba } from '../lib/teams.js'
 import { useLiveMode } from '../lib/liveMode.js'
 
+// How the weather page can be ranked. Each is a distinct "what helps a HR"
+// lens: the air (park × weather × hand), the park alone, wind blowing out,
+// or heat (warm air carries the ball).
+const WX_SORTS = [
+  { key: 'air', label: 'Best air', icon: 'Wind' },
+  { key: 'park', label: 'Best parks', icon: 'Gauge' },
+  { key: 'wind', label: 'Wind out', icon: 'TrendingUp' },
+  { key: 'warm', label: 'Warmest', icon: 'Thermometer' },
+]
+
+function sortGames(games, sort) {
+  const byAir = (a, b) => (b.envFactor ?? 0) - (a.envFactor ?? 0)
+  const arr = games.slice()
+  if (sort === 'park') arr.sort((a, b) => (b.parkHR ?? 0) - (a.parkHR ?? 0) || byAir(a, b))
+  else if (sort === 'wind') arr.sort((a, b) => (b.windOutMph ?? -99) - (a.windOutMph ?? -99) || byAir(a, b))
+  else if (sort === 'warm') arr.sort((a, b) => (b.tempF ?? -99) - (a.tempF ?? -99) || byAir(a, b))
+  else arr.sort((a, b) => byAir(a, b) || (b.windOutMph ?? 0) - (a.windOutMph ?? 0))
+  return arr
+}
+
 // Weather Report — one card per game, ranked by how much tonight's park + air
 // helps home runs. Wind gets the real OUT/IN verdict (engine port). Reuses the
 // already-filtered batter list so the board's filters narrow the slate.
 export default function WeatherView({ batters, onSelect, selectedId }) {
-  const games = useMemo(() => groupWeather(batters), [batters])
-  if (!games.length) return <div className="empty-note">No games match the current filters.</div>
+  const [sort, setSort] = useState('air')
+  const [outdoorOnly, setOutdoorOnly] = useState(false)
+  const [favorableOnly, setFavorableOnly] = useState(false)
+
+  const allGames = useMemo(() => groupWeather(batters), [batters])
+  const games = useMemo(() => {
+    let list = allGames
+    if (outdoorOnly) list = list.filter((g) => !g.closed)
+    if (favorableOnly) list = list.filter((g) => (g.envFactor ?? 0) >= 1.03)
+    return sortGames(list, sort)
+  }, [allGames, sort, outdoorOnly, favorableOnly])
+
+  if (!allGames.length) return <div className="empty-note">No games match the current filters.</div>
+
   return (
-    <div className="wx-games">
-      {games.map((g) => (
-        <WeatherCard key={g.gamePk} g={g} onSelect={onSelect} selectedId={selectedId} />
-      ))}
-    </div>
+    <>
+      <div className="wx-controls">
+        <div className="wx-sorts" role="group" aria-label="Sort games by">
+          {WX_SORTS.map((s) => (
+            <button
+              key={s.key}
+              className={`badge-toggle ${sort === s.key ? 'on' : ''}`}
+              onClick={() => setSort(s.key)}
+              aria-pressed={sort === s.key}
+            >
+              <Icon name={s.icon} size={12} />
+              {s.label}
+            </button>
+          ))}
+        </div>
+        <div className="wx-filters">
+          <button
+            className={`badge-toggle ${outdoorOnly ? 'on' : ''}`}
+            onClick={() => setOutdoorOnly((o) => !o)}
+            aria-pressed={outdoorOnly}
+            title="Hide domes & closed roofs (no wind/air effect)"
+          >
+            <Icon name="Sun" size={12} />
+            Outdoor only
+          </button>
+          <button
+            className={`badge-toggle ${favorableOnly ? 'on' : ''}`}
+            onClick={() => setFavorableOnly((f) => !f)}
+            aria-pressed={favorableOnly}
+            title="Only HR-friendly air (≥ +3% park × weather)"
+          >
+            <Icon name="Flame" size={12} />
+            Favorable
+          </button>
+        </div>
+      </div>
+
+      {games.length ? (
+        <div className="wx-games">
+          {games.map((g) => (
+            <WeatherCard key={g.gamePk} g={g} onSelect={onSelect} selectedId={selectedId} />
+          ))}
+        </div>
+      ) : (
+        <div className="empty-note">No games match these weather filters.</div>
+      )}
+    </>
   )
 }
 
@@ -40,6 +114,10 @@ function groupWeather(batters) {
     const home = e.game?.homeTeam?.abbr
     e.wind = interpretWind(e.weather, home, { roofClosed: e.weather?.roofClosed })
     e.stadium = stadiumFor(home)
+    // Derived metrics the control bar sorts/filters on.
+    e.closed = !!(e.weather?.roofClosed || e.stadium?.type === 'Fixed Dome')
+    e.tempF = e.weather?.tempF ?? null
+    e.windOutMph = e.closed ? null : (e.wind?.windOutMph ?? null)
     // Most weather-helped bats first (fall back to model HR prob).
     e.helped = e.batters
       .slice()
@@ -50,10 +128,6 @@ function groupWeather(batters) {
       )
     return e
   })
-  // Rank games by the air: most HR-friendly env first, then wind blowing out.
-  list.sort(
-    (a, b) => (b.envFactor ?? 0) - (a.envFactor ?? 0) || (b.wind?.windOutMph ?? 0) - (a.wind?.windOutMph ?? 0),
-  )
   return list
 }
 
