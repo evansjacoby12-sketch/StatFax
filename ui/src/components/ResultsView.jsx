@@ -27,6 +27,7 @@ function computeAuc(rows) {
 export default function ResultsView({ meta }) {
   const [log, setLog] = useState(null)
   const [err, setErr] = useState(null)
+  const [hrDay, setHrDay] = useState(null) // null = all days
   useEffect(() => {
     let alive = true
     fetch(`${import.meta.env.BASE_URL}data/backtest-log.json`, { cache: 'no-store' })
@@ -89,6 +90,9 @@ export default function ResultsView({ meta }) {
   const topHRs = rows
     .filter((r) => (r.grade === 'PRIME' || r.grade === 'STRONG') && r.homered)
     .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : (b.score ?? 0) - (a.score ?? 0)))
+  const hrDates = [...new Set(topHRs.map((r) => r.date))] // already newest-first
+  const activeDay = hrDay && hrDates.includes(hrDay) ? hrDay : null
+  const shownHRs = activeDay ? topHRs.filter((r) => r.date === activeDay) : topHRs
 
   return (
     <div className="results">
@@ -128,11 +132,25 @@ export default function ResultsView({ meta }) {
       <section className="results-card">
         <h3 className="section-title">
           <Icon name="Flame" size={14} /> Top-tier home runs
-          <span className="dim" style={{ fontWeight: 400, marginLeft: 6 }}>· {topHRs.length} PRIME/STRONG cashed</span>
+          <span className="dim" style={{ fontWeight: 400, marginLeft: 6 }}>
+            · {shownHRs.length} PRIME/STRONG {activeDay ? `on ${activeDay.slice(5)}` : 'cashed'}
+          </span>
         </h3>
-        {topHRs.length ? (
+        {hrDates.length > 1 && (
+          <div className="hr-days">
+            <button className={`hr-day ${!activeDay ? 'on' : ''}`} onClick={() => setHrDay(null)}>
+              All
+            </button>
+            {hrDates.map((d) => (
+              <button key={d} className={`hr-day ${activeDay === d ? 'on' : ''}`} onClick={() => setHrDay(d)}>
+                {d.slice(5)}
+              </button>
+            ))}
+          </div>
+        )}
+        {shownHRs.length ? (
           <ul className="hr-feed">
-            {topHRs.map((r, i) => (
+            {shownHRs.map((r, i) => (
               <li className="hr-feed-row" key={`${r.playerId}-${r.date}-${i}`}>
                 <span className="hr-feed-date mono dim">{r.date.slice(5)}</span>
                 <img className="hr-feed-photo" src={playerHeadshot(r.playerId, 64)} alt="" loading="lazy" />

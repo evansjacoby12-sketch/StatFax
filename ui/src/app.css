@@ -3642,3 +3642,38 @@ button.th:hover {
 .hr-feed .grade-chip {
   flex-shrink: 0;
 }
+
+/* Day filter chips for the top-tier HR feed */
+.hr-days {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 8px;
+  margin-bottom: 4px;
+}
+.hr-days::-webkit-scrollbar {
+  display: none;
+}
+.hr-day {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  border-radius: 7px;
+  border: 1px solid var(--border-soft);
+  background: transparent;
+  color: var(--text-faint);
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: color 0.14s, border-color 0.14s, background 0.14s;
+}
+.hr-day:hover {
+  color: var(--text-dim);
+  border-color: var(--border);
+}
+.hr-day.on {
+  color: var(--prime);
+  border-color: color-mix(in srgb, var(--prime) 45%, transparent);
+  background: rgba(0, 212, 255, 0.1);
+}
