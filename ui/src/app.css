@@ -433,6 +433,23 @@ button.th:hover {
   display: flex;
   justify-content: center;
 }
+/* Center the LABEL of numeric headers over their data by floating the sort icon
+   to the right edge (out of flow) so it doesn't shift the label off-center. */
+.th.col-grade,
+.th.col-xhr,
+.th.col-rating,
+.th.col-edge {
+  position: relative;
+}
+.th.col-grade > svg,
+.th.col-xhr > svg,
+.th.col-rating > svg,
+.th.col-edge > svg {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+}
 
 .board-body {
   display: flex;
