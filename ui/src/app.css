@@ -2542,16 +2542,41 @@ button.th:hover {
 }
 
 /* ============ Filters disclosure ============ */
-.more-btn .badge-toggle-n {
-  background: var(--card-2);
-  border-radius: 5px;
-  padding: 0 5px;
+/* Compact chevron toggle for the expandable filter panel. Fixed-size square so
+   activating a filter never changes its width (no row reflow); the active count
+   rides in the corner. */
+.chevron-btn {
+  position: relative;
+  width: 38px;
+  padding: 0;
+  justify-content: center;
 }
-/* Keep the count's width reserved when there's no active filter, so toggling a
-   filter on/off never changes the button width (which would reflow the wrapping
-   filter row and make the button jump to another line on narrow screens). */
-.more-btn .badge-toggle-n.is-empty {
-  visibility: hidden;
+.chevron-btn svg {
+  transition: transform 0.2s ease;
+  color: var(--text-dim);
+}
+.chevron-btn.open svg {
+  transform: rotate(180deg);
+}
+.chevron-btn.on svg {
+  color: var(--prime);
+}
+.chevron-btn .more-count {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 16px;
+  height: 16px;
+  display: grid;
+  place-items: center;
+  padding: 0 4px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  color: #04222b;
+  background: var(--prime);
+  border: 1.5px solid var(--bg);
 }
 .filters-panel {
   width: 100%;

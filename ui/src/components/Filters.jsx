@@ -92,18 +92,16 @@ export default function Filters({ value, onChange, gradeCounts, games, badgeCoun
         </div>
 
         <button
-          className={`toggle-btn more-btn ${open || activeMore ? 'on' : ''}`}
+          className={`toggle-btn more-btn chevron-btn ${open ? 'open' : ''} ${activeMore ? 'on' : ''}`}
           onClick={() => setOpen((o) => !o)}
           aria-expanded={open}
+          aria-label={`Filters${activeMore ? ` (${activeMore} active)` : ''}`}
           title="More filters: game, lineup, watchlist, signals"
         >
-          <Icon name="SlidersHorizontal" size={14} />
-          Filters
-          {/* Always rendered (hidden when zero) so the button width — and thus
-              its place in the wrapping filter row — never shifts when a filter
-              becomes active. */}
-          <span className={`badge-toggle-n mono${activeMore > 0 ? '' : ' is-empty'}`}>{activeMore || 0}</span>
-          <Icon name={open ? 'ChevronUp' : 'ChevronDown'} size={13} />
+          <Icon name="ChevronDown" size={18} />
+          {/* Count sits absolutely in the corner so the button stays a fixed
+              square — toggling a filter never changes its width or reflows the row. */}
+          {activeMore > 0 && <span className="more-count mono">{activeMore}</span>}
         </button>
         </>
         )}
