@@ -1,11 +1,89 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import Icon from './Icon.jsx'
 import { GRADE_ORDER, gradeColor, BADGES } from '../lib/badges.js'
 import { SORTS } from '../lib/constants.js'
 import { useLiveMode } from '../lib/liveMode.js'
 import { hexA } from './atoms.jsx'
 
-export default function Filters({ value, onChange, gradeCounts, games, badgeCounts, watchCount, view, onView }) {
+const MENU_VIEWS = [
+  { key: 'pitchers', tab: 'Pitchers', label: 'Pitcher Plan', icon: 'Crosshair', desc: 'Vulnerability + HR targets' },
+  { key: 'weather', tab: 'Weather', label: 'Weather Report', icon: 'Wind', desc: 'Wind, park & air by game' },
+]
+
+function ViewMenu({ view, onView, onOpenGuide }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+  useEffect(() => {
+    if (!open) return
+    const onDoc = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
+    }
+    const onKey = (e) => {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('mousedown', onDoc)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDoc)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [open])
+
+  const active = MENU_VIEWS.find((m) => m.key === view)
+  return (
+    <div className="view-menu" ref={ref}>
+      <button
+        className={`view-btn view-menu-btn ${active ? 'on' : ''}`}
+        onClick={() => setOpen((o) => !o)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        title="More views & guide"
+      >
+        <Icon name={active?.icon || 'Layers'} size={15} />
+        {active ? active.tab : 'More'}
+        <Icon name="ChevronDown" size={12} />
+      </button>
+      {open && (
+        <div className="view-menu-pop" role="menu">
+          {MENU_VIEWS.map((m) => (
+            <button
+              key={m.key}
+              role="menuitem"
+              className={`vm-item ${view === m.key ? 'on' : ''}`}
+              onClick={() => {
+                onView(m.key)
+                setOpen(false)
+              }}
+            >
+              <Icon name={m.icon} size={16} />
+              <span className="vm-txt">
+                <b>{m.label}</b>
+                <span className="dim">{m.desc}</span>
+              </span>
+            </button>
+          ))}
+          <div className="vm-divider" />
+          <button
+            role="menuitem"
+            className="vm-item"
+            onClick={() => {
+              onOpenGuide()
+              setOpen(false)
+            }}
+          >
+            <Icon name="Info" size={16} />
+            <span className="vm-txt">
+              <b>Guide</b>
+              <span className="dim">How the board works</span>
+            </span>
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+export default function Filters({ value, onChange, gradeCounts, games, badgeCounts, watchCount, view, onView, onOpenGuide }) {
   const v = value
   const liveMode = useLiveMode()
   const [open, setOpen] = useState(false)
@@ -32,18 +110,11 @@ export default function Filters({ value, onChange, gradeCounts, games, badgeCoun
             <Icon name="LayoutGrid" size={15} />
             Games
           </button>
-          <button className={`view-btn ${view === 'pitchers' ? 'on' : ''}`} onClick={() => onView('pitchers')} title="Pitcher plan — vulnerability + HR targets">
-            <Icon name="Crosshair" size={15} />
-            Pitchers
-          </button>
-          <button className={`view-btn ${view === 'weather' ? 'on' : ''}`} onClick={() => onView('weather')} title="Weather report — wind, park & air by game">
-            <Icon name="Wind" size={15} />
-            Weather
-          </button>
           <button className={`view-btn ${view === 'results' ? 'on' : ''}`} onClick={() => onView('results')} title="Model track record">
             <Icon name="Activity" size={15} />
             Results
           </button>
+          <ViewMenu view={view} onView={onView} onOpenGuide={onOpenGuide} />
         </div>
 
         {view === 'results' ? null : (

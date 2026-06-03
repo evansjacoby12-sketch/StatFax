@@ -14,6 +14,7 @@ import ResultsView from './components/ResultsView.jsx'
 import PlayerDrawer from './components/PlayerDrawer.jsx'
 import ParlaySlip from './components/ParlaySlip.jsx'
 import Legend from './components/Legend.jsx'
+import Guide from './components/Guide.jsx'
 import Skeleton from './components/Skeleton.jsx'
 import BackToTop from './components/BackToTop.jsx'
 import Icon from './components/Icon.jsx'
@@ -42,6 +43,7 @@ export default function App() {
   const [filters, setFilters] = useState(initialFilters)
   const [selectedId, setSelectedId] = useState(null)
   const [showLegend, setShowLegend] = useState(false)
+  const [showGuide, setShowGuide] = useState(false)
   const [watchlist, setWatchlist] = useState(() => new Set(store.load('watchlist', [])))
   const [slipIds, setSlipIds] = useState(() => store.load('slip', []))
   const [autoRefresh, setAutoRefresh] = useState(() => store.load('autoRefresh', false))
@@ -107,13 +109,14 @@ export default function App() {
   useEffect(() => {
     const onKey = (e) => {
       if (e.key === 'Escape') {
-        if (showLegend) setShowLegend(false)
+        if (showGuide) setShowGuide(false)
+        else if (showLegend) setShowLegend(false)
         else if (selectedId) setSelectedId(null)
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [selectedId, showLegend])
+  }, [selectedId, showLegend, showGuide])
 
   const patch = useCallback((p) => setFilters((f) => ({ ...f, ...p })), [])
 
@@ -266,6 +269,7 @@ export default function App() {
           watchCount={watchlist.size}
           view={view}
           onView={setView}
+          onOpenGuide={() => setShowGuide(true)}
         />
       </div>
 
@@ -338,6 +342,7 @@ export default function App() {
         />
       )}
       {showLegend && <Legend onClose={() => setShowLegend(false)} />}
+      {showGuide && <Guide onClose={() => setShowGuide(false)} />}
       <BackToTop />
     </div>
     </LiveModeContext.Provider>
