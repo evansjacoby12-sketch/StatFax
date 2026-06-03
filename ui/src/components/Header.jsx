@@ -91,7 +91,7 @@ export default function Header({
             <span className="brand-name">
               Stat<span className="brand-accent">Fax</span>
             </span>
-            <span className="brand-sub">HR Model Board</span>
+            <span className="brand-sub">Model Board</span>
           </div>
         </div>
         <div className="slate-block">
