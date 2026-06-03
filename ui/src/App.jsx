@@ -326,7 +326,7 @@ export default function App() {
       <footer className="foot">
         <span className="dim">
           StatFax brain v{data.meta.version} · scored {data.meta.stats?.scoredBatters} batters across{' '}
-          {data.games.length} games · {data.meta.stats?.oddsPlayerCount || 0} with market odds
+          {data.games.length} games
         </span>
       </footer>
 
