@@ -8,3 +8,4 @@ dist/*
 !dist/backtest-log.json
 *.out.json
 .env
+.omc/

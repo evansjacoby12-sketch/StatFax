@@ -36,7 +36,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       # Persist the rolling reconcile/backtest log across runs (drives
       # calibration + the Results view). Unique key always saves; restore-keys
