@@ -55,9 +55,6 @@ export default function BatterTable({
         <div className="th col-signals" title="Active model signals (hot, due, edges…)">
           Signals
         </div>
-        <HeadCol k="edge" className="col-edge" title="Model probability vs best book price (EV%)">
-          Edge
-        </HeadCol>
         <div className="th col-actions" title="Watchlist & parlay" />
       </div>
 

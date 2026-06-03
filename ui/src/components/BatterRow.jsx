@@ -117,17 +117,6 @@ export default function BatterRow({
         <BadgeRow batter={b} max={4} />
       </div>
 
-      <div className="col-edge">
-        {edge != null ? (
-          <div className={`edge-cell ${edge >= 0 ? 'pos' : 'neg'}`}>
-            <span className="edge-val mono">{signedPct(edge, 0)}</span>
-            <span className="edge-price mono">{american(b.odds?.best?.american)}</span>
-          </div>
-        ) : (
-          <span className="edge-none">—</span>
-        )}
-      </div>
-
       <div className="col-actions">
         <button
           className={`act-btn star ${watched ? 'on' : ''}`}

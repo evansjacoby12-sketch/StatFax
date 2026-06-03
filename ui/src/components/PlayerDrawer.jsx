@@ -106,7 +106,6 @@ export default function PlayerDrawer({ batter: b, onClose, watched, inSlip, onTo
           <StatcastSection b={b} />
           <EnvSection b={b} />
           <PitcherSection b={b} />
-          <OddsSection b={b} />
           {liveMode && b.game?.isLive && <LiveSection b={b} />}
           <TechReasons b={b} />
         </div>

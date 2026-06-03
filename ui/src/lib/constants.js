@@ -12,7 +12,6 @@ export const SORTS = [
   { key: 'hrProbability', label: 'HR Probability' },
   { key: 'score', label: 'Model Score' },
   { key: 'heat', label: 'Heat Index' },
-  { key: 'edge', label: 'Market Edge' },
   { key: 'battingOrder', label: 'Lineup Spot' },
   { key: 'name', label: 'Name' },
 ]

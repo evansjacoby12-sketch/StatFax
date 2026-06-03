@@ -384,7 +384,7 @@
 .board-head,
 .board-row {
   display: grid;
-  grid-template-columns: 44px minmax(220px, 1.7fr) 86px minmax(150px, 1fr) 78px 92px minmax(104px, 0.9fr) 88px 92px;
+  grid-template-columns: 44px minmax(220px, 1.7fr) 86px minmax(150px, 1fr) 78px 92px minmax(104px, 0.9fr) 92px;
   align-items: center;
   gap: 12px;
   padding: 0 16px;
@@ -1445,7 +1445,7 @@ button.th:hover {
 @media (max-width: 1080px) {
   .board-head,
   .board-row {
-    grid-template-columns: 38px minmax(190px, 1.7fr) 80px minmax(140px, 1fr) 72px 88px 84px 88px;
+    grid-template-columns: 38px minmax(190px, 1.7fr) 80px minmax(140px, 1fr) 72px 88px 88px;
   }
   .col-signals {
     display: none;
