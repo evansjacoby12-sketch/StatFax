@@ -12,7 +12,8 @@
     "lab:pull": "node model-lab/pull-data.mjs",
     "lab:backtest": "node model-lab/backtest.mjs",
     "lab:train": "node model-lab/train-logreg.mjs",
-    "lab:score": "node model-lab/score-offline.mjs"
+    "lab:score": "node model-lab/score-offline.mjs",
+    "lab:audit": "node model-lab/badge-audit.mjs"
   },
   "devDependencies": {
     "esbuild": "^0.28.0"

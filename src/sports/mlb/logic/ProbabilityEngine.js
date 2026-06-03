@@ -1324,11 +1324,17 @@ export function scoreBatter(
     }
   }
 
-  // Who's Due: scale dueScore (0–100) to a max +12 bonus
-  const dueBonus = due ? Math.round(dueScore * 0.12) : 0;
+  // Who's Due — ZERO score contribution (was dueScore*0.12, max +12). The "due"
+  // hunch is the gambler's fallacy: an 11-day / 2,646-row audit found due bats
+  // homer LESS, not more (univariate lift 0.88×; within PRIME 32.2% vs 46.3%
+  // for grademates; L2-logistic weight −0.517). It was promoting cold bats into
+  // good tiers. `due`/`dueScore` are still computed for the narrative badge —
+  // they just no longer move the score. See README "Capturing inputs".
+  const dueBonus = 0;
 
-  // Due + Hot combo: player is both "owed" HRs AND currently hitting well — prime regression target
-  const dueAndHotBonus = (due && hot && hotScore >= 6) ? 5 : 0;
+  // Due + Hot combo removed (was +5): audit showed hot&due ≈ hot alone (25.1% vs
+  // 24.3%) — the combo carried no extra information.
+  const dueAndHotBonus = 0;
 
   // Recent batted-ball surge (−4 to +6): barrel% over the last ~14 days vs the
   // batter's season barrel rate. Squaring the ball up RIGHT NOW is a sharper
