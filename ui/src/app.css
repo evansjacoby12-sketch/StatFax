@@ -317,6 +317,85 @@
 .select-wrap select option {
   background: var(--panel);
 }
+/* Custom themed dropdown (Select.jsx) — the native popup can't be styled. */
+.sel {
+  position: relative;
+  cursor: pointer;
+}
+.sel-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--text);
+  font-size: 13px;
+  font-family: inherit;
+}
+.sel-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sel-chev {
+  color: var(--text-faint);
+  flex: none;
+  transition: transform 0.18s ease;
+}
+.sel.open .sel-chev {
+  transform: rotate(180deg);
+}
+.sel-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 100%;
+  max-height: 320px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 5px;
+  list-style: none;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow-lg);
+  z-index: 45;
+  animation: selPop 0.14s ease;
+}
+@keyframes selPop {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.sel-opt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  background: none;
+  border-radius: 7px;
+  color: var(--text-dim);
+  font-size: 13px;
+  font-family: inherit;
+  text-align: left;
+  white-space: nowrap;
+}
+.sel-opt:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+.sel-opt.on {
+  color: var(--prime);
+  background: color-mix(in srgb, var(--prime) 12%, transparent);
+  font-weight: 600;
+}
 .toggle-btn {
   display: flex;
   align-items: center;

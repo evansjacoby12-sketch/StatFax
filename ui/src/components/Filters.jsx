@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import Icon from './Icon.jsx'
+import Select from './Select.jsx'
 import { GRADE_ORDER, gradeColor, BADGES } from '../lib/badges.js'
 import { SORTS } from '../lib/constants.js'
 import { useLiveMode } from '../lib/liveMode.js'
@@ -91,16 +92,14 @@ export default function Filters({ value, onChange, gradeCounts, games, badgeCoun
 
         <div className="filters-spacer" />
 
-        <div className="select-wrap" title="Sort">
-          <Icon name="ArrowUpDown" size={14} />
-          <select value={v.sort} onChange={(e) => onChange({ sort: e.target.value })} aria-label="Sort by">
-            {SORTS.map((s) => (
-              <option key={s.key} value={s.key}>
-                {s.label}
-              </option>
-            ))}
-          </select>
-        </div>
+        <Select
+          icon="ArrowUpDown"
+          title="Sort"
+          ariaLabel="Sort by"
+          value={v.sort}
+          onChange={(val) => onChange({ sort: val })}
+          options={SORTS.map((s) => ({ value: s.key, label: s.label }))}
+        />
 
         <button
           className={`toggle-btn more-btn chevron-btn ${open ? 'open' : ''} ${activeMore ? 'on' : ''}`}
@@ -134,18 +133,20 @@ export default function Filters({ value, onChange, gradeCounts, games, badgeCoun
       {showFilters && open && (
         <div className="filters-panel">
           <div className="filters-row fp-controls">
-            <div className="select-wrap" title="Filter by game">
-              <Icon name="MapPin" size={14} />
-              <select value={v.gamePk} onChange={(e) => onChange({ gamePk: e.target.value })} aria-label="Filter by game">
-                <option value="">All games</option>
-                {games.map((g) => (
-                  <option key={g.gamePk} value={g.gamePk}>
-                    {g.awayTeam.abbr} @ {g.homeTeam.abbr}
-                    {liveMode && g.isLive ? ' · LIVE' : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <Select
+              icon="MapPin"
+              title="Filter by game"
+              ariaLabel="Filter by game"
+              value={v.gamePk}
+              onChange={(val) => onChange({ gamePk: val })}
+              options={[
+                { value: '', label: 'All games' },
+                ...games.map((g) => ({
+                  value: g.gamePk,
+                  label: `${g.awayTeam.abbr} @ ${g.homeTeam.abbr}${liveMode && g.isLive ? ' · LIVE' : ''}`,
+                })),
+              ]}
+            />
 
             <button
               className={`toggle-btn ${v.confirmedOnly ? 'on' : ''}`}
