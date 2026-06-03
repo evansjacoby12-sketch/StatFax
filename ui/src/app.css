@@ -3733,23 +3733,23 @@ button.th:hover {
 
 /* Circular HR-probability gauge (board) */
 .prob-ring {
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
   flex-shrink: 0;
+  overflow: visible;
 }
-.prob-ring-hole {
-  width: calc(100% - 7px);
-  height: calc(100% - 7px);
-  border-radius: 50%;
-  background: var(--panel);
-  display: grid;
-  place-items: center;
+.prob-ring .pr-track {
+  stroke: var(--card-2);
 }
-.prob-ring-val {
+.prob-ring .pr-val {
   font-size: 15px;
   font-weight: 700;
-  line-height: 1;
+}
+/* Right-aligned sortable headers: put the sort icon left of the label so the
+   label hugs the right edge and lines up over the right-aligned numbers. */
+.th.col-prob svg,
+.th.col-xhr svg,
+.th.col-rating svg,
+.th.col-edge svg {
+  order: -1;
 }
 
 /* Error-boundary fallback (never blank the screen on a crash) */

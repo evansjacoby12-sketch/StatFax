@@ -62,23 +62,46 @@ export function ProbBar({ value, max = 0.28, color = 'var(--prime)', showLabel =
   )
 }
 
-// Circular 0–100 HR-probability gauge. The ring fills to value×100 (HR% tops out
-// near ~31), and the center shows the whole-number percent; grade color.
-export function ProbRing({ value, color = 'var(--prime)', size = 46 }) {
+// Circular 0–100 HR-probability gauge — a rounded SVG progress arc on a track
+// (fills to value×100; HR% tops out near ~31). Center shows the whole-number
+// percent in the grade color, with a faint glow.
+export function ProbRing({ value, color = 'var(--prime)', size = 48 }) {
   const has = value != null && !Number.isNaN(value)
   const pctVal = Math.max(0, Math.min(100, (value || 0) * 100))
+  const stroke = 4
+  const r = (size - stroke) / 2
+  const c = 2 * Math.PI * r
+  const dash = (pctVal / 100) * c
+  const mid = size / 2
   return (
-    <div
+    <svg
       className="prob-ring"
-      style={{ width: size, height: size, background: `conic-gradient(${color} ${pctVal * 3.6}deg, var(--card-2) 0)` }}
-      title={has ? `HR probability ${pct(value, 1)}` : 'No probability'}
+      width={size}
+      height={size}
+      viewBox={`0 0 ${size} ${size}`}
+      role="img"
+      aria-label={has ? `HR probability ${pct(value, 1)}` : 'No probability'}
     >
-      <div className="prob-ring-hole">
-        <span className="prob-ring-val mono" style={{ color }}>
-          {has ? Math.round(pctVal) : '—'}
-        </span>
-      </div>
-    </div>
+      <title>{has ? `HR probability ${pct(value, 1)}` : 'No probability'}</title>
+      <circle className="pr-track" cx={mid} cy={mid} r={r} strokeWidth={stroke} fill="none" />
+      {has && (
+        <circle
+          cx={mid}
+          cy={mid}
+          r={r}
+          fill="none"
+          stroke={color}
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          strokeDasharray={`${dash} ${c - dash}`}
+          transform={`rotate(-90 ${mid} ${mid})`}
+          style={{ filter: `drop-shadow(0 0 3px ${color})`, transition: 'stroke-dasharray .35s ease' }}
+        />
+      )}
+      <text className="pr-val mono" x={mid} y={mid} textAnchor="middle" dominantBaseline="central" fill={color}>
+        {has ? Math.round(pctVal) : '—'}
+      </text>
+    </svg>
   )
 }
 
