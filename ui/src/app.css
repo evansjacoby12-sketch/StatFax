@@ -79,8 +79,8 @@
   place-items: center;
   border-radius: 10px;
   color: #06222b;
-  background: linear-gradient(135deg, var(--prime), #28e0b0);
-  box-shadow: 0 4px 16px rgba(0, 212, 255, 0.35);
+  background: linear-gradient(135deg, var(--prime), #f7b955);
+  box-shadow: 0 4px 16px rgba(245, 158, 11, 0.35);
 }
 .brand-txt {
   display: flex;
@@ -338,7 +338,7 @@
 .toggle-btn.on {
   color: var(--prime);
   border-color: color-mix(in srgb, var(--prime) 45%, transparent);
-  background: rgba(0, 212, 255, 0.1);
+  background: rgba(245, 158, 11, 0.1);
 }
 
 .badges-row-label {
@@ -1827,7 +1827,7 @@ button.th:hover {
 }
 .wd-arrow {
   fill: var(--prime);
-  filter: drop-shadow(0 0 4px rgba(0, 212, 255, 0.5));
+  filter: drop-shadow(0 0 4px rgba(245, 158, 11, 0.5));
 }
 .wd-spd {
   fill: var(--text);
@@ -1909,7 +1909,7 @@ button.th:hover {
 }
 .view-btn.on {
   color: #04222b;
-  background: linear-gradient(135deg, var(--prime), #28e0b0);
+  background: linear-gradient(135deg, var(--prime), #f7b955);
 }
 
 /* ============ Games view ============ */
@@ -2644,7 +2644,7 @@ button.th:hover {
   padding: 0 7px 0 10px;
   border-radius: 8px;
   border: 1px solid color-mix(in srgb, var(--prime) 35%, var(--border));
-  background: rgba(0, 212, 255, 0.08);
+  background: rgba(245, 158, 11, 0.08);
   color: var(--text);
   font-size: 12px;
   font-weight: 600;
@@ -3694,7 +3694,7 @@ button.th:hover {
 .hr-day.on {
   color: var(--prime);
   border-color: color-mix(in srgb, var(--prime) 45%, transparent);
-  background: rgba(0, 212, 255, 0.1);
+  background: rgba(245, 158, 11, 0.1);
 }
 
 /* Name glows red when a batter has already homered today (live mode). */
@@ -3768,7 +3768,7 @@ button.th:hover {
 .crash-card h2 { margin: 0 0 8px; font-size: 18px; }
 .crash-reload {
   margin: 14px 0; padding: 9px 18px; border-radius: 10px;
-  border: 1px solid var(--prime); background: rgba(0, 212, 255, 0.12);
+  border: 1px solid var(--prime); background: rgba(245, 158, 11, 0.12);
   color: var(--prime); font-weight: 700; cursor: pointer;
 }
 .crash-err {
