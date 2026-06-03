@@ -71,6 +71,7 @@ jobs:
       - name: Build UI
         run: |
           npm --prefix ui install
+          npm --prefix ui run smoke   # headless-render every view against the slate; fails the deploy on a crash
           npm --prefix ui run build
 
       - name: Upload Pages artifact
