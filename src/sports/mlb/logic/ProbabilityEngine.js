@@ -117,7 +117,11 @@ function hotBatScore(season, recent) {
   if (!season || !recent?.ab || recent.ab < 12) return 0;
   const gap = computeISO(recent) - computeISO(season);
   if (gap < 0.020) return 0;
-  return Math.min(15, Math.round(gap * 200));
+  // Up-weighted: cap 15→20, slope 200→240. lab:audit shows hot bats beat their
+  // own grademates by +17.6 (STRONG) / +16.2 (SKIP) / +8.6 (LEAN) — the single
+  // strongest positive signal, previously under-credited. Modest bump, not fit
+  // to the sample; confirm the gain with a held-out re-score before shipping.
+  return Math.min(20, Math.round(gap * 240));
 }
 
 /**
@@ -1311,11 +1315,13 @@ export function scoreBatter(
     const hasEnoughSample = homeAB >= 50 && awayAB >= 50;
     if (hasEnoughSample && homeISO != null && awayISO != null) {
       const diff = isHomeGame ? (homeISO - awayISO) : (awayISO - homeISO);
+      // Up-weighted tiers (5→7, 3→5): lab:audit shows homeEdge bats beat their
+      // grademates by +8.4 (PRIME) / +8.0 (STRONG) — consistently under-credited.
       if (diff >= 0.045) {
-        homeAwayAdj = 5;
+        homeAwayAdj = 7;
         if (isHomeGame) homeEdge = true; else awayEdge = true;
       } else if (diff >= 0.025) {
-        homeAwayAdj = 3;
+        homeAwayAdj = 5;
         if (isHomeGame) homeEdge = true; else awayEdge = true;
       } else if (diff <= -0.025) {
         homeAwayAdj = -2;
