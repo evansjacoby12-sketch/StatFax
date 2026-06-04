@@ -11,6 +11,7 @@ import GamesView from './components/GamesView.jsx'
 import PitchersView from './components/PitchersView.jsx'
 import WeatherView from './components/WeatherView.jsx'
 import GroupsView from './components/GroupsView.jsx'
+import BacktestView from './components/BacktestView.jsx'
 import ResultsView from './components/ResultsView.jsx'
 import PlayerDrawer from './components/PlayerDrawer.jsx'
 import ZoneView from './components/ZoneView.jsx'
@@ -62,6 +63,7 @@ export default function App() {
   const [showGuide, setShowGuide] = useState(false)
   const [showHowTo, setShowHowTo] = useState(false)
   const [showGroups, setShowGroups] = useState(false)
+  const [showBacktest, setShowBacktest] = useState(false)
   const [watchlist, setWatchlist] = useState(() => new Set(store.load('watchlist', [])))
   const [slipIds, setSlipIds] = useState(() => store.load('slip', []))
   const [autoRefresh, setAutoRefresh] = useState(() => store.load('autoRefresh', false))
@@ -140,6 +142,7 @@ export default function App() {
     const onKey = (e) => {
       if (e.key === 'Escape') {
         if (zoneId) setZoneId(null)
+        else if (showBacktest) setShowBacktest(false)
         else if (showGroups) setShowGroups(false)
         else if (showHowTo) setShowHowTo(false)
         else if (showGuide) setShowGuide(false)
@@ -149,7 +152,7 @@ export default function App() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [selectedId, showLegend, showGuide, showHowTo, zoneId, showGroups])
+  }, [selectedId, showLegend, showGuide, showHowTo, zoneId, showGroups, showBacktest])
 
   const patch = useCallback((p) => setFilters((f) => ({ ...f, ...p })), [])
 
@@ -299,6 +302,7 @@ export default function App() {
           onOpenGuide={() => setShowGuide(true)}
           onOpenHowTo={() => setShowHowTo(true)}
           onOpenGroups={() => setShowGroups(true)}
+          onOpenBacktest={() => setShowBacktest(true)}
         />
 
         <Filters
@@ -401,6 +405,21 @@ export default function App() {
                 selectedId={selectedId}
               />
             </div>
+          </div>
+        </>
+      )}
+      {showBacktest && (
+        <>
+          <div className="drawer-scrim" onClick={() => setShowBacktest(false)} />
+          <div className="modal backtest-modal" role="dialog" aria-modal="true" aria-label="Signal Backtest">
+            <button className="drawer-close icon-btn" onClick={() => setShowBacktest(false)} aria-label="Close">
+              <Icon name="X" size={18} />
+            </button>
+            <div className="groups-modal-head">
+              <Icon name="Activity" size={18} />
+              <h2>Signal Backtest</h2>
+            </div>
+            <BacktestView />
           </div>
         </>
       )}

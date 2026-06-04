@@ -4638,3 +4638,54 @@ button.th:hover {
   border-radius: 50%;
   background: var(--accent);
 }
+
+/* ============ Signal Backtest ============ */
+.backtest-modal { width: 680px; padding: 20px 22px; }
+.bt-intro { font-size: 12.5px; line-height: 1.5; margin: 4px 0 14px; }
+.bt-group { margin-bottom: 14px; }
+.bt-glabel {
+  display: block;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+  margin-bottom: 7px;
+}
+.bt-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.bt-result {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-top: 18px;
+  padding: 16px 18px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--card);
+}
+.bt-result.good { border-color: color-mix(in srgb, var(--good) 50%, var(--border)); }
+.bt-result.bad { border-color: color-mix(in srgb, var(--bad) 50%, var(--border)); }
+.bt-result.warn { border-color: color-mix(in srgb, var(--warn) 45%, var(--border)); }
+.bt-stat { display: flex; flex-direction: column; gap: 2px; }
+.bt-stat-v { font-size: 22px; font-weight: 800; }
+.bt-result.good .bt-stat:first-child .bt-stat-v { color: var(--good); }
+.bt-result.bad .bt-stat:first-child .bt-stat-v { color: var(--bad); }
+.bt-stat-k {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-faint);
+}
+.bt-reset {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--card-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-dim);
+  font-size: 12px;
+  padding: 6px 10px;
+}
+.bt-reset:hover { color: var(--text); }
+.bt-warn { margin-top: 10px; font-size: 12px; color: var(--warn); }
