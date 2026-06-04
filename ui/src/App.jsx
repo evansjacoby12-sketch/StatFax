@@ -29,7 +29,7 @@ const AUTO_REFRESH_MS = 60_000
 
 // Each view is its own page via a URL hash (#board, #pitchers, …) — bookmarkable
 // and back/forward navigable. Hash routing works as-is on static hosting.
-const VIEWS = new Set(['board', 'games', 'pitchers', 'weather', 'groups', 'results'])
+const VIEWS = new Set(['board', 'games', 'pitchers', 'weather', 'results'])
 const viewFromHash = () => {
   const h = (typeof location !== 'undefined' ? location.hash : '').replace(/^#\/?/, '')
   return VIEWS.has(h) ? h : null
@@ -61,6 +61,7 @@ export default function App() {
   const [showLegend, setShowLegend] = useState(false)
   const [showGuide, setShowGuide] = useState(false)
   const [showHowTo, setShowHowTo] = useState(false)
+  const [showGroups, setShowGroups] = useState(false)
   const [watchlist, setWatchlist] = useState(() => new Set(store.load('watchlist', [])))
   const [slipIds, setSlipIds] = useState(() => store.load('slip', []))
   const [autoRefresh, setAutoRefresh] = useState(() => store.load('autoRefresh', false))
@@ -139,6 +140,7 @@ export default function App() {
     const onKey = (e) => {
       if (e.key === 'Escape') {
         if (zoneId) setZoneId(null)
+        else if (showGroups) setShowGroups(false)
         else if (showHowTo) setShowHowTo(false)
         else if (showGuide) setShowGuide(false)
         else if (showLegend) setShowLegend(false)
@@ -147,7 +149,7 @@ export default function App() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [selectedId, showLegend, showGuide, showHowTo, zoneId])
+  }, [selectedId, showLegend, showGuide, showHowTo, zoneId, showGroups])
 
   const patch = useCallback((p) => setFilters((f) => ({ ...f, ...p })), [])
 
@@ -296,6 +298,7 @@ export default function App() {
           total={all.length}
           onOpenGuide={() => setShowGuide(true)}
           onOpenHowTo={() => setShowHowTo(true)}
+          onOpenGroups={() => setShowGroups(true)}
         />
 
         <Filters
@@ -313,8 +316,6 @@ export default function App() {
       <main className="main">
         {view === 'results' ? (
           <ResultsView meta={data.meta} />
-        ) : view === 'groups' ? (
-          <GroupsView batters={all} onSelect={(b) => setSelectedId(b.id)} selectedId={selectedId} />
         ) : view === 'pitchers' ? (
           <PitchersView
             batters={all}
@@ -379,6 +380,30 @@ export default function App() {
         />
       )}
       {zoneBatter && <ZoneView batter={zoneBatter} onClose={() => setZoneId(null)} />}
+      {showGroups && (
+        <>
+          <div className="drawer-scrim" onClick={() => setShowGroups(false)} />
+          <div className="modal groups-modal" role="dialog" aria-modal="true" aria-label="Cross-Game HR Groups">
+            <button className="drawer-close icon-btn" onClick={() => setShowGroups(false)} aria-label="Close">
+              <Icon name="X" size={18} />
+            </button>
+            <div className="groups-modal-head">
+              <Icon name="Layers" size={18} />
+              <h2>Cross-Game HR Groups</h2>
+            </div>
+            <div className="groups-modal-body">
+              <GroupsView
+                batters={all}
+                onSelect={(b) => {
+                  setShowGroups(false)
+                  setSelectedId(b.id)
+                }}
+                selectedId={selectedId}
+              />
+            </div>
+          </div>
+        </>
+      )}
       {showLegend && <Legend onClose={() => setShowLegend(false)} />}
       {showGuide && <Guide onClose={() => setShowGuide(false)} />}
       {showHowTo && <HowToPick onClose={() => setShowHowTo(false)} />}

@@ -4527,3 +4527,33 @@ button.th:hover {
 @media (max-width: 720px) {
   .grp-list { grid-template-columns: 1fr; }
 }
+
+/* Groups modal (opened from the info menu) */
+.groups-modal {
+  width: 960px;
+  padding: 20px 22px;
+}
+.groups-modal-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+.groups-modal-head h2 {
+  margin: 0;
+  font-size: 18px;
+}
+.groups-modal-head svg {
+  color: var(--accent);
+}
+.groups-modal-body .grp-controls {
+  margin-top: 12px;
+}
+.groups-modal-body .grp-list {
+  grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+}
+@media (max-width: 720px) {
+  .groups-modal-body .grp-list {
+    grid-template-columns: 1fr;
+  }
+}
