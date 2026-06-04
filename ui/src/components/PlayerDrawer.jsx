@@ -101,6 +101,7 @@ export default function PlayerDrawer({ batter: b, onClose, watched, inSlip, onTo
           <HeroNumbers b={b} color={color} />
           <ScoutReport b={b} />
           <ZoneTeaser b={b} onOpen={onOpenZone} />
+          <HrFormSection b={b} />
           <PaCurve b={b} color={color} />
           <Why b={b} />
           <StatsSection b={b} />
@@ -695,6 +696,90 @@ function ZoneTeaser({ b, onOpen }) {
         </div>
       </button>
     </Section>
+  )
+}
+
+// Recent HR-rate over windows (LineTerminal-style sample-aware bars) + the two
+// situational splits we carry. Honest framing: it's HR-per-AB, not a per-game
+// "hit rate" (we don't log game-by-game), with the sample shown beside each bar.
+const HRF_MAX = 0.08 // ~8% HR/AB fills the bar (elite territory)
+function hrfTone(r) {
+  if (r == null) return ''
+  if (r >= 0.05) return 'good'
+  if (r >= 0.03) return 'warn'
+  return 'bad'
+}
+function HrFormSection({ b }) {
+  const windows = [
+    { k: 'L7', w: b.recent7 },
+    { k: 'L30', w: b.recent },
+    { k: 'Season', w: b.season },
+  ].map(({ k, w }) => {
+    const ab = w?.ab ?? 0
+    const hr = w?.hr ?? 0
+    return { k, hr, ab, rate: ab ? hr / ab : null }
+  })
+  if (!windows.some((x) => x.ab)) return null
+  return (
+    <Section title="HR form" icon="Flame">
+      <div className="hrform">
+        {windows.map(({ k, hr, ab, rate }) => (
+          <div className="hrf-row" key={k}>
+            <span className="hrf-k">{k}</span>
+            <span className="hrf-bar">
+              <span
+                className={`hrf-fill ${hrfTone(rate)}`}
+                style={{ width: rate == null ? '0%' : `${Math.min(100, (rate / HRF_MAX) * 100)}%` }}
+              />
+            </span>
+            <span className="hrf-val mono">{rate == null ? '—' : pct(rate, 1)}</span>
+            <span className="hrf-sub dim">{ab ? `${hr} HR · ${ab} AB` : 'no sample'}</span>
+          </div>
+        ))}
+      </div>
+      <SplitChips b={b} />
+    </Section>
+  )
+}
+
+function SplitRow({ label, left, right }) {
+  const lv = left.iso
+  const rv = right.iso
+  const betterLeft = (lv ?? -1) >= (rv ?? -1)
+  return (
+    <div className="split-row">
+      <span className="split-label dim">{label}</span>
+      <span className={`split-side ${betterLeft && lv != null ? 'better' : ''} ${left.tonight ? 'tonight' : ''}`}>
+        {left.name}
+        {left.tonight && <span className="split-dot" title="Tonight" />}
+        <b className="mono">{lv != null ? rate(lv) : '—'}</b>
+      </span>
+      <span className={`split-side ${!betterLeft && rv != null ? 'better' : ''} ${right.tonight ? 'tonight' : ''}`}>
+        {right.name}
+        {right.tonight && <span className="split-dot" title="Tonight" />}
+        <b className="mono">{rv != null ? rate(rv) : '—'}</b>
+      </span>
+    </div>
+  )
+}
+
+function SplitChips({ b }) {
+  const ha = b.homeAwaySplits
+  const dn = b.dayNightSplits
+  if (!ha && !dn) return null
+  return (
+    <div className="split-chips">
+      {ha && (ha.homeISO != null || ha.awayISO != null) && (
+        <SplitRow
+          label="ISO · home / away"
+          left={{ name: 'Home', iso: ha.homeISO, tonight: b.isHome === true }}
+          right={{ name: 'Away', iso: ha.awayISO, tonight: b.isHome === false }}
+        />
+      )}
+      {dn && (dn.dayISO != null || dn.nightISO != null) && (
+        <SplitRow label="ISO · day / night" left={{ name: 'Day', iso: dn.dayISO }} right={{ name: 'Night', iso: dn.nightISO }} />
+      )}
+    </div>
   )
 }
 

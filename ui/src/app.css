@@ -4557,3 +4557,84 @@ button.th:hover {
     grid-template-columns: 1fr;
   }
 }
+
+/* ============ Drawer HR form + splits ============ */
+.hrform {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.hrf-row {
+  display: grid;
+  grid-template-columns: 46px 1fr 46px auto;
+  align-items: center;
+  gap: 9px;
+}
+.hrf-k {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+.hrf-bar {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--card-2);
+  overflow: hidden;
+}
+.hrf-fill {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: var(--text-faint);
+  transition: width 0.35s ease;
+}
+.hrf-fill.good { background: var(--good); }
+.hrf-fill.warn { background: var(--warn); }
+.hrf-fill.bad { background: var(--bad); }
+.hrf-val {
+  font-size: 12px;
+  font-weight: 700;
+  text-align: right;
+}
+.hrf-sub {
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+.split-chips {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.split-row {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr 1fr;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+.split-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.split-side {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-dim);
+}
+.split-side b {
+  color: var(--text);
+  font-weight: 700;
+}
+.split-side.better,
+.split-side.better b {
+  color: var(--good);
+}
+.split-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+}
