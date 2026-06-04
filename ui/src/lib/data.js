@@ -108,6 +108,9 @@ export async function loadSlate() {
       // Boolean signal: tonight's park × weather × handedness env boosts HR.
       // parkWeatherHandFactor is a multiplier (1.0 = neutral); flag a ≥5% boost.
       wxEdge: (b.parkWeatherHandFactor ?? 1) >= 1.05,
+      // Boolean signal: elite barrel rate (top ~10% of MLB, ≥13% of batted
+      // balls). Matches the backend's barrelKing definition (backtest/reconcile).
+      barrelKing: (b.barrelPctBBE ?? b.barrelPct ?? 0) >= 13,
       // Pitch-type matchup data for the Zone page: the batter's own arsenal
       // (SLG/RV/Whiff per pitch) and the opposing starter's mix (usage% + shape).
       arsenal: d.batterArsenal?.[b.playerId] || null,
