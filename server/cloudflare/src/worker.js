@@ -42,6 +42,10 @@ export default {
    */
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+    // Natural-language → backtest-filter parser (used by the Signal Backtest UI).
+    if (url.pathname === '/parse') {
+      return handleParse(request, env);
+    }
     if (url.pathname !== '/' && url.pathname !== '/trigger') {
       return new Response('Not found', { status: 404 });
     }
@@ -102,4 +106,115 @@ async function triggerSlateRefresh(env) {
   // 204 No Content on success — no body to read.
   console.log(`Dispatched ${eventType} to ${repo}`);
   return { ok: true, status: res.status, body: '' };
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * Natural-language backtest parser
+ * ─────────────────────────────────────────────────────────────────────────
+ * POST /parse  { query, grades:[...allowed], signals:[...allowed] }
+ *   → { grades:[...], signals:[...] }   (a subset of the allowed lists)
+ *
+ * The LLM (Claude Haiku) ONLY translates English → the existing filter chips.
+ * It never sees the data or does math — the browser runs the returned filter
+ * against the backtest log it already loaded. Cheap (tool-use, tiny prompt,
+ * cached system block).
+ *
+ * Required Worker secret:  ANTHROPIC_API_KEY  (wrangler secret put)
+ * Optional Worker var:     ALLOW_ORIGIN       (default "*"; set to your site)
+ */
+const ANTHROPIC_MODEL = 'claude-haiku-4-5-20251001';
+
+function corsHeaders(env) {
+  return {
+    'Access-Control-Allow-Origin': env.ALLOW_ORIGIN || '*',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+  };
+}
+function jsonResponse(obj, status, env) {
+  return new Response(JSON.stringify(obj), {
+    status,
+    headers: { 'Content-Type': 'application/json', ...corsHeaders(env) },
+  });
+}
+
+async function handleParse(request, env) {
+  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders(env) });
+  if (request.method !== 'POST') return jsonResponse({ error: 'POST only' }, 405, env);
+
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return jsonResponse({ error: 'bad json' }, 400, env);
+  }
+  const query = String(body.query || '').slice(0, 500).trim();
+  const grades = Array.isArray(body.grades) && body.grades.length ? body.grades : ['PRIME', 'STRONG', 'LEAN', 'SKIP'];
+  const signals = Array.isArray(body.signals) ? body.signals : [];
+  if (!query) return jsonResponse({ grades: [], signals: [] }, 200, env);
+  if (!env.ANTHROPIC_API_KEY) return jsonResponse({ error: 'ANTHROPIC_API_KEY not set on the worker' }, 500, env);
+
+  const tool = {
+    name: 'apply_filters',
+    description: 'Select the grade tiers and signal flags that match the request.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        grades: {
+          type: 'array',
+          items: { type: 'string', enum: grades },
+          description: 'Grade tiers to include (OR). Empty = all grades.',
+        },
+        signals: {
+          type: 'array',
+          items: { type: 'string', enum: signals },
+          description: 'Signal flags that must ALL be present (AND). Empty = no signal filter.',
+        },
+      },
+      required: ['grades', 'signals'],
+    },
+  };
+  const system =
+    `You translate a baseball bettor's plain-English request into a StatFax home-run backtest filter.\n` +
+    `Grade tiers (quality, best→worst): PRIME > STRONG > LEAN > SKIP.\n` +
+    `Signal flags available: ${signals.join(', ') || '(none)'}.\n` +
+    `Map the request to the closest grades and signals using ONLY the exact enum values provided.\n` +
+    `If a concept has no matching signal (e.g. handedness, home/away, a specific team), omit it rather than forcing one.\n` +
+    `Examples: "hot bats"→signals:["hot"]; "best plays"/"elite"→grades:["PRIME"]; "due hitters"→signals:["due"]; ` +
+    `"strong or better"→grades:["PRIME","STRONG"]. Prefer few, confident filters.`;
+
+  let data;
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: env.ANTHROPIC_MODEL || ANTHROPIC_MODEL,
+        max_tokens: 256,
+        // Cache the (stable) instructions so repeat queries are cheaper.
+        system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
+        tools: [tool],
+        tool_choice: { type: 'tool', name: 'apply_filters' },
+        messages: [{ role: 'user', content: query }],
+      }),
+    });
+    if (!resp.ok) {
+      const detail = (await resp.text()).slice(0, 300);
+      return jsonResponse({ error: 'LLM error', status: resp.status, detail }, 502, env);
+    }
+    data = await resp.json();
+  } catch (e) {
+    return jsonResponse({ error: 'LLM unreachable', detail: String(e).slice(0, 200) }, 502, env);
+  }
+
+  const use = (data.content || []).find((b) => b.type === 'tool_use');
+  const out = use?.input || { grades: [], signals: [] };
+  // Sanitize: never return anything outside the allowed lists.
+  const g = (out.grades || []).filter((x) => grades.includes(x));
+  const s = (out.signals || []).filter((x) => signals.includes(x));
+  return jsonResponse({ grades: g, signals: s }, 200, env);
 }

@@ -3,6 +3,8 @@ import Icon from './Icon.jsx'
 import { GRADE_ORDER, gradeColor } from '../lib/badges.js'
 
 const BASE_URL = import.meta.env?.BASE_URL ?? '/'
+// Worker endpoint that turns plain English into filters. Unset → NL box hidden.
+const PARSE_URL = import.meta.env?.VITE_PARSE_URL || ''
 
 // Prettify a camelCase badge key → "Bullpen Legend".
 const pretty = (k) => k.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase())
@@ -17,6 +19,9 @@ export default function BacktestView() {
   const [err, setErr] = useState(null)
   const [grades, setGrades] = useState(new Set())
   const [signals, setSignals] = useState(new Set())
+  const [q, setQ] = useState('')
+  const [asking, setAsking] = useState(false)
+  const [askErr, setAskErr] = useState(null)
 
   useEffect(() => {
     let alive = true
@@ -64,6 +69,26 @@ export default function BacktestView() {
     setGrades(new Set())
     setSignals(new Set())
   }
+  const ask = async () => {
+    if (!q.trim() || asking) return
+    setAsking(true)
+    setAskErr(null)
+    try {
+      const r = await fetch(PARSE_URL, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ query: q, grades: GRADE_ORDER, signals: signalKeys }),
+      })
+      const j = await r.json()
+      if (j.error) throw new Error(j.error)
+      setGrades(new Set(j.grades || []))
+      setSignals(new Set(j.signals || []))
+    } catch (e) {
+      setAskErr(e.message || 'failed')
+    } finally {
+      setAsking(false)
+    }
+  }
 
   if (err) return <div className="empty-note">Couldn’t load the backtest log ({err}).</div>
   if (!log) return <div className="empty-note">Loading reconciled history…</div>
@@ -78,6 +103,28 @@ export default function BacktestView() {
         <b>{res?.days} days · {res?.total.toLocaleString()} bats</b> (base rate {res ? pctOf(res.base) : '—'}). Signals
         require <b>all</b> selected to be present.
       </p>
+
+      {PARSE_URL && (
+        <form
+          className="bt-ask"
+          onSubmit={(e) => {
+            e.preventDefault()
+            ask()
+          }}
+        >
+          <Icon name="Search" size={15} />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Ask in plain English — e.g. hot due power bats"
+            aria-label="Describe a backtest"
+          />
+          <button type="submit" disabled={asking || !q.trim()}>
+            {asking ? '…' : 'Ask'}
+          </button>
+        </form>
+      )}
+      {askErr && <div className="bt-warn">Couldn’t parse: {askErr}</div>}
 
       <div className="bt-group">
         <span className="bt-glabel">Grade {grades.size ? `(any of ${grades.size})` : ''}</span>
