@@ -84,6 +84,10 @@ export default function Header({
 }) {
   const m = meta.modelMetrics
   const brierEdge = m ? (m.baselineBrier - m.brier) / m.baselineBrier : null
+  // Flag a stale slate: rebuilds target ~10 min during games, so anything older
+  // than ~14 min means the scores/innings on screen are lagging behind reality.
+  const genMs = meta.generatedAt ? Date.parse(meta.generatedAt) : NaN
+  const slateStale = Number.isFinite(genMs) && Date.now() - genMs > 14 * 60_000
   return (
     <header className="header">
       <div className="header-left">
@@ -141,8 +145,15 @@ export default function Header({
           )}
         </button>
 
-        <div className="gen-meta" title={`Generated ${meta.generatedAt}`}>
-          <Icon name="Clock" size={13} />
+        <div
+          className={`gen-meta ${slateStale ? 'stale' : ''}`}
+          title={
+            slateStale
+              ? `Slate generated ${meta.generatedAt} — scores/innings are from then, not live-now. Rebuilds run on a schedule.`
+              : `Generated ${meta.generatedAt}`
+          }
+        >
+          <Icon name={slateStale ? 'TriangleAlert' : 'Clock'} size={13} />
           <span>{timeAgo(meta.generatedAt)}</span>
         </div>
 

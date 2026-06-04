@@ -12,10 +12,16 @@ on:
   push:
     branches: [main]
   schedule:
-    # Every 30 min, around the clock — so the new day's slate (dated in US
-    # Central) loads right after midnight CT instead of waiting for a morning
-    # window. UTC.
-    - cron: '*/30 * * * *'
+    # Cron is UTC. GitHub throttles scheduled runs, so these are best-effort
+    # targets, not guarantees — the tighter cadence during game hours just gives
+    # more chances to fire so live scores/innings don't freeze between rebuilds.
+    #
+    # MLB game window ≈ 16:00 UTC (noon ET day games) through ~07:00 UTC (late
+    # west-coast games + the post-midnight US-Central day rollover) — refresh
+    # every ~10 min there. Sparser the rest of the day when nothing is live.
+    - cron: '*/10 16-23 * * *'
+    - cron: '*/10 0-6 * * *'
+    - cron: '*/30 7-15 * * *'
 
 permissions:
   contents: read
