@@ -446,7 +446,12 @@
   color: var(--text-faint);
   font-size: 12px;
   font-weight: 500;
+  white-space: nowrap;
+  flex: none;
   transition: all 0.18s;
+}
+.badge-toggle > svg {
+  flex: none;
 }
 .badge-toggle:hover {
   color: var(--text-dim);
