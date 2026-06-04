@@ -55,6 +55,11 @@ function PitcherCard({ entry, onSelect, selectedId, watchlist, slip }) {
   const worst = pitcher.pitchMix?.worstPitch
   const vl = pitcher.splits?.vl
   const vr = pitcher.splits?.vr
+  // Which batter hand to attack with — the side this starter gives up more HRs
+  // to (higher HR/9). Ties/one-sided data fall back to whatever's present.
+  const lH = vl?.hrPer9
+  const rH = vr?.hrPer9
+  const attackSide = lH != null && rH != null ? (lH >= rH ? 'L' : 'R') : lH != null ? 'L' : rH != null ? 'R' : null
   const pl3d = pitcher.recentForm?.pitchesL3D
   const hand = pitcher.hand ? `${pitcher.hand}HP` : null
 
@@ -100,6 +105,21 @@ function PitcherCard({ entry, onSelect, selectedId, watchlist, slip }) {
           value={Number.isFinite(x.xEra) ? num(x.xEra, 2) : Number.isFinite(x.xwOba) ? rate(x.xwOba) : '—'}
         />
       </div>
+
+      {attackSide && (
+        <div className="pcard-attack">
+          <span className="pa-cap">
+            <Icon name="Crosshair" size={12} /> Attack with
+          </span>
+          <span className={`pa-hand ${attackSide === 'L' ? 'on' : ''}`}>
+            LHB <b className="mono">{lH != null ? num(lH, 2) : '—'}</b>
+          </span>
+          <span className={`pa-hand ${attackSide === 'R' ? 'on' : ''}`}>
+            RHB <b className="mono">{rH != null ? num(rH, 2) : '—'}</b>
+          </span>
+          <span className="pa-unit dim">HR/9</span>
+        </div>
+      )}
 
       <div className="pcard-cols">
         {/* Top HR targets */}
