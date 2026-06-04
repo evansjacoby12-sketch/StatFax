@@ -4723,3 +4723,12 @@ button.th:hover {
   background: var(--prime);
 }
 .bt-ask button:disabled { opacity: 0.5; }
+
+/* Semicircle prob gauge in the Games silos — pin right like the old % text. */
+.sb-line1 .prob-ring {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.sb-line1 .prob-ring .pr-val {
+  font-size: 13px;
+}

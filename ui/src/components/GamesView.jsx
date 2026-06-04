@@ -1,5 +1,5 @@
 import Icon from './Icon.jsx'
-import { GradeChip, BadgeRow, ProbBar } from './atoms.jsx'
+import { GradeChip, BadgeRow, ProbBar, ProbRing } from './atoms.jsx'
 import { teamColor, teamLogo, hexToRgba, readableOn, playerHeadshot } from '../lib/teams.js'
 import { pct, num, gameTime } from '../lib/format.js'
 import { gradeColor } from '../lib/badges.js'
@@ -185,9 +185,7 @@ function SiloBatter({ b, onSelect, selectedId, watchlist, slip, onToggleWatch, o
               <Icon name="Flame" size={9} />
             </span>
           )}
-          <span className="sb-prob mono" style={{ color }}>
-            {pct(b.hrProbability, 1)}
-          </span>
+          <ProbRing value={b.hrProbability} color={color} size={42} />
         </div>
         <div className="sb-line2">
           <GradeChip grade={b.grade} size="sm" score={b.score} />

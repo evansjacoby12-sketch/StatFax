@@ -62,43 +62,43 @@ export function ProbBar({ value, max = 0.28, color = 'var(--prime)', showLabel =
   )
 }
 
-// Circular 0–100 HR-probability gauge — a rounded SVG progress arc on a track
-// (fills to value×100; HR% tops out near ~31). Center shows the whole-number
-// percent in the grade color, with a faint glow.
+// Semicircle HR-probability gauge — a top half-arc on a track (fills left→right
+// to value×100; HR% tops out near ~31), with the whole-number percent beneath
+// it in the grade color and a faint glow.
 export function ProbRing({ value, color = 'var(--prime)', size = 48 }) {
   const has = value != null && !Number.isNaN(value)
   const pctVal = Math.max(0, Math.min(100, (value || 0) * 100))
   const stroke = 4
   const r = (size - stroke) / 2
-  const c = 2 * Math.PI * r
-  const dash = (pctVal / 100) * c
-  const mid = size / 2
+  const cx = size / 2
+  const cy = size / 2 // flat side (diameter) of the semicircle
+  const arc = `M ${stroke / 2} ${cy} A ${r} ${r} 0 0 1 ${size - stroke / 2} ${cy}` // top semicircle, left→right
+  const L = Math.PI * r // arc length of a semicircle
+  const dash = (pctVal / 100) * L
+  const h = size * 0.82 // crop height: top arc + room for the value below
   return (
     <svg
       className="prob-ring"
       width={size}
-      height={size}
-      viewBox={`0 0 ${size} ${size}`}
+      height={h}
+      viewBox={`0 0 ${size} ${h}`}
       role="img"
       aria-label={has ? `HR probability ${pct(value, 1)}` : 'No probability'}
     >
       <title>{has ? `HR probability ${pct(value, 1)}` : 'No probability'}</title>
-      <circle className="pr-track" cx={mid} cy={mid} r={r} strokeWidth={stroke} fill="none" />
+      <path className="pr-track" d={arc} fill="none" strokeWidth={stroke} strokeLinecap="round" />
       {has && (
-        <circle
-          cx={mid}
-          cy={mid}
-          r={r}
+        <path
+          d={arc}
           fill="none"
           stroke={color}
           strokeWidth={stroke}
           strokeLinecap="round"
-          strokeDasharray={`${dash} ${c - dash}`}
-          transform={`rotate(-90 ${mid} ${mid})`}
+          strokeDasharray={`${dash} ${L}`}
           style={{ filter: `drop-shadow(0 0 3px ${color})`, transition: 'stroke-dasharray .35s ease' }}
         />
       )}
-      <text className="pr-val mono" x={mid} y={mid} textAnchor="middle" dominantBaseline="central" fill={color}>
+      <text className="pr-val mono" x={cx} y={cy + size * 0.15} textAnchor="middle" dominantBaseline="central" fill={color}>
         {has ? Math.round(pctVal) : '—'}
       </text>
     </svg>
