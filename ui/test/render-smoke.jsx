@@ -22,6 +22,7 @@ import Guide from '../src/components/Guide.jsx'
 import HowToPick from '../src/components/HowToPick.jsx'
 import Legend from '../src/components/Legend.jsx'
 import UpdateBanner from '../src/components/UpdateBanner.jsx'
+import PullToRefresh from '../src/components/PullToRefresh.jsx'
 
 const SYNTH = {
   version: 4,
@@ -170,6 +171,7 @@ add('Guide', <Guide onClose={noop} />)
 add('HowToPick', <HowToPick onClose={noop} />)
 add('Legend', <Legend onClose={noop} />)
 add('UpdateBanner', <UpdateBanner />)
+add('PullToRefresh', <PullToRefresh onRefresh={noop} />)
 
 let failed = 0
 for (const [name, el] of cases) {

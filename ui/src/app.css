@@ -4293,3 +4293,38 @@ button.th:hover {
   border-color: color-mix(in srgb, var(--good) 50%, transparent);
   background: color-mix(in srgb, var(--good) 14%, transparent);
 }
+
+/* ============ Pull-to-refresh indicator ============ */
+.ptr {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 4px);
+  left: 50%;
+  z-index: 60;
+  transform: translate(-50%, 0);
+  transition: transform 0.14s ease;
+  pointer-events: none;
+}
+.ptr-circle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  color: var(--text-faint);
+  transition: color 0.15s, border-color 0.15s;
+}
+.ptr-circle.ready {
+  color: var(--prime);
+  border-color: color-mix(in srgb, var(--prime) 50%, var(--border));
+}
+.ptr-circle.spin {
+  color: var(--prime);
+  animation: ptrspin 0.7s linear infinite;
+}
+@keyframes ptrspin {
+  to { transform: rotate(360deg); }
+}
