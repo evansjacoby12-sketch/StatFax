@@ -1244,6 +1244,34 @@ button.th:hover {
 .pitcher-head {
   margin-bottom: 11px;
 }
+.pitcher-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border-soft);
+  border-radius: 9px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.pitcher-link:hover {
+  border-color: var(--prime);
+  background: var(--card);
+}
+.pitcher-link-cta {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--prime);
+}
 .pitcher-name {
   font-size: 15px;
   font-weight: 700;
@@ -5026,4 +5054,17 @@ button.th:hover {
   bottom: 12px;
   display: flex;
   gap: 6px;
+}
+
+/* Scroll-to + flash when opening a pitcher card from a batter's drawer link. */
+.pcard {
+  scroll-margin-top: calc(var(--chrome-h, 90px) + 14px);
+}
+.pcard.flash {
+  animation: pcardFlash 1.6s ease;
+}
+@keyframes pcardFlash {
+  0%, 100% { outline: 2px solid transparent; outline-offset: 2px; box-shadow: none; }
+  12% { outline-color: var(--prime); box-shadow: 0 0 22px color-mix(in srgb, var(--prime) 45%, transparent); }
+  70% { outline-color: var(--prime); }
 }

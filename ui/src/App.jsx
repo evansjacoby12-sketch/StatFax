@@ -61,6 +61,8 @@ export default function App() {
   const [filters, setFilters] = useState(initialFilters)
   const [selectedId, setSelectedId] = useState(null)
   const [zoneId, setZoneId] = useState(null)
+  // Pitcher card to scroll to on the Pitchers page (entry key: `${pitcherId}-${gamePk}`).
+  const [focusPitcher, setFocusPitcher] = useState(null)
   const [showLegend, setShowLegend] = useState(false)
   const [showGuide, setShowGuide] = useState(false)
   const [showHowTo, setShowHowTo] = useState(false)
@@ -173,6 +175,17 @@ export default function App() {
   }, [selectedId, showLegend, showGuide, showHowTo, zoneId, showGroups, showBacktest])
 
   const patch = useCallback((p) => setFilters((f) => ({ ...f, ...p })), [])
+
+  // Jump from a batter's "Opposing pitcher" section to that pitcher's card on the
+  // Pitchers page. Close any open overlay, switch view, and flag which card to
+  // scroll to (entry key matches groupPitchers: `${pitcherId}-${gamePk}`).
+  const openPitcher = useCallback((b) => {
+    if (b?.pitcher?.id == null) return
+    setSelectedId(null)
+    setZoneId(null)
+    setFocusPitcher(`${b.pitcher.id}-${b.gamePk}`)
+    setView('pitchers')
+  }, [])
 
   const onSort = useCallback((key) => {
     setFilters((f) => {
@@ -366,6 +379,8 @@ export default function App() {
             selectedId={selectedId}
             watchlist={watchlist}
             slip={slipSet}
+            focusKey={focusPitcher}
+            onFocusDone={() => setFocusPitcher(null)}
           />
         ) : view === 'weather' ? (
           <WeatherView
@@ -459,6 +474,7 @@ export default function App() {
           onToggleWatch={toggleWatch}
           onToggleSlip={toggleSlip}
           onOpenZone={(bb) => setZoneId(bb.id)}
+          onOpenPitcher={openPitcher}
         />
       )}
       {zoneBatter && <ZoneView batter={zoneBatter} onClose={() => setZoneId(null)} />}

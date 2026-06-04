@@ -68,7 +68,7 @@ function useCountUp(target, ms = 550) {
   return v
 }
 
-export default function PlayerDrawer({ batter: b, onClose, watched, inSlip, onToggleWatch, onToggleSlip, onOpenZone }) {
+export default function PlayerDrawer({ batter: b, onClose, watched, inSlip, onToggleWatch, onToggleSlip, onOpenZone, onOpenPitcher }) {
   const trapRef = useFocusTrap()
   const liveMode = useLiveMode()
   if (!b) return null
@@ -108,7 +108,7 @@ export default function PlayerDrawer({ batter: b, onClose, watched, inSlip, onTo
           <StatsSection b={b} />
           <StatcastSection b={b} />
           <EnvSection b={b} />
-          <PitcherSection b={b} />
+          <PitcherSection b={b} onOpenPitcher={onOpenPitcher} />
           {liveMode && b.game?.isLive && <LiveSection b={b} />}
           <TechReasons b={b} />
         </div>
@@ -447,21 +447,34 @@ function EnvSection({ b }) {
   )
 }
 
-function PitcherSection({ b }) {
+function PitcherSection({ b, onOpenPitcher }) {
   const p = b.pitcher
   if (!p) return null
   const s = p.season || {}
   const split = b.batSide === 'L' ? p.splits?.vl : p.splits?.vr
   const rf = p.recentForm
+  const canOpen = !!onOpenPitcher && p.id != null
+  const idBlock = (
+    <div>
+      <div className="pitcher-name">{p.name}</div>
+      <div className="pitcher-meta">
+        {p.hand}HP{split ? ` · vs ${b.batSide}HB` : ''}
+      </div>
+    </div>
+  )
   return (
     <Section title="Opposing pitcher" icon="Shield">
       <div className="pitcher-head">
-        <div>
-          <div className="pitcher-name">{p.name}</div>
-          <div className="pitcher-meta">
-            {p.hand}HP{split ? ` · vs ${b.batSide}HB` : ''}
-          </div>
-        </div>
+        {canOpen ? (
+          <button className="pitcher-link" onClick={() => onOpenPitcher(b)} title={`Open ${p.name}'s pitcher card`}>
+            {idBlock}
+            <span className="pitcher-link-cta">
+              Pitcher card <Icon name="ChevronRight" size={14} />
+            </span>
+          </button>
+        ) : (
+          idBlock
+        )}
       </div>
       <div className="stat-grid">
         <Cell k="ERA" v={num(s.era, 2)} />

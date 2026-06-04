@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useEffect } from 'react'
 import Icon from './Icon.jsx'
 import { GradeChip, ScoreRing, ProbBar, Stat } from './atoms.jsx'
 import { groupPitchers, pitchUsage, effSide } from '../lib/pitchers.js'
@@ -9,8 +9,26 @@ import { useLiveMode } from '../lib/liveMode.js'
 // Pitcher Plan — one card per starting pitcher: vulnerability verdict, the
 // lineup ranked as HR targets, pitch mix, and splits + fatigue. Reads the
 // already-filtered batter list so the board's filters narrow the pool.
-export default function PitchersView({ batters, onSelect, selectedId, watchlist, slip }) {
+export default function PitchersView({ batters, onSelect, selectedId, watchlist, slip, focusKey, onFocusDone }) {
   const pitchers = useMemo(() => groupPitchers(batters), [batters])
+
+  // When arriving from a batter's "Opposing pitcher" link, scroll that card into
+  // view and flash it. Runs after the cards mount; clears the focus once done.
+  useEffect(() => {
+    if (!focusKey) return
+    const el = document.getElementById(`pcard-${focusKey}`)
+    if (el) {
+      const t = setTimeout(() => {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        el.classList.add('flash')
+        setTimeout(() => el.classList.remove('flash'), 1600)
+      }, 60)
+      onFocusDone?.()
+      return () => clearTimeout(t)
+    }
+    onFocusDone?.()
+  }, [focusKey, pitchers, onFocusDone])
+
   if (!pitchers.length) {
     return <div className="empty-note">No pitchers match the current filters.</div>
   }
@@ -66,7 +84,7 @@ function PitcherCard({ entry, onSelect, selectedId, watchlist, slip }) {
   const isFinal = game?.isFinal
 
   return (
-    <section className={`pcard ${isFinal ? 'final' : ''}`} style={{ '--tc': color }}>
+    <section id={`pcard-${entry.key}`} className={`pcard ${isFinal ? 'final' : ''}`} style={{ '--tc': color }}>
       <div className="pcard-accent" style={{ background: hexToRgba(color, 0.5) }} />
 
       {/* Header */}
