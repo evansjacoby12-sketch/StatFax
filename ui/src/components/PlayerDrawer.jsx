@@ -202,37 +202,23 @@ function HeroNumbers({ b, color }) {
 
 const SCOUT_TOOLS = [
   { key: 'power', label: 'Power', color: 'var(--prime)' },
-  { key: 'heat', label: 'Heat', color: 'var(--b-hot)' },
   { key: 'matchup', label: 'Matchup', color: 'var(--strong)' },
   { key: 'environment', label: 'Park / Air', color: 'var(--accent)' },
 ]
 
 function ScoutReport({ b }) {
-  const [heatOpen, setHeatOpen] = useState(false)
   if (b.batterScore == null && b.matchupScore == null) return null
   const grades = toolGrades(b)
-  const hb = heatBreakdown(b)
   return (
     <Section title="Scout report" icon="Crosshair">
       <div className="scout-verdict">{scoutVerdict(b)}</div>
       <div className="scout-grades">
         {SCOUT_TOOLS.map((t) => {
           const g = grades[t.key]
-          const isHeat = t.key === 'heat'
-          const Tag = isHeat ? 'button' : 'div'
           return (
-            <Tag
-              key={t.key}
-              className={`scout-tool ${isHeat ? 'scout-tool-btn' : ''} ${isHeat && heatOpen ? 'open' : ''}`}
-              onClick={isHeat ? () => setHeatOpen((o) => !o) : undefined}
-              aria-expanded={isHeat ? heatOpen : undefined}
-              title={isHeat ? `Heat index ${hb.total}/100 — tap for why` : `${t.label} grade ${g}/80`}
-            >
+            <div key={t.key} className="scout-tool" title={`${t.label} grade ${g}/80`}>
               <div className="scout-tool-head">
-                <span className="scout-tool-label">
-                  {t.label}
-                  {isHeat && <Icon name={heatOpen ? 'ChevronUp' : 'ChevronDown'} size={11} className="scout-tool-chev" />}
-                </span>
+                <span className="scout-tool-label">{t.label}</span>
                 <span className="scout-tool-grade mono" style={{ color: t.color }}>
                   {g}
                   <span className="scout-tool-desc"> · {gradeLabel(g)}</span>
@@ -241,34 +227,10 @@ function ScoutReport({ b }) {
               <div className="scout-tool-track">
                 <div className="scout-tool-fill" style={{ width: `${((g - 20) / 60) * 100}%`, background: t.color }} />
               </div>
-            </Tag>
+            </div>
           )
         })}
       </div>
-      {heatOpen && (
-        <div className="heat-breakdown">
-          <div className="heat-bd-row heat-bd-base">
-            <span>Baseline form</span>
-            <span className="mono">{hb.base}</span>
-          </div>
-          {hb.parts.map((p, i) => (
-            <div className="heat-bd-row" key={i}>
-              <span className="heat-bd-main">
-                <span className="heat-bd-label">{p.label}</span>
-                <span className="heat-bd-detail dim">{p.detail}</span>
-              </span>
-              <span className={`heat-bd-delta mono ${p.delta > 0 ? 'pos' : p.delta < 0 ? 'neg' : 'dim'}`}>
-                {p.delta > 0 ? '+' : ''}
-                {p.delta || '·'}
-              </span>
-            </div>
-          ))}
-          <div className="heat-bd-row heat-bd-total">
-            <span>Heat index</span>
-            <span className="mono">{hb.total}/100</span>
-          </div>
-        </div>
-      )}
       {b.zoneBonus != null && b.zoneBonus !== 0 && (
         <div className="zone-bonus">
           Zone matchup{' '}
@@ -743,14 +705,18 @@ function HrSetupSection({ b }) {
     },
   ]
   const n = checks.filter((c) => c.pass).length
-  const tone = n >= 5 ? 'good' : n >= 3 ? 'warn' : 'bad'
-  const tag = n >= 5 ? 'Loaded 🔥' : n >= 3 ? 'Setting up' : 'Thin'
+  // Heat index (0–100, recent-form) headlines the section; the 6-box setup
+  // checklist (form + matchup + park) is the "why". One combined block.
+  const heat = b.heatIndex != null ? b.heatIndex : heatBreakdown(b).total
+  const tone = heat >= 70 ? 'good' : heat >= 50 ? 'warn' : 'bad'
+  const tag = heat >= 70 ? 'On fire 🔥' : heat >= 58 ? 'Hot' : heat >= 45 ? 'Warm' : 'Cool'
   return (
-    <Section title="HR setup" icon="Crosshair">
+    <Section title="Heat index" icon="Flame">
       <div className={`hrsetup-score ${tone}`}>
-        <span className="hrs-n mono">{n}</span>
-        <span className="hrs-of dim">/ 6</span>
+        <span className="hrs-n mono">{heat}</span>
+        <span className="hrs-of dim">/ 100</span>
         <span className="hrs-tag">{tag}</span>
+        <span className="hrs-setup dim">setup {n}/6</span>
       </div>
       <ul className="hrsetup-list">
         {checks.map((c) => (

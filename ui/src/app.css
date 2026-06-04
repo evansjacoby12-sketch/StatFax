@@ -4866,3 +4866,5 @@ button.th:hover {
 .hrs-label { font-size: 13px; font-weight: 600; color: var(--text); }
 .hrs-row.off .hrs-label { color: var(--text-dim); }
 .hrs-detail { font-size: 11.5px; }
+
+.hrs-setup { margin-left: auto; font-size: 12px; font-weight: 600; }

@@ -50,14 +50,9 @@ export function heatBreakdown(b) {
   if (b.hot) parts.push({ label: 'Hot streak', detail: 'Flagged hot by the engine', delta: 13 })
   if (b.cold) parts.push({ label: 'Cold slump', detail: 'Flagged cold by the engine', delta: -20 })
   if (b.hrStreak) parts.push({ label: 'HR streak', detail: 'Gone deep recently', delta: 10 })
-  if (b.due) {
-    const delta = Math.round(clamp((b.dueScore ?? 0) * 0.12, 0, 12))
-    const detail =
-      b.expected30 != null && b.season?.hr != null
-        ? `~${b.expected30.toFixed(1)} HR expected vs ${b.recent?.hr ?? '?'} hit — regression candidate`
-        : 'Overdue vs expected pace'
-    parts.push({ label: 'Due', detail, delta })
-  }
+  // No "Due" term — the overdue/drought signal is the gambler's fallacy (due bats
+  // homer LESS, proven on 11d/2.6k bats); removed from the model, so the heat
+  // index must not credit it either.
   const total = Math.round(clamp(HEAT_BASE + parts.reduce((s, p) => s + p.delta, 0), 0, 100))
   return { total, base: HEAT_BASE, parts }
 }
