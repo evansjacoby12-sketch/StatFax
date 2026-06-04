@@ -433,13 +433,22 @@ function EnvSection({ b }) {
       )}
       {hasFactors && (
         <div className="stat-grid" style={{ marginTop: w ? 12 : 0 }}>
-          <Cell k="Park HR factor" v={b.gameParkHRFactor != null ? `${num(b.gameParkHRFactor, 3)}×` : '—'} />
           <Cell
-            k="Park·Wx·Hand"
+            k="Park HR factor"
+            v={b.gameParkHRFactor != null ? `${num(b.gameParkHRFactor, 3)}×` : '—'}
+            title="Park-only HR multiplier for tonight's venue (1.00 = league-average park)"
+          />
+          <Cell
+            k="Air factor"
             v={b.parkWeatherHandFactor != null ? `${num(b.parkWeatherHandFactor, 3)}×` : '—'}
+            title="Combined park × weather × batter-handedness HR multiplier (1.00 = neutral conditions)"
           />
           {b.parkWeatherHandFactor != null && (
-            <Cell k="Env delta" v={signedPct(b.parkWeatherHandFactor - 1, 1)} />
+            <Cell
+              k="Air vs neutral"
+              v={signedPct(b.parkWeatherHandFactor - 1, 1)}
+              title="How much the air helps or hurts HRs vs neutral — Air factor minus 1"
+            />
           )}
         </div>
       )}
@@ -805,9 +814,9 @@ function Section({ title, icon, children }) {
   )
 }
 
-function Cell({ k, v, unit, tone }) {
+function Cell({ k, v, unit, tone, title }) {
   return (
-    <div className="cell">
+    <div className="cell" title={title}>
       <div className="cell-k">{k}</div>
       <div className="cell-v mono" style={tone ? { color: toneColor(tone) } : undefined}>
         {v}
