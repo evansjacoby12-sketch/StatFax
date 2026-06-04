@@ -8,7 +8,8 @@ import Header from './components/Header.jsx'
 import Filters from './components/Filters.jsx'
 import BatterTable from './components/BatterTable.jsx'
 import GamesView from './components/GamesView.jsx'
-import PitchersView from './components/PitchersView.jsx'
+import PitchersView, { PitcherCard } from './components/PitchersView.jsx'
+import { groupPitchers } from './lib/pitchers.js'
 import WeatherView from './components/WeatherView.jsx'
 import GroupsView from './components/GroupsView.jsx'
 import BacktestView from './components/BacktestView.jsx'
@@ -61,8 +62,8 @@ export default function App() {
   const [filters, setFilters] = useState(initialFilters)
   const [selectedId, setSelectedId] = useState(null)
   const [zoneId, setZoneId] = useState(null)
-  // Pitcher card to scroll to on the Pitchers page (entry key: `${pitcherId}-${gamePk}`).
-  const [focusPitcher, setFocusPitcher] = useState(null)
+  // Opposing-pitcher card shown as a popup overlay (entry key: `${pitcherId}-${gamePk}`).
+  const [pitcherKey, setPitcherKey] = useState(null)
   const [showLegend, setShowLegend] = useState(false)
   const [showGuide, setShowGuide] = useState(false)
   const [showHowTo, setShowHowTo] = useState(false)
@@ -161,7 +162,8 @@ export default function App() {
   useEffect(() => {
     const onKey = (e) => {
       if (e.key === 'Escape') {
-        if (zoneId) setZoneId(null)
+        if (pitcherKey) setPitcherKey(null)
+        else if (zoneId) setZoneId(null)
         else if (showBacktest) setShowBacktest(false)
         else if (showGroups) setShowGroups(false)
         else if (showHowTo) setShowHowTo(false)
@@ -172,20 +174,23 @@ export default function App() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [selectedId, showLegend, showGuide, showHowTo, zoneId, showGroups, showBacktest])
+  }, [selectedId, showLegend, showGuide, showHowTo, zoneId, showGroups, showBacktest, pitcherKey])
 
   const patch = useCallback((p) => setFilters((f) => ({ ...f, ...p })), [])
 
-  // Jump from a batter's "Opposing pitcher" section to that pitcher's card on the
-  // Pitchers page. Close any open overlay, switch view, and flag which card to
-  // scroll to (entry key matches groupPitchers: `${pitcherId}-${gamePk}`).
+  // Pop up the opposing pitcher's card as an overlay (entry key matches
+  // groupPitchers: `${pitcherId}-${gamePk}`). Stays in place — no view change.
   const openPitcher = useCallback((pitcherId, gamePk) => {
     if (pitcherId == null) return
-    setSelectedId(null)
-    setZoneId(null)
-    setFocusPitcher(`${pitcherId}-${gamePk}`)
-    setView('pitchers')
+    setPitcherKey(`${pitcherId}-${gamePk}`)
   }, [])
+
+  // Resolve the popup's pitcher entry from the full slate (grouped the same way
+  // the Pitchers page does, so the key lines up).
+  const pitcherEntry = useMemo(() => {
+    if (!pitcherKey) return null
+    return groupPitchers(state.data?.batters || []).find((e) => e.key === pitcherKey) || null
+  }, [pitcherKey, state.data])
 
   const onSort = useCallback((key) => {
     setFilters((f) => {
@@ -379,8 +384,6 @@ export default function App() {
             selectedId={selectedId}
             watchlist={watchlist}
             slip={slipSet}
-            focusKey={focusPitcher}
-            onFocusDone={() => setFocusPitcher(null)}
           />
         ) : view === 'weather' ? (
           <WeatherView
@@ -481,6 +484,28 @@ export default function App() {
         />
       )}
       {zoneBatter && <ZoneView batter={zoneBatter} onClose={() => setZoneId(null)} />}
+      {pitcherEntry && (
+        <>
+          <div className="drawer-scrim pitcher-scrim" onClick={() => setPitcherKey(null)} />
+          <div className="modal pitcher-modal" role="dialog" aria-modal="true" aria-label="Pitcher card">
+            <button className="drawer-close icon-btn" onClick={() => setPitcherKey(null)} aria-label="Close">
+              <Icon name="X" size={18} />
+            </button>
+            <div className="pitcher-modal-body">
+              <PitcherCard
+                entry={pitcherEntry}
+                onSelect={(b) => {
+                  setPitcherKey(null)
+                  setSelectedId(b.id)
+                }}
+                selectedId={selectedId}
+                watchlist={watchlist}
+                slip={slipSet}
+              />
+            </div>
+          </div>
+        </>
+      )}
       {showGroups && (
         <>
           <div className="drawer-scrim" onClick={() => setShowGroups(false)} />

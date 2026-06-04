@@ -5099,3 +5099,29 @@ button.th:hover {
   font-size: 11.5px;
   white-space: nowrap;
 }
+
+/* ============ Opposing-pitcher popup ============ */
+/* Reuses the Pitchers-page PitcherCard inside a centered modal. The modal is the
+   frame, so the card's own border/background is dropped to avoid a double frame. */
+/* Sit above the batter drawer (z-index 41) so opening the pitcher from inside
+   the drawer cleanly covers it. */
+.pitcher-scrim {
+  z-index: 42;
+}
+.pitcher-modal {
+  z-index: 43;
+  width: 620px;
+  padding: 14px;
+}
+.pitcher-modal .pcard {
+  margin: 0;
+  border: none;
+  background: none;
+}
+.pitcher-modal .pcard-head {
+  padding-right: 30px; /* keep the vulnerability badge clear of the close button */
+}
+.pitcher-modal .drawer-close {
+  background: var(--card-2);
+  border-radius: 8px;
+}

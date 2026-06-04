@@ -62,7 +62,7 @@ function tone(value, { hi, lo, invert = false }) {
   return (invert ? cold : hot) ? HITTABLE : TOUGH
 }
 
-function PitcherCard({ entry, onSelect, selectedId, watchlist, slip }) {
+export function PitcherCard({ entry, onSelect, selectedId, watchlist, slip }) {
   const { pitcher, vuln, targets, team, game, attackSide } = entry
   const color = teamColor(team?.id)
   const logo = teamLogo(team?.id)
