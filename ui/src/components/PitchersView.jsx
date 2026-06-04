@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import Icon from './Icon.jsx'
 import { GradeChip, ScoreRing, ProbBar, Stat } from './atoms.jsx'
-import { groupPitchers, pitchUsage } from '../lib/pitchers.js'
+import { groupPitchers, pitchUsage, effSide } from '../lib/pitchers.js'
 import { pct, num, rate, gameTime } from '../lib/format.js'
 import { teamColor, teamLogo, playerHeadshot, hexToRgba } from '../lib/teams.js'
 import { useLiveMode } from '../lib/liveMode.js'
@@ -45,7 +45,7 @@ function tone(value, { hi, lo, invert = false }) {
 }
 
 function PitcherCard({ entry, onSelect, selectedId, watchlist, slip }) {
-  const { pitcher, vuln, targets, team, game } = entry
+  const { pitcher, vuln, targets, team, game, attackSide } = entry
   const color = teamColor(team?.id)
   const logo = teamLogo(team?.id)
   const season = pitcher.season || {}
@@ -55,11 +55,8 @@ function PitcherCard({ entry, onSelect, selectedId, watchlist, slip }) {
   const worst = pitcher.pitchMix?.worstPitch
   const vl = pitcher.splits?.vl
   const vr = pitcher.splits?.vr
-  // Which batter hand to attack with — the side this starter gives up more HRs
-  // to (higher HR/9). Ties/one-sided data fall back to whatever's present.
   const lH = vl?.hrPer9
   const rH = vr?.hrPer9
-  const attackSide = lH != null && rH != null ? (lH >= rH ? 'L' : 'R') : lH != null ? 'L' : rH != null ? 'R' : null
   const pl3d = pitcher.recentForm?.pitchesL3D
   const hand = pitcher.hand ? `${pitcher.hand}HP` : null
 
@@ -145,7 +142,12 @@ function PitcherCard({ entry, onSelect, selectedId, watchlist, slip }) {
                 <span className="ptarget-ord mono">{b.battingOrder || '–'}</span>
                 <span className={`ptarget-name ${liveMode && b.liveContext?.isHRThisGame ? 'hr-glow' : ''}`}>
                   {b.name}
-                  <span className="bathand">{b.batSide}</span>
+                  <span
+                    className={`bathand ${attackSide && effSide(b.batSide, pitcher.hand) === attackSide ? 'pa-match' : ''}`}
+                    title={attackSide && effSide(b.batSide, pitcher.hand) === attackSide ? 'On the attack side' : undefined}
+                  >
+                    {b.batSide}
+                  </span>
                   {watchlist?.has(b.id) && <Icon name="Star" size={10} />}
                   {slip?.has(b.id) && <Icon name="Plus" size={10} />}
                   {b.h2h?.ab > 0 && (

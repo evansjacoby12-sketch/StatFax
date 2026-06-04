@@ -4286,3 +4286,10 @@ button.th:hover {
 .pa-unit {
   font-size: 10px;
 }
+
+/* Target batter on the pitcher's attack side — green hand badge. */
+.bathand.pa-match {
+  color: var(--good);
+  border-color: color-mix(in srgb, var(--good) 50%, transparent);
+  background: color-mix(in srgb, var(--good) 14%, transparent);
+}

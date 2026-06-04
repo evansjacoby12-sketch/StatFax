@@ -5,6 +5,22 @@
 
 import { pitcherVulnerability } from './vulnerability.js'
 
+// Effective batter side vs this arm — a switch hitter bats opposite the pitcher.
+export function effSide(batSide, pitcherHand) {
+  if (batSide === 'S') return pitcherHand === 'L' ? 'R' : 'L'
+  return batSide || 'R'
+}
+
+// Which batter hand to attack with = the side the starter allows more HR/9 to.
+export function attackSideFor(pitcher) {
+  const lH = pitcher?.splits?.vl?.hrPer9
+  const rH = pitcher?.splits?.vr?.hrPer9
+  if (lH != null && rH != null) return lH >= rH ? 'L' : 'R'
+  if (lH != null) return 'L'
+  if (rH != null) return 'R'
+  return null
+}
+
 export function groupPitchers(batters) {
   const map = new Map()
   for (const b of batters || []) {
@@ -31,9 +47,16 @@ export function groupPitchers(batters) {
 
   const list = [...map.values()].map((e) => {
     e.vuln = pitcherVulnerability(e.pitcher)
+    e.attackSide = attackSideFor(e.pitcher)
+    // Bump batters on the attack side (+0.012 effective HR%) — enough to jump
+    // them past similar bats on the wrong side without leapfrogging clearly
+    // better targets. The model's own platoonAdj already nudges the score; this
+    // makes the platoon edge explicit in the target order.
+    const boost = (b) =>
+      e.attackSide && effSide(b.batSide, e.pitcher.hand) === e.attackSide ? 0.012 : 0
     e.targets.sort(
       (a, b) =>
-        (b.hrProbability ?? 0) - (a.hrProbability ?? 0) ||
+        (b.hrProbability ?? 0) + boost(b) - ((a.hrProbability ?? 0) + boost(a)) ||
         (b.score ?? 0) - (a.score ?? 0) ||
         (a.battingOrder ?? 99) - (b.battingOrder ?? 99),
     )
