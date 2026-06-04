@@ -4812,3 +4812,20 @@ button.th:hover {
   color: var(--text-faint);
 }
 .bt-sys-x:hover { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 40%, transparent); }
+
+.bt-examples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: -6px 0 14px;
+}
+.bt-ex {
+  font-size: 11.5px;
+  color: var(--text-dim);
+  background: var(--card-2);
+  border: 1px solid var(--border-soft);
+  border-radius: 20px;
+  padding: 4px 10px;
+}
+.bt-ex:hover { color: var(--text); border-color: var(--border); }
+.bt-ex:disabled { opacity: 0.5; }

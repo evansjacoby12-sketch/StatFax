@@ -108,15 +108,17 @@ export default function BacktestView({ batters = [], onApply }) {
     setGrades(new Set())
     setSignals(new Set())
   }
-  const ask = async () => {
-    if (!q.trim() || asking) return
+  const ask = async (text) => {
+    const query = (text ?? q).trim()
+    if (!query || asking) return
+    setQ(query)
     setAsking(true)
     setAskErr(null)
     try {
       const r = await fetch(PARSE_URL, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ query: q, grades: GRADE_ORDER, signals: signalKeys }),
+        body: JSON.stringify({ query, grades: GRADE_ORDER, signals: signalKeys }),
       })
       const j = await r.json()
       if (j.error) throw new Error(j.error)
@@ -162,6 +164,15 @@ export default function BacktestView({ batters = [], onApply }) {
             {asking ? '…' : 'Ask'}
           </button>
         </form>
+      )}
+      {PARSE_URL && (
+        <div className="bt-examples">
+          {['hot due power bats', 'elite home sluggers', 'strong or better hot bats'].map((ex) => (
+            <button key={ex} className="bt-ex" onClick={() => ask(ex)} disabled={asking}>
+              {ex}
+            </button>
+          ))}
+        </div>
       )}
       {askErr && <div className="bt-warn">Couldn’t parse: {askErr}</div>}
 
