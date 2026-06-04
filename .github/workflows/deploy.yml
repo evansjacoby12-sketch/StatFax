@@ -12,8 +12,10 @@ on:
   push:
     branches: [main]
   schedule:
-    # Every 30 min, ~10am–1am ET (covers warmups through late games). UTC.
-    - cron: '*/30 14-23,0-5 * * *'
+    # Every 30 min, around the clock — so the new day's slate (dated in US
+    # Central) loads right after midnight CT instead of waiting for a morning
+    # window. UTC.
+    - cron: '*/30 * * * *'
 
 permissions:
   contents: read
