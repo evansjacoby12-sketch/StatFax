@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import Icon from './Icon.jsx'
-import { GRADE_ORDER, gradeColor } from '../lib/badges.js'
+import { GRADE_ORDER, BADGES, gradeColor } from '../lib/badges.js'
+import * as store from '../lib/storage.js'
 
 const BASE_URL = import.meta.env?.BASE_URL ?? '/'
 // Worker endpoint that turns plain English into filters. Unset → NL box hidden.
 const PARSE_URL = import.meta.env?.VITE_PARSE_URL || ''
+// Signals the BOARD can filter on (so a saved system applies to tonight exactly).
+const BOARD_SIGNALS = new Set(BADGES.map((b) => b.key))
 
 // Prettify a camelCase badge key → "Bullpen Legend".
 const pretty = (k) => k.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase())
@@ -14,7 +17,7 @@ const pctOf = (x) => (x * 100).toFixed(1) + '%'
 // stack a grade and/or signal conditions and see the historical HR hit rate vs
 // the base rate. (Not natural language — that needs an LLM backend; this is the
 // same evidence `npm run lab:audit` produces, made interactive.)
-export default function BacktestView() {
+export default function BacktestView({ batters = [], onApply }) {
   const [log, setLog] = useState(null)
   const [err, setErr] = useState(null)
   const [grades, setGrades] = useState(new Set())
@@ -22,6 +25,8 @@ export default function BacktestView() {
   const [q, setQ] = useState('')
   const [asking, setAsking] = useState(false)
   const [askErr, setAskErr] = useState(null)
+  const [systems, setSystems] = useState(() => store.load('systems', []))
+  const [sysName, setSysName] = useState('')
 
   useEffect(() => {
     let alive = true
@@ -57,8 +62,42 @@ export default function BacktestView() {
     )
     const hits = matched.filter((r) => r.homered).length
     const hr = matched.length ? hits / matched.length : 0
-    return { base, n: matched.length, hits, hr, lift: base ? hr / base : 0, days: log.dates?.length || 0, total: rows.length }
-  }, [rows, grades, signals, log])
+    // How many of TONIGHT's bats fit the same selection (board signals only).
+    const gArr = [...grades]
+    const sArr = [...signals]
+    const tonight = (batters || []).filter(
+      (b) => (gArr.length === 0 || gArr.includes(b.grade?.label || 'SKIP')) && sArr.every((s) => b[s] === true),
+    ).length
+    return { base, n: matched.length, hits, hr, lift: base ? hr / base : 0, tonight, days: log.dates?.length || 0, total: rows.length }
+  }, [rows, grades, signals, log, batters])
+
+  // History + tonight counts for a saved system spec.
+  const sysMetrics = (sys) => {
+    const g = sys.grades || []
+    const s = sys.signals || []
+    const m = rows.filter((r) => (g.length === 0 || g.includes(r.grade)) && s.every((x) => (r.badges || []).includes(x)))
+    const tonight = (batters || []).filter(
+      (b) => (g.length === 0 || g.includes(b.grade?.label || 'SKIP')) && s.every((x) => b[x] === true),
+    ).length
+    return { histHr: m.length ? m.filter((r) => r.homered).length / m.length : null, tonight }
+  }
+  // Can only save/apply when every chosen signal is one the board can filter on.
+  const canSave = (grades.size > 0 || signals.size > 0) && [...signals].every((s) => BOARD_SIGNALS.has(s))
+  const autoName = () => [...grades, ...[...signals].map(pretty)].join(' · ') || 'System'
+  const saveSystem = () => {
+    if (!canSave) return
+    const sys = { id: String(Date.now()), name: sysName.trim() || autoName(), grades: [...grades], signals: [...signals] }
+    const next = [sys, ...systems].slice(0, 24)
+    setSystems(next)
+    store.save('systems', next)
+    setSysName('')
+  }
+  const removeSystem = (id) => {
+    const next = systems.filter((s) => s.id !== id)
+    setSystems(next)
+    store.save('systems', next)
+  }
+  const applySystem = (sys) => onApply?.(sys.grades || [], (sys.signals || []).filter((s) => BOARD_SIGNALS.has(s)))
 
   const toggle = (set, setSet) => (key) => {
     const next = new Set(set)
@@ -171,6 +210,12 @@ export default function BacktestView() {
             <span className="bt-stat-v mono">{res.hits}/{res.n.toLocaleString()}</span>
             <span className="bt-stat-k">sample</span>
           </div>
+          {onApply && (
+            <div className="bt-stat">
+              <span className="bt-stat-v mono">{res.tonight}</span>
+              <span className="bt-stat-k">tonight</span>
+            </div>
+          )}
           {(grades.size || signals.size) > 0 && (
             <button className="bt-reset" onClick={reset}>
               <Icon name="X" size={13} /> Reset
@@ -179,6 +224,49 @@ export default function BacktestView() {
         </div>
       )}
       {small && <div className="bt-warn">⚠ Small sample ({res.n}) — read with caution.</div>}
+
+      <div className="bt-systems">
+        <span className="bt-glabel">Systems — save a pattern, one-tap it onto tonight’s board</span>
+        <div className="bt-sys-save">
+          <input
+            value={sysName}
+            onChange={(e) => setSysName(e.target.value)}
+            placeholder={canSave ? 'Name this system…' : 'Pick a grade / board signal first'}
+            aria-label="System name"
+            onKeyDown={(e) => e.key === 'Enter' && saveSystem()}
+          />
+          <button onClick={saveSystem} disabled={!canSave} title={canSave ? 'Save current filters as a system' : 'Select a grade and/or board-filterable signal'}>
+            <Icon name="Plus" size={13} /> Save
+          </button>
+        </div>
+        {!signalsAreBoardOk(signals) && (
+          <div className="bt-warn">Some selected signals aren’t board filters, so this can’t be saved as a tonight system.</div>
+        )}
+        {systems.length > 0 && (
+          <ul className="bt-sys-list">
+            {systems.map((sys) => {
+              const m = sysMetrics(sys)
+              return (
+                <li key={sys.id} className="bt-sys">
+                  <button className="bt-sys-main" onClick={() => applySystem(sys)} title="Apply to the board" disabled={!onApply}>
+                    <span className="bt-sys-name">{sys.name}</span>
+                    <span className="bt-sys-meta dim">
+                      {m.histHr != null ? `${pctOf(m.histHr)} hist` : '— hist'} · <b className="bt-sys-tonight">{m.tonight} tonight</b>
+                    </span>
+                  </button>
+                  <button className="bt-sys-x" onClick={() => removeSystem(sys.id)} aria-label="Delete system">
+                    <Icon name="X" size={13} />
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </div>
     </div>
   )
+}
+
+function signalsAreBoardOk(signals) {
+  return [...signals].every((s) => BOARD_SIGNALS.has(s))
 }

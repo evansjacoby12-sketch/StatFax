@@ -419,7 +419,14 @@ export default function App() {
               <Icon name="Activity" size={18} />
               <h2>Signal Backtest</h2>
             </div>
-            <BacktestView />
+            <BacktestView
+              batters={all}
+              onApply={(g, s) => {
+                patch({ grades: new Set(g.length ? g : GRADE_ORDER), badges: new Set(s) })
+                setShowBacktest(false)
+                setView('board')
+              }}
+            />
           </div>
         </>
       )}
