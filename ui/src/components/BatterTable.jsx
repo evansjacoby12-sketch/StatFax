@@ -12,6 +12,7 @@ export default function BatterTable({
   slip,
   onToggleWatch,
   onToggleSlip,
+  onOpenPitcher,
 }) {
   const HeadCol = ({ k, children, className, title }) => {
     const active = sort === k
@@ -76,6 +77,7 @@ export default function BatterTable({
               inSlip={slip.has(b.id)}
               onToggleWatch={onToggleWatch}
               onToggleSlip={onToggleSlip}
+              onOpenPitcher={onOpenPitcher}
             />
           ))
         )}

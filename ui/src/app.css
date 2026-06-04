@@ -5068,3 +5068,26 @@ button.th:hover {
   12% { outline-color: var(--prime); box-shadow: 0 0 22px color-mix(in srgb, var(--prime) 45%, transparent); }
   70% { outline-color: var(--prime); }
 }
+
+/* Inline "vs [pitcher]" link → jumps to that pitcher's card. Quiet by default
+   (just a pointer); underlines + accents on hover so rows stay uncluttered. */
+.pitch-link {
+  appearance: none;
+  border: 0;
+  background: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-decoration: none;
+}
+.pitch-link:hover {
+  color: var(--prime);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.gc-pitcher.pitch-link {
+  font-size: 11.5px;
+  white-space: nowrap;
+}

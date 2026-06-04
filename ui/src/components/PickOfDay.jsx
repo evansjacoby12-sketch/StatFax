@@ -16,13 +16,14 @@ function heatTag(h) {
 // The single best play of the slate, with every signal laid out. The pick is
 // chosen in App (top HR probability among confirmed-lineup bats); this just
 // renders the "everything lined up" hero card. Click opens the full drawer.
-export default function PickOfDay({ batter: b, onSelect, watched, inSlip, onToggleWatch, onToggleSlip }) {
+export default function PickOfDay({ batter: b, onSelect, watched, inSlip, onToggleWatch, onToggleSlip, onOpenPitcher }) {
   if (!b) return null
   const g = b.grade?.label || 'SKIP'
   const color = gradeColor(g)
   const { checks, n } = hrSetup(b)
   const heat = b.heatIndex
   const best = b.odds?.best
+  const canOpenPitcher = !!onOpenPitcher && b.pitcher?.id != null
   const stop = (fn) => (e) => {
     e.stopPropagation()
     fn(b)
@@ -64,7 +65,21 @@ export default function PickOfDay({ batter: b, onSelect, watched, inSlip, onTogg
             <Icon name="ChevronRight" size={11} className="vs-arrow" />
             <span className="opp-tag">{b.opponent?.abbr || '—'}</span>
             <span className="dot-sep">·</span>
-            vs {b.pitcher?.name || 'TBD'}
+            vs{' '}
+            {canOpenPitcher ? (
+              <button
+                className="pitch-link"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onOpenPitcher(b.pitcher.id, b.gamePk)
+                }}
+                title={`Open ${b.pitcher.name}'s pitcher card`}
+              >
+                {b.pitcher.name}
+              </button>
+            ) : (
+              b.pitcher?.name || 'TBD'
+            )}{' '}
             {b.pitcher?.hand ? <span className="phand">{b.pitcher.hand}HP</span> : null}
           </div>
           <div className="potd-meta">

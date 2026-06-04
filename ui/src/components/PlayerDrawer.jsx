@@ -466,7 +466,7 @@ function PitcherSection({ b, onOpenPitcher }) {
     <Section title="Opposing pitcher" icon="Shield">
       <div className="pitcher-head">
         {canOpen ? (
-          <button className="pitcher-link" onClick={() => onOpenPitcher(b)} title={`Open ${p.name}'s pitcher card`}>
+          <button className="pitcher-link" onClick={() => onOpenPitcher(p.id, b.gamePk)} title={`Open ${p.name}'s pitcher card`}>
             {idBlock}
             <span className="pitcher-link-cta">
               Pitcher card <Icon name="ChevronRight" size={14} />

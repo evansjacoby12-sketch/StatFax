@@ -14,11 +14,13 @@ export default function BatterRow({
   inSlip,
   onToggleWatch,
   onToggleSlip,
+  onOpenPitcher,
 }) {
   const stop = (fn) => (e) => {
     e.stopPropagation()
     fn(b)
   }
+  const canOpenPitcher = !!onOpenPitcher && b.pitcher?.id != null
   const g = b.grade?.label || 'SKIP'
   const color = gradeColor(g)
   const liveMode = useLiveMode()
@@ -88,7 +90,21 @@ export default function BatterRow({
           <span className="opp-tag">{b.opponent?.abbr || '—'}</span>
           <span className="dot-sep">·</span>
           <span className="matchup-pitch">
-            vs {b.pitcher?.name || 'TBD'}{' '}
+            vs{' '}
+            {canOpenPitcher ? (
+              <button
+                className="pitch-link"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onOpenPitcher(b.pitcher.id, b.gamePk)
+                }}
+                title={`Open ${b.pitcher.name}'s pitcher card`}
+              >
+                {b.pitcher.name}
+              </button>
+            ) : (
+              b.pitcher?.name || 'TBD'
+            )}{' '}
             {b.pitcher?.hand ? <span className="phand">{b.pitcher.hand}HP</span> : null}
           </span>
         </div>

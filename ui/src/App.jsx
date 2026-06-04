@@ -179,11 +179,11 @@ export default function App() {
   // Jump from a batter's "Opposing pitcher" section to that pitcher's card on the
   // Pitchers page. Close any open overlay, switch view, and flag which card to
   // scroll to (entry key matches groupPitchers: `${pitcherId}-${gamePk}`).
-  const openPitcher = useCallback((b) => {
-    if (b?.pitcher?.id == null) return
+  const openPitcher = useCallback((pitcherId, gamePk) => {
+    if (pitcherId == null) return
     setSelectedId(null)
     setZoneId(null)
-    setFocusPitcher(`${b.pitcher.id}-${b.gamePk}`)
+    setFocusPitcher(`${pitcherId}-${gamePk}`)
     setView('pitchers')
   }, [])
 
@@ -398,6 +398,7 @@ export default function App() {
             slip={slipSet}
             onToggleWatch={toggleWatch}
             onToggleSlip={toggleSlip}
+            onOpenPitcher={openPitcher}
           />
         ) : (
           <>
@@ -436,6 +437,7 @@ export default function App() {
                 inSlip={slipSet.has(pick.id)}
                 onToggleWatch={toggleWatch}
                 onToggleSlip={toggleSlip}
+                onOpenPitcher={openPitcher}
               />
             )}
             <BatterTable
@@ -449,6 +451,7 @@ export default function App() {
               slip={slipSet}
               onToggleWatch={toggleWatch}
               onToggleSlip={toggleSlip}
+              onOpenPitcher={openPitcher}
             />
           </>
         )}

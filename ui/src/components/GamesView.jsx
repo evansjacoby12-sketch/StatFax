@@ -7,7 +7,7 @@ import { HOT_HEAT } from '../lib/constants.js'
 import { compass } from '../lib/weather.js'
 import { useLiveMode } from '../lib/liveMode.js'
 
-export default function GamesView({ games, batters, onSelect, selectedId, watchlist, slip, onToggleWatch, onToggleSlip }) {
+export default function GamesView({ games, batters, onSelect, selectedId, watchlist, slip, onToggleWatch, onToggleSlip, onOpenPitcher }) {
   // Group the (already filtered + sorted) batters by game, then by side.
   const byGame = new Map()
   for (const b of batters) {
@@ -33,7 +33,7 @@ export default function GamesView({ games, batters, onSelect, selectedId, watchl
     )
   }
 
-  const ctx = { onSelect, selectedId, watchlist, slip, onToggleWatch, onToggleSlip }
+  const ctx = { onSelect, selectedId, watchlist, slip, onToggleWatch, onToggleSlip, onOpenPitcher }
   return (
     <div className="games-grid">
       {ordered.map((g, i) => (
@@ -57,15 +57,26 @@ function GameStatus({ g }) {
   return <div className="gc-status">{gameTime(g.gameDate) || 'TBD'}</div>
 }
 
-function TeamHead({ team, pitcher, score, showScore, align }) {
+function TeamHead({ team, pitcher, score, showScore, align, gamePk, onOpenPitcher }) {
   const color = teamColor(team?.id)
   const logo = teamLogo(team?.id)
+  const canOpen = !!onOpenPitcher && pitcher?.id != null
   return (
     <div className={`gc-team ${align}`} style={{ '--tc': color }}>
       {logo && <img className="gc-logo" src={logo} alt={team?.name || ''} loading="lazy" />}
       <div className="gc-team-txt">
         <span className="gc-abbr">{team?.abbr}</span>
-        <span className="gc-pitcher">{pitcher?.name || 'TBD'}</span>
+        {canOpen ? (
+          <button
+            className="gc-pitcher pitch-link"
+            onClick={() => onOpenPitcher(pitcher.id, gamePk)}
+            title={`Open ${pitcher.name}'s pitcher card`}
+          >
+            {pitcher.name}
+          </button>
+        ) : (
+          <span className="gc-pitcher">{pitcher?.name || 'TBD'}</span>
+        )}
       </div>
       {showScore && <span className="gc-score mono">{score ?? 0}</span>}
     </div>
@@ -85,12 +96,12 @@ function GameCard({ game: g, groups, idx = 0, ...ctx }) {
           background: `linear-gradient(100deg, ${hexToRgba(awayC, 0.22)}, transparent 42%, transparent 58%, ${hexToRgba(homeC, 0.22)})`,
         }}
       >
-        <TeamHead team={g.awayTeam} pitcher={g.awayPitcher} score={g.awayScore} showScore={showScore} align="left" />
+        <TeamHead team={g.awayTeam} pitcher={g.awayPitcher} score={g.awayScore} showScore={showScore} align="left" gamePk={g.gamePk} onOpenPitcher={ctx.onOpenPitcher} />
         <div className="gc-center">
           <GameStatus g={g} />
           <span className="gc-venue">{g.venueName || ''}</span>
         </div>
-        <TeamHead team={g.homeTeam} pitcher={g.homePitcher} score={g.homeScore} showScore={showScore} align="right" />
+        <TeamHead team={g.homeTeam} pitcher={g.homePitcher} score={g.homeScore} showScore={showScore} align="right" gamePk={g.gamePk} onOpenPitcher={ctx.onOpenPitcher} />
       </header>
 
       <GameChips sample={groups.away[0] || groups.home[0]} />
