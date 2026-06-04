@@ -78,7 +78,7 @@ function GameCard({ game: g, groups, idx = 0, ...ctx }) {
   const homeC = teamColor(g.homeTeam?.id)
   const showScore = liveMode && (g.isLive || g.isFinal)
   return (
-    <section className="game-card" style={{ '--i': Math.min(idx, 12) }}>
+    <section className={`game-card ${g.isFinal ? 'final' : ''}`} style={{ '--i': Math.min(idx, 12) }}>
       <header
         className="gc-head"
         style={{

@@ -4228,3 +4228,16 @@ button.th:hover {
   padding: 4px;
 }
 .ub-x:hover { color: var(--text); }
+
+/* Finished games dimmed in the Pitchers + Games views (matches the board). */
+.pcard.final,
+.game-card.final {
+  opacity: 0.5;
+  filter: grayscale(0.5);
+  transition: opacity 0.15s, filter 0.15s;
+}
+.pcard.final:hover,
+.game-card.final:hover {
+  opacity: 0.78;
+  filter: grayscale(0.2);
+}

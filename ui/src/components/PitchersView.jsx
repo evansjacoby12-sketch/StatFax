@@ -61,9 +61,10 @@ function PitcherCard({ entry, onSelect, selectedId, watchlist, slip }) {
   const matchup = game ? `${game.awayTeam?.abbr} @ ${game.homeTeam?.abbr}` : null
   const liveMode = useLiveMode()
   const live = liveMode && game?.isLive
+  const isFinal = game?.isFinal
 
   return (
-    <section className="pcard" style={{ '--tc': color }}>
+    <section className={`pcard ${isFinal ? 'final' : ''}`} style={{ '--tc': color }}>
       <div className="pcard-accent" style={{ background: hexToRgba(color, 0.5) }} />
 
       {/* Header */}
@@ -76,7 +77,7 @@ function PitcherCard({ entry, onSelect, selectedId, watchlist, slip }) {
             {team?.abbr}
             {hand && <span className="pcard-hand">{hand}</span>}
             {matchup && <span className="dim"> · {matchup}</span>}
-            {live ? <span className="pcard-live">LIVE</span> : game?.gameDate && <span className="dim"> · {gameTime(game.gameDate)}</span>}
+            {live ? <span className="pcard-live">LIVE</span> : isFinal ? <span className="final-tag">FINAL</span> : game?.gameDate && <span className="dim"> · {gameTime(game.gameDate)}</span>}
           </div>
         </div>
         <div className="pcard-vuln">
