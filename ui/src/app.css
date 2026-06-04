@@ -2565,25 +2565,30 @@ button.th:hover {
   .filters-spacer {
     display: none;
   }
-  /* Five tabs (Board · Games · Pitchers · Weather · Results) scroll
-     horizontally on their own full-width line. */
+  /* Five tabs (Board · Games · Pitchers · Weather · Results) share the row
+     equally and shrink to fit on one line — no horizontal scroll. */
   .view-toggle {
     order: 1;
     flex: 1 1 auto;
     min-width: 0;
-    overflow-x: auto;
-    scrollbar-width: none;
-    -webkit-overflow-scrolling: touch;
-  }
-  .view-toggle::-webkit-scrollbar {
-    display: none;
+    padding: 2px;
+    gap: 2px;
   }
   .view-toggle .view-btn {
-    flex: 0 0 auto;
-    padding: 0 9px;
-    gap: 5px;
-    font-size: 12px;
+    flex: 1 1 0;
+    min-width: 0;
+    justify-content: center;
+    padding: 0 3px;
+    gap: 3px;
+    font-size: 11px;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .view-toggle .view-btn svg {
+    width: 12px;
+    height: 12px;
+    flex: none;
   }
   /* The "more filters" chevron pairs with the sort select on the bottom line. */
   .more-btn {
