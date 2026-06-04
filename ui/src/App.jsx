@@ -28,6 +28,7 @@ import Icon from './components/Icon.jsx'
 import './app.css'
 
 const AUTO_REFRESH_MS = 60_000
+const LIVE_REFRESH_MS = 30_000 // faster cadence while a game is actually live
 
 // Each view is its own page via a URL hash (#board, #pitchers, …) — bookmarkable
 // and back/forward navigable. Hash routing works as-is on static hosting.
@@ -131,13 +132,28 @@ export default function App() {
     load()
   }, [load])
 
-  // Live auto-refresh — soft reload on an interval (no loader flicker; filters,
+  // Live game state (scores, innings, "homered" tags) lives in daily.json, so it
+  // only changes when we re-fetch. Detect what's in progress to drive polling.
+  const livePhase = useMemo(() => {
+    const games = state.data?.games || []
+    return {
+      anyLive: games.some((g) => g.isLive),
+      anyPending: games.some((g) => !g.isFinal), // scheduled or live
+    }
+  }, [state.data])
+
+  // Auto-refresh — soft reload on an interval (no loader flicker; filters,
   // selection, watchlist and slip all survive because they live in state by id).
+  // Two triggers: the explicit auto-refresh toggle, OR Live mode while games are
+  // still going — otherwise "Live on" would freeze on the last load, which is
+  // exactly what users hit. Poll faster once a game is actually live.
   useEffect(() => {
-    if (!autoRefresh) return
-    const t = setInterval(load, AUTO_REFRESH_MS)
+    const livePolling = liveScores && livePhase.anyPending
+    if (!autoRefresh && !livePolling) return
+    const ms = livePhase.anyLive ? LIVE_REFRESH_MS : AUTO_REFRESH_MS
+    const t = setInterval(load, ms)
     return () => clearInterval(t)
-  }, [autoRefresh, load])
+  }, [autoRefresh, liveScores, livePhase.anyLive, livePhase.anyPending, load])
 
   // Esc closes the topmost overlay.
   useEffect(() => {

@@ -151,8 +151,8 @@ export default function Header({
           onClick={onToggleLive}
           title={
             liveScores
-              ? 'Live scores & innings shown — tap for a clean pregame look'
-              : 'Pregame look (scores hidden) — tap to show live scores'
+              ? 'Live scores & innings shown and auto-updated while games are in progress — tap for a clean pregame look'
+              : 'Pregame look (scores hidden, no live polling) — tap to show & auto-update live scores'
           }
           aria-pressed={liveScores}
         >
