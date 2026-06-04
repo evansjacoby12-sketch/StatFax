@@ -22,7 +22,7 @@ export const DESC_BY_DEFAULT = new Set(['hrProbability', 'score', 'rating', 'hea
 export const DEFAULT_FILTERS = {
   q: '',
   grades: new Set(GRADE_ORDER),
-  gamePk: '',
+  gamePks: new Set(),
   confirmedOnly: false,
   watchedOnly: false,
   hotOnly: false,

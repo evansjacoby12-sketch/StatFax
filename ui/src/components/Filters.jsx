@@ -29,7 +29,7 @@ export default function Filters({ value, onChange, gradeCounts, games, badgeCoun
   }
   // Count of active "secondary" filters tucked behind the disclosure.
   const activeMore =
-    (v.gamePk ? 1 : 0) + (v.confirmedOnly ? 1 : 0) + (v.watchedOnly ? 1 : 0) + (v.hotOnly ? 1 : 0) + v.badges.size
+    v.gamePks.size + (v.confirmedOnly ? 1 : 0) + (v.watchedOnly ? 1 : 0) + (v.hotOnly ? 1 : 0) + v.badges.size
   const badgeDefs = BADGES.filter((b) => v.badges.has(b.key))
 
   return (
@@ -126,9 +126,17 @@ export default function Filters({ value, onChange, gradeCounts, games, badgeCoun
       {/* Active secondary filters stay visible as removable chips even when collapsed */}
       {showFilters && !open && activeMore > 0 && (
         <div className="active-chips">
-          {v.gamePk && (
-            <FilterChip label={gameLabel(games, v.gamePk)} onClear={() => onChange({ gamePk: '' })} />
-          )}
+          {[...v.gamePks].map((pk) => (
+            <FilterChip
+              key={pk}
+              label={gameLabel(games, pk)}
+              onClear={() => {
+                const next = new Set(v.gamePks)
+                next.delete(pk)
+                onChange({ gamePks: next })
+              }}
+            />
+          ))}
           {v.confirmedOnly && <FilterChip label="Confirmed" onClear={() => onChange({ confirmedOnly: false })} />}
           {v.watchedOnly && <FilterChip label="Watchlist" onClear={() => onChange({ watchedOnly: false })} />}
           {v.hotOnly && <FilterChip label="Hot bats" icon="Flame" onClear={() => onChange({ hotOnly: false })} />}
@@ -151,11 +159,12 @@ export default function Filters({ value, onChange, gradeCounts, games, badgeCoun
         <div className="filters-panel">
           <div className="filters-row fp-controls">
             <Select
+              multi
               icon="MapPin"
               title="Filter by game"
               ariaLabel="Filter by game"
-              value={v.gamePk}
-              onChange={(val) => onChange({ gamePk: val })}
+              value={v.gamePks}
+              onChange={(val) => onChange({ gamePks: val })}
               options={[
                 { value: '', label: 'All games' },
                 ...games.map((g) => ({

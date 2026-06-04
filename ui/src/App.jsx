@@ -199,7 +199,7 @@ export default function App() {
     const q = normName(filters.q)
     let rows = all.filter((b) => {
       if (!filters.grades.has(b.grade?.label || 'SKIP')) return false
-      if (filters.gamePk && String(b.gamePk) !== String(filters.gamePk)) return false
+      if (filters.gamePks.size && !filters.gamePks.has(String(b.gamePk))) return false
       if (filters.confirmedOnly && !b.lineupConfirmed) return false
       if (filters.watchedOnly && !watchlist.has(b.id)) return false
       if (filters.hotOnly && (b.heatIndex ?? 0) < HOT_HEAT) return false
