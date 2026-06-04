@@ -10,6 +10,7 @@ import BatterTable from './components/BatterTable.jsx'
 import GamesView from './components/GamesView.jsx'
 import PitchersView from './components/PitchersView.jsx'
 import WeatherView from './components/WeatherView.jsx'
+import GroupsView from './components/GroupsView.jsx'
 import ResultsView from './components/ResultsView.jsx'
 import PlayerDrawer from './components/PlayerDrawer.jsx'
 import ZoneView from './components/ZoneView.jsx'
@@ -28,7 +29,7 @@ const AUTO_REFRESH_MS = 60_000
 
 // Each view is its own page via a URL hash (#board, #pitchers, …) — bookmarkable
 // and back/forward navigable. Hash routing works as-is on static hosting.
-const VIEWS = new Set(['board', 'games', 'pitchers', 'weather', 'results'])
+const VIEWS = new Set(['board', 'games', 'pitchers', 'weather', 'groups', 'results'])
 const viewFromHash = () => {
   const h = (typeof location !== 'undefined' ? location.hash : '').replace(/^#\/?/, '')
   return VIEWS.has(h) ? h : null
@@ -312,6 +313,8 @@ export default function App() {
       <main className="main">
         {view === 'results' ? (
           <ResultsView meta={data.meta} />
+        ) : view === 'groups' ? (
+          <GroupsView batters={all} onSelect={(b) => setSelectedId(b.id)} selectedId={selectedId} />
         ) : view === 'pitchers' ? (
           <PitchersView
             batters={all}

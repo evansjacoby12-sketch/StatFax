@@ -52,6 +52,10 @@ export default function Filters({ value, onChange, gradeCounts, games, badgeCoun
             <Icon name="Wind" size={15} />
             Weather
           </button>
+          <button className={`view-btn ${view === 'groups' ? 'on' : ''}`} onClick={() => onView('groups')} title="Cross-game HR groups — auto-built multi-leg parlays">
+            <Icon name="Layers" size={15} />
+            Groups
+          </button>
           <button className={`view-btn ${view === 'results' ? 'on' : ''}`} onClick={() => onView('results')} title="Model track record">
             <Icon name="Activity" size={15} />
             Results

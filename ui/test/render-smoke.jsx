@@ -14,6 +14,7 @@ import BatterTable from '../src/components/BatterTable.jsx'
 import GamesView from '../src/components/GamesView.jsx'
 import PitchersView from '../src/components/PitchersView.jsx'
 import WeatherView from '../src/components/WeatherView.jsx'
+import GroupsView from '../src/components/GroupsView.jsx'
 import ResultsView from '../src/components/ResultsView.jsx'
 import PlayerDrawer from '../src/components/PlayerDrawer.jsx'
 import ZoneView from '../src/components/ZoneView.jsx'
@@ -161,6 +162,7 @@ for (const mode of [true, false]) {
   add(`GamesView[${tag}]`, <GamesView games={d.games || []} batters={batters} onSelect={noop} watchlist={new Set()} slip={new Set()} onToggleWatch={noop} onToggleSlip={noop} />)
   add(`PitchersView[${tag}]`, <PitchersView batters={batters} onSelect={noop} watchlist={new Set()} slip={new Set()} />)
   add(`WeatherView[${tag}]`, <WeatherView batters={batters} onSelect={noop} />)
+  add(`GroupsView[${tag}]`, <GroupsView batters={batters} onSelect={noop} />)
   add(`PlayerDrawer.live[${tag}]`, <PlayerDrawer batter={live} onClose={noop} watched={false} inSlip={false} onToggleWatch={noop} onToggleSlip={noop} />)
   add(`PlayerDrawer.normal[${tag}]`, <PlayerDrawer batter={normal} onClose={noop} watched onToggleWatch={noop} onToggleSlip={noop} />)
 }
