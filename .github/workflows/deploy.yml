@@ -69,6 +69,11 @@ jobs:
           npm run slate
 
       - name: Build UI
+        env:
+          # Worker /parse endpoint for the natural-language Signal Backtest box.
+          # Falls back to the repo variable if set; otherwise the hardcoded URL.
+          # Not a secret (public endpoint; CORS-gated). Box hides if blank.
+          VITE_PARSE_URL: ${{ vars.VITE_PARSE_URL || 'https://statfax-cron.evansjacoby12.workers.dev/parse' }}
         run: |
           npm --prefix ui install
           npm --prefix ui run smoke   # headless-render every view against the slate; fails the deploy on a crash
