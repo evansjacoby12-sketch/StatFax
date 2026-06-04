@@ -25,6 +25,7 @@ import Legend from '../src/components/Legend.jsx'
 import UpdateBanner from '../src/components/UpdateBanner.jsx'
 import PullToRefresh from '../src/components/PullToRefresh.jsx'
 import BacktestView from '../src/components/BacktestView.jsx'
+import PickOfDay from '../src/components/PickOfDay.jsx'
 
 const SYNTH = {
   version: 4,
@@ -176,6 +177,7 @@ add('Legend', <Legend onClose={noop} />)
 add('UpdateBanner', <UpdateBanner />)
 add('PullToRefresh', <PullToRefresh onRefresh={noop} />)
 add('BacktestView', <BacktestView />)
+add('PickOfDay', <PickOfDay batter={normal} onSelect={noop} watched={false} inSlip={false} onToggleWatch={noop} onToggleSlip={noop} />)
 
 let failed = 0
 for (const [name, el] of cases) {

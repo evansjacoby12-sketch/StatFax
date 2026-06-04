@@ -22,6 +22,7 @@ import HowToPick from './components/HowToPick.jsx'
 import Skeleton from './components/Skeleton.jsx'
 import BackToTop from './components/BackToTop.jsx'
 import PullToRefresh from './components/PullToRefresh.jsx'
+import PickOfDay from './components/PickOfDay.jsx'
 import UpdateBanner from './components/UpdateBanner.jsx'
 import Icon from './components/Icon.jsx'
 import './app.css'
@@ -69,6 +70,7 @@ export default function App() {
   const [autoRefresh, setAutoRefresh] = useState(() => store.load('autoRefresh', false))
   const [view, setView] = useState(() => viewFromHash() || store.load('view', 'board'))
   const [liveScores, setLiveScores] = useState(() => store.load('liveScores', true))
+  const [lineupNoticeOff, setLineupNoticeOff] = useState(false)
   const topbarRef = useRef(null)
 
   // Persist the durable bits.
@@ -257,6 +259,27 @@ export default function App() {
     [all, zoneId],
   )
 
+  // Slate-wide lineup confirmation, for the unconfirmed banner.
+  const lineupStatus = useMemo(() => {
+    const playable = all.filter((b) => (b.grade?.label || 'SKIP') !== 'SKIP')
+    const confirmed = playable.filter((b) => b.lineupConfirmed).length
+    return { confirmed, total: playable.length }
+  }, [all])
+
+  // Pick of the Day: the model's top HR play with the lineup actually set.
+  // Prefer confirmed-lineup bats (no point headlining a bat who may be benched);
+  // fall back to the full pool before lineups post. Rank by HR probability,
+  // tie-break by model score.
+  const pick = useMemo(() => {
+    const pool = all.filter((b) => (b.grade?.label || 'SKIP') !== 'SKIP')
+    if (!pool.length) return null
+    const confirmed = pool.filter((b) => b.lineupConfirmed)
+    const base = confirmed.length ? confirmed : pool
+    return base
+      .slice()
+      .sort((a, b) => (b.hrProbability ?? 0) - (a.hrProbability ?? 0) || (b.score ?? 0) - (a.score ?? 0))[0]
+  }, [all])
+
   if (state.status === 'loading') {
     return <Skeleton />
   }
@@ -346,18 +369,57 @@ export default function App() {
             onToggleSlip={toggleSlip}
           />
         ) : (
-          <BatterTable
-            batters={filtered}
-            onSelect={(b) => setSelectedId(b.id)}
-            selectedId={selectedId}
-            sort={filters.sort}
-            dir={filters.dir}
-            onSort={onSort}
-            watchlist={watchlist}
-            slip={slipSet}
-            onToggleWatch={toggleWatch}
-            onToggleSlip={toggleSlip}
-          />
+          <>
+            {lineupStatus.total > 0 && lineupStatus.confirmed < lineupStatus.total && !lineupNoticeOff && (
+              <div className="lineup-banner" role="status">
+                <Icon name="TriangleAlert" size={16} />
+                <span className="lb-text">
+                  {lineupStatus.confirmed === 0 ? (
+                    <>
+                      <b>Lineups not posted yet.</b> Every projection below uses probable lineups — re-check near first pitch.
+                    </>
+                  ) : (
+                    <>
+                      <b>
+                        {lineupStatus.confirmed}/{lineupStatus.total} lineups confirmed.
+                      </b>{' '}
+                      Unconfirmed bats are projections and may be benched.
+                    </>
+                  )}
+                </span>
+                {!filters.confirmedOnly && (
+                  <button className="lb-action" onClick={() => patch({ confirmedOnly: true })}>
+                    Confirmed only
+                  </button>
+                )}
+                <button className="lb-close icon-btn" onClick={() => setLineupNoticeOff(true)} aria-label="Dismiss">
+                  <Icon name="X" size={14} />
+                </button>
+              </div>
+            )}
+            {pick && (
+              <PickOfDay
+                batter={pick}
+                onSelect={(b) => setSelectedId(b.id)}
+                watched={watchlist.has(pick.id)}
+                inSlip={slipSet.has(pick.id)}
+                onToggleWatch={toggleWatch}
+                onToggleSlip={toggleSlip}
+              />
+            )}
+            <BatterTable
+              batters={filtered}
+              onSelect={(b) => setSelectedId(b.id)}
+              selectedId={selectedId}
+              sort={filters.sort}
+              dir={filters.dir}
+              onSort={onSort}
+              watchlist={watchlist}
+              slip={slipSet}
+              onToggleWatch={toggleWatch}
+              onToggleSlip={toggleSlip}
+            />
+          </>
         )}
       </main>
 

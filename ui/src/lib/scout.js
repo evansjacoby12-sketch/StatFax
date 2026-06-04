@@ -64,6 +64,57 @@ export function heatIndex(b) {
   return heatBreakdown(b).total
 }
 
+// The 6-box HR setup checklist — the signals that actually predict homers
+// (form + matchup + park). Shared by the drawer's Heat Index section and the
+// board's Pick of the Day so they never drift. Deliberately NO "due/drought"
+// box: that's the gambler's fallacy we falsified and removed from the model.
+export function hrSetup(b) {
+  const rb = b.recentBarrel
+  const seasonBarrel = Number.isFinite(b.barrelPctBBE) ? b.barrelPctBBE : b.barrelPct
+  const hr9 = b.pitcher?.season?.hrPer9
+  const park = b.gameParkHRFactor
+  const la = b.launchAngle
+  const checks = [
+    {
+      key: 'barrel',
+      label: 'Barreling lately',
+      pass: rb?.recentBarrelPct >= 10 && (rb?.recentBBE ?? 0) >= 5,
+      detail: Number.isFinite(rb?.recentBarrelPct) ? `${rb.recentBarrelPct.toFixed(1)}% barrels · last ~14d` : 'no recent sample',
+    },
+    {
+      key: 'elite',
+      label: 'Elite barrel rate',
+      pass: Number.isFinite(seasonBarrel) && seasonBarrel >= 9,
+      detail: Number.isFinite(seasonBarrel) ? `${seasonBarrel.toFixed(1)}% season · MLB median ~7%` : 'no data',
+    },
+    {
+      key: 'hot',
+      label: 'Hot bat',
+      pass: b.hot === true,
+      detail: b.hot ? 'recent ISO above season — power surge' : 'not on a heater',
+    },
+    {
+      key: 'la',
+      label: 'Launch angle in HR window',
+      pass: Number.isFinite(la) && la >= 8 && la <= 32,
+      detail: Number.isFinite(la) ? `${la.toFixed(1)}° average` : 'no LA data',
+    },
+    {
+      key: 'pitcher',
+      label: 'HR-friendly pitcher',
+      pass: Number.isFinite(hr9) && hr9 >= 1.3,
+      detail: Number.isFinite(hr9) ? `opp HR/9 ${hr9.toFixed(2)} · MLB ~1.30` : 'no pitcher data',
+    },
+    {
+      key: 'park',
+      label: 'HR park',
+      pass: Number.isFinite(park) && park >= 1.05,
+      detail: Number.isFinite(park) ? `${park >= 1 ? '+' : ''}${Math.round((park - 1) * 100)}% HRs today` : 'no park data',
+    },
+  ]
+  return { checks, n: checks.filter((c) => c.pass).length }
+}
+
 export function toolGrades(b) {
   return {
     power: toGrade(b.batterScore),

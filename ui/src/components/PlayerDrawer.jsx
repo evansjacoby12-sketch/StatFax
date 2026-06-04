@@ -7,7 +7,7 @@ import { bookLabel } from '../lib/data.js'
 import { compass, skyLabel } from '../lib/weather.js'
 import { interpretWind } from '../lib/wind.js'
 import { playerHeadshot, teamColor } from '../lib/teams.js'
-import { toolGrades, heatBreakdown, scoutVerdict, gradeLabel } from '../lib/scout.js'
+import { toolGrades, heatBreakdown, scoutVerdict, gradeLabel, hrSetup } from '../lib/scout.js'
 import { useLiveMode } from '../lib/liveMode.js'
 
 // Focus-trap + restore-focus for the slide-over (accessibility).
@@ -667,44 +667,7 @@ function ZoneTeaser({ b, onOpen }) {
 // that's the gambler's fallacy we falsified + removed from the model. Hot takes
 // its slot (the strongest positive signal in the audit).
 function HrSetupSection({ b }) {
-  const rb = b.recentBarrel
-  const seasonBarrel = b.barrelPctBBE ?? b.barrelPct
-  const hr9 = b.pitcher?.season?.hrPer9
-  const park = b.gameParkHRFactor
-  const la = b.launchAngle
-  const checks = [
-    {
-      label: 'Barreling lately',
-      pass: rb?.recentBarrelPct >= 10 && (rb?.recentBBE ?? 0) >= 5,
-      detail: rb?.recentBarrelPct != null ? `${num(rb.recentBarrelPct, 1)}% barrels · last ~14d` : 'no recent sample',
-    },
-    {
-      label: 'Elite barrel rate',
-      pass: seasonBarrel != null && seasonBarrel >= 9,
-      detail: seasonBarrel != null ? `${num(seasonBarrel, 1)}% season · MLB median ~7%` : 'no data',
-    },
-    {
-      label: 'Hot bat',
-      pass: b.hot === true,
-      detail: b.hot ? 'recent ISO above season — power surge' : 'not on a heater',
-    },
-    {
-      label: 'Launch angle in HR window',
-      pass: la != null && la >= 8 && la <= 32,
-      detail: la != null ? `${num(la, 1)}° average` : 'no LA data',
-    },
-    {
-      label: 'HR-friendly pitcher',
-      pass: hr9 != null && hr9 >= 1.3,
-      detail: hr9 != null ? `opp HR/9 ${num(hr9, 2)} · MLB ~1.30` : 'no pitcher data',
-    },
-    {
-      label: 'HR park',
-      pass: park != null && park >= 1.05,
-      detail: park != null ? `${signedPct(park - 1, 0)} HRs today` : 'no park data',
-    },
-  ]
-  const n = checks.filter((c) => c.pass).length
+  const { checks, n } = hrSetup(b)
   // Heat index (0–100, recent-form) headlines the section; the 6-box setup
   // checklist (form + matchup + park) is the "why". One combined block.
   const heat = b.heatIndex != null ? b.heatIndex : heatBreakdown(b).total
