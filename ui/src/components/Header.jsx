@@ -21,7 +21,7 @@ function HelpMenu({ onOpenGroups, onOpenBacktest, onOpenGuide, onOpenHowTo, onOp
     }
   }, [open])
   const items = [
-    { label: 'HR Groups', desc: 'Auto-built cross-game parlays', icon: 'Layers', fn: onOpenGroups },
+    { label: 'Parlay Combos', desc: 'Auto-built combos — chalk, value, heat, power, lottery', icon: 'Layers', fn: onOpenGroups },
     { label: 'Signal Backtest', desc: 'Hit rates by grade + signals', icon: 'Activity', fn: onOpenBacktest },
     { label: 'How to Pick', desc: 'HR-selection playbook', icon: 'Target', fn: onOpenHowTo },
     { label: 'Guide', desc: 'How the board works', icon: 'Info', fn: onOpenGuide },

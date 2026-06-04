@@ -449,13 +449,13 @@ export default function App() {
       {showGroups && (
         <>
           <div className="drawer-scrim" onClick={() => setShowGroups(false)} />
-          <div className="modal groups-modal" role="dialog" aria-modal="true" aria-label="Cross-Game HR Groups">
+          <div className="modal groups-modal" role="dialog" aria-modal="true" aria-label="Parlay Combos">
             <button className="drawer-close icon-btn" onClick={() => setShowGroups(false)} aria-label="Close">
               <Icon name="X" size={18} />
             </button>
             <div className="groups-modal-head">
               <Icon name="Layers" size={18} />
-              <h2>Cross-Game HR Groups</h2>
+              <h2>Parlay Combos</h2>
             </div>
             <div className="groups-modal-body">
               <GroupsView

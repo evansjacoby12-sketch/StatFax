@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import Icon from './Icon.jsx'
 import { GradeChip } from './atoms.jsx'
-import { pct, num, rate } from '../lib/format.js'
+import { pct, num, rate, american, signedPct } from '../lib/format.js'
 import { buildGroups, lastFirst, isoOf } from '../lib/groups.js'
 import { useLiveMode } from '../lib/liveMode.js'
 
@@ -47,18 +47,30 @@ function GroupCard({ g, onSelect, selectedId }) {
     <section className="grp-card" style={{ '--gc': gc }}>
       <header className="grp-head">
         <span className="grp-legbadge">{g.size}-LEG</span>
-        <span className="grp-letter">GROUP {g.letter}</span>
-        <span className="grp-title">Cross-Game HR Group</span>
+        <span className="grp-strategy">
+          <Icon name={g.icon} size={13} /> {g.label}
+        </span>
         <span className="grp-grade" style={{ color: gc, borderColor: gc }}>{g.grade}</span>
       </header>
-      <div className="grp-sub dim">— 1 batter per game · all-hit {pct(g.allHit, g.allHit < 0.01 ? 2 : 1)}</div>
+      <div className="grp-sub dim">
+        — {g.desc} · 1 per game · all-hit {pct(g.allHit, g.allHit < 0.01 ? 2 : 1)}
+        {g.american && (
+          <>
+            {' · pays '}
+            <b className="grp-pays">{american(g.american)}</b>
+          </>
+        )}
+        {g.edge != null && (
+          <span className={`grp-edge ${g.edge >= 0 ? 'pos' : 'neg'}`}> · {signedPct(g.edge, 0)} edge</span>
+        )}
+      </div>
       <ul className="grp-legs">
         {g.legs.map((b, i) => (
           <GroupLeg key={b.id} b={b} idx={i + 1} onSelect={onSelect} selected={selectedId === b.id} />
         ))}
       </ul>
       <footer className="grp-foot dim">
-        {g.size}-leg cross-game HR group · {names}
+        {g.size}-leg {g.label} · {names}
       </footer>
     </section>
   )
