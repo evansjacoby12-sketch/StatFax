@@ -490,6 +490,14 @@
   border-bottom: 1px solid var(--border);
   border-radius: var(--radius) var(--radius) 0 0;
 }
+/* When the filters panel is open, .topbar drops to position:static and scrolls
+   away with the page (see .topbar:has(.filters-panel)). The column header must
+   then pin to the very top — otherwise it sticks at top:--chrome-h, leaving a
+   dead band above it where batter rows bleed through and the header lands on top
+   of a row (the Nick-Kurtz overlap). .app wraps both topbar and board. */
+.app:has(.filters-panel) .board-head {
+  top: 0;
+}
 .th {
   font-size: 11px;
   text-transform: uppercase;
