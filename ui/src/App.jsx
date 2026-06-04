@@ -228,8 +228,8 @@ export default function App() {
       if (filters.confirmedOnly && !b.lineupConfirmed) return false
       if (filters.watchedOnly && !watchlist.has(b.id)) return false
       if (filters.hotOnly && (b.heatIndex ?? 0) < HOT_HEAT) return false
-      // Signals are multi-select (OR): show batters carrying ANY chosen signal.
-      if (filters.badges.size && ![...filters.badges].some((k) => b[k])) return false
+      // Signals are multi-select (AND): a batter must carry EVERY chosen signal.
+      if (filters.badges.size && ![...filters.badges].every((k) => b[k])) return false
       if (q) {
         const hay = normName(`${b.name} ${b.team} ${b.opponent?.abbr || ''} ${b.pitcher?.name || ''}`)
         if (!hay.includes(q)) return false
