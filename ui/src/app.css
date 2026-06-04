@@ -5100,28 +5100,38 @@ button.th:hover {
   white-space: nowrap;
 }
 
-/* ============ Opposing-pitcher popup ============ */
-/* Reuses the Pitchers-page PitcherCard inside a centered modal. The modal is the
-   frame, so the card's own border/background is dropped to avoid a double frame. */
-/* Sit above the batter drawer (z-index 41) so opening the pitcher from inside
-   the drawer cleanly covers it. */
+/* ============ Opposing-pitcher drawer ============ */
+/* Reuses the Pitchers-page PitcherCard, slid in as a right-side drawer (same
+   motion as the batter drawer) so it "pops" out of the batter card. Sits above
+   the batter drawer (z 41) so it works when opened from inside the drawer. No
+   backdrop blur — the board/batter card stays crisp behind it. */
 .pitcher-scrim {
   z-index: 42;
+  background: rgba(2, 4, 8, 0.4);
+  backdrop-filter: none;
 }
-.pitcher-modal {
+.pitcher-drawer {
   z-index: 43;
-  width: 620px;
+  width: 520px;
+}
+.pitcher-drawer-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   padding: 14px;
 }
-.pitcher-modal .pcard {
+.pitcher-drawer .pcard {
   margin: 0;
   border: none;
   background: none;
 }
-.pitcher-modal .pcard-head {
-  padding-right: 30px; /* keep the vulnerability badge clear of the close button */
+.pitcher-drawer .pcard-head {
+  padding-right: 32px; /* keep the vulnerability badge clear of the close button */
 }
-.pitcher-modal .drawer-close {
+/* Lift the close button above the card content so it's reliably clickable
+   (the card's accent/header used to sit over it). */
+.pitcher-drawer .drawer-close {
+  z-index: 5;
   background: var(--card-2);
   border-radius: 8px;
 }

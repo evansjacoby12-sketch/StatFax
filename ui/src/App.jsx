@@ -487,11 +487,11 @@ export default function App() {
       {pitcherEntry && (
         <>
           <div className="drawer-scrim pitcher-scrim" onClick={() => setPitcherKey(null)} />
-          <div className="modal pitcher-modal" role="dialog" aria-modal="true" aria-label="Pitcher card">
+          <div className="drawer pitcher-drawer" role="dialog" aria-modal="true" aria-label="Pitcher card">
             <button className="drawer-close icon-btn" onClick={() => setPitcherKey(null)} aria-label="Close">
               <Icon name="X" size={18} />
             </button>
-            <div className="pitcher-modal-body">
+            <div className="pitcher-drawer-body">
               <PitcherCard
                 entry={pitcherEntry}
                 onSelect={(b) => {
