@@ -100,6 +100,7 @@ export default function PlayerDrawer({ batter: b, onClose, watched, inSlip, onTo
         <div className="drawer-body">
           <HeroNumbers b={b} color={color} />
           <ScoutReport b={b} />
+          <HrSetupSection b={b} />
           <ZoneTeaser b={b} onOpen={onOpenZone} />
           <HrFormSection b={b} />
           <PaCurve b={b} color={color} />
@@ -695,6 +696,73 @@ function ZoneTeaser({ b, onOpen }) {
           </span>
         </div>
       </button>
+    </Section>
+  )
+}
+
+// HR Setup — a 6-box "why this is a play" checklist (RudeBets-style), but every
+// box is a signal that actually predicts HRs. Deliberately NO "due/drought" box:
+// that's the gambler's fallacy we falsified + removed from the model. Hot takes
+// its slot (the strongest positive signal in the audit).
+function HrSetupSection({ b }) {
+  const rb = b.recentBarrel
+  const seasonBarrel = b.barrelPctBBE ?? b.barrelPct
+  const hr9 = b.pitcher?.season?.hrPer9
+  const park = b.gameParkHRFactor
+  const la = b.launchAngle
+  const checks = [
+    {
+      label: 'Barreling lately',
+      pass: rb?.recentBarrelPct >= 10 && (rb?.recentBBE ?? 0) >= 5,
+      detail: rb?.recentBarrelPct != null ? `${num(rb.recentBarrelPct, 1)}% barrels · last ~14d` : 'no recent sample',
+    },
+    {
+      label: 'Elite barrel rate',
+      pass: seasonBarrel != null && seasonBarrel >= 9,
+      detail: seasonBarrel != null ? `${num(seasonBarrel, 1)}% season · MLB median ~7%` : 'no data',
+    },
+    {
+      label: 'Hot bat',
+      pass: b.hot === true,
+      detail: b.hot ? 'recent ISO above season — power surge' : 'not on a heater',
+    },
+    {
+      label: 'Launch angle in HR window',
+      pass: la != null && la >= 8 && la <= 32,
+      detail: la != null ? `${num(la, 1)}° average` : 'no LA data',
+    },
+    {
+      label: 'HR-friendly pitcher',
+      pass: hr9 != null && hr9 >= 1.3,
+      detail: hr9 != null ? `opp HR/9 ${num(hr9, 2)} · MLB ~1.30` : 'no pitcher data',
+    },
+    {
+      label: 'HR park',
+      pass: park != null && park >= 1.05,
+      detail: park != null ? `${signedPct(park - 1, 0)} HRs today` : 'no park data',
+    },
+  ]
+  const n = checks.filter((c) => c.pass).length
+  const tone = n >= 5 ? 'good' : n >= 3 ? 'warn' : 'bad'
+  const tag = n >= 5 ? 'Loaded 🔥' : n >= 3 ? 'Setting up' : 'Thin'
+  return (
+    <Section title="HR setup" icon="Crosshair">
+      <div className={`hrsetup-score ${tone}`}>
+        <span className="hrs-n mono">{n}</span>
+        <span className="hrs-of dim">/ 6</span>
+        <span className="hrs-tag">{tag}</span>
+      </div>
+      <ul className="hrsetup-list">
+        {checks.map((c) => (
+          <li key={c.label} className={`hrs-row ${c.pass ? 'on' : 'off'}`}>
+            <Icon name={c.pass ? 'Check' : 'X'} size={14} />
+            <div className="hrs-txt">
+              <span className="hrs-label">{c.label}</span>
+              <span className="hrs-detail dim">{c.detail}</span>
+            </div>
+          </li>
+        ))}
+      </ul>
     </Section>
   )
 }
