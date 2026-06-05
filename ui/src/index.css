@@ -1,14 +1,14 @@
 :root {
   /* ---- Surfaces (clean dark, near-flat) ---- */
-  --bg: #0a0d13;
-  --bg-grad-1: #0c1017;
-  --bg-grad-2: #090c11;
-  --panel: #0f141c;
-  --card: #131922;
-  --card-2: #171f2a;
-  --hover: #1a2230;
-  --border: #1e2531;
-  --border-soft: #161c26;
+  --bg: #05070a;
+  --bg-grad-1: #070a0e;
+  --bg-grad-2: #04060a;
+  --panel: #090d13;
+  --card: #0d1119;
+  --card-2: #11161f;
+  --hover: #151c28;
+  --border: #1a212c;
+  --border-soft: #10141c;
 
   /* ---- Text ---- */
   --text: #e9eff6;
