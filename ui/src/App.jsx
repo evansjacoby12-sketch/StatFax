@@ -421,28 +421,26 @@ export default function App() {
                 <button className="lb-close icon-btn" onClick={() => setLineupNoticeOff(true)} aria-label="Dismiss">
                   <Icon name="X" size={14} />
                 </button>
-                <Icon name="TriangleAlert" size={16} className="lb-icon" />
-                <div className="lb-body">
-                  <span className="lb-text">
-                    {lineupStatus.confirmed === 0 ? (
-                      <>
-                        <b>Lineups not posted yet.</b> Projections use probable lineups — re-check near first pitch.
-                      </>
-                    ) : (
-                      <>
-                        <b>
-                          {lineupStatus.confirmed}/{lineupStatus.total} lineups confirmed.
-                        </b>{' '}
-                        Unconfirmed bats are projections and may be benched.
-                      </>
-                    )}
-                  </span>
-                  {!filters.confirmedOnly && (
-                    <button className="lb-action" onClick={() => patch({ confirmedOnly: true })}>
-                      Confirmed only
-                    </button>
+                <p className="lb-text">
+                  <Icon name="TriangleAlert" size={15} className="lb-inline-icon" />
+                  {lineupStatus.confirmed === 0 ? (
+                    <>
+                      <b>Lineups not posted yet.</b> Projections use probable lineups — re-check near first pitch.
+                    </>
+                  ) : (
+                    <>
+                      <b>
+                        {lineupStatus.confirmed}/{lineupStatus.total} lineups confirmed.
+                      </b>{' '}
+                      Unconfirmed bats are projections and may be benched.
+                    </>
                   )}
-                </div>
+                </p>
+                {!filters.confirmedOnly && (
+                  <button className="lb-action" onClick={() => patch({ confirmedOnly: true })}>
+                    Confirmed only
+                  </button>
+                )}
               </div>
             )}
             {pick && pick.id !== podDismissedId && (
