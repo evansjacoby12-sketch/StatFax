@@ -300,18 +300,24 @@ export default function App() {
     return { confirmed, total: playable.length }
   }, [all])
 
-  // Pick of the Day: the model's top HR play with the lineup actually set.
-  // Prefer confirmed-lineup bats (no point headlining a bat who may be benched);
-  // fall back to the full pool before lineups post. Rank by HR probability,
-  // tie-break by model score.
+  // Pick of the Day: the model's single best HR play with the lineup set.
+  // Lead with MODEL SCORE, not HR probability — probability saturates at a
+  // ceiling (~26.5%), so the top tier ties on it and the pick flickers on every
+  // 10-min rebuild. Score has real resolution. Prefer confirmed-lineup bats, and
+  // finish with a deterministic tie-break (xHR → stable id) so the pick only
+  // changes when the numbers actually move, never on iteration-order noise.
   const pick = useMemo(() => {
     const pool = all.filter((b) => (b.grade?.label || 'SKIP') !== 'SKIP')
     if (!pool.length) return null
     const confirmed = pool.filter((b) => b.lineupConfirmed)
     const base = confirmed.length ? confirmed : pool
-    return base
-      .slice()
-      .sort((a, b) => (b.hrProbability ?? 0) - (a.hrProbability ?? 0) || (b.score ?? 0) - (a.score ?? 0))[0]
+    return base.slice().sort(
+      (a, b) =>
+        (b.score ?? 0) - (a.score ?? 0) ||
+        (b.hrProbability ?? 0) - (a.hrProbability ?? 0) ||
+        (b.expectedHRs ?? 0) - (a.expectedHRs ?? 0) ||
+        String(a.id).localeCompare(String(b.id)),
+    )[0]
   }, [all])
 
   if (state.status === 'loading') {
