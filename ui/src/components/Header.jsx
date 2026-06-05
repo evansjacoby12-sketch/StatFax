@@ -37,7 +37,7 @@ function HelpMenu({ onOpenGroups, onOpenBacktest, onOpenGuide, onOpenHowTo, onOp
         title="Help — Guide, How to Pick, Legend"
         aria-label="Help"
       >
-        <Icon name="Info" size={16} />
+        <Icon name="ChevronDown" size={16} />
       </button>
       {open && (
         <div className="view-menu-pop" role="menu">
