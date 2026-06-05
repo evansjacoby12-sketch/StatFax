@@ -75,9 +75,10 @@ export default function App() {
   const [view, setView] = useState(() => viewFromHash() || store.load('view', 'board'))
   const [liveScores, setLiveScores] = useState(() => store.load('liveScores', true))
   const [lineupNoticeOff, setLineupNoticeOff] = useState(false)
-  // Dismissed Pick of the Day, keyed by batter id — hides the current pick but
-  // re-shows automatically if the pick changes to a different player.
-  const [podDismissedId, setPodDismissedId] = useState(null)
+  // Dismissed Pick of the Day, keyed by batter id (which embeds the gamePk, so
+  // it's inherently scoped to that day). Persisted, so a dismiss survives reloads
+  // — but a new day's (or changed) pick has a new id and shows again.
+  const [podDismissedId, setPodDismissedId] = useState(() => store.load('podDismissed', null))
   const topbarRef = useRef(null)
 
   // Persist the durable bits.
@@ -94,6 +95,7 @@ export default function App() {
   useEffect(() => store.save('watchlist', [...watchlist]), [watchlist])
   useEffect(() => store.save('slip', slipIds), [slipIds])
   useEffect(() => store.save('autoRefresh', autoRefresh), [autoRefresh])
+  useEffect(() => store.save('podDismissed', podDismissedId), [podDismissedId])
   useEffect(() => {
     store.save('view', view)
     if (viewFromHash() !== view) location.hash = view // reflect the view in the URL
