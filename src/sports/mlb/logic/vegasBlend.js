@@ -16,10 +16,14 @@
 // ---------------------------------------------------------------------------
 
 /**
- * Assumed total overround (vig) when only one side of the market is available.
- * A standard -115/-115 two-way market carries ~8.7% hold; 0.08 is conservative.
+ * Assumed total overround (vig) when only one side of an HR prop is available
+ * (the common case — books rarely post the "No / 0 HR" line). Two-way *game*
+ * markets hold ~8%, but player HR props are juiced far harder: 15–25% is typical.
+ * 0.15 keeps the single-side de-juice realistic instead of over-trusting the
+ * vigged "Yes" price. When BOTH sides are present we de-juice exactly and this
+ * constant isn't used.
  */
-export const DEFAULT_HOLD = 0.08;
+export const DEFAULT_HOLD = 0.15;
 
 /** Score calibration constant: 18% implied probability = score of 100. */
 export const PROB_AT_MAX_SCORE = 0.18;
