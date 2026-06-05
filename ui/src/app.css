@@ -582,20 +582,6 @@ button.th:hover {
   transition: opacity 0.15s;
   z-index: 1;
 }
-/* Faint team-logo watermark behind each player (15%). Fixed size (not a % of
-   row height) so taller rows — LIVE tag, reason line — don't get bigger logos. */
-.board-row::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-image: var(--team-logo, none);
-  background-repeat: no-repeat;
-  background-position: right 22px center;
-  background-size: auto 44px;
-  opacity: 0.15;
-  pointer-events: none;
-  z-index: -1;
-}
 .board-row:hover {
   background: var(--hover);
 }
