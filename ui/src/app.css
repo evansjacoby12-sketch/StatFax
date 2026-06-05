@@ -1868,55 +1868,22 @@ button.th:hover {
   overflow-y: auto;
   padding: 6px;
 }
+.slip-summary {
+  padding: 9px 15px 4px;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--text-dim);
+}
 .slip-leg {
-  padding: 8px 9px;
-  border-radius: 9px;
-  border-bottom: 1px solid var(--border-soft);
-}
-.slip-leg:last-child {
-  border-bottom: none;
-}
-.slip-leg:hover {
-  background: var(--card);
-}
-.slip-leg-top {
   display: grid;
   grid-template-columns: 1fr auto auto auto 28px;
   align-items: center;
   gap: 8px;
+  padding: 7px 9px;
+  border-radius: 9px;
 }
-.slip-leg-scout {
-  font-size: 11px;
-  line-height: 1.3;
-  margin: 4px 0 0 15px;
-}
-.slip-leg-factors {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-  margin: 5px 0 1px 15px;
-}
-.slip-fchip {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  font-size: 10.5px;
-  font-weight: 600;
-  padding: 2px 6px;
-  border-radius: 6px;
-  border: 1px solid var(--border-soft);
-  color: var(--text-dim);
-}
-.slip-fchip svg {
-  opacity: 0.85;
-}
-.slip-fchip.good {
-  color: var(--good);
-  border-color: color-mix(in srgb, var(--good) 30%, var(--border-soft));
-}
-.slip-fchip.bad {
-  color: var(--bad);
-  border-color: color-mix(in srgb, var(--bad) 30%, var(--border-soft));
+.slip-leg:hover {
+  background: var(--card);
 }
 .slip-grade {
   margin: 0 auto 0 8px;
