@@ -3205,14 +3205,25 @@ async function main() {
         const { liveContext, ...rest } = row; // pregame: snapshot pre-first-pitch values
         nextByKey[key] = rest;
         stored++;
-      } else if (live && priorByKey[key]) {
-        const lc = row.liveContext;
-        Object.assign(row, priorByKey[key]); // live: restore frozen model/form fields
-        if (lc !== undefined) row.liveContext = lc; // keep live context fresh
-        nextByKey[key] = priorByKey[key]; // carry forward while still live
+      } else if (priorByKey[key]) {
+        const snap = priorByKey[key];
+        if (live) {
+          const lc = row.liveContext;
+          Object.assign(row, snap); // live: restore frozen model/form fields for display
+          if (lc !== undefined) row.liveContext = lc; // keep live context fresh
+        }
+        // Pin the LOGGED prediction (preGameScore/Grade — what reconcile + the
+        // Results view read) to the TRUE pre-first-pitch snapshot, for BOTH live
+        // and final games. Without this, preGameScore was re-derived from the
+        // live-decayed / post-game recompute on every refresh, so the backtest
+        // logged a drifted score (the board showed the frozen 87 while the log
+        // captured ~80) — quietly under-calibrating started-game bats. FINAL rows
+        // keep their settled score (0) on the board; only the logged fields move.
+        row.preGameScore = snap.score;
+        row.preGameGrade = snap.grade;
+        nextByKey[key] = snap; // carry forward through final too, so it survives to the post-Final snapshot reconcile reads
         frozen++;
       }
-      // final games: leave the settled values; drop the freeze entry.
     }
     mkdirSync(dirname(FREEZE_OUT_PATH), { recursive: true });
     writeFileSync(FREEZE_OUT_PATH, JSON.stringify({ date, byKey: nextByKey }));
