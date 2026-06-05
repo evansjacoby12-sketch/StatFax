@@ -86,17 +86,12 @@ export default function ParlaySlip({ legs, onRemove, onClear, onSelect }) {
             <span className="slip-stat-k">Model</span>
             <span className="slip-stat-v mono">{pct(p.modelProb, p.modelProb < 0.01 ? 2 : 1)}</span>
           </span>
-          <span className="slip-stat">
-            <span className="slip-stat-k">{p.allPriced ? 'Odds' : 'Fair'}</span>
-            <span className="slip-stat-v mono">{p.allPriced ? american(p.american) : american(p.fairAmerican)}</span>
-          </span>
           {p.edge != null && (
             <span className="slip-stat">
               <span className="slip-stat-k">Edge</span>
               <span className={`slip-stat-v mono ${p.edge >= 0 ? 'pos' : 'neg'}`}>{signedPct(p.edge, 0)}</span>
             </span>
           )}
-          {!p.allPriced && p.n > 0 && <span className="slip-stat slip-unpriced">{p.priced}/{p.n} priced</span>}
         </span>
         <Icon name={open ? 'ChevronDown' : 'ChevronUp'} size={16} />
       </button>
