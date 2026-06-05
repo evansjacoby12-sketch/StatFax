@@ -4936,10 +4936,13 @@ button.th:hover {
 
 /* ============ Unconfirmed-lineup banner ============ */
 .lineup-banner {
+  position: relative;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
-  padding: 9px 12px;
+  gap: 9px 12px;
+  padding: 11px 14px;
+  padding-right: 34px; /* clear the corner close button */
   margin-bottom: 12px;
   border: 1px solid color-mix(in srgb, var(--warn) 40%, var(--border));
   border-radius: 10px;
@@ -4947,13 +4950,24 @@ button.th:hover {
   font-size: 13px;
   color: var(--text);
 }
-.lineup-banner > svg { color: var(--warn); flex: none; }
-.lb-text { flex: 1; min-width: 0; line-height: 1.35; }
+.lb-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  flex: 1 1 300px; /* take the row when there's room; wrap the action below when tight */
+  min-width: 0;
+}
+.lb-main > svg {
+  color: var(--warn);
+  flex: none;
+  margin-top: 1px;
+}
+.lb-text { min-width: 0; line-height: 1.4; }
 .lb-text b { font-weight: 700; }
 .lb-action {
   flex: none;
-  padding: 5px 11px;
-  border-radius: 7px;
+  padding: 6px 13px;
+  border-radius: 8px;
   border: 1px solid color-mix(in srgb, var(--warn) 55%, transparent);
   background: color-mix(in srgb, var(--warn) 18%, transparent);
   color: var(--warn);
@@ -4962,7 +4976,15 @@ button.th:hover {
   cursor: pointer;
 }
 .lb-action:hover { background: color-mix(in srgb, var(--warn) 28%, transparent); }
-.lb-close { flex: none; color: var(--text-faint); }
+.lb-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  color: var(--text-faint);
+}
 
 /* ============ Pick of the Day ============ */
 .potd {

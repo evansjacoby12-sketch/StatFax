@@ -418,29 +418,31 @@ export default function App() {
           <>
             {lineupStatus.total > 0 && lineupStatus.confirmed < lineupStatus.total && !lineupNoticeOff && (
               <div className="lineup-banner" role="status">
-                <Icon name="TriangleAlert" size={16} />
-                <span className="lb-text">
-                  {lineupStatus.confirmed === 0 ? (
-                    <>
-                      <b>Lineups not posted yet.</b> Every projection below uses probable lineups — re-check near first pitch.
-                    </>
-                  ) : (
-                    <>
-                      <b>
-                        {lineupStatus.confirmed}/{lineupStatus.total} lineups confirmed.
-                      </b>{' '}
-                      Unconfirmed bats are projections and may be benched.
-                    </>
-                  )}
-                </span>
+                <button className="lb-close icon-btn" onClick={() => setLineupNoticeOff(true)} aria-label="Dismiss">
+                  <Icon name="X" size={14} />
+                </button>
+                <div className="lb-main">
+                  <Icon name="TriangleAlert" size={16} />
+                  <span className="lb-text">
+                    {lineupStatus.confirmed === 0 ? (
+                      <>
+                        <b>Lineups not posted yet.</b> Projections use probable lineups — re-check near first pitch.
+                      </>
+                    ) : (
+                      <>
+                        <b>
+                          {lineupStatus.confirmed}/{lineupStatus.total} lineups confirmed.
+                        </b>{' '}
+                        Unconfirmed bats are projections and may be benched.
+                      </>
+                    )}
+                  </span>
+                </div>
                 {!filters.confirmedOnly && (
                   <button className="lb-action" onClick={() => patch({ confirmedOnly: true })}>
                     Confirmed only
                   </button>
                 )}
-                <button className="lb-close icon-btn" onClick={() => setLineupNoticeOff(true)} aria-label="Dismiss">
-                  <Icon name="X" size={14} />
-                </button>
               </div>
             )}
             {pick && pick.id !== podDismissedId && (
