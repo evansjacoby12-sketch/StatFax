@@ -3,6 +3,10 @@
   min-height: 100%;
   display: flex;
   flex-direction: column;
+  /* Clip horizontal overflow so a stray wide child can never force the whole
+     page to scroll sideways on phones. Clips X only (Y stays visible), so the
+     sticky topbar is unaffected. */
+  overflow-x: clip;
 }
 .main {
   flex: 1;
@@ -5176,4 +5180,19 @@ button.th:hover {
   z-index: 5;
   background: var(--card-2);
   border-radius: 8px;
+}
+
+/* ============ Mobile fit polish (session-added cards) ============ */
+@media (max-width: 560px) {
+  /* Pick of the Day: full-width checklist + inline actions (no 84px reserve) */
+  .potd-name { font-size: 18px; }
+  .potd-checks { padding-right: 0; }
+  .potd-actions {
+    position: static;
+    justify-content: flex-end;
+    margin-top: 8px;
+  }
+  /* Parlay slip: keep the summary + leg rows from ever overflowing */
+  .slip-summary { font-size: 12px; }
+  .slip-leg-name { font-size: 13px; }
 }
