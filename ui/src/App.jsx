@@ -169,12 +169,12 @@ export default function App() {
       if (e.key === 'Escape') {
         if (pitcherKey) setPitcherKey(null)
         else if (zoneId) setZoneId(null)
+        else if (selectedId) setSelectedId(null) // drawer stacks above the modals — close it first
         else if (showBacktest) setShowBacktest(false)
         else if (showGroups) setShowGroups(false)
         else if (showHowTo) setShowHowTo(false)
         else if (showGuide) setShowGuide(false)
         else if (showLegend) setShowLegend(false)
-        else if (selectedId) setSelectedId(null)
       }
     }
     window.addEventListener('keydown', onKey)
@@ -527,10 +527,7 @@ export default function App() {
             <div className="groups-modal-body">
               <GroupsView
                 batters={all}
-                onSelect={(b) => {
-                  setShowGroups(false)
-                  setSelectedId(b.id)
-                }}
+                onSelect={(b) => setSelectedId(b.id)}
                 selectedId={selectedId}
               />
             </div>

@@ -950,7 +950,8 @@ button.th:hover {
   top: 0;
   right: 0;
   bottom: 0;
-  z-index: 41;
+  z-index: 44; /* above the centered modals (groups / backtest, z 41) so the
+                  drawer stacks on top when opened from inside one */
   width: 480px;
   max-width: 94vw;
   background: var(--panel);
@@ -959,6 +960,11 @@ button.th:hover {
   display: flex;
   flex-direction: column;
   animation: slideIn 0.26s cubic-bezier(0.22, 1, 0.36, 1);
+}
+/* The batter drawer's own scrim sits above the modals so the modal dims behind
+   the drawer (and reappears, with its state intact, when the drawer closes). */
+.drawer-scrim-top {
+  z-index: 43;
 }
 @keyframes slideIn {
   from {
@@ -5164,12 +5170,12 @@ button.th:hover {
    the batter drawer (z 41) so it works when opened from inside the drawer. No
    backdrop blur — the board/batter card stays crisp behind it. */
 .pitcher-scrim {
-  z-index: 42;
+  z-index: 45; /* above the batter drawer (44) — pitcher card opens from it */
   background: rgba(2, 4, 8, 0.4);
   backdrop-filter: none;
 }
 .pitcher-drawer {
-  z-index: 43;
+  z-index: 46;
   width: 520px;
 }
 .pitcher-drawer-body {

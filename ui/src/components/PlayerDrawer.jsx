@@ -77,7 +77,7 @@ export default function PlayerDrawer({ batter: b, onClose, watched, inSlip, onTo
 
   return (
     <>
-      <div className="drawer-scrim" onClick={onClose} />
+      <div className="drawer-scrim drawer-scrim-top" onClick={onClose} />
       <aside
         className="drawer"
         style={{ '--accent': color }}
