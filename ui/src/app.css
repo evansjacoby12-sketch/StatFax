@@ -4938,9 +4938,8 @@ button.th:hover {
 .lineup-banner {
   position: relative;
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 9px 12px;
+  align-items: flex-start;
+  gap: 9px;
   padding: 11px 14px;
   padding-right: 34px; /* clear the corner close button */
   margin-bottom: 12px;
@@ -4950,17 +4949,17 @@ button.th:hover {
   font-size: 13px;
   color: var(--text);
 }
-.lb-main {
-  display: flex;
-  align-items: flex-start;
-  gap: 9px;
-  flex: 1 1 300px; /* take the row when there's room; wrap the action below when tight */
-  min-width: 0;
-}
-.lb-main > svg {
+.lb-icon {
   color: var(--warn);
   flex: none;
   margin-top: 1px;
+}
+.lb-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start; /* text + action share the same left edge */
+  gap: 9px;
+  min-width: 0;
 }
 .lb-text { min-width: 0; line-height: 1.4; }
 .lb-text b { font-weight: 700; }
