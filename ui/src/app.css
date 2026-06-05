@@ -4976,6 +4976,19 @@ button.th:hover {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 9px;
+  padding-right: 26px; /* clear the dismiss button in the corner */
+}
+.potd-dismiss {
+  position: absolute;
+  top: 8px;
+  right: 9px;
+  width: 26px;
+  height: 26px;
+  color: var(--text-faint);
+  z-index: 2;
+}
+.potd-dismiss:hover {
+  color: var(--text);
 }
 .potd-kicker {
   display: inline-flex;

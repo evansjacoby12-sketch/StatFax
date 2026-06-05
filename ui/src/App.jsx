@@ -75,6 +75,9 @@ export default function App() {
   const [view, setView] = useState(() => viewFromHash() || store.load('view', 'board'))
   const [liveScores, setLiveScores] = useState(() => store.load('liveScores', true))
   const [lineupNoticeOff, setLineupNoticeOff] = useState(false)
+  // Dismissed Pick of the Day, keyed by batter id — hides the current pick but
+  // re-shows automatically if the pick changes to a different player.
+  const [podDismissedId, setPodDismissedId] = useState(null)
   const topbarRef = useRef(null)
 
   // Persist the durable bits.
@@ -438,7 +441,7 @@ export default function App() {
                 </button>
               </div>
             )}
-            {pick && (
+            {pick && pick.id !== podDismissedId && (
               <PickOfDay
                 batter={pick}
                 onSelect={(b) => setSelectedId(b.id)}
@@ -447,6 +450,7 @@ export default function App() {
                 onToggleWatch={toggleWatch}
                 onToggleSlip={toggleSlip}
                 onOpenPitcher={openPitcher}
+                onDismiss={(b) => setPodDismissedId(b.id)}
               />
             )}
             <BatterTable

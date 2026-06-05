@@ -16,7 +16,7 @@ function heatTag(h) {
 // The single best play of the slate, with every signal laid out. The pick is
 // chosen in App (top HR probability among confirmed-lineup bats); this just
 // renders the "everything lined up" hero card. Click opens the full drawer.
-export default function PickOfDay({ batter: b, onSelect, watched, inSlip, onToggleWatch, onToggleSlip, onOpenPitcher }) {
+export default function PickOfDay({ batter: b, onSelect, watched, inSlip, onToggleWatch, onToggleSlip, onOpenPitcher, onDismiss }) {
   if (!b) return null
   const g = b.grade?.label || 'SKIP'
   const color = gradeColor(g)
@@ -42,6 +42,19 @@ export default function PickOfDay({ batter: b, onSelect, watched, inSlip, onTogg
         }
       }}
     >
+      {onDismiss && (
+        <button
+          className="potd-dismiss icon-btn"
+          onClick={(e) => {
+            e.stopPropagation()
+            onDismiss(b)
+          }}
+          aria-label="Dismiss Pick of the Day"
+          title="Dismiss"
+        >
+          <Icon name="X" size={15} />
+        </button>
+      )}
       <div className="potd-head">
         <span className="potd-kicker">
           <Icon name="Trophy" size={13} /> Pick of the Day
