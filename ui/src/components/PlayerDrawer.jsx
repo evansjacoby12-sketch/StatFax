@@ -629,20 +629,35 @@ function zoneHeat(t) {
   if (t == null || Number.isNaN(t)) return 'var(--card-2)'
   return `hsl(${220 - 200 * t} ${45 + 35 * t}% ${18 + 22 * t}%)`
 }
+// 5×5 placement for the 13-zone mini-grid (matches ZoneView): 0-8 = strike
+// zone (center 3×3), 9-12 = the four chase corners.
+const ZMINI_POS = [
+  [2, 2], [2, 3], [2, 4],
+  [3, 2], [3, 3], [3, 4],
+  [4, 2], [4, 3], [4, 4],
+  [1, 1], [1, 5], [5, 1], [5, 5],
+]
 function MiniGrid({ grid, metric, matched }) {
   const vals = grid.map((c) => c?.[metric]).filter((v) => Number.isFinite(v))
   const min = vals.length ? Math.min(...vals) : 0
   const max = vals.length ? Math.max(...vals) : 1
+  const is13 = grid.length >= 13
   return (
-    <div className="zmini-grid">
+    <div className={`zmini-grid ${is13 ? 'zmini-grid-13' : ''}`}>
       {grid.map((c, i) => {
         const v = c?.[metric]
         const t = Number.isFinite(v) && max > min ? (v - min) / (max - min) : null
+        const style = { background: zoneHeat(t) }
+        if (is13) {
+          const [r, col] = ZMINI_POS[i] || [0, 0]
+          style.gridRow = r
+          style.gridColumn = col
+        }
         return (
           <span
             key={i}
-            className={`zmini-cell ${matched?.includes(i) ? 'matched' : ''}`}
-            style={{ background: zoneHeat(t) }}
+            className={`zmini-cell ${matched?.includes(i) ? 'matched' : ''} ${is13 && i >= 9 ? 'chase' : ''}`}
+            style={style}
           />
         )
       })}

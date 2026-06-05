@@ -5226,3 +5226,24 @@ button.th:hover {
     padding-bottom: 96px;
   }
 }
+
+/* ============ 13-zone (3×3 strike zone + 4 chase corners) ============ */
+.zone-grid.zone-grid-13 {
+  grid-template-columns: repeat(5, 1fr);
+  grid-template-rows: repeat(5, 1fr);
+  gap: 5px;
+}
+/* Chase corners read as "outside the zone" — dashed edge, slightly recessed. */
+.zone-cell.zone-chase {
+  border: 1px dashed rgba(255, 255, 255, 0.18);
+  opacity: 0.9;
+}
+.zmini-grid.zmini-grid-13 {
+  grid-template-columns: repeat(5, 9px);
+  grid-auto-rows: 9px;
+  gap: 1.5px;
+}
+.zmini-cell.chase {
+  outline: 1px dashed rgba(255, 255, 255, 0.22);
+  outline-offset: -1px;
+}

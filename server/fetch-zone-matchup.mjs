@@ -58,6 +58,14 @@ const MLB_BASE = 'https://statsapi.mlb.com/api/v1';
 const SAVANT   = 'https://baseballsavant.mlb.com';
 const SEASON   = new Date().getFullYear();
 
+// 13-zone layout: the 3×3 strike zone (MLB/Statcast zones 1-9) PLUS the four
+// outer "chase" quadrants (11-14). Grid index 0-8 = strike zone, 9-12 = the
+// chase corners (11→9, 12→10, 13→11, 14→12). The client renders 0-8 in the
+// center 3×3 and 9-12 in the four outer corners of a 5×5.
+const ZONE_IDS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14];
+const ZONE_N   = ZONE_IDS.length; // 13
+const zoneToIdx = (z) => (z >= 1 && z <= 9 ? z - 1 : z >= 11 && z <= 14 ? z - 2 : -1);
+
 // Browser-like UA so Cloudflare doesn't serve Savant's HTML challenge page.
 // Lifted from the existing `fetch-slate.mjs` SAVANT_HEADERS so we behave
 // identically to the rest of the pipeline.
@@ -133,6 +141,12 @@ export function primeFromPriorCache(prior, { ttlMs = DEFAULT_CACHE_TTL_MS } = {}
     // Using `'KEY' in firstCell` rather than `firstCell.KEY != null`
     // because new-shape cells can legitimately have KEY = null for
     // sparse zones (e.g., a cell with no batted balls has xwoba=null).
+    // Any cached grid that isn't the new 13-cell shape (old 9-cell, or the
+    // older cell schemas) is dropped so it refetches with the chase zones.
+    if (Array.isArray(entry.value?.grid) && entry.value.grid.length !== ZONE_N) {
+      skippedShape++;
+      continue;
+    }
     if (key.startsWith('batter-')) {
       const firstCell = entry.value?.grid?.[0];
       if (firstCell && 'iso' in firstCell && !('slg' in firstCell)) {
@@ -253,18 +267,19 @@ export async function fetchBatterZones(batterId, { vsHand = 'R', season = SEASON
     // batted-ball log when available; fall back to 0 if Savant returned
     // nothing (rare — usually means the batter has no batted-ball events
     // yet, e.g., a new call-up).
-    const grid = new Array(9).fill(null).map(() => ({
+    const grid = new Array(ZONE_N).fill(null).map(() => ({
       iso: null, slg: null, avg: null, obp: null, ops: null, ev: null,
       count: 0, hrCount: 0,
     }));
 
-    for (let i = 0; i < 9; i++) {
-      const mlbZone = String(i + 1).padStart(2, '0');  // '01'..'09'
-      const slgVal = parseZoneValue(slgZones, mlbZone, i + 1);
-      const avgVal = parseZoneValue(avgZones, mlbZone, i + 1);
-      const obpVal = parseZoneValue(obpZones, mlbZone, i + 1);
-      const opsVal = parseZoneValue(opsZones, mlbZone, i + 1);
-      const evVal  = parseZoneValue(evZones,  mlbZone, i + 1);
+    for (let i = 0; i < ZONE_N; i++) {
+      const zid = ZONE_IDS[i];
+      const mlbZone = String(zid).padStart(2, '0');  // '01'..'09','11'..'14'
+      const slgVal = parseZoneValue(slgZones, mlbZone, zid);
+      const avgVal = parseZoneValue(avgZones, mlbZone, zid);
+      const obpVal = parseZoneValue(obpZones, mlbZone, zid);
+      const opsVal = parseZoneValue(opsZones, mlbZone, zid);
+      const evVal  = parseZoneValue(evZones,  mlbZone, zid);
       const iso    = (Number.isFinite(slgVal) && Number.isFinite(avgVal))
                        ? +(slgVal - avgVal).toFixed(3)
                        : null;
@@ -352,8 +367,8 @@ async function fetchBatterZoneCounts(batterId, { vsHand = 'R', season = SEASON }
     const csv = await res.text();
     const rows = parseSavantCsv(csv);
 
-    const counts = new Array(9).fill(0);
-    const hrs    = new Array(9).fill(0);
+    const counts = new Array(ZONE_N).fill(0);
+    const hrs    = new Array(ZONE_N).fill(0);
     let totalBip = 0;
 
     for (const r of rows) {
@@ -361,11 +376,11 @@ async function fetchBatterZoneCounts(batterId, { vsHand = 'R', season = SEASON }
       // pitch including takes/fouls, but BIP-by-zone math should only
       // include batted balls.
       if (!r.events || r.events === '' || r.events === 'null') continue;
-      const z = parseInt(r.zone, 10);
-      if (!Number.isFinite(z) || z < 1 || z > 9) continue;
-      counts[z - 1]++;
+      const idx = zoneToIdx(parseInt(r.zone, 10));
+      if (idx < 0) continue;
+      counts[idx]++;
       totalBip++;
-      if (r.events === 'home_run') hrs[z - 1]++;
+      if (r.events === 'home_run') hrs[idx]++;
     }
 
     return { counts, hrs, totalBip };
@@ -441,7 +456,7 @@ export async function fetchPitcherZones(pitcherId, { vsHand = 'R', season = SEAS
     //   xwobaCount  — # of BIPs with a valid xwOBA reading
     //
     // Derived rates: whiff%/swings, hardHit%/contacts, xwoba = sum/count.
-    const stats = new Array(9).fill(null).map(() => ({
+    const stats = new Array(ZONE_N).fill(null).map(() => ({
       pitches: 0, hrs: 0, swings: 0, whiffs: 0,
       contacts: 0, hardHits: 0, xwobaSum: 0, xwobaCount: 0,
     }));
@@ -461,9 +476,9 @@ export async function fetchPitcherZones(pitcherId, { vsHand = 'R', season = SEAS
     ]);
 
     for (const r of rows) {
-      const z = parseInt(r.zone, 10);
-      if (!Number.isFinite(z) || z < 1 || z > 9) continue;
-      const s = stats[z - 1];
+      const idx = zoneToIdx(parseInt(r.zone, 10));
+      if (idx < 0) continue;
+      const s = stats[idx];
       s.pitches++;
       total++;
 
@@ -786,7 +801,7 @@ export function buildZoneMatchup(batter, pitcher, { minBIPPerCell = 5 } = {}) {
   let ratingNumerator = 0;
   let ratingMaxPossible = 0;
 
-  for (let i = 0; i < 9; i++) {
+  for (let i = 0; i < Math.min(bGrid.length, pGrid.length); i++) {
     const bCell = bGrid[i];
     const pCell = pGrid[i];
     const iso   = bCell?.iso;

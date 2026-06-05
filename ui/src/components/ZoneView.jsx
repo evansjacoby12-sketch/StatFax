@@ -54,18 +54,40 @@ function heatColor(t) {
   return `hsl(${h} ${s}% ${l}%)`
 }
 
+// 5×5 placement for the 13-zone grid: indices 0-8 = the 3×3 strike zone
+// (center), 9-12 = the four outer "chase" corners (MLB zones 11-14).
+const ZONE_POS = [
+  [2, 2], [2, 3], [2, 4],
+  [3, 2], [3, 3], [3, 4],
+  [4, 2], [4, 3], [4, 4],
+  [1, 1], [1, 5], [5, 1], [5, 5],
+]
+
 function Heatmap({ grid, metric, fmt, matched }) {
   const vals = grid.map((c) => c?.[metric]).filter((v) => Number.isFinite(v))
   const min = vals.length ? Math.min(...vals) : 0
   const max = vals.length ? Math.max(...vals) : 1
+  const is13 = grid.length >= 13 // 13-zone (3×3 + chase) vs legacy 3×3
   return (
-    <div className="zone-grid" role="img" aria-label="Strike-zone heatmap, catcher's view">
+    <div className={`zone-grid ${is13 ? 'zone-grid-13' : ''}`} role="img" aria-label="Strike-zone heatmap with chase zones, catcher's view">
       {grid.map((c, i) => {
         const v = c?.[metric]
         const t = Number.isFinite(v) && max > min ? (v - min) / (max - min) : null
         const isMatched = matched?.includes(i)
+        const isChase = is13 && i >= 9
+        const style = { background: heatColor(t) }
+        if (is13) {
+          const [r, col] = ZONE_POS[i] || [0, 0]
+          style.gridRow = r
+          style.gridColumn = col
+        }
         return (
-          <div key={i} className={`zone-cell ${isMatched ? 'matched' : ''}`} style={{ background: heatColor(t) }}>
+          <div
+            key={i}
+            className={`zone-cell ${isMatched ? 'matched' : ''} ${isChase ? 'zone-chase' : ''}`}
+            style={style}
+            title={isChase ? 'Chase zone (outside the strike zone)' : undefined}
+          >
             <span className="zc-v mono">{fmt(v)}</span>
             {c?.count != null && <span className="zc-n mono">{c.count}</span>}
           </div>
