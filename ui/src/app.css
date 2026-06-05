@@ -3,10 +3,6 @@
   min-height: 100%;
   display: flex;
   flex-direction: column;
-  /* Clip horizontal overflow so a stray wide child can never force the whole
-     page to scroll sideways on phones. Clips X only (Y stays visible), so the
-     sticky topbar is unaffected. */
-  overflow-x: clip;
 }
 .main {
   flex: 1;
@@ -14,6 +10,12 @@
   max-width: 1360px;
   margin: 0 auto;
   padding: 14px 20px 60px;
+  /* Clip horizontal overflow of the scrolling content so a stray wide child
+     can't force sideways page scroll. Lives on .main (not .app) so it never
+     clips the fixed overlays — slip / drawer / modals — which are .app's
+     siblings of .main. Clips X only (Y visible), so the sticky board-head
+     stays put. */
+  overflow-x: clip;
 }
 .foot {
   text-align: center;
@@ -5192,7 +5194,14 @@ button.th:hover {
     justify-content: flex-end;
     margin-top: 8px;
   }
-  /* Parlay slip: keep the summary + leg rows from ever overflowing */
+  /* Parlay slip: full-width with EQUAL side margins (was right-anchored, which
+     hugged/clipped the left edge). */
+  .slip {
+    left: 12px;
+    right: 12px;
+    width: auto;
+    max-width: none;
+  }
   .slip-summary { font-size: 12px; }
   .slip-leg-name { font-size: 13px; }
   /* When the slip is open, pad the board so the last picks clear the fixed
