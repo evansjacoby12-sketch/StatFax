@@ -57,7 +57,11 @@ function attachOdds(batter, oddsIndex) {
 }
 
 export async function loadSlate() {
-  const res = await fetch(DATA_URL, { cache: 'no-store' })
+  // Cache-buster: GitHub Pages' CDN (Fastly) can keep serving a stale daily.json
+  // for many minutes even though each deploy republishes it — and `cache:no-store`
+  // only governs the browser cache, not the CDN edge. A unique query string per
+  // request is a URL the edge hasn't cached, forcing a fresh pull every poll.
+  const res = await fetch(`${DATA_URL}?t=${Date.now()}`, { cache: 'no-store' })
   if (!res.ok) {
     throw new Error(
       `Couldn't load ${DATA_URL} (HTTP ${res.status}). Run \`npm run slate\` in the brain to generate dist/daily.json.`,
