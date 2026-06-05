@@ -11,6 +11,15 @@ const SIZES = [2, 3, 4]
 
 const barrelOf = (b) => (Number.isFinite(b.barrelPctBBE) ? b.barrelPctBBE : b.barrelPct)
 
+// Proven HR signals, weighted by the badge audit's within-grade lift (hot &
+// barrelKing carry the most; park/weather the least). "due" is excluded — it's
+// the gambler's-fallacy signal we falsified. Drives the Signal Stack combo,
+// which groups bats that light up the SAME signals — what the per-metric
+// strategies miss (they rank on one number, never on shared badges).
+const STACK_SIGNALS = { hot: 3, barrelKing: 2, homeEdge: 2, bullpenLegend: 2, awayEdge: 1.5, pitchEdge: 1, wxEdge: 0.5 }
+const signalScore = (b) => Object.entries(STACK_SIGNALS).reduce((s, [k, w]) => s + (b[k] ? w : 0), 0)
+const signalCount = (b) => Object.keys(STACK_SIGNALS).reduce((n, k) => n + (b[k] ? 1 : 0), 0)
+
 // Strategy menu. Each ranks the eligible pool by its own metric and may require
 // a leg to clear a bar (e.g. Hot Hand only takes hot bats). `top` additionally
 // spins off a second non-overlapping tier so there's always a backup combo.
@@ -22,6 +31,14 @@ const STRATEGIES = [
     desc: 'highest HR probability',
     rank: (b) => b.hrProbability ?? 0,
     tiers: 2,
+  },
+  {
+    key: 'stack',
+    label: 'Signal Stack',
+    icon: 'Layers',
+    desc: 'most proven signals stacked',
+    rank: signalScore,
+    require: (b) => signalCount(b) >= 2, // a real stack, not a lone badge
   },
   {
     key: 'value',
