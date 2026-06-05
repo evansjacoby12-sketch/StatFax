@@ -99,7 +99,7 @@ export function ProbRing({ value, color = 'var(--prime)', size = 48 }) {
         />
       )}
       <text className="pr-val mono" x={cx} y={cy + size * 0.15} textAnchor="middle" dominantBaseline="central" fill={color}>
-        {has ? Math.round(pctVal) : '—'}
+        {has ? pctVal.toFixed(1) : '—'}
       </text>
     </svg>
   )
