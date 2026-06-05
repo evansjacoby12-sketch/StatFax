@@ -1,5 +1,16 @@
 import { decimalToAmerican } from './format.js'
 
+// Quality grade for a built parlay — the legs' average model score mapped to a
+// letter (same scale as the auto Parlay Combos cards, so the manual builder and
+// the combo grades read consistently). Reflects how strong the picks are, not
+// how likely all legs hit (that's the all-hit probability).
+export function parlayGrade(legs) {
+  if (!legs?.length) return null
+  const avgScore = legs.reduce((s, b) => s + (b.score ?? 0), 0) / legs.length
+  const letter = avgScore >= 76 ? 'S' : avgScore >= 70 ? 'A' : avgScore >= 62 ? 'B' : avgScore >= 54 ? 'C' : 'D'
+  return { letter, avgScore }
+}
+
 // Combine parlay legs. Model probability assumes leg independence (HRs by
 // different batters are close enough to independent for a quick read).
 // Market figures only resolve when EVERY leg has a priced book.
