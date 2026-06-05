@@ -436,11 +436,6 @@ export default function App() {
                     </>
                   )}
                 </p>
-                {!filters.confirmedOnly && (
-                  <button className="lb-action" onClick={() => patch({ confirmedOnly: true })}>
-                    Confirmed only
-                  </button>
-                )}
               </div>
             )}
             {pick && pick.id !== podDismissedId && (
