@@ -13,7 +13,7 @@ const VIEWS = [
 const TOOLS = [
   ['Search', 'Search', 'Filter by batter, team, or pitcher name.'],
   ['Trophy', 'Grade chips', 'Toggle PRIME / STRONG / LEAN / SKIP to focus the board.'],
-  ['SlidersHorizontal', 'Filters (chevron)', 'Game, confirmed-lineup-only, watchlist-only, hot bats, and the signal chips.'],
+  ['SlidersHorizontal', 'Filters (chevron)', 'Game, confirmed-lineup-only, watchlist-only, heating-up (Heat index ≥ 58), and the signal chips.'],
   ['Activity', 'Live / Pregame', 'Flip the whole board between live scores + innings and a clean pregame projection look.'],
   ['Radio', 'Auto', 'Soft-refresh the slate every 60s for live games — filters and selection survive.'],
   ['Star', 'Watchlist', 'Star any batter (row or drawer), then filter to just your list.'],

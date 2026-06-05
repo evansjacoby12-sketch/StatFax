@@ -139,7 +139,7 @@ export default function Filters({ value, onChange, gradeCounts, games, badgeCoun
           ))}
           {v.confirmedOnly && <FilterChip label="Confirmed" onClear={() => onChange({ confirmedOnly: false })} />}
           {v.watchedOnly && <FilterChip label="Watchlist" onClear={() => onChange({ watchedOnly: false })} />}
-          {v.hotOnly && <FilterChip label="Hot bats" icon="Flame" onClear={() => onChange({ hotOnly: false })} />}
+          {v.hotOnly && <FilterChip label="Heating up" icon="Flame" onClear={() => onChange({ hotOnly: false })} />}
           {badgeDefs.map((bd) => (
             <FilterChip
               key={bd.key}
@@ -196,10 +196,10 @@ export default function Filters({ value, onChange, gradeCounts, games, badgeCoun
             <button
               className={`toggle-btn hot-toggle ${v.hotOnly ? 'on' : ''}`}
               onClick={() => onChange({ hotOnly: !v.hotOnly })}
-              title="Only hot bats (Heat index ≥ 58)"
+              title="Only bats with Heat index ≥ 58 — the composite recent-form score (broader than the Hot signal flag)"
             >
               <Icon name="Flame" size={14} />
-              Hot bats
+              Heating up
             </button>
           </div>
 
