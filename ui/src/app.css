@@ -5195,4 +5195,9 @@ button.th:hover {
   /* Parlay slip: keep the summary + leg rows from ever overflowing */
   .slip-summary { font-size: 12px; }
   .slip-leg-name { font-size: 13px; }
+  /* When the slip is open, pad the board so the last picks clear the fixed
+     bottom bar instead of hiding behind it (only when a slip exists). */
+  .app:has(.slip) .main {
+    padding-bottom: 96px;
+  }
 }
