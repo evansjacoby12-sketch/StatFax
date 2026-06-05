@@ -1752,7 +1752,7 @@ button.th:hover {
   gap: 12px;
   width: 100%;
   padding: 12px 16px;
-  border-radius: 14px;
+  border-radius: 999px;
   border: 1px solid color-mix(in srgb, var(--prime) 40%, var(--border));
   background: linear-gradient(180deg, #131c2b, #0e1623);
   box-shadow: var(--shadow-lg);
@@ -5180,13 +5180,13 @@ button.th:hover {
     justify-content: flex-end;
     margin-top: 8px;
   }
-  /* Parlay slip: full-width with EQUAL side margins (was right-anchored, which
-     hugged/clipped the left edge). */
+  /* Parlay slip: a centered, content-width floating pill (not a full-width bar). */
   .slip {
-    left: 12px;
-    right: 12px;
-    width: auto;
-    max-width: none;
+    left: 0;
+    right: 0;
+    margin-inline: auto;
+    width: fit-content;
+    max-width: calc(100vw - 24px);
   }
   .slip-summary { font-size: 12px; }
   .slip-leg-name { font-size: 13px; }
