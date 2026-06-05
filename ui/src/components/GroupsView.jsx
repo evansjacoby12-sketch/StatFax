@@ -14,16 +14,56 @@ const SIZE_TABS = [
 
 // Cross-Game HR Groups — auto-built multi-leg parlays, one best bat per game.
 export default function GroupsView({ batters, onSelect, selectedId }) {
-  const bySize = useMemo(() => buildGroups(batters), [batters])
-  const available = SIZE_TABS.filter((t) => bySize[t.k]?.length)
   const [size, setSize] = useState(2)
+  const [games, setGames] = useState(() => new Set()) // empty = all games
+
+  // Distinct, still-playable games in the pool — for the game selector.
+  const gameList = useMemo(() => {
+    const m = new Map()
+    for (const b of batters || []) {
+      if (b.gamePk == null || m.has(b.gamePk) || b.game?.isFinal) continue
+      const a = b.game?.awayTeam?.abbr
+      const h = b.game?.homeTeam?.abbr
+      m.set(b.gamePk, { gamePk: b.gamePk, label: a && h ? `${a}@${h}` : b.team || `#${b.gamePk}`, time: b.game?.gameDate || '' })
+    }
+    return [...m.values()].sort((x, y) => x.time.localeCompare(y.time) || x.label.localeCompare(y.label))
+  }, [batters])
+
+  // Restrict the combo pool to the selected games (none selected = all games).
+  const pool = useMemo(
+    () => (games.size ? (batters || []).filter((b) => games.has(b.gamePk)) : batters),
+    [batters, games],
+  )
+  const bySize = useMemo(() => buildGroups(pool), [pool])
+  const available = SIZE_TABS.filter((t) => bySize[t.k]?.length)
   const activeSize = bySize[size]?.length ? size : available[0]?.k
   const groups = activeSize ? bySize[activeSize] : []
 
-  if (!available.length) return <div className="empty-note">Not enough games to build cross-game groups.</div>
+  const toggleGame = (pk) =>
+    setGames((prev) => {
+      const next = new Set(prev)
+      next.has(pk) ? next.delete(pk) : next.add(pk)
+      return next
+    })
 
   return (
     <>
+      {gameList.length > 1 && (
+        <div className="grp-games" role="group" aria-label="Filter by game">
+          <button className={`badge-toggle ${games.size === 0 ? 'on' : ''}`} onClick={() => setGames(new Set())}>
+            All games
+          </button>
+          {gameList.map((g) => (
+            <button
+              key={g.gamePk}
+              className={`badge-toggle ${games.has(g.gamePk) ? 'on' : ''}`}
+              onClick={() => toggleGame(g.gamePk)}
+            >
+              {g.label}
+            </button>
+          ))}
+        </div>
+      )}
       <div className="grp-controls" role="group" aria-label="Group size">
         {available.map((t) => (
           <button key={t.k} className={`badge-toggle ${activeSize === t.k ? 'on' : ''}`} onClick={() => setSize(t.k)}>
@@ -31,11 +71,17 @@ export default function GroupsView({ batters, onSelect, selectedId }) {
           </button>
         ))}
       </div>
-      <div className="grp-list">
-        {groups.map((g) => (
-          <GroupCard key={g.id} g={g} onSelect={onSelect} selectedId={selectedId} />
-        ))}
-      </div>
+      {available.length ? (
+        <div className="grp-list">
+          {groups.map((g) => (
+            <GroupCard key={g.id} g={g} onSelect={onSelect} selectedId={selectedId} />
+          ))}
+        </div>
+      ) : (
+        <div className="empty-note">
+          {games.size ? 'Pick at least 2 games to build a combo.' : 'Not enough games to build cross-game groups.'}
+        </div>
+      )}
     </>
   )
 }
