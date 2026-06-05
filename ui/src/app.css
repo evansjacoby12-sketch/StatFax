@@ -4398,18 +4398,9 @@ button.th:hover {
 /* ============ Cross-Game HR Groups ============ */
 .grp-games {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
   margin-top: 12px;
-  overflow-x: auto;
-  padding-bottom: 4px;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
-}
-.grp-games::-webkit-scrollbar { display: none; }
-.grp-games .badge-toggle {
-  flex: none;
-  font-family: var(--mono);
-  font-size: 11.5px;
 }
 .grp-controls {
   display: flex;
