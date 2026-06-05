@@ -16,14 +16,14 @@ crons = ["*/10 * * * *"]
 
 # Non-secret config — change here without rotating secrets.
 [vars]
-GITHUB_REPO = "evansjacoby12-sketch/HRSauce"
+GITHUB_REPO = "evansjacoby12-sketch/StatFax"
 EVENT_TYPE  = "slate-refresh"
 
 # Secrets (set via `wrangler secret put` — NEVER commit values here):
 #   GITHUB_TOKEN  — fine-grained PAT with Actions: write on this repo
 #
 #   Generate at: https://github.com/settings/personal-access-tokens
-#     Repository access:    "Only select repositories" → HRSauce
+#     Repository access:    "Only select repositories" → StatFax
 #     Repository permissions → Contents:  Read and write   (what repository_dispatch needs)
 #     Repository permissions → Metadata:  Read-only        (always required)
 #     Expiration:            longest available (or no-expiry org policy)

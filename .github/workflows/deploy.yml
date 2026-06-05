@@ -9,6 +9,11 @@ name: Build slate + deploy
 
 on:
   workflow_dispatch: {}
+  # The Cloudflare worker (server/cloudflare) fires this every 10 min on CF's
+  # reliable cron — GitHub's own `schedule` trigger is best-effort and gets
+  # dropped almost entirely (≈1 run in 22h observed), which left the slate stale.
+  repository_dispatch:
+    types: [slate-refresh]
   push:
     branches: [main]
   schedule:

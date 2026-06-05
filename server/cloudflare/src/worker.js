@@ -20,7 +20,7 @@
  *   GITHUB_TOKEN  — fine-grained PAT with Actions: write on this repo
  *
  * Required Worker vars (set in wrangler.toml or dashboard):
- *   GITHUB_REPO   — "owner/repo" (e.g. "evansjacoby12-sketch/HRSauce")
+ *   GITHUB_REPO   — "owner/repo" (e.g. "evansjacoby12-sketch/StatFax")
  *   EVENT_TYPE    — repository_dispatch event_type to fire
  *                   (matches the workflow's `on.repository_dispatch.types`)
  */
@@ -71,7 +71,7 @@ export default {
  * `wrangler tail`.
  */
 async function triggerSlateRefresh(env) {
-  const repo      = env.GITHUB_REPO || 'evansjacoby12-sketch/HRSauce';
+  const repo      = env.GITHUB_REPO || 'evansjacoby12-sketch/StatFax';
   const eventType = env.EVENT_TYPE  || 'slate-refresh';
   const token     = env.GITHUB_TOKEN;
 
