@@ -5247,3 +5247,85 @@ button.th:hover {
   outline: 1px dashed rgba(255, 255, 255, 0.22);
   outline-offset: -1px;
 }
+
+/* ============ Game of the Day ============ */
+.god-card {
+  margin-bottom: 16px;
+  padding: 13px 15px;
+  border: 1px solid color-mix(in srgb, var(--prime) 40%, var(--border));
+  border-radius: 14px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--prime) 11%, var(--card)), var(--card) 60%);
+}
+.god-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.god-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--prime);
+}
+.god-xhr { font-size: 12px; color: var(--text-dim); white-space: nowrap; }
+.god-xhr b { font-size: 20px; font-weight: 800; color: var(--text); }
+.god-xhr em { font-style: normal; }
+.god-matchup { font-size: 13px; color: var(--text-dim); margin-bottom: 10px; }
+.god-matchup b { color: var(--text); font-size: 15px; }
+.god-factors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin-bottom: 10px;
+}
+.god-fac {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.god-fac.good { color: var(--good); }
+.god-fac.bad { color: var(--bad); }
+.god-fac > svg { flex: none; opacity: 0.85; }
+.god-amp { color: var(--text-faint); }
+.god-pitcher {
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  padding: 0;
+}
+.god-pitcher:hover { text-decoration: underline; }
+.god-pitcher b { font-weight: 700; }
+.god-pitcher b.pos { color: var(--good); }
+.god-pitcher b.neg { color: var(--bad); }
+.god-threats {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.god-threats-k { font-size: 11px; }
+.god-threat {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--row-accent, var(--prime)) 35%, var(--border-soft));
+  background: transparent;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.god-threat:hover { background: var(--card-2); }
+.god-threat .mono { color: var(--row-accent, var(--prime)); }

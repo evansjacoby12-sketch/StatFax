@@ -1,11 +1,115 @@
 import Icon from './Icon.jsx'
 import { GradeChip, BadgeRow, ProbBar, ProbRing } from './atoms.jsx'
 import { teamColor, teamLogo, hexToRgba, readableOn, playerHeadshot } from '../lib/teams.js'
-import { pct, num, gameTime } from '../lib/format.js'
+import { pct, num, gameTime, signedPct } from '../lib/format.js'
 import { gradeColor } from '../lib/badges.js'
 import { HOT_HEAT } from '../lib/constants.js'
 import { compass } from '../lib/weather.js'
+import { interpretWind } from '../lib/wind.js'
 import { useLiveMode } from '../lib/liveMode.js'
+
+const lastName = (n) => (n || '').trim().split(/\s+/).slice(-1)[0]
+
+// Game of the Day — the best HR environment on the slate, cross-checking
+// everything at once. Ranks games by total expected HRs (the model's xHR already
+// bakes in the pitcher matchup, park, and weather), then surfaces the WHY: both
+// starters' HR/9, the wind/park, the PRIME/STRONG count, and the top threats.
+function computeGameOfDay(batters) {
+  const byGame = new Map()
+  for (const b of batters || []) {
+    if (b.game?.isFinal || !Number.isFinite(b.expectedHRs)) continue
+    let g = byGame.get(b.gamePk)
+    if (!g) {
+      g = { gamePk: b.gamePk, game: b.game, bats: [], xhr: 0, primeStrong: 0 }
+      byGame.set(b.gamePk, g)
+    }
+    g.bats.push(b)
+    g.xhr += b.expectedHRs
+    const lbl = b.grade?.label
+    if (lbl === 'PRIME' || lbl === 'STRONG') g.primeStrong++
+  }
+  const list = [...byGame.values()].filter((g) => g.bats.length >= 4 && g.primeStrong >= 1)
+  if (!list.length) return null
+  list.sort((a, b) => b.xhr - a.xhr)
+  const g = list[0]
+  // A home batter faces the AWAY starter and vice-versa, so pull both starters
+  // (with full season stats) off the batters' pitcher field.
+  g.awayPitcher = g.bats.find((b) => b.isHome)?.pitcher || null
+  g.homePitcher = g.bats.find((b) => !b.isHome)?.pitcher || null
+  g.park = g.bats[0]?.gameParkHRFactor ?? null
+  g.weather = g.bats[0]?.weather || g.game?.weather || null
+  g.threats = g.bats
+    .filter((b) => (b.grade?.label || 'SKIP') !== 'SKIP')
+    .sort((a, b) => (b.hrProbability ?? 0) - (a.hrProbability ?? 0))
+    .slice(0, 4)
+  return g
+}
+
+function GodPitcher({ p, onOpenPitcher, gamePk }) {
+  if (!p?.name) return null
+  const hr9 = p.season?.hrPer9
+  const tone = hr9 >= 1.3 ? 'pos' : hr9 <= 0.9 ? 'neg' : ''
+  return (
+    <button className="god-pitcher" onClick={() => onOpenPitcher?.(p.id, gamePk)} title={`${p.name} — open pitcher card`}>
+      {lastName(p.name)} {hr9 != null && <b className={tone}>{num(hr9, 2)}</b>}
+    </button>
+  )
+}
+
+function GameOfDay({ god, onSelect, onOpenPitcher }) {
+  if (!god) return null
+  const g = god.game
+  const away = g?.awayTeam?.abbr || '—'
+  const home = g?.homeTeam?.abbr || '—'
+  const wind = interpretWind(god.weather, g?.homeTeam?.abbr, { roofClosed: god.weather?.roofClosed })
+  return (
+    <section className="god-card">
+      <div className="god-head">
+        <span className="god-kicker">
+          <Icon name="Flame" size={14} /> Game of the Day
+        </span>
+        <span className="god-xhr mono">
+          {num(god.xhr, 1)} <em>exp HR</em>
+        </span>
+      </div>
+      <div className="god-matchup">
+        <b>
+          {away} @ {home}
+        </b>
+        {g?.venueName ? ` · ${g.venueName}` : ''}
+        {g?.gameDate ? ` · ${gameTime(g.gameDate)}` : ''}
+      </div>
+      <div className="god-factors">
+        <span className="god-fac" title="Both starters' HR allowed per 9 — higher = more hittable">
+          <Icon name="Shield" size={12} /> vs <GodPitcher p={god.awayPitcher} onOpenPitcher={onOpenPitcher} gamePk={god.gamePk} />
+          <span className="god-amp">·</span>
+          <GodPitcher p={god.homePitcher} onOpenPitcher={onOpenPitcher} gamePk={god.gamePk} /> HR/9
+        </span>
+        {wind && wind.verdict !== 'CROSS' && (
+          <span className={`god-fac ${wind.verdict === 'OUT' ? 'good' : 'bad'}`}>
+            <Icon name="Wind" size={12} /> {wind.caption}
+          </span>
+        )}
+        {god.park != null && Math.abs(god.park - 1) >= 0.02 && (
+          <span className={`god-fac ${god.park >= 1.05 ? 'good' : god.park <= 0.95 ? 'bad' : ''}`}>
+            <Icon name="Gauge" size={12} /> {signedPct(god.park - 1, 0)} park
+          </span>
+        )}
+        <span className="god-fac">
+          <Icon name="Award" size={12} /> {god.primeStrong} PRIME/STRONG
+        </span>
+      </div>
+      <div className="god-threats">
+        <span className="god-threats-k dim">Top threats</span>
+        {god.threats.map((b) => (
+          <button key={b.id} className="god-threat" onClick={() => onSelect(b)} style={{ '--row-accent': gradeColor(b.grade?.label) }}>
+            {lastName(b.name)} <span className="mono">{pct(b.hrProbability, 1)}</span>
+          </button>
+        ))}
+      </div>
+    </section>
+  )
+}
 
 export default function GamesView({ games, batters, onSelect, selectedId, watchlist, slip, onToggleWatch, onToggleSlip, onOpenPitcher }) {
   // Group the (already filtered + sorted) batters by game, then by side.
@@ -34,12 +138,16 @@ export default function GamesView({ games, batters, onSelect, selectedId, watchl
   }
 
   const ctx = { onSelect, selectedId, watchlist, slip, onToggleWatch, onToggleSlip, onOpenPitcher }
+  const god = computeGameOfDay(batters)
   return (
-    <div className="games-grid">
-      {ordered.map((g, i) => (
-        <GameCard key={g.gamePk} game={g} groups={byGame.get(g.gamePk)} idx={i} {...ctx} />
-      ))}
-    </div>
+    <>
+      <GameOfDay god={god} onSelect={onSelect} onOpenPitcher={onOpenPitcher} />
+      <div className="games-grid">
+        {ordered.map((g, i) => (
+          <GameCard key={g.gamePk} game={g} groups={byGame.get(g.gamePk)} idx={i} {...ctx} />
+        ))}
+      </div>
+    </>
   )
 }
 
