@@ -1,4 +1,4 @@
-import { useMemo, useEffect } from 'react'
+import { useMemo, useEffect, useState } from 'react'
 import Icon from './Icon.jsx'
 import { GradeChip, ScoreRing, ProbBar, Stat } from './atoms.jsx'
 import { groupPitchers, pitchUsage, effSide } from '../lib/pitchers.js'
@@ -6,11 +6,28 @@ import { pct, num, rate, gameTime } from '../lib/format.js'
 import { teamColor, teamLogo, playerHeadshot, hexToRgba } from '../lib/teams.js'
 import { useLiveMode } from '../lib/liveMode.js'
 
+const PSORT = [
+  { k: 'vuln', label: 'Most hittable' },
+  { k: 'time', label: 'Game time' },
+]
+
 // Pitcher Plan — one card per starting pitcher: vulnerability verdict, the
 // lineup ranked as HR targets, pitch mix, and splits + fatigue. Reads the
 // already-filtered batter list so the board's filters narrow the pool.
 export default function PitchersView({ batters, onSelect, selectedId, watchlist, slip, focusKey, onFocusDone }) {
-  const pitchers = useMemo(() => groupPitchers(batters), [batters])
+  const [sort, setSort] = useState('vuln')
+  const grouped = useMemo(() => groupPitchers(batters), [batters])
+  // 'vuln' = groupPitchers' default (most hittable first). 'time' = by game
+  // start, which also puts both starters of a game next to each other; ties
+  // within a game fall back to vulnerability.
+  const pitchers = useMemo(() => {
+    if (sort !== 'time') return grouped
+    return [...grouped].sort(
+      (a, b) =>
+        (a.game?.gameDate || '￿').localeCompare(b.game?.gameDate || '￿') ||
+        (b.vuln?.score ?? 0) - (a.vuln?.score ?? 0),
+    )
+  }, [grouped, sort])
 
   // When arriving from a batter's "Opposing pitcher" link, scroll that card into
   // view and flash it. Runs after the cards mount; clears the focus once done.
@@ -33,18 +50,28 @@ export default function PitchersView({ batters, onSelect, selectedId, watchlist,
     return <div className="empty-note">No pitchers match the current filters.</div>
   }
   return (
-    <div className="pitchers">
-      {pitchers.map((e) => (
-        <PitcherCard
-          key={e.key}
-          entry={e}
-          onSelect={onSelect}
-          selectedId={selectedId}
-          watchlist={watchlist}
-          slip={slip}
-        />
-      ))}
-    </div>
+    <>
+      <div className="pitchers-controls" role="group" aria-label="Sort pitchers">
+        <span className="pitchers-controls-k dim">Sort</span>
+        {PSORT.map((t) => (
+          <button key={t.k} className={`badge-toggle ${sort === t.k ? 'on' : ''}`} onClick={() => setSort(t.k)}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+      <div className="pitchers">
+        {pitchers.map((e) => (
+          <PitcherCard
+            key={e.key}
+            entry={e}
+            onSelect={onSelect}
+            selectedId={selectedId}
+            watchlist={watchlist}
+            slip={slip}
+          />
+        ))}
+      </div>
+    </>
   )
 }
 

@@ -5329,3 +5329,18 @@ button.th:hover {
 }
 .god-threat:hover { background: var(--card-2); }
 .god-threat .mono { color: var(--row-accent, var(--prime)); }
+
+/* Pitchers tab sort control */
+.pitchers-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.pitchers-controls-k {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-right: 2px;
+}
