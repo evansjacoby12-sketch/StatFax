@@ -12,6 +12,7 @@ import PitchersView, { PitcherCard } from './components/PitchersView.jsx'
 import { groupPitchers } from './lib/pitchers.js'
 import WeatherView from './components/WeatherView.jsx'
 import GroupsView from './components/GroupsView.jsx'
+import SplitsView from './components/SplitsView.jsx'
 import BacktestView from './components/BacktestView.jsx'
 import ResultsView from './components/ResultsView.jsx'
 import PlayerDrawer from './components/PlayerDrawer.jsx'
@@ -68,6 +69,7 @@ export default function App() {
   const [showGuide, setShowGuide] = useState(false)
   const [showHowTo, setShowHowTo] = useState(false)
   const [showGroups, setShowGroups] = useState(false)
+  const [showSplits, setShowSplits] = useState(false)
   const [showBacktest, setShowBacktest] = useState(false)
   const [watchlist, setWatchlist] = useState(() => new Set(store.load('watchlist', [])))
   const [slipIds, setSlipIds] = useState(() => store.load('slip', []))
@@ -171,6 +173,7 @@ export default function App() {
         else if (zoneId) setZoneId(null)
         else if (selectedId) setSelectedId(null) // drawer stacks above the modals — close it first
         else if (showBacktest) setShowBacktest(false)
+        else if (showSplits) setShowSplits(false)
         else if (showGroups) setShowGroups(false)
         else if (showHowTo) setShowHowTo(false)
         else if (showGuide) setShowGuide(false)
@@ -179,7 +182,7 @@ export default function App() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [selectedId, showLegend, showGuide, showHowTo, zoneId, showGroups, showBacktest, pitcherKey])
+  }, [selectedId, showLegend, showGuide, showHowTo, zoneId, showGroups, showSplits, showBacktest, pitcherKey])
 
   const patch = useCallback((p) => setFilters((f) => ({ ...f, ...p })), [])
 
@@ -370,6 +373,7 @@ export default function App() {
           onOpenGuide={() => setShowGuide(true)}
           onOpenHowTo={() => setShowHowTo(true)}
           onOpenGroups={() => setShowGroups(true)}
+          onOpenSplits={() => setShowSplits(true)}
           onOpenBacktest={() => setShowBacktest(true)}
         />
 
@@ -530,6 +534,23 @@ export default function App() {
                 onSelect={(b) => setSelectedId(b.id)}
                 selectedId={selectedId}
               />
+            </div>
+          </div>
+        </>
+      )}
+      {showSplits && (
+        <>
+          <div className="drawer-scrim" onClick={() => setShowSplits(false)} />
+          <div className="modal groups-modal" role="dialog" aria-modal="true" aria-label="Batter Splits">
+            <button className="drawer-close icon-btn" onClick={() => setShowSplits(false)} aria-label="Close">
+              <Icon name="X" size={18} />
+            </button>
+            <div className="groups-modal-head">
+              <Icon name="LayoutGrid" size={18} />
+              <h2>Batter Splits</h2>
+            </div>
+            <div className="groups-modal-body">
+              <SplitsView batters={all} onSelect={(b) => setSelectedId(b.id)} />
             </div>
           </div>
         </>

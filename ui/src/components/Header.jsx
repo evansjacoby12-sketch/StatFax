@@ -4,7 +4,7 @@ import { timeAgo, pct } from '../lib/format.js'
 import { GRADE_ORDER, gradeColor } from '../lib/badges.js'
 
 // Help dropdown anchored to the header info button: Groups, Guide, How to Pick, Legend.
-function HelpMenu({ onOpenGroups, onOpenBacktest, onOpenGuide, onOpenHowTo, onOpenLegend }) {
+function HelpMenu({ onOpenGroups, onOpenSplits, onOpenBacktest, onOpenGuide, onOpenHowTo, onOpenLegend }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
   useEffect(() => {
@@ -22,6 +22,7 @@ function HelpMenu({ onOpenGroups, onOpenBacktest, onOpenGuide, onOpenHowTo, onOp
   }, [open])
   const items = [
     { label: 'Parlay Combos', desc: 'Auto-built combos — chalk, value, heat, power, lottery', icon: 'Layers', fn: onOpenGroups },
+    { label: 'Batter Splits', desc: 'Day/night & home/road HR leaders', icon: 'LayoutGrid', fn: onOpenSplits },
     { label: 'Signal Backtest', desc: 'Hit rates by grade + signals', icon: 'Activity', fn: onOpenBacktest },
     { label: 'How to Pick', desc: 'HR-selection playbook', icon: 'Target', fn: onOpenHowTo },
     { label: 'Guide', desc: 'How the board works', icon: 'Info', fn: onOpenGuide },
@@ -80,6 +81,7 @@ export default function Header({
   onOpenGuide,
   onOpenHowTo,
   onOpenGroups,
+  onOpenSplits,
   onOpenBacktest,
 }) {
   const m = meta.modelMetrics
@@ -181,7 +183,7 @@ export default function Header({
           Auto
         </button>
 
-        <HelpMenu onOpenGroups={onOpenGroups} onOpenBacktest={onOpenBacktest} onOpenGuide={onOpenGuide} onOpenHowTo={onOpenHowTo} onOpenLegend={onOpenLegend} />
+        <HelpMenu onOpenGroups={onOpenGroups} onOpenSplits={onOpenSplits} onOpenBacktest={onOpenBacktest} onOpenGuide={onOpenGuide} onOpenHowTo={onOpenHowTo} onOpenLegend={onOpenLegend} />
 
         <button
           className={`icon-btn ${refreshing ? 'refreshing' : ''}`}
