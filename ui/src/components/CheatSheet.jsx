@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import Icon from './Icon.jsx'
 import { GradeChip } from './atoms.jsx'
+import { hrSetup } from '../lib/scout.js'
 import { pct, num, rate, signedPct } from '../lib/format.js'
 
 const isDayGame = (b) => {
@@ -99,9 +100,23 @@ export default function CheatSheet({ batters, onSelect, onOpenPitcher }) {
   }, [batters])
 
   const B = (cfg) => batterBoard(batters, { ...cfg, onSelect })
+  const lb = (b) => (b || []).filter(live)
+  const gradeBadge = (b) => <GradeChip grade={b.grade} size="sm" />
 
   // ── Batters ──
-  const topHR = B({ get: (b) => b.hrProbability, fmt: (v) => pct(v, 1) })
+  // HR Matchups — bat × opposing-pitcher HR/9 cross-check, sorted by model HR%.
+  const hrMatchups = lb(batters)
+    .filter((b) => Number.isFinite(b.hrProbability))
+    .sort((a, b) => b.hrProbability - a.hrProbability)
+    .slice(0, 12)
+    .map((b) => ({
+      key: b.id,
+      name: b.name,
+      meta: b.pitcher?.name ? `vs ${lastName(b.pitcher.name)} ${Number.isFinite(b.pitcher.season?.hrPer9) ? num(b.pitcher.season.hrPer9, 2) : '–'}` : b.team,
+      badge: gradeBadge(b),
+      val: pct(b.hrProbability, 1),
+      onClick: () => onSelect(b),
+    }))
   const barrels = B({ get: (b) => b.barrelPctBBE ?? b.barrelPct, fmt: (v) => `${num(v, 1)}%` })
   const exitVelo = B({ get: (b) => b.exitVelo, fmt: (v) => `${num(v, 1)}` })
   const hot = B({ get: (b) => b.recent7?.iso, fmt: (v) => rate(v), filter: (b) => (b.recent7?.ab ?? 0) >= 8 })
@@ -110,6 +125,29 @@ export default function CheatSheet({ batters, onSelect, onOpenPitcher }) {
     fmt: (v) => pct(v, 1),
     filter: (b) => (b.bullpenSplits?.rpAb ?? 0) >= 20,
   })
+
+  // ── Alerts ──
+  // Blast Alert — most HR signals stacked (the 6-box setup), the "about to go off" list.
+  const blast = lb(batters)
+    .map((b) => ({ b, n: hrSetup(b).n }))
+    .filter((x) => x.n >= 4)
+    .sort((a, b) => b.n - a.n || (b.b.hrProbability ?? 0) - (a.b.hrProbability ?? 0))
+    .slice(0, 12)
+    .map(({ b, n }) => ({ key: b.id, name: b.name, meta: b.team, badge: gradeBadge(b), val: `${n}/6`, onClick: () => onSelect(b) }))
+  // Exit-Velo Surge — recent (14d) EV jump over season (bat-speed proxy; we don't get bat speed).
+  const evSurge = lb(batters)
+    .filter((b) => Number.isFinite(b.recentBarrel?.recentEV) && Number.isFinite(b.exitVelo) && (b.recentBarrel?.recentBBE ?? 0) >= 10)
+    .map((b) => ({ b, delta: b.recentBarrel.recentEV - b.exitVelo }))
+    .filter((x) => x.delta > 0)
+    .sort((a, b) => b.delta - a.delta)
+    .slice(0, 12)
+    .map(({ b, delta }) => ({ key: b.id, name: b.name, meta: `${num(b.recentBarrel.recentEV, 1)} mph`, badge: gradeBadge(b), val: `+${num(delta, 1)}`, onClick: () => onSelect(b) }))
+  // 1st-Inning HR Leaders — top-of-order bats (they hit the starter in the 1st).
+  const firstInning = lb(batters)
+    .filter((b) => b.battingOrder >= 1 && b.battingOrder <= 3 && Number.isFinite(b.hrProbability))
+    .sort((a, b) => b.hrProbability - a.hrProbability)
+    .slice(0, 12)
+    .map((b) => ({ key: b.id, name: b.name, meta: `#${b.battingOrder} vs ${lastName(b.pitcher?.name)}`, badge: gradeBadge(b), val: pct(b.hrProbability, 1), onClick: () => onSelect(b) }))
 
   // ── Splits ──
   const night = B({ get: (b) => b.dayNightSplits?.nightHRRate, ab: (b) => b.dayNightSplits?.nightAB, minAb: 25, fmt: (v) => pct(v, 1), filter: (b) => isDayGame(b) === false })
@@ -153,11 +191,12 @@ export default function CheatSheet({ batters, onSelect, onOpenPitcher }) {
     .slice(0, 8)
     .map((g) => ({ key: g.gamePk, name: g.label, meta: g.venue, val: signedPct(g.park - 1, 0) }))
 
-  const anything = [topHR, barrels, exitVelo, hot, penMash, pitchEdgeRows, night, day, home, away, weakArms, highK, bullpenTargets, bestParks].some((x) => x.length)
+  const anything = [hrMatchups, barrels, exitVelo, hot, penMash, pitchEdgeRows, blast, evSurge, firstInning, night, day, home, away, weakArms, highK, bullpenTargets, bestParks].some((x) => x.length)
   if (!anything) return <div className="empty-note">No cheat-sheet data for today's slate yet.</div>
 
   const TABS = [
     { k: 'batters', label: 'Batters', icon: 'Crosshair' },
+    { k: 'alerts', label: 'Alerts', icon: 'Flame' },
     { k: 'splits', label: 'Splits', icon: 'LayoutGrid' },
     { k: 'arms', label: 'Pitchers & Parks', icon: 'Target' },
   ]
@@ -180,12 +219,20 @@ export default function CheatSheet({ batters, onSelect, onOpenPitcher }) {
 
       {tab === 'batters' && (
         <div className="splits-grid">
-          <LbCard title="Top HR Plays" sub="model %" icon="Flame" items={topHR} />
+          <LbCard title="HR Matchups" sub="HR% · vs pitcher HR/9" icon="Flame" items={hrMatchups} />
           <LbCard title="Barrel Kings" sub="barrel%" icon="Crosshair" items={barrels} />
           <LbCard title="Exit Velo" sub="avg EV (mph)" icon="Zap" items={exitVelo} />
           <LbCard title="Hot Streaks" sub="last-7 ISO" icon="TrendingUp" items={hot} />
           <LbCard title="Bullpen Mashers" sub="HR% vs RP" icon="Shield" items={penMash} />
           <LbCard title="Pitch Matchup Edge" sub="SLG vs top pitch" icon="Crosshair" items={pitchEdgeRows} />
+        </div>
+      )}
+
+      {tab === 'alerts' && (
+        <div className="splits-grid">
+          <LbCard title="Blast Alert" sub="HR signals stacked (/6)" icon="Flame" items={blast} />
+          <LbCard title="Exit-Velo Surge" sub="last-14d EV vs season" icon="TrendingUp" items={evSurge} />
+          <LbCard title="1st-Inning HR Leaders" sub="top-of-order vs starter" icon="Clock" items={firstInning} />
         </div>
       )}
 
