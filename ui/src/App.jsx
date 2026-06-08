@@ -12,7 +12,7 @@ import PitchersView, { PitcherCard } from './components/PitchersView.jsx'
 import { groupPitchers } from './lib/pitchers.js'
 import WeatherView from './components/WeatherView.jsx'
 import GroupsView from './components/GroupsView.jsx'
-import SplitsView from './components/SplitsView.jsx'
+import CheatSheet from './components/CheatSheet.jsx'
 import BacktestView from './components/BacktestView.jsx'
 import ResultsView from './components/ResultsView.jsx'
 import PlayerDrawer from './components/PlayerDrawer.jsx'
@@ -541,16 +541,16 @@ export default function App() {
       {showSplits && (
         <>
           <div className="drawer-scrim" onClick={() => setShowSplits(false)} />
-          <div className="modal groups-modal" role="dialog" aria-modal="true" aria-label="Batter Splits">
+          <div className="modal groups-modal cheat-modal" role="dialog" aria-modal="true" aria-label="Cheat Sheet">
             <button className="drawer-close icon-btn" onClick={() => setShowSplits(false)} aria-label="Close">
               <Icon name="X" size={18} />
             </button>
             <div className="groups-modal-head">
               <Icon name="LayoutGrid" size={18} />
-              <h2>Batter Splits</h2>
+              <h2>Cheat Sheet</h2>
             </div>
             <div className="groups-modal-body">
-              <SplitsView batters={all} onSelect={(b) => setSelectedId(b.id)} />
+              <CheatSheet batters={all} onSelect={(b) => setSelectedId(b.id)} onOpenPitcher={openPitcher} />
             </div>
           </div>
         </>

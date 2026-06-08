@@ -22,7 +22,7 @@ function HelpMenu({ onOpenGroups, onOpenSplits, onOpenBacktest, onOpenGuide, onO
   }, [open])
   const items = [
     { label: 'Parlay Combos', desc: 'Auto-built combos — chalk, value, heat, power, lottery', icon: 'Layers', fn: onOpenGroups },
-    { label: 'Batter Splits', desc: 'Day/night & home/road HR leaders', icon: 'LayoutGrid', fn: onOpenSplits },
+    { label: 'Cheat Sheet', desc: 'HR plays, barrels, splits, weak arms & parks', icon: 'LayoutGrid', fn: onOpenSplits },
     { label: 'Signal Backtest', desc: 'Hit rates by grade + signals', icon: 'Activity', fn: onOpenBacktest },
     { label: 'How to Pick', desc: 'HR-selection playbook', icon: 'Target', fn: onOpenHowTo },
     { label: 'Guide', desc: 'How the board works', icon: 'Info', fn: onOpenGuide },

@@ -5389,3 +5389,20 @@ button.th:hover {
 }
 .splits-team { font-size: 10px; font-weight: 700; color: var(--text-faint); }
 .splits-val { font-size: 13px; font-weight: 700; color: var(--prime); min-width: 44px; text-align: right; }
+
+/* ============ Cheat Sheet page ============ */
+.cheat-cat {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 20px 0 0;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+}
+.cheat-cat:first-child { margin-top: 6px; }
+.cheat-cat > svg { color: var(--prime); }
+.splits-row.static { cursor: default; }
+.splits-row.static:hover { background: none; }
