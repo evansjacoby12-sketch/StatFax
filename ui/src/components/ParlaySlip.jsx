@@ -32,6 +32,14 @@ export default function ParlaySlip({ legs, onRemove, onClear, onSelect }) {
   const p = computeParlay(legs)
   const pg = parlayGrade(legs)
   const gColor = pg ? GRADE_COLOR[pg.letter] : null
+  // Weak link = the leg most likely to sink the parlay: lowest HR prob, then
+  // lowest model score (prob saturates at the top, so score breaks the ties).
+  // Only flagged once there are 2+ legs.
+  const weak =
+    legs.length >= 2
+      ? legs.slice().sort((a, b) => (a.hrProbability ?? 1) - (b.hrProbability ?? 1) || (a.score ?? 0) - (b.score ?? 0))[0]
+      : null
+  const weakId = weak?.id
 
   return (
     <div className={`slip ${open ? 'open' : ''}`}>
@@ -50,14 +58,27 @@ export default function ParlaySlip({ legs, onRemove, onClear, onSelect }) {
               Clear all
             </button>
           </div>
-          <div className="slip-summary">{parlaySummary(p, pg)}</div>
+          <div className="slip-summary">
+            {parlaySummary(p, pg)}
+            {weak && (
+              <span className="slip-weak-note">
+                {' '}
+                <Icon name="TriangleAlert" size={11} /> Weak link: <b>{weak.name}</b> ({pct(weak.hrProbability, 1)}).
+              </span>
+            )}
+          </div>
           <div className="slip-legs">
             {legs.map((b) => (
-              <div className="slip-leg" key={b.id}>
+              <div className={`slip-leg ${b.id === weakId ? 'weak' : ''}`} key={b.id}>
                 <button className="slip-leg-main" onClick={() => onSelect(b)} title="Open detail">
                   <span className="slip-leg-grade" style={{ background: gradeColor(b.grade?.label) }} />
                   <span className="slip-leg-name">{b.name}</span>
                   <span className="slip-leg-team">{b.team}</span>
+                  {b.id === weakId && (
+                    <span className="slip-weak-tag" title="Weakest leg — most likely to sink the parlay">
+                      <Icon name="TriangleAlert" size={10} /> weak link
+                    </span>
+                  )}
                 </button>
                 <GradeChip grade={b.grade} size="sm" score={b.score} />
                 <span className="slip-leg-prob mono">{pct(b.hrProbability, 1)}</span>
