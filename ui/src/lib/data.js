@@ -106,6 +106,9 @@ export async function loadSlate() {
       weather: d.weatherByGame?.[b.gamePk] || null,
       h2h: pitcherId ? h2hMap[`${b.playerId}-${pitcherId}`] || null : null,
       heatIndex: heatIndex(b),
+      // Opposing team's bullpen HR/9 — the pen this batter attacks once the
+      // starter exits. Drives the Cheat Sheet "Bullpen Targets" board.
+      opposingBullpenHR9: d.bullpenHR9?.[opp?.id] ?? null,
       // Boolean signal: batter mashes the pitcher's most-used pitch (slate's
       // primaryPitchEdge.passes). Surfaced as the "Pitch Edge" badge/filter.
       pitchEdge: b.primaryPitchEdge?.passes === true,

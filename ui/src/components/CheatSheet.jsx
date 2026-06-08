@@ -76,8 +76,15 @@ export default function CheatSheet({ batters, onSelect, onOpenPitcher }) {
       if (!pmap.has(key)) {
         const a = x.game?.awayTeam?.abbr
         const h = x.game?.homeTeam?.abbr
-        pmap.set(key, { id: p.id, gamePk: x.gamePk, name: p.name, hr9: p.season?.hrPer9, era: p.season?.era, matchup: a && h ? `${a}@${h}` : x.opponent?.abbr || '' })
+        pmap.set(key, { id: p.id, gamePk: x.gamePk, name: p.name, hr9: p.season?.hrPer9, k9: p.season?.kPer9, era: p.season?.era, matchup: a && h ? `${a}@${h}` : x.opponent?.abbr || '' })
       }
+    }
+    // Unique opposing bullpens (one per team being faced) for Bullpen Targets.
+    const bpmap = new Map()
+    for (const x of b) {
+      const opp = x.opponent
+      if (!live(x) || opp?.id == null || bpmap.has(opp.id) || !Number.isFinite(x.opposingBullpenHR9)) continue
+      bpmap.set(opp.id, { id: opp.id, abbr: opp.abbr, hr9: x.opposingBullpenHR9 })
     }
     // Unique games for park environment.
     const gmap = new Map()
@@ -87,7 +94,7 @@ export default function CheatSheet({ batters, onSelect, onOpenPitcher }) {
       const h = x.game?.homeTeam?.abbr
       gmap.set(x.gamePk, { gamePk: x.gamePk, label: a && h ? `${a} @ ${h}` : '', park: x.gameParkHRFactor, venue: x.game?.venueName })
     }
-    return { pitchers: [...pmap.values()], games: [...gmap.values()] }
+    return { pitchers: [...pmap.values()], games: [...gmap.values()], bullpens: [...bpmap.values()] }
   }, [batters])
 
   const B = (cfg) => batterBoard(batters, { ...cfg, onSelect })
@@ -109,19 +116,43 @@ export default function CheatSheet({ batters, onSelect, onOpenPitcher }) {
   const home = B({ get: (b) => b.homeAwaySplits?.homeISO, ab: (b) => b.homeAwaySplits?.homeAB, minAb: 30, fmt: (v) => rate(v), filter: (b) => b.isHome === true })
   const away = B({ get: (b) => b.homeAwaySplits?.awayISO, ab: (b) => b.homeAwaySplits?.awayAB, minAb: 30, fmt: (v) => rate(v), filter: (b) => b.isHome === false })
 
+  // ── Matchups ── batters ranked by their SLG on the pitcher's most-used pitch
+  const pitchEdgeRows = (batters || [])
+    .filter((b) => live(b) && Number.isFinite(b.primaryPitchEdge?.batterSlg) && (b.primaryPitchEdge?.pitcherFreq ?? 0) >= 0.18)
+    .sort((a, b) => b.primaryPitchEdge.batterSlg - a.primaryPitchEdge.batterSlg)
+    .slice(0, 10)
+    .map((b) => ({
+      key: b.id,
+      name: b.name,
+      meta: b.primaryPitchEdge.pitchName,
+      badge: <GradeChip grade={b.grade} size="sm" />,
+      val: rate(b.primaryPitchEdge.batterSlg),
+      onClick: () => onSelect(b),
+    }))
+
   // ── Pitchers & parks ──
   const weakArms = data.pitchers
     .filter((p) => Number.isFinite(p.hr9))
     .sort((a, b) => b.hr9 - a.hr9)
     .slice(0, 10)
     .map((p) => ({ key: `${p.id}-${p.gamePk}`, name: lastName(p.name), meta: p.matchup, val: `${num(p.hr9, 2)}`, onClick: () => onOpenPitcher?.(p.id, p.gamePk) }))
+  const highK = data.pitchers
+    .filter((p) => Number.isFinite(p.k9))
+    .sort((a, b) => b.k9 - a.k9)
+    .slice(0, 10)
+    .map((p) => ({ key: `${p.id}-${p.gamePk}`, name: lastName(p.name), meta: p.matchup, val: `${num(p.k9, 1)}`, onClick: () => onOpenPitcher?.(p.id, p.gamePk) }))
+  const bullpenTargets = data.bullpens
+    .filter((t) => Number.isFinite(t.hr9))
+    .sort((a, b) => b.hr9 - a.hr9)
+    .slice(0, 10)
+    .map((t) => ({ key: t.id, name: `${t.abbr} bullpen`, meta: '', val: `${num(t.hr9, 2)}` }))
   const bestParks = data.games
     .filter((g) => Number.isFinite(g.park))
     .sort((a, b) => b.park - a.park)
     .slice(0, 8)
     .map((g) => ({ key: g.gamePk, name: g.label, meta: g.venue, val: signedPct(g.park - 1, 0) }))
 
-  const anything = [topHR, barrels, exitVelo, hot, penMash, night, day, home, away, weakArms, bestParks].some((x) => x.length)
+  const anything = [topHR, barrels, exitVelo, hot, penMash, pitchEdgeRows, night, day, home, away, weakArms, highK, bullpenTargets, bestParks].some((x) => x.length)
   if (!anything) return <div className="empty-note">No cheat-sheet data for today's slate yet.</div>
 
   return (
@@ -135,6 +166,7 @@ export default function CheatSheet({ batters, onSelect, onOpenPitcher }) {
         <LbCard title="Exit Velo" sub="avg EV (mph)" icon="Zap" items={exitVelo} />
         <LbCard title="Hot Streaks" sub="last-7 ISO" icon="TrendingUp" items={hot} />
         <LbCard title="Bullpen Mashers" sub="HR% vs RP" icon="Shield" items={penMash} />
+        <LbCard title="Pitch Matchup Edge" sub="SLG vs top pitch" icon="Crosshair" items={pitchEdgeRows} />
       </div>
 
       <h3 className="cheat-cat">
@@ -152,6 +184,8 @@ export default function CheatSheet({ batters, onSelect, onOpenPitcher }) {
       </h3>
       <div className="splits-grid">
         <LbCard title="Pitcher Weak Spots" sub="HR/9 allowed" icon="Shield" items={weakArms} />
+        <LbCard title="Strikeout Arms" sub="K/9 — tough to homer off" icon="Zap" items={highK} />
+        <LbCard title="Bullpen Targets" sub="opp pen HR/9" icon="Shield" items={bullpenTargets} />
         <LbCard title="Best HR Parks" sub="park factor" icon="Gauge" items={bestParks} />
       </div>
     </div>
