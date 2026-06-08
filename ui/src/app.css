@@ -5391,18 +5391,21 @@ button.th:hover {
 .splits-val { font-size: 13px; font-weight: 700; color: var(--prime); min-width: 44px; text-align: right; }
 
 /* ============ Cheat Sheet page ============ */
-.cheat-cat {
+.cheat-tabs {
+  position: sticky;
+  top: -1px;
+  z-index: 2;
   display: flex;
-  align-items: center;
-  gap: 7px;
-  margin: 20px 0 0;
-  font-size: 13px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-dim);
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 0;
+  margin-bottom: 4px;
+  background: var(--panel);
 }
-.cheat-cat:first-child { margin-top: 6px; }
-.cheat-cat > svg { color: var(--prime); }
+.cheat-tabs .badge-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
 .splits-row.static { cursor: default; }
 .splits-row.static:hover { background: none; }

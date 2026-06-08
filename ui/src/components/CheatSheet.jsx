@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import Icon from './Icon.jsx'
 import { GradeChip } from './atoms.jsx'
 import { pct, num, rate, signedPct } from '../lib/format.js'
@@ -65,6 +65,7 @@ function batterBoard(batters, { get, fmt, filter, ab, minAb = 0, onSelect }) {
 }
 
 export default function CheatSheet({ batters, onSelect, onOpenPitcher }) {
+  const [tab, setTab] = useState('batters')
   const data = useMemo(() => {
     const b = batters || []
     // Unique starters this slate (a batter faces the opposing starter).
@@ -155,39 +156,56 @@ export default function CheatSheet({ batters, onSelect, onOpenPitcher }) {
   const anything = [topHR, barrels, exitVelo, hot, penMash, pitchEdgeRows, night, day, home, away, weakArms, highK, bullpenTargets, bestParks].some((x) => x.length)
   if (!anything) return <div className="empty-note">No cheat-sheet data for today's slate yet.</div>
 
+  const TABS = [
+    { k: 'batters', label: 'Batters', icon: 'Crosshair' },
+    { k: 'splits', label: 'Splits', icon: 'LayoutGrid' },
+    { k: 'arms', label: 'Pitchers & Parks', icon: 'Target' },
+  ]
+
   return (
     <div className="cheat">
-      <h3 className="cheat-cat">
-        <Icon name="Crosshair" size={14} /> Batters
-      </h3>
-      <div className="splits-grid">
-        <LbCard title="Top HR Plays" sub="model %" icon="Flame" items={topHR} />
-        <LbCard title="Barrel Kings" sub="barrel%" icon="Crosshair" items={barrels} />
-        <LbCard title="Exit Velo" sub="avg EV (mph)" icon="Zap" items={exitVelo} />
-        <LbCard title="Hot Streaks" sub="last-7 ISO" icon="TrendingUp" items={hot} />
-        <LbCard title="Bullpen Mashers" sub="HR% vs RP" icon="Shield" items={penMash} />
-        <LbCard title="Pitch Matchup Edge" sub="SLG vs top pitch" icon="Crosshair" items={pitchEdgeRows} />
+      <div className="cheat-tabs" role="tablist" aria-label="Cheat sheet pages">
+        {TABS.map((t) => (
+          <button
+            key={t.k}
+            role="tab"
+            aria-selected={tab === t.k}
+            className={`badge-toggle ${tab === t.k ? 'on' : ''}`}
+            onClick={() => setTab(t.k)}
+          >
+            <Icon name={t.icon} size={13} /> {t.label}
+          </button>
+        ))}
       </div>
 
-      <h3 className="cheat-cat">
-        <Icon name="LayoutGrid" size={14} /> Splits — today's slate
-      </h3>
-      <div className="splits-grid">
-        <LbCard title="Night HR Leaders" sub="night games" icon="Clock" items={night} />
-        <LbCard title="Day HR Leaders" sub="day games" icon="Sun" items={day} />
-        <LbCard title="Home Power (ISO)" sub="home today" icon="House" items={home} />
-        <LbCard title="Road Power (ISO)" sub="road today" icon="Plane" items={away} />
-      </div>
+      {tab === 'batters' && (
+        <div className="splits-grid">
+          <LbCard title="Top HR Plays" sub="model %" icon="Flame" items={topHR} />
+          <LbCard title="Barrel Kings" sub="barrel%" icon="Crosshair" items={barrels} />
+          <LbCard title="Exit Velo" sub="avg EV (mph)" icon="Zap" items={exitVelo} />
+          <LbCard title="Hot Streaks" sub="last-7 ISO" icon="TrendingUp" items={hot} />
+          <LbCard title="Bullpen Mashers" sub="HR% vs RP" icon="Shield" items={penMash} />
+          <LbCard title="Pitch Matchup Edge" sub="SLG vs top pitch" icon="Crosshair" items={pitchEdgeRows} />
+        </div>
+      )}
 
-      <h3 className="cheat-cat">
-        <Icon name="Target" size={14} /> Pitchers & parks
-      </h3>
-      <div className="splits-grid">
-        <LbCard title="Pitcher Weak Spots" sub="HR/9 allowed" icon="Shield" items={weakArms} />
-        <LbCard title="Strikeout Arms" sub="K/9 — tough to homer off" icon="Zap" items={highK} />
-        <LbCard title="Bullpen Targets" sub="opp pen HR/9" icon="Shield" items={bullpenTargets} />
-        <LbCard title="Best HR Parks" sub="park factor" icon="Gauge" items={bestParks} />
-      </div>
+      {tab === 'splits' && (
+        <div className="splits-grid">
+          <LbCard title="Night HR Leaders" sub="night games" icon="Clock" items={night} />
+          <LbCard title="Day HR Leaders" sub="day games" icon="Sun" items={day} />
+          <LbCard title="Home Power (ISO)" sub="home today" icon="House" items={home} />
+          <LbCard title="Road Power (ISO)" sub="road today" icon="Plane" items={away} />
+        </div>
+      )}
+
+      {tab === 'arms' && (
+        <div className="splits-grid">
+          <LbCard title="Pitcher Weak Spots" sub="HR/9 allowed" icon="Shield" items={weakArms} />
+          <LbCard title="Strikeout Arms" sub="K/9 — tough to homer off" icon="Zap" items={highK} />
+          <LbCard title="Bullpen Targets" sub="opp pen HR/9" icon="Shield" items={bullpenTargets} />
+          <LbCard title="Best HR Parks" sub="park factor" icon="Gauge" items={bestParks} />
+        </div>
+      )}
     </div>
   )
 }
