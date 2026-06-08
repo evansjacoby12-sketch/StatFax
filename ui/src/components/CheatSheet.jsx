@@ -198,7 +198,7 @@ export default function CheatSheet({ batters, onSelect, onOpenPitcher }) {
     { k: 'batters', label: 'Batters', icon: 'Crosshair' },
     { k: 'alerts', label: 'Alerts', icon: 'Flame' },
     { k: 'splits', label: 'Splits', icon: 'LayoutGrid' },
-    { k: 'arms', label: 'Pitchers & Parks', icon: 'Target' },
+    { k: 'arms', label: 'Pitchers', icon: 'Target' },
   ]
 
   return (

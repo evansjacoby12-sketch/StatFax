@@ -5392,15 +5392,12 @@ button.th:hover {
 
 /* ============ Cheat Sheet page ============ */
 .cheat-tabs {
-  position: sticky;
-  top: -1px;
-  z-index: 2;
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  padding: 8px 0;
-  margin-bottom: 4px;
-  background: var(--panel);
+  padding-bottom: 10px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--border-soft);
 }
 .cheat-tabs .badge-toggle {
   display: inline-flex;
