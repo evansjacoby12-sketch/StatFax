@@ -8,8 +8,58 @@ import { useLiveMode } from '../lib/liveMode.js'
 const GROUP_GRADE_COLOR = { S: '#f5a623', A: '#32d74b', B: '#3b82f6', C: '#9aa6b6', D: '#6b7787' }
 const SIZE_TABS = [2, 3, 4, 5, 6, 7, 8].map((k) => ({ k, label: `${k}-leg` }))
 
+const STRAT_LABEL = { top: 'Top Picks', stack: 'Signal Stack', hot: 'Hot Hand', power: 'Power Bats', matchup: 'Soft Matchup', park: 'Park & Air' }
+
+// Rolling combo scorecard — the real "have our combos hit?" record, graded
+// server-side off frozen pregame combos vs actual HRs (server/parlay-combos.mjs).
+function ScoreCard({ sc }) {
+  if (!sc || !sc.days || !sc.overall?.combos) return null
+  const sizes = Object.entries(sc.bySize || {}).sort((a, b) => Number(a[0]) - Number(b[0]))
+  const strat = Object.entries(sc.byStrategy || {})
+    .filter(([, v]) => v.combos >= 3)
+    .sort((a, b) => (b[1].hitRate ?? 0) - (a[1].hitRate ?? 0))[0]
+  const ov = sc.overall
+  return (
+    <details className="combo-sc">
+      <summary className="combo-sc-sum">
+        <Icon name="Activity" size={13} />
+        <span className="combo-sc-head">
+          Combo scorecard · <b className="mono">{pct(ov.hitRate, 0)}</b> cashed
+        </span>
+        <span className="combo-sc-sub dim">
+          {ov.allHit}/{ov.combos} combos · {sc.days}d
+        </span>
+        <Icon name="ChevronDown" size={14} className="combo-sc-chev" />
+      </summary>
+      <div className="combo-sc-body">
+        <div className="combo-sc-cap dim">
+          Canonical pregame combos (one per strategy &amp; size), graded against actual home runs.
+        </div>
+        <div className="combo-sc-rows">
+          {sizes.map(([k, v]) => (
+            <div className="combo-sc-row" key={k}>
+              <span className="combo-sc-k">{k}-leg</span>
+              <span className="combo-sc-bar">
+                <span className="combo-sc-fill" style={{ width: `${Math.round((v.hitRate ?? 0) * 100)}%` }} />
+              </span>
+              <span className="combo-sc-v mono">{pct(v.hitRate, 0)}</span>
+              <span className="combo-sc-n dim">{v.allHit}/{v.combos}</span>
+            </div>
+          ))}
+        </div>
+        {strat && (
+          <div className="combo-sc-best dim">
+            Best strategy: <b>{STRAT_LABEL[strat[0]] || strat[0]}</b> {pct(strat[1].hitRate, 0)} ({strat[1].allHit}/{strat[1].combos})
+            {' · '}per-leg hit {pct(ov.legHitRate, 0)}
+          </div>
+        )}
+      </div>
+    </details>
+  )
+}
+
 // Cross-Game HR Groups — auto-built multi-leg parlays, one best bat per game.
-export default function GroupsView({ batters, onSelect, selectedId }) {
+export default function GroupsView({ batters, onSelect, selectedId, scorecard }) {
   const [size, setSize] = useState(2)
   const [games, setGames] = useState(() => new Set()) // empty = all games
   // Hide started defaults ON: HR props can't be bet pregame once the game is
@@ -56,6 +106,7 @@ export default function GroupsView({ batters, onSelect, selectedId }) {
 
   return (
     <>
+      <ScoreCard sc={scorecard} />
       {gameList.length > 1 && (
         <div className="grp-games" role="group" aria-label="Filter by game">
           <button className={`badge-toggle ${games.size === 0 ? 'on' : ''}`} onClick={() => setGames(new Set())}>

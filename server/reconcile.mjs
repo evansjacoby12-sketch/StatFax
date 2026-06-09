@@ -313,7 +313,7 @@ export function computeMultipliers(log) {
  * where today's first cron run already happened earlier and we no longer
  * have access to yesterday's snapshot.
  */
-export async function reconcileDate(date, yesterdayPredictions, priorLog) {
+export async function reconcileDate(date, yesterdayPredictions, priorLog, prefetchedOutcomes = null) {
   let log = priorLog || { dates: [], records: {} };
   if (log.dates?.includes(date)) {
     // Already reconciled this date on an earlier run today. Idempotent.
@@ -324,7 +324,9 @@ export async function reconcileDate(date, yesterdayPredictions, priorLog) {
     console.warn(`[calib] no predictions available for ${date} — skipping reconciliation`);
     return log;
   }
-  const result = await fetchHomerersForDate(date);
+  // Reuse a pre-fetched outcomes sweep when the caller already did one (the
+  // combo scorecard shares it), else fetch now.
+  const result = prefetchedOutcomes || await fetchHomerersForDate(date);
   if (!result) {
     console.warn(`[calib] failed to fetch box scores for ${date} — skipping`);
     return log;

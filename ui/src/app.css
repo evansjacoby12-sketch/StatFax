@@ -5484,6 +5484,44 @@ button.th:hover {
   color: var(--good);
 }
 
+/* Combo scorecard (Parlay Combos header) — rolling graded hit rate */
+.combo-sc {
+  margin-top: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+  overflow: hidden;
+}
+.combo-sc-sum {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 13px;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+.combo-sc-sum::-webkit-details-marker { display: none; }
+.combo-sc-head { font-size: 13px; }
+.combo-sc-head b { color: var(--good); }
+.combo-sc-sub { font-size: 11.5px; margin-left: 2px; }
+.combo-sc-chev { margin-left: auto; transition: transform 0.15s; color: var(--text-faint); }
+.combo-sc[open] .combo-sc-chev { transform: rotate(180deg); }
+.combo-sc-body {
+  padding: 0 13px 13px;
+  display: grid;
+  gap: 9px;
+}
+.combo-sc-cap, .combo-sc-best { font-size: 11px; line-height: 1.4; }
+.combo-sc-rows { display: grid; gap: 6px; }
+.combo-sc-row { display: grid; grid-template-columns: 48px 1fr 38px 44px; align-items: center; gap: 8px; }
+.combo-sc-k { font-size: 11px; font-weight: 700; color: var(--text-dim); }
+.combo-sc-bar { height: 7px; border-radius: 99px; background: var(--card-2); overflow: hidden; }
+.combo-sc-fill { display: block; height: 100%; border-radius: 99px; background: var(--good); }
+.combo-sc-v { font-size: 12px; font-weight: 700; text-align: right; }
+.combo-sc-n { font-size: 11px; text-align: right; }
+.combo-sc-best b { color: var(--text); }
+
 /* divider between size tabs and pool filters in Parlay Combos controls */
 .grp-ctrl-sep {
   width: 1px;

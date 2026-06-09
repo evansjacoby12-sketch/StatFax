@@ -1,0 +1,179 @@
+/**
+ * parlay-combos.mjs — canonical pregame parlay combos + a graded scorecard.
+ *
+ * The UI (ui/src/lib/groups.js) builds Parlay Combos live on each device from
+ * the current board, with user filters and live-decaying scores — great for
+ * picking, useless as a record (nothing is persisted, and the same combo shifts
+ * through the day). This module is the RECORD side: at reconcile time it rebuilds
+ * a FIXED, reproducible set of combos from yesterday's frozen pre-first-pitch
+ * snapshot, grades each against actual HR outcomes, and rolls the results into
+ * the backtest log so a true combo scorecard accumulates day over day.
+ *
+ * What's tracked is a benchmark — "the combos StatFax's strategies offered
+ * pregame today", one per strategy per size (2/3/4 legs), at most one bat per
+ * game. It is NOT every combo every user saw after filtering. That's the honest,
+ * well-defined thing to score (like tracking the model's top picks, not each
+ * user's clicks).
+ *
+ * Odds-dependent strategies (value, longshot) are intentionally omitted — the
+ * slate often lacks live book odds, and the scorecard should be measurable on
+ * every slate regardless.
+ *
+ * Pure JS, no imports. Mirrors the strategy math in ui/src/lib/groups.js so the
+ * benchmark stays recognizably "the same combos".
+ */
+
+const SIZES = [2, 3, 4];
+
+// Proven HR signals, weighted by the badge audit's within-grade lift — the same
+// set + weighting the UI's Signal Stack uses (minus odds-only signals). "due" is
+// excluded (the falsified gambler's-fallacy signal).
+const STACK_SIGNALS = { hot: 3, barrelKing: 2, homeEdge: 2, bullpenLegend: 2, awayEdge: 1.5, launchPad: 1, wxEdge: 0.5 };
+const signalScore = (b) => Object.entries(STACK_SIGNALS).reduce((s, [k, w]) => s + (b[k] ? w : 0), 0);
+const signalCount = (b) => Object.keys(STACK_SIGNALS).reduce((n, k) => n + (b[k] ? 1 : 0), 0);
+
+// Strategy menu — the no-odds subset of the UI's strategies. Each ranks the
+// eligible pool by its own metric; `require` gates which bats qualify.
+const STRATEGIES = [
+  { key: 'top',     rank: (b) => b.score,          require: null },
+  { key: 'stack',   rank: signalScore,             require: (b) => signalCount(b) >= 2 },
+  { key: 'hot',     rank: (b) => b.score,          require: (b) => b.hot },
+  { key: 'power',   rank: (b) => b.barrel ?? 0,    require: (b) => Number.isFinite(b.barrel) && b.barrel >= 9 },
+  { key: 'matchup', rank: (b) => b.pitcherHr9 ?? 0, require: (b) => Number.isFinite(b.pitcherHr9) && b.pitcherHr9 >= 1.3 },
+  { key: 'park',    rank: (b) => b.park ?? 0,      require: (b) => Number.isFinite(b.park) && b.park >= 1.05 },
+];
+
+/**
+ * Normalize a snapshot scoredBatters row to the compact shape the strategies
+ * rank on, reading the FROZEN pregame fields (score/grade decay once a game
+ * starts; preGameScore/preGameGrade are pinned to pre-first-pitch — see the
+ * freeze block in fetch-slate). Falls back to the live fields for rows that
+ * never started (postponed), where they ARE pregame.
+ */
+export function comboRowFromSnapshot(row) {
+  if (!row || row.playerId == null) return null;
+  const score = Number.isFinite(row.preGameScore) ? row.preGameScore : row.score;
+  const grade = row.preGameGrade?.label || row.preGameGrade || row.grade?.label || row.grade || null;
+  const barrel = Number.isFinite(row.barrelPctBBE) ? row.barrelPctBBE
+    : Number.isFinite(row.barrelPct) ? row.barrelPct : null;
+  const park = Number.isFinite(row.gameParkHRFactor) ? row.gameParkHRFactor : null;
+  const air  = Number.isFinite(row.parkWeatherHandFactor) ? row.parkWeatherHandFactor : null;
+  return {
+    playerId: row.playerId,
+    gamePk:   row.gamePk,
+    name:     row.name,
+    team:     row.team,
+    score,
+    grade,
+    barrel,
+    park,
+    pitcherHr9: Number.isFinite(row.pitcher?.season?.hrPer9) ? row.pitcher.season.hrPer9 : null,
+    // Boolean signals (static — not decayed) for the Signal Stack strategy.
+    hot:           row.hot === true,
+    homeEdge:      row.homeEdge === true,
+    awayEdge:      row.awayEdge === true,
+    bullpenLegend: row.bullpenLegend === true,
+    barrelKing:    Number.isFinite(barrel) && barrel >= 13,
+    launchPad:     Number.isFinite(park) && park >= 1.10,
+    wxEdge:        Number.isFinite(air) && air >= 1.05,
+  };
+}
+
+// Best eligible bat per game by a metric (skip SKIP-grade + scoreless rows).
+function topPerGame(rows, rank, require) {
+  const byGame = new Map();
+  for (const b of rows) {
+    if (!b || b.gamePk == null) continue;
+    if ((b.grade || 'SKIP') === 'SKIP') continue;
+    if (!Number.isFinite(b.score)) continue;
+    if (require && !require(b)) continue;
+    const cur = byGame.get(b.gamePk);
+    if (!cur || rank(b) > rank(cur) || (rank(b) === rank(cur) && (b.score ?? 0) > (cur.score ?? 0))) {
+      byGame.set(b.gamePk, b);
+    }
+  }
+  return [...byGame.values()].sort((a, b) => rank(b) - rank(a) || (b.score ?? 0) - (a.score ?? 0));
+}
+
+/**
+ * Build the canonical combos (one per strategy per size, dedup'd) from a list of
+ * comboRowFromSnapshot rows. Returns compact records: { strategy, size, legs:
+ * [playerId, …] } — just enough to grade and report.
+ */
+export function buildComboRecords(rows) {
+  const pools = STRATEGIES.map((s) => ({ s, pool: topPerGame(rows, s.rank, s.require) }));
+  const out = [];
+  const seen = new Set();
+  for (const size of SIZES) {
+    for (const { s, pool } of pools) {
+      if (pool.length < size) continue;
+      const legs = pool.slice(0, size);
+      const sig = `${size}:` + legs.map((l) => l.playerId).slice().sort().join('-');
+      if (seen.has(sig)) continue; // identical leg set from another strategy
+      seen.add(sig);
+      out.push({ strategy: s.key, size, legs: legs.map((l) => l.playerId) });
+    }
+  }
+  return out;
+}
+
+/**
+ * Grade combos against a Set<number> of playerIds who homered. Adds nHit (legs
+ * that homered) and allHit (the parlay cashed).
+ */
+export function gradeCombos(combos, homerers) {
+  return combos.map((c) => {
+    const nHit = c.legs.filter((pid) => homerers.has(Number(pid))).length;
+    return { strategy: c.strategy, size: c.size, legs: c.legs, nHit, allHit: nHit === c.legs.length };
+  });
+}
+
+/**
+ * Append one graded day into the combo log, which lives embedded on the backtest
+ * log object (`log.combos.byDate`) so it rides the same R2/cache persistence for
+ * free. Idempotent per date; trims to the backtest log's own rolling date window
+ * so combos and reconciled records expire together.
+ */
+export function appendComboDay(log, date, gradedCombos) {
+  const combos = log?.combos && typeof log.combos === 'object' ? { ...log.combos } : {};
+  const byDate = { ...(combos.byDate || {}) };
+  if (!byDate[date]) byDate[date] = gradedCombos;
+  const keep = new Set(log?.dates?.length ? log.dates : Object.keys(byDate));
+  for (const d of Object.keys(byDate)) if (!keep.has(d)) delete byDate[d];
+  combos.byDate = byDate;
+  return { ...log, combos };
+}
+
+/**
+ * Aggregate the embedded combo log into a scorecard: overall, per-strategy, and
+ * per-size hit rates (parlay all-hit rate) plus per-leg hit rate. Pure read.
+ */
+export function comboScorecard(log) {
+  const byDate = log?.combos?.byDate || {};
+  const dates = Object.keys(byDate).sort();
+  const cell = () => ({ combos: 0, allHit: 0, legs: 0, legHits: 0 });
+  const byStrategy = {};
+  const bySize = {};
+  const overall = cell();
+  const add = (x, c) => { x.combos += 1; x.allHit += c.allHit ? 1 : 0; x.legs += c.size; x.legHits += c.nHit; };
+  for (const d of dates) {
+    for (const c of byDate[d] || []) {
+      add(overall, c);
+      add((byStrategy[c.strategy] ??= cell()), c);
+      add((bySize[String(c.size)] ??= cell()), c);
+    }
+  }
+  const finalize = (x) => ({
+    combos: x.combos,
+    allHit: x.allHit,
+    hitRate: x.combos ? x.allHit / x.combos : null,
+    legHitRate: x.legs ? x.legHits / x.legs : null,
+  });
+  return {
+    days: dates.length,
+    overall: finalize(overall),
+    byStrategy: Object.fromEntries(Object.entries(byStrategy).map(([k, v]) => [k, finalize(v)])),
+    bySize: Object.fromEntries(Object.entries(bySize).map(([k, v]) => [k, finalize(v)])),
+    updatedAt: new Date().toISOString(),
+  };
+}

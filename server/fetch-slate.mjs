@@ -234,7 +234,15 @@ import {
   reconcileDate,
   repairRecentDays,
   computeMultipliers,
+  fetchHomerersForDate,
 } from './reconcile.mjs';
+import {
+  comboRowFromSnapshot,
+  buildComboRecords,
+  gradeCombos,
+  appendComboDay,
+  comboScorecard,
+} from './parlay-combos.mjs';
 
 // Phase 3 ensemble scaffold — pure ESM, direct import OK. The other math
 // helpers (vegasBlend, isotonic, etc.) ride along inside model.mjs via
@@ -1652,6 +1660,7 @@ async function main() {
     console.warn(`[calib] snapshot fetch for reconcile failed: ${e?.message}`);
   }
 
+  let comboRows = [];
   if (calibSnapshot?.scoredBatters) {
     // Snapshot stores both composite (`${id}-${gamePk}`) AND legacy (`${id}`)
     // keys for back-compat — dedupe to composite-only so we don't double-
@@ -1665,15 +1674,40 @@ async function main() {
       if (seen.has(dedup)) continue;
       seen.add(dedup);
       reconcilePredictions.push(extractPredictionRecord(row));
+      // Same frozen rows feed the pregame combo scorecard (graded below).
+      const cr = comboRowFromSnapshot(row);
+      if (cr) comboRows.push(cr);
     }
     console.log(`[calib] found ${reconcilePredictions.length} yesterday-predictions to reconcile`);
   }
-  backtestLog = await reconcileDate(yesterdayCT, reconcilePredictions, backtestLog);
+  // Fetch yesterday's HR outcomes ONCE and share them between the per-batter
+  // reconcile and the combo scorecard (avoids a second box-score sweep).
+  let yesterdayOutcomes = null;
+  if (reconcilePredictions?.length) {
+    yesterdayOutcomes = await fetchHomerersForDate(yesterdayCT);
+  }
+  backtestLog = await reconcileDate(yesterdayCT, reconcilePredictions, backtestLog, yesterdayOutcomes);
   // Self-heal late-game / transient misses on recent days — a PRIME pick whose
   // HR landed in a late west-coast game after this date was first reconciled
   // would otherwise stay logged as a miss forever, deflating measured accuracy.
   // Monotonic false→true correction; days with all games Final are skipped.
   backtestLog = await repairRecentDays(backtestLog, 3);
+
+  // Combo scorecard — grade yesterday's canonical PREGAME combos (one per
+  // strategy per size, off the same frozen snapshot the per-batter reconcile
+  // used) against actual HR outcomes, and roll them into the embedded combo log.
+  // Idempotent per date; only logs once yesterday's slate is fully Final so a
+  // late west-coast game in progress can't freeze a half-day as all-miss.
+  try {
+    if (comboRows.length && yesterdayOutcomes?.allFinal && !backtestLog?.combos?.byDate?.[yesterdayCT]) {
+      const graded = gradeCombos(buildComboRecords(comboRows), yesterdayOutcomes.homerers);
+      backtestLog = appendComboDay(backtestLog, yesterdayCT, graded);
+      const hit = graded.filter((c) => c.allHit).length;
+      console.log(`[combo] graded ${graded.length} pregame combos for ${yesterdayCT} — ${hit} cashed`);
+    }
+  } catch (e) {
+    console.warn(`[combo] scorecard skipped: ${e?.message}`);
+  }
 
   const calibration = computeMultipliers(backtestLog);
   console.log(`[calib] multipliers — samples:${calibration.samples} ready:${calibration.ready === true} badges:${Object.keys(calibration.badges).length} grades:${Object.keys(calibration.grades).length}`);
@@ -3291,6 +3325,11 @@ async function main() {
     // modelMetrics: Brier + log-loss + reliability curve from last 30
     // days of reconciled records. Shown on ModelPerformance screen.
     modelMetrics,                        // { brier, logLoss, reliability, ... } | null
+
+    // comboScorecard: rolling hit rate of the canonical PREGAME parlay combos
+    // (one per strategy per size), graded against actual HR outcomes. The real,
+    // accumulating answer to "have our combos hit?" — see server/parlay-combos.mjs.
+    comboScorecard: comboScorecard(backtestLog),  // { days, overall, byStrategy, bySize }
 
     // ensembleMeta: out-of-sample holdout comparison of the ML stacker vs the
     // rule model, and the gated blend weight actually applied to scores.

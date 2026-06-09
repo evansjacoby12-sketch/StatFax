@@ -533,6 +533,7 @@ export default function App() {
                 batters={all}
                 onSelect={(b) => setSelectedId(b.id)}
                 selectedId={selectedId}
+                scorecard={data.meta?.comboScorecard}
               />
             </div>
           </div>

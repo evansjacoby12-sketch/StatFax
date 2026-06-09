@@ -134,6 +134,7 @@ export async function loadSlate() {
     finishedAt: d.finishedAt,
     stats: d.stats || {},
     modelMetrics: d.modelMetrics || null,
+    comboScorecard: d.comboScorecard || null,
     ensembleMeta: d.ensembleMeta || null,
     scoreToProb: d.scoreToProb || null,
     oddsBooks: collectBooks(d.odds),
