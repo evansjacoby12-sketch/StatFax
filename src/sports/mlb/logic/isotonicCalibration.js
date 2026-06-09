@@ -219,6 +219,125 @@ export function fitIsotonicFromBacktest(backtestLog, opts = {}) {
 }
 
 // ---------------------------------------------------------------------------
+// fitIsotonicAdaptive — CV-selected bucket width
+// ---------------------------------------------------------------------------
+
+/** Candidate bucket widths, coarse → fine. The selector starts coarse and only
+ *  adopts a finer grid when it MEASURABLY improves cross-validated Brier. */
+const ADAPTIVE_BUCKET_SIZES = [20, 15, 12, 10, 8, 6, 5];
+
+/** A finer grid must beat the current incumbent's CV Brier by at least this
+ *  much to be adopted. Keeps day-to-day bucket choice stable (their own CV gap
+ *  between bucket 15 and 10 was ~0.0008, so this is ~1/3 of a real signal). */
+const ADAPTIVE_BRIER_EPS = 0.0003;
+
+/** Below this many reconciled rows there isn't enough data to CV-select a grid
+ *  without chasing noise — fall back to the plain fit at the proven default. */
+const ADAPTIVE_MIN_ROWS = 750;
+
+const _defaultIsoFallback = (s) => Math.max(0.005, Math.min(0.30, (Math.max(0, Math.min(100, s)) / 100) * 0.18));
+
+/** One-fold Brier: fit the isotonic table on `train` at `bucketSize`, score
+ *  `test` with it (out-of-sample). */
+function _isoFoldBrier(train, test, bucketSize, fallbackFn) {
+  const sub = { dates: ['_'], records: { _: train } };
+  const { table } = fitIsotonicFromBacktest(sub, { lookbackDays: 9999, bucketSize });
+  let s = 0;
+  for (const r of test) {
+    const p = lookupProb(r.score, table, fallbackFn);
+    const y = r.homered ? 1 : 0;
+    s += (p - y) * (p - y);
+  }
+  return test.length ? s / test.length : null;
+}
+
+/** Deterministic k-fold (index % k, no RNG) mean out-of-sample Brier at a grid. */
+function _isoCvBrier(rows, bucketSize, fallbackFn, k = 5) {
+  const folds = Array.from({ length: k }, () => []);
+  rows.forEach((r, i) => folds[i % k].push(r));
+  let sum = 0;
+  let used = 0;
+  for (let f = 0; f < k; f++) {
+    const test = folds[f];
+    const train = folds.filter((_, i) => i !== f).flat();
+    if (!test.length || !train.length) continue;
+    const b = _isoFoldBrier(train, test, bucketSize, fallbackFn);
+    if (b == null) continue;
+    sum += b;
+    used += 1;
+  }
+  return used ? sum / used : null;
+}
+
+/**
+ * Fit the score→prob table at the bucket width that GENERALIZES best, chosen by
+ * 5-fold CV on the current log rather than a hardcoded constant.
+ *
+ * Background: the deployed call hardcoded `bucketSize: 15` because an offline
+ * 5-fold CV found 15 beat 10 (Brier 0.1000 vs 0.1008). But that CV ran on a log
+ * whose pre-game scores had drifted (the live-decay/Final freeze bug — since
+ * fixed), so coarse buckets were "winning" partly by smearing over corrupted
+ * scores. Coarse buckets also pin the ceiling low: the top 75-90 band genuinely
+ * homers ~37% lately, but a single wide, thin top bucket regresses that toward
+ * the bucket mean. Letting CV re-pick the grid each run on the now-clean log
+ * lifts the ceiling exactly when the data supports finer resolution — and can
+ * never do worse than the old default, since 15 stays in the candidate set and
+ * a finer grid is adopted only when it clearly wins.
+ *
+ * Returns the same shape as fitIsotonicFromBacktest plus { bucketSize, cv,
+ * adaptive } for observability.
+ */
+export function fitIsotonicAdaptive(backtestLog, opts = {}) {
+  const lookbackDays  = opts.lookbackDays  ?? 30;
+  const minNPerBucket = opts.minNPerBucket ?? 10;
+  const fallbackFn    = opts.fallbackFn    ?? _defaultIsoFallback;
+  const candidates    = opts.bucketSizes   ?? ADAPTIVE_BUCKET_SIZES;
+  const defaultBucket = opts.bucketSize    ?? 15;
+
+  // Gather the resolved rows (score + outcome) within the lookback window.
+  const rows = [];
+  if (backtestLog && typeof backtestLog === 'object' && backtestLog.records && typeof backtestLog.records === 'object') {
+    const cutoff = _dateMinus(lookbackDays);
+    const dates = Array.isArray(backtestLog.dates) ? backtestLog.dates : Object.keys(backtestLog.records);
+    for (const d of dates) {
+      if (d < cutoff) continue;
+      const day = backtestLog.records[d];
+      if (!Array.isArray(day)) continue;
+      for (const r of day) {
+        const score = typeof r.score === 'number' ? r.score : null;
+        if (score === null || score < 0 || score > 100) continue;
+        if (r.homered !== true && r.homered !== false) continue;
+        rows.push({ score, homered: r.homered === true });
+      }
+    }
+  }
+
+  // Thin log → behave exactly like the old hardcoded path.
+  if (rows.length < ADAPTIVE_MIN_ROWS) {
+    const res = fitIsotonicFromBacktest(backtestLog, { lookbackDays, minNPerBucket, bucketSize: defaultBucket });
+    return { ...res, bucketSize: defaultBucket, cv: null, adaptive: false };
+  }
+
+  // CV every candidate grid; keep the finite ones, coarse → fine.
+  const cv = candidates
+    .slice()
+    .sort((a, b) => b - a)
+    .map((bs) => ({ bucketSize: bs, brier: _isoCvBrier(rows, bs, fallbackFn) }))
+    .filter((c) => Number.isFinite(c.brier));
+
+  // Pick the coarsest as incumbent, then walk finer; adopt a finer grid only
+  // when it beats the incumbent by more than EPS (conservative — finer must
+  // clearly win, not edge ahead on noise).
+  let chosen = cv[0] || { bucketSize: defaultBucket, brier: null };
+  for (let i = 1; i < cv.length; i++) {
+    if (chosen.brier == null || cv[i].brier < chosen.brier - ADAPTIVE_BRIER_EPS) chosen = cv[i];
+  }
+
+  const res = fitIsotonicFromBacktest(backtestLog, { lookbackDays, minNPerBucket, bucketSize: chosen.bucketSize });
+  return { ...res, bucketSize: chosen.bucketSize, cv, adaptive: true };
+}
+
+// ---------------------------------------------------------------------------
 // lookupProb
 // ---------------------------------------------------------------------------
 

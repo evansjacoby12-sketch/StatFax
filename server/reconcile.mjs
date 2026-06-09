@@ -29,7 +29,31 @@
 const MLB_BASE = 'https://statsapi.mlb.com/api/v1';
 const ROLLING_DAYS = 30;
 const MIN_SAMPLES_TO_CALIBRATE = 1500;
-const MAX_DELTA = 0.08;
+
+// ── Significance-scaled clamp band ──────────────────────────────────────────
+// The old clamp gave every signal the same ±8% room regardless of how trustworthy
+// its measured lift was. The badge audit showed the trust gap is huge: hot
+// (z≈14), homeEdge (z≈5.8), barrelKing (z≈4.7) are rock-solid, while launchPad
+// (z≈1.7) and zoneMaster (z≈2.2) sit at noise. So scale each signal's allowed
+// deviation from 1.0 by the statistical strength (|z| vs the overall rate) of
+// its OWN measured lift: proven signals earn a wider band and move scores more,
+// near-noise signals get pulled toward neutral. z is recomputed from the live
+// log each run, so this re-weights automatically as the sample grows — no
+// hardcoded audit constants to go stale.
+const Z_FLOOR  = 2.0;   // |z| at/below this → treat as noise, tightest band
+const Z_FULL   = 5.0;   // |z| at/above this → fully trusted, widest band
+const DELTA_NOISE = 0.03;  // near-noise signals barely move scores (was a flat 0.08)
+const DELTA_MAX   = 0.12;  // proven signals get more room than the old flat cap
+
+// z-score of a sub-group's HR rate vs the overall rate (binomial SE under the
+// null that the group rate equals overall), and the clamp band that strength
+// earns. Returns { z, delta }.
+function significanceBand(rate, n, overallRate) {
+  const se = n > 0 ? Math.sqrt((overallRate * (1 - overallRate)) / n) : 0;
+  const z = se > 0 ? Math.abs(rate - overallRate) / se : 0;
+  const w = Math.max(0, Math.min(1, (z - Z_FLOOR) / (Z_FULL - Z_FLOOR)));
+  return { z, delta: DELTA_NOISE + w * (DELTA_MAX - DELTA_NOISE) };
+}
 
 // Badges tracked for the StatRecap lift report. Direct boolean fields
 // (hot/due/cold/bullpenLegend/homeEdge/awayEdge) PLUS the three "premium"
@@ -202,12 +226,15 @@ export function appendToLog(log, date, reconciled) {
  * From the full rolling log compute per-badge and per-grade multipliers.
  *
  *   per-badge multiplier = sqrt(with-badge HR rate / overall HR rate)
- *                          clamped to [1 - MAX_DELTA, 1 + MAX_DELTA]
+ *                          clamped to [1 - delta, 1 + delta]
  *
- * Sqrt-dampens noisy small samples and the clamp keeps even a wildly
- * over/underperforming bucket from yanking scores by more than 8% per
- * multiplier (geometric-mean dampening in applyCalibration combines them
- * conservatively when a batter has multiple active badges).
+ * Sqrt-dampens noisy small samples. The clamp band `delta` is no longer a flat
+ * ±8% — it's scaled by each signal's statistical strength (significanceBand):
+ * a proven signal whose lift is many SE from the overall rate earns up to
+ * ±12%, while one sitting near noise is held to ±3%, so the trustworthy badges
+ * (hot, homeEdge, barrelKing) move scores and the weak ones (launchPad,
+ * zoneMaster) barely do. Geometric-mean dampening in applyCalibration still
+ * combines them conservatively when a batter has multiple active badges.
  *
  * Survivorship-bias note: records with `actuallyPlayed: false` (late lineup
  * scratches) are EXCLUDED from all rate calculations. Including them would
@@ -252,8 +279,12 @@ export function computeMultipliers(log) {
     const lift = bRate / overallRate;
     if (!isFinite(lift) || lift <= 0) continue;
     const dampened = Math.sqrt(lift);
-    const clamped  = Math.min(1 + MAX_DELTA, Math.max(1 - MAX_DELTA, dampened));
+    // Band widens with the signal's statistical strength: proven badges move
+    // scores more, near-noise badges are clamped tight toward 1.0.
+    const { z, delta } = significanceBand(bRate, withBadge.length, overallRate);
+    const clamped  = Math.min(1 + delta, Math.max(1 - delta, dampened));
     base.badges[key] = +clamped.toFixed(3);
+    console.log(`[calib] badge ${key}: n=${withBadge.length} rate=${(bRate * 100).toFixed(1)}% lift=${lift.toFixed(2)} z=${z.toFixed(1)} band=±${(delta * 100).toFixed(1)}% → ${base.badges[key]}`);
   }
 
   // Per-grade — need 80+ in each grade bucket. PRIME players are rarer so
@@ -266,7 +297,8 @@ export function computeMultipliers(log) {
     const lift = gRate / overallRate;
     if (!isFinite(lift) || lift <= 0) continue;
     const dampened = Math.sqrt(lift);
-    const clamped  = Math.min(1 + MAX_DELTA, Math.max(1 - MAX_DELTA, dampened));
+    const { delta } = significanceBand(gRate, withGrade.length, overallRate);
+    const clamped  = Math.min(1 + delta, Math.max(1 - delta, dampened));
     base.grades[grade] = +clamped.toFixed(3);
   }
 

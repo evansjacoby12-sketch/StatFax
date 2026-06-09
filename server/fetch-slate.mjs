@@ -215,6 +215,7 @@ const {
   dejuicedImpliedProb,
   blendScoreWithVegas,
   fitIsotonicFromBacktest,
+  fitIsotonicAdaptive,
   lookupProb,
   computeMetricsFromBacktest,
   baselineBrierForRate,
@@ -1689,11 +1690,16 @@ async function main() {
   let scoreToProbTable = null;
   let modelMetrics     = null;
   try {
-    // bucketSize 15 beats 10 on 5-fold CV (Brier 0.1000 vs 0.1008, LogLoss
-    // 0.3364 vs 0.3386) — narrower buckets overfit sparse score regions.
-    // See server/tools/model-metrics.mjs.
-    scoreToProbTable = fitIsotonicFromBacktest(backtestLog, { lookbackDays: 30, bucketSize: 15 });
-    console.log(`[calib] isotonic — totalN:${scoreToProbTable.totalN} buckets:${scoreToProbTable.table?.length}`);
+    // Bucket width is CV-SELECTED each run (fitIsotonicAdaptive) instead of a
+    // hardcoded 15. The old 15 came from an offline CV that ran on a log whose
+    // pre-game scores had drifted (live-decay/Final freeze bug — since fixed),
+    // which biased the choice coarse and pinned the top-bucket ceiling low. The
+    // selector starts at 15 and only goes finer when it measurably improves
+    // 5-fold Brier on the now-clean log, lifting the ceiling for the genuinely
+    // hot top band. See server/tools/model-metrics.mjs.
+    scoreToProbTable = fitIsotonicAdaptive(backtestLog, { lookbackDays: 30 });
+    console.log(`[calib] isotonic — totalN:${scoreToProbTable.totalN} buckets:${scoreToProbTable.table?.length} bucketSize:${scoreToProbTable.bucketSize} adaptive:${scoreToProbTable.adaptive === true}` +
+      (Array.isArray(scoreToProbTable.cv) ? ` cv:[${scoreToProbTable.cv.map(c => `${c.bucketSize}:${c.brier.toFixed(4)}`).join(' ')}]` : ''));
   } catch (e) {
     console.warn(`[calib] isotonic fit failed: ${e?.message}`);
   }

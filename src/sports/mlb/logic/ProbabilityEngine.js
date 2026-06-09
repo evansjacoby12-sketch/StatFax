@@ -2129,6 +2129,7 @@ export {
 } from './vegasBlend.js';
 export {
   fitIsotonicFromBacktest,
+  fitIsotonicAdaptive,
   lookupProb,
   serializeTable as serializeIsotonicTable,
   deserializeTable as deserializeIsotonicTable,
