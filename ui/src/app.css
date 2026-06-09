@@ -5428,3 +5428,71 @@ button.th:hover {
 }
 .slip-weak-note { color: var(--warn); }
 .slip-weak-note b { font-weight: 700; }
+
+/* Wager → payout calculator row in the slip panel */
+.slip-wager {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 15px 4px;
+}
+.slip-wager-field {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+}
+.slip-wager-k {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+.slip-wager-input {
+  width: 64px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+}
+.slip-wager-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+/* hide number-input spinners — the field is tiny */
+.slip-wager-input::-webkit-outer-spin-button,
+.slip-wager-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.slip-wager-input[type='number'] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+.slip-wager-arrow {
+  color: var(--text-faint);
+  display: grid;
+  place-items: center;
+}
+.slip-wager-payout {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--good);
+}
+
+/* divider between size tabs and pool filters in Parlay Combos controls */
+.grp-ctrl-sep {
+  width: 1px;
+  align-self: stretch;
+  margin: 2px 4px;
+  background: var(--border-soft);
+}
+.grp-controls .badge-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}

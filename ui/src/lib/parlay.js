@@ -34,6 +34,7 @@ export function computeParlay(legs) {
     priced,
     allPriced,
     modelProb,
+    fairDecimal,
     fairAmerican: fairDecimal ? decimalToAmerican(fairDecimal) : null,
     decimal: allPriced ? decimal : null,
     american: allPriced ? decimalToAmerican(decimal) : null,

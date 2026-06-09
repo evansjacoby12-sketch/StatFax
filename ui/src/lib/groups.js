@@ -7,7 +7,7 @@
 import { decimalToAmerican } from './format.js'
 import { HOT_HEAT } from './constants.js'
 
-const SIZES = [2, 3, 4]
+const SIZES = [2, 3, 4, 5, 6, 7, 8]
 
 const barrelOf = (b) => (Number.isFinite(b.barrelPctBBE) ? b.barrelPctBBE : b.barrelPct)
 
@@ -147,6 +147,8 @@ function makeGroup(legs, size, strat, idSuffix = '') {
 }
 
 export function buildGroups(batters) {
+  // Each strategy's ranked pool is size-independent — compute once, slice per size.
+  const pools = STRATEGIES.map((strat) => ({ strat, pool: topPerGame(batters, strat.rank, strat.require) }))
   const out = {}
   for (const size of SIZES) {
     const groups = []
@@ -160,8 +162,7 @@ export function buildGroups(batters) {
       seen.add(sig)
       groups.push(g)
     }
-    for (const strat of STRATEGIES) {
-      const pool = topPerGame(batters, strat.rank, strat.require)
+    for (const { strat, pool } of pools) {
       const tiers = strat.tiers || 1
       for (let t = 0, i = 0; t < tiers && i + size <= pool.length; t++, i += size) {
         push(makeGroup(pool.slice(i, i + size), size, strat, t ? `-t${t}` : ''))

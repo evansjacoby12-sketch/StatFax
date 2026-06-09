@@ -6,33 +6,41 @@ import { buildGroups, lastFirst, isoOf } from '../lib/groups.js'
 import { useLiveMode } from '../lib/liveMode.js'
 
 const GROUP_GRADE_COLOR = { S: '#f5a623', A: '#32d74b', B: '#3b82f6', C: '#9aa6b6', D: '#6b7787' }
-const SIZE_TABS = [
-  { k: 2, label: '2-leg' },
-  { k: 3, label: '3-leg' },
-  { k: 4, label: '4-leg' },
-]
+const SIZE_TABS = [2, 3, 4, 5, 6, 7, 8].map((k) => ({ k, label: `${k}-leg` }))
 
 // Cross-Game HR Groups — auto-built multi-leg parlays, one best bat per game.
 export default function GroupsView({ batters, onSelect, selectedId }) {
   const [size, setSize] = useState(2)
   const [games, setGames] = useState(() => new Set()) // empty = all games
+  // Hide started defaults ON: HR props can't be bet pregame once the game is
+  // live, so combos built on started games are usually unplaceable.
+  const [hideStarted, setHideStarted] = useState(true)
+  const [confirmedOnly, setConfirmedOnly] = useState(false)
 
   // Distinct, still-playable games in the pool — for the game selector.
   const gameList = useMemo(() => {
     const m = new Map()
     for (const b of batters || []) {
       if (b.gamePk == null || m.has(b.gamePk) || b.game?.isFinal) continue
+      if (hideStarted && b.game?.isLive) continue
       const a = b.game?.awayTeam?.abbr
       const h = b.game?.homeTeam?.abbr
       m.set(b.gamePk, { gamePk: b.gamePk, label: a && h ? `${a}@${h}` : b.team || `#${b.gamePk}`, time: b.game?.gameDate || '' })
     }
     return [...m.values()].sort((x, y) => x.time.localeCompare(y.time) || x.label.localeCompare(y.label))
-  }, [batters])
+  }, [batters, hideStarted])
 
-  // Restrict the combo pool to the selected games (none selected = all games).
+  // Restrict the combo pool: selected games (none = all), pregame-only and
+  // confirmed-lineup-only when those chips are on.
   const pool = useMemo(
-    () => (games.size ? (batters || []).filter((b) => games.has(b.gamePk)) : batters),
-    [batters, games],
+    () =>
+      (batters || []).filter(
+        (b) =>
+          (!games.size || games.has(b.gamePk)) &&
+          (!hideStarted || !b.game?.isLive) &&
+          (!confirmedOnly || b.lineupConfirmed === true),
+      ),
+    [batters, games, hideStarted, confirmedOnly],
   )
   const bySize = useMemo(() => buildGroups(pool), [pool])
   const available = SIZE_TABS.filter((t) => bySize[t.k]?.length)
@@ -70,6 +78,23 @@ export default function GroupsView({ batters, onSelect, selectedId }) {
             {t.label}
           </button>
         ))}
+        <span className="grp-ctrl-sep" aria-hidden="true" />
+        <button
+          className={`badge-toggle ${hideStarted ? 'on' : ''}`}
+          onClick={() => setHideStarted((v) => !v)}
+          aria-pressed={hideStarted}
+          title="Only build combos from games that haven't started"
+        >
+          <Icon name="Clock" size={12} /> Hide started
+        </button>
+        <button
+          className={`badge-toggle ${confirmedOnly ? 'on' : ''}`}
+          onClick={() => setConfirmedOnly((v) => !v)}
+          aria-pressed={confirmedOnly}
+          title="Only batters in a confirmed lineup"
+        >
+          <Icon name="UserCheck" size={12} /> Confirmed only
+        </button>
       </div>
       {available.length ? (
         <div className="grp-list">
@@ -79,7 +104,9 @@ export default function GroupsView({ batters, onSelect, selectedId }) {
         </div>
       ) : (
         <div className="empty-note">
-          {games.size ? 'Pick at least 2 games to build a combo.' : 'Not enough games to build cross-game groups.'}
+          {games.size || confirmedOnly || hideStarted
+            ? 'Not enough eligible batters with these filters — widen the games or turn a filter off.'
+            : 'Not enough games to build cross-game groups.'}
         </div>
       )}
     </>

@@ -45,6 +45,7 @@ import {
   Eye,
   List,
   LayoutGrid,
+  UserCheck,
 } from 'lucide-react'
 
 const REGISTRY = {
@@ -94,6 +95,7 @@ const REGISTRY = {
   Eye,
   List,
   LayoutGrid,
+  UserCheck,
 }
 
 export default function Icon({ name, size = 16, ...rest }) {

@@ -28,8 +28,14 @@ function parlaySummary(p, pg) {
 
 export default function ParlaySlip({ legs, onRemove, onClear, onSelect }) {
   const [open, setOpen] = useState(false)
+  const [wager, setWager] = useState('10')
   if (!legs.length) return null
   const p = computeParlay(legs)
+  // Payout calculator: book price when every leg is priced, else the model's
+  // fair price (flagged so it's clear no book is actually paying it).
+  const payDecimal = p.allPriced ? p.decimal : p.fairDecimal
+  const wagerNum = parseFloat(wager)
+  const payout = Number.isFinite(wagerNum) && wagerNum > 0 && payDecimal ? wagerNum * payDecimal : null
   const pg = parlayGrade(legs)
   const gColor = pg ? GRADE_COLOR[pg.letter] : null
   // Weak link = the leg most likely to sink the parlay: lowest HR prob, then
@@ -66,6 +72,28 @@ export default function ParlaySlip({ legs, onRemove, onClear, onSelect }) {
                 <Icon name="TriangleAlert" size={11} /> Weak link: <b>{weak.name}</b> ({pct(weak.hrProbability, 1)}).
               </span>
             )}
+          </div>
+          <div className="slip-wager">
+            <label className="slip-wager-field">
+              <span className="slip-wager-k">Wager $</span>
+              <input
+                className="slip-wager-input mono"
+                type="number"
+                inputMode="decimal"
+                min="0"
+                step="1"
+                value={wager}
+                onChange={(e) => setWager(e.target.value)}
+                aria-label="Wager amount in dollars"
+              />
+            </label>
+            <span className="slip-wager-arrow" aria-hidden="true">
+              <Icon name="ChevronRight" size={14} />
+            </span>
+            <span className="slip-wager-field">
+              <span className="slip-wager-k">Payout{p.allPriced ? '' : ' (fair)'}</span>
+              <span className="slip-wager-payout mono">{payout != null ? `$${payout >= 100 ? Math.round(payout) : payout.toFixed(2)}` : '—'}</span>
+            </span>
           </div>
           <div className="slip-legs">
             {legs.map((b) => (
