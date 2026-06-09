@@ -107,6 +107,7 @@ export default function PlayerDrawer({ batter: b, onClose, watched, inSlip, onTo
           <Why b={b} />
           <StatsSection b={b} />
           <StatcastSection b={b} />
+          <PercentileSection b={b} />
           <EnvSection b={b} />
           <PitcherSection b={b} onOpenPitcher={onOpenPitcher} />
           {liveMode && b.game?.isLive && <LiveSection b={b} />}
@@ -349,6 +350,45 @@ function StatcastSection({ b }) {
           {pct(b.primaryPitchEdge.pitcherFreq, 0)} of the time
         </div>
       )}
+    </Section>
+  )
+}
+
+// Savant-style percentile bars vs TODAY'S SLATE (see attachSlatePercentiles).
+// Blue = bottom of the slate, red = top, chip rides the end of the fill.
+const PCTILE_ROWS = [
+  { k: 'hrRate', label: 'HR/AB', v: (b) => (b.season?.ab >= 30 ? pct(b.season.hr / b.season.ab, 1) : null) },
+  { k: 'iso', label: 'ISO', v: (b) => rate(b.season?.iso ?? (b.season?.slg != null && b.season?.avg != null ? b.season.slg - b.season.avg : null)) },
+  { k: 'xiso', label: 'xISO', v: (b) => rate(b.xStats?.xISO) },
+  { k: 'barrel', label: 'Barrel%', v: (b) => (b.barrelPctBBE ?? b.barrelPct) != null ? `${num(b.barrelPctBBE ?? b.barrelPct, 1)}%` : null },
+  { k: 'ev', label: 'Exit velo', v: (b) => (b.exitVelo != null ? `${num(b.exitVelo, 1)} mph` : null) },
+  { k: 'hardHit', label: 'Hard-hit%', v: (b) => (b.hardHitPct != null ? `${num(b.hardHitPct, 0)}%` : null) },
+]
+const pctileColor = (p) => `hsl(${215 - 200 * (p / 100)} 72% 50%)`
+
+function PercentileSection({ b }) {
+  const rows = PCTILE_ROWS.map((r) => ({ ...r, p: b.pctile?.[r.k], val: r.v(b) })).filter((r) => r.p != null)
+  if (!rows.length) return null
+  return (
+    <Section title="Percentiles" icon="BarChart3">
+      <div className="pctile-cap dim">Power profile ranked against every batter on today&apos;s slate.</div>
+      <div className="pctile-list">
+        {rows.map((r) => (
+          <div className="pctile-row" key={r.k} title={`${r.label}: better than ${r.p}% of today's slate`}>
+            <span className="pctile-label">{r.label}</span>
+            <span className="pctile-bar">
+              <span className="pctile-fill" style={{ width: `${r.p}%`, background: pctileColor(r.p) }} />
+              <span
+                className="pctile-chip mono"
+                style={{ left: `clamp(0px, calc(${r.p}% - 11px), calc(100% - 22px))`, background: pctileColor(r.p) }}
+              >
+                {r.p}
+              </span>
+            </span>
+            <span className="pctile-val mono">{r.val ?? '—'}</span>
+          </div>
+        ))}
+      </div>
     </Section>
   )
 }

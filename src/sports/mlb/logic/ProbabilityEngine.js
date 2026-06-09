@@ -1404,7 +1404,12 @@ export function scoreBatter(
   // gradually. Falls back to starter-only when bullpen data is missing.
   let effectiveHR9 = pitcherHRPer9;
   if (Number.isFinite(pitcherHRPer9) && Number.isFinite(opposingBullpenHR9) && Number.isFinite(battingOrder)) {
-    const ipDist = estimateIPDistribution(pitcher);
+    // `pitcher` is just { id, name } — the stint data the estimator reads
+    // (recentForm.ip/games, season ip) arrives via separate params. Passing
+    // the bare object meant EVERY pitcher got the league-average stint
+    // distribution, so openers (recent avg ~1-2 IP) were blended as if they'd
+    // pitch 5+ innings, badly understating bullpen exposure on opener days.
+    const ipDist = estimateIPDistribution({ ...pitcher, season: pitcherSeason, recentForm: pitcherRecentForm });
     const weightedHR9 = expectedHR9ForBatter(battingOrder, null, pitcherHRPer9, opposingBullpenHR9, ipDist);
     if (Number.isFinite(weightedHR9)) {
       effectiveHR9 = 0.5 * pitcherHRPer9 + 0.5 * weightedHR9;
@@ -1662,6 +1667,12 @@ export function scoreBatter(
     awayBad,
     bullpenLegend: bullpenSplits?.bullpenLegend ?? false,
     bullpenSplits,
+    // The pitcher HR/9 the model ACTUALLY scored against: starter HR/9 blended
+    // with bullpen exposure by lineup spot + expected starter stint (and the
+    // catcher-framing adj). On opener days this differs a lot from the listed
+    // starter's raw HR/9 — surfaced so the UI's "HR-friendly pitcher" check
+    // grades the real exposure, not just the opener's one or two innings.
+    effectiveHR9: Number.isFinite(effectiveHR9) ? +Number(effectiveHR9).toFixed(3) : null,
     // Raw split data attached so the player-detail modal can show the actual
     // numbers behind each flag (e.g. "Day ISO .250 vs Night .195").
     dayNightSplits,

@@ -71,7 +71,13 @@ export function heatIndex(b) {
 export function hrSetup(b) {
   const rb = b.recentBarrel
   const seasonBarrel = Number.isFinite(b.barrelPctBBE) ? b.barrelPctBBE : b.barrelPct
-  const hr9 = b.pitcher?.season?.hrPer9
+  // Grade the model's BLENDED pitcher exposure (starter HR/9 weighted by how
+  // long he's expected to last for this lineup spot + the opposing pen), not
+  // the listed starter's raw line — on opener days the opener may face this
+  // bat once while the bulk arm takes the rest, and the raw line lies.
+  const starterHr9 = b.pitcher?.season?.hrPer9
+  const hr9 = Number.isFinite(b.effectiveHR9) ? b.effectiveHR9 : starterHr9
+  const blended = Number.isFinite(b.effectiveHR9) && Number.isFinite(starterHr9) && Math.abs(b.effectiveHR9 - starterHr9) >= 0.05
   const park = b.gameParkHRFactor
   const la = b.launchAngle
   const checks = [
@@ -103,7 +109,11 @@ export function hrSetup(b) {
       key: 'pitcher',
       label: 'HR-friendly pitcher',
       pass: Number.isFinite(hr9) && hr9 >= 1.3,
-      detail: Number.isFinite(hr9) ? `opp HR/9 ${hr9.toFixed(2)} · MLB ~1.30` : 'no pitcher data',
+      detail: Number.isFinite(hr9)
+        ? blended
+          ? `exposure HR/9 ${hr9.toFixed(2)} (starter ${starterHr9.toFixed(2)} + pen) · MLB ~1.30`
+          : `opp HR/9 ${hr9.toFixed(2)} · MLB ~1.30`
+        : 'no pitcher data',
     },
     {
       key: 'park',

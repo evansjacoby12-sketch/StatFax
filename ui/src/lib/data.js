@@ -125,6 +125,8 @@ export async function loadSlate() {
     }
   })
 
+  attachSlatePercentiles(batters)
+
   const meta = {
     version: d.version,
     date: d.date,
@@ -138,6 +140,57 @@ export async function loadSlate() {
   }
 
   return { batters, games: d.games || [], meta, raw: d }
+}
+
+// Savant-style percentile ranks, computed against TODAY'S SLATE (every scored
+// batter on the board) rather than all of MLB — the honest comparison set we
+// actually have client-side, and arguably the more useful one for picking.
+// Attaches `b.pctile = { iso: 0-100, ... }` (null where the stat is missing).
+const PCTILE_METRICS = {
+  iso: (b) => {
+    const s = b.season
+    if (Number.isFinite(s?.iso)) return s.iso
+    return Number.isFinite(s?.slg) && Number.isFinite(s?.avg) ? s.slg - s.avg : null
+  },
+  xiso: (b) => (Number.isFinite(b.xStats?.xISO) ? b.xStats.xISO : null),
+  barrel: (b) => {
+    const v = b.barrelPctBBE ?? b.barrelPct
+    return Number.isFinite(v) ? v : null
+  },
+  ev: (b) => (Number.isFinite(b.exitVelo) ? b.exitVelo : null),
+  hardHit: (b) => (Number.isFinite(b.hardHitPct) ? b.hardHitPct : null),
+  // HR per AB needs a real sample before a rate means anything.
+  hrRate: (b) => {
+    const s = b.season
+    return Number.isFinite(s?.hr) && Number.isFinite(s?.ab) && s.ab >= 30 ? s.hr / s.ab : null
+  },
+}
+
+function attachSlatePercentiles(batters) {
+  // De-dupe doubleheader rows so a batter playing twice doesn't count double
+  // in the distribution.
+  const byPlayer = new Map()
+  for (const b of batters) if (!byPlayer.has(b.playerId)) byPlayer.set(b.playerId, b)
+  const pool = [...byPlayer.values()]
+  const sorted = {}
+  for (const [k, get] of Object.entries(PCTILE_METRICS)) {
+    sorted[k] = pool.map(get).filter((v) => v != null).sort((a, b) => a - b)
+  }
+  // Mid-rank percentile: ties share rank so identical values get the same number.
+  const pctOf = (arr, v) => {
+    if (v == null || arr.length < 20) return null
+    let lo = 0
+    while (lo < arr.length && arr[lo] < v) lo++
+    let hi = lo
+    while (hi < arr.length && arr[hi] === v) hi++
+    return Math.round(((lo + (hi - lo) / 2) / arr.length) * 100)
+  }
+  for (const b of batters) {
+    b.pctile = {}
+    for (const [k, get] of Object.entries(PCTILE_METRICS)) {
+      b.pctile[k] = pctOf(sorted[k], get(b))
+    }
+  }
 }
 
 function collectBooks(odds) {
