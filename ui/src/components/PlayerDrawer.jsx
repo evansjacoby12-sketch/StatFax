@@ -496,6 +496,19 @@ function EnvSection({ b }) {
   )
 }
 
+// GO/AO ratio → fly-ball/ground-ball descriptor. League average ≈ 1.15.
+function battedBallLabel(goAo) {
+  if (!Number.isFinite(goAo) || goAo <= 0) return '—'
+  const tag = goAo <= 0.92 ? 'FB' : goAo >= 1.45 ? 'GB' : 'neu'
+  return `${goAo.toFixed(2)} · ${tag}`
+}
+function ballTone(goAo) {
+  if (!Number.isFinite(goAo) || goAo <= 0) return null
+  if (goAo <= 0.92) return 'good' // fly-ball arm = HR-friendly for the hitter
+  if (goAo >= 1.45) return 'bad'  // ground-ball arm = HR-suppressing
+  return null
+}
+
 function PitcherSection({ b, onOpenPitcher }) {
   const p = b.pitcher
   if (!p) return null
@@ -531,8 +544,23 @@ function PitcherSection({ b, onOpenPitcher }) {
         <Cell k="K/9" v={num(s.kPer9, 1)} />
         <Cell k="WHIP" v={num(s.whip, 2)} />
         <Cell k="IP" v={num(s.ip, 1)} />
-        <Cell k="HR" v={num(s.hr)} />
+        <Cell
+          k="GB/FB"
+          v={battedBallLabel(s.goAo)}
+          tone={ballTone(s.goAo)}
+          title="Ground-out : air-out ratio — fly-ball arms (low) allow more HR, ground-ball arms (high) fewer. League ~1.15."
+        />
       </div>
+      {b.flyBallMatchup && (
+        <div className="note good">
+          <Icon name="Wind" size={13} /> Fly-ball-prone arm (GB/FB {num(s.goAo, 2)}) — more balls in the air, HR-friendly matchup
+        </div>
+      )}
+      {b.hrPlatoonEdge && (
+        <div className="note good">
+          <Icon name="Target" size={13} /> Gives up more HR to {b.batSide === 'S' ? 'this batter’s side' : `${b.batSide}HB`} — platoon HR split
+        </div>
+      )}
       {split && (
         <div className="split-line">
           <span className="split-label">vs {b.batSide}HB</span>

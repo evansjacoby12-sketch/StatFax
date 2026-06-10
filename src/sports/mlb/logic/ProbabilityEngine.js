@@ -1427,6 +1427,20 @@ export function scoreBatter(
     effectiveHR9 *= (1 - fr * 0.005);
   }
 
+  // Pitcher batted-ball tilt — fly-ball arms put more balls in the air and
+  // allow more HR; ground-ball arms suppress them. GO/AO (ground-outs:air-outs)
+  // is the stable proxy; league average ≈ 1.15. Applied as a GENTLE clamped
+  // nudge to effectiveHR9: HR/9 already partly reflects this, so we only add a
+  // small correction (more stable than HR/9 in small samples), and the daily
+  // isotonic + badge calibration re-centers any systematic bias. Asymmetric
+  // clamp — extreme fly-ball arms are more HR-prone than extreme ground-ball
+  // arms are HR-safe. Needs a real sample (≥30 IP) before we trust the ratio.
+  const goAo = pitcherSeason?.goAo;
+  if (Number.isFinite(goAo) && goAo > 0 && (pitcherSeason?.ip ?? 0) >= 30) {
+    const tilt = Math.max(-0.05, Math.min(0.06, (1.15 - goAo) * 0.12));
+    effectiveHR9 *= (1 + tilt);
+  }
+
   // Traditional matchup signals — all clamped so a tiny-sample pitcher
   // (e.g., a September call-up with 1 IP and 1 HR allowed → hrPer9 = 9.0)
   // can't peg matchupScore at 100 and collapse the whole model into a

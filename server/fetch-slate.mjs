@@ -579,6 +579,16 @@ async function fetchPitcherStatsBatch(playerIds) {
               const ip = parseIP(s.inningsPitched);
               const hr = +s.homeRuns || 0;
               const k  = +s.strikeOuts || 0;
+              // Ground-out : air-out ratio — a stable proxy for a pitcher's
+              // fly-ball/ground-ball tilt (the MLB stat object carries
+              // groundOuts/airOuts and a pre-divided groundOutsToAirouts).
+              // Fly-ball arms (low GO/AO) allow more HR; ground-ball arms fewer.
+              // Far more sample-stable than HR/9 early in the year.
+              const groundOuts = +s.groundOuts || 0;
+              const airOuts    = +s.airOuts || 0;
+              const goAo = airOuts > 0 ? groundOuts / airOuts
+                         : (s.groundOutsToAirouts != null && s.groundOutsToAirouts !== '-.--')
+                           ? parseFloat(s.groundOutsToAirouts) : null;
               out.season = {
                 ip,
                 hr,
@@ -587,6 +597,9 @@ async function fetchPitcherStatsBatch(playerIds) {
                 k,
                 bb:    +s.baseOnBalls || 0,
                 bf:    +s.battersFaced || 0,
+                groundOuts,
+                airOuts,
+                goAo:  Number.isFinite(goAo) && goAo > 0 ? +goAo.toFixed(3) : null,
                 // hrPer9/kPer9 are how the scoring model reads HR risk and
                 // strikeout rate (ProbabilityEngine reads `pitcherSeason.hrPer9`
                 // in synergy calc + matchup factors). MLBService.getPitcherStats

@@ -23,6 +23,8 @@ export const BADGES = [
   { key: 'pitchEdge', label: 'Pitch Edge', lucide: 'Crosshair', color: 'var(--b-pitch)', tone: 'good', desc: "Mashes the pitcher's most-used pitch (SLG well above his season norm)" },
   { key: 'wxEdge', label: 'WX Edge', lucide: 'Wind', color: 'var(--b-wx)', tone: 'good', desc: 'Park & weather conditions boost HR tonight (favorable air)' },
   { key: 'barrelKing', label: 'Barrel King', lucide: 'Award', color: 'var(--b-barrel)', tone: 'good', desc: 'Elite barrel rate — top ~10% of MLB (≥13% of batted balls)' },
+  { key: 'flyBallMatchup', label: 'vs FB Arm', lucide: 'Wind', color: 'var(--b-fly)', tone: 'good', desc: 'Facing a fly-ball-prone starter (low ground-out/air-out ratio) — more balls in the air, HR-friendly matchup' },
+  { key: 'hrPlatoonEdge', label: 'HR Platoon', lucide: 'Target', color: 'var(--b-plat)', tone: 'good', desc: "Opposing starter gives up notably more HR to this batter's side (platoon HR split)" },
   { key: 'homeEdge', label: 'Home Edge', lucide: 'House', color: 'var(--b-home)', tone: 'good', desc: 'Strong home/park split advantage' },
   { key: 'awayEdge', label: 'Road Edge', lucide: 'Plane', color: 'var(--b-away)', tone: 'good', desc: 'Strong road split advantage' },
   { key: 'homeBad', label: 'Home Drag', lucide: 'House', color: 'var(--b-neg)', tone: 'bad', desc: 'Weak home/park split' },

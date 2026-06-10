@@ -22,6 +22,27 @@ export function normName(name) {
     .trim()
 }
 
+// Does the opposing starter allow a big HR platoon split on THIS batter's side?
+// Mirrors RudeBets' "vs LHB/RHB" tag: ≥30% higher HR/9 to the batter's side
+// than the other, with a real per-side sample (~12 IP ≈ 50 PA) and a floor on
+// the absolute rate so a 0.2→0.3 jump doesn't flag. Switch hitters bat opposite
+// the pitcher's hand.
+function hasHrPlatoonEdge(b) {
+  const sp = b.pitcher?.splits
+  if (!sp) return false
+  const phand = b.pitcher?.hand
+  const effSide = b.batSide === 'S' ? (phand === 'L' ? 'R' : 'L') : b.batSide
+  const onSide = effSide === 'L' ? sp.vl : sp.vr
+  const offSide = effSide === 'L' ? sp.vr : sp.vl
+  if (!onSide || !offSide) return false
+  if ((onSide.ip ?? 0) < 12 || (offSide.ip ?? 0) < 12) return false
+  const on = onSide.hrPer9
+  const off = offSide.hrPer9
+  if (!Number.isFinite(on) || on < 1.2) return false // floor: must be genuinely HR-prone
+  const ratioFlag = off > 0 ? on >= 1.3 * off : true // off-side allows ~none → clear split
+  return ratioFlag
+}
+
 function buildOddsIndex(oddsForGame) {
   // gamePk → { normName → { books: {book: {american, decimal, link}}, name } }
   const idx = new Map()
@@ -118,6 +139,13 @@ export async function loadSlate() {
       // Boolean signal: elite barrel rate (top ~10% of MLB, ≥13% of batted
       // balls). Matches the backend's barrelKing definition (backtest/reconcile).
       barrelKing: (b.barrelPctBBE ?? b.barrelPct ?? 0) >= 13,
+      // Boolean signal: facing a fly-ball-prone starter (GO/AO well below the
+      // ~1.15 league norm) — more balls in the air, an HR-friendly matchup.
+      // (RudeBets' "vs FB Pitcher".) Needs a real IP sample to be trustworthy.
+      flyBallMatchup: (b.pitcher?.season?.ip ?? 0) >= 30 && (b.pitcher?.season?.goAo ?? 99) <= 0.92,
+      // Boolean signal: the opposing starter gives up notably more HR to this
+      // batter's side than the other (RudeBets' "vs LHB/RHB"). Computed below.
+      hrPlatoonEdge: hasHrPlatoonEdge(b),
       // Pitch-type matchup data for the Zone page: the batter's own arsenal
       // (SLG/RV/Whiff per pitch) and the opposing starter's mix (usage% + shape).
       arsenal: d.batterArsenal?.[b.playerId] || null,
