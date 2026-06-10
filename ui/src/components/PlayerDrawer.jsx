@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import Icon from './Icon.jsx'
 import { GradeChip, BadgeRow, KV, hexA, ScoreRing } from './atoms.jsx'
 import { eli5IconName, toneColor, gradeColor } from '../lib/badges.js'
@@ -75,7 +76,12 @@ export default function PlayerDrawer({ batter: b, onClose, watched, inSlip, onTo
   const g = b.grade?.label || 'SKIP'
   const color = gradeColor(g)
 
-  return (
+  // Portal to <body>: rendered inside .app the fixed sheet was being resolved
+  // against an ancestor containing block on iOS (it floated up, leaving the
+  // board visible beneath it, and top/bottom anchors were ignored). At body
+  // level — no transformed/filtered ancestor — position:fixed is finally
+  // relative to the viewport.
+  const content = (
     <>
       <div className="drawer-scrim drawer-scrim-top" onClick={onClose} />
       <aside
@@ -116,6 +122,8 @@ export default function PlayerDrawer({ batter: b, onClose, watched, inSlip, onTo
       </aside>
     </>
   )
+  // Guard for the Node smoke renderer (no DOM) — portal only in the browser.
+  return typeof document === 'undefined' ? content : createPortal(content, document.body)
 }
 
 function DrawerHeader({ b, color, onClose, watched, inSlip, onToggleWatch, onToggleSlip }) {

@@ -2706,22 +2706,22 @@ button.th:hover {
   .grade-pill-n {
     font-size: 10px;
   }
-  /* Bottom sheet. Pin BOTH ends (top + bottom) rather than bottom:0 + auto
-     height: on iOS Safari a fixed element with only bottom:0 and height:auto
-     was floating up into the upper-middle, leaving the board visible beneath
-     it. Anchoring top AND bottom makes the sheet always span from near the top
-     down to the very bottom edge — it physically can't sit high — and the body
-     scrolls inside. A small top gap leaves the board peeking (dimmed) for
-     tap-to-dismiss. */
+  /* Bottom sheet. The drawer is portaled to <body> (PlayerDrawer) so fixed is
+     viewport-relative, and we anchor by TOP + an explicit dvh HEIGHT — never
+     bottom:0, which iOS Safari was ignoring (that's what left the board showing
+     beneath the sheet). A definite height from the top anchor always reaches
+     the bottom edge; the body scrolls inside. The 9% top gap leaves the board
+     peeking (dimmed) for tap-to-dismiss. */
   .drawer {
     top: 9vh;
     top: 9dvh;
     left: 0;
     right: 0;
-    bottom: 0;
+    bottom: auto;
+    height: 91vh;
+    height: 91dvh;
     width: 100%;
     max-width: 100%;
-    height: auto;
     max-height: none;
     border-left: none;
     border-top: 1px solid var(--border);
