@@ -936,8 +936,11 @@ button.th:hover {
   position: fixed;
   inset: 0;
   z-index: 40;
-  background: rgba(2, 4, 8, 0.62);
-  backdrop-filter: blur(3px);
+  /* Solid-ish overlay, NO backdrop-filter: on iOS Safari a blur backdrop lets
+     GPU-composited content behind it (the board's animated score rings) punch
+     through and paint on top regardless of z-index — part of what made the
+     board bleed through. A plain dark layer can't be composited around. */
+  background: rgba(2, 4, 8, 0.82);
   animation: fade 0.2s;
 }
 @keyframes fade {
