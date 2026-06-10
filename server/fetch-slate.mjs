@@ -410,7 +410,11 @@ async function fetchSchedule(date) {
         gamePk:        g.gamePk,
         gameDate:      g.gameDate,
         status:        g.status?.detailedState || g.status?.abstractGameState,
-        isLive:        g.status?.abstractGameState === 'Live',
+        // MLB tags "Warmup" with abstractGameState === 'Live' even though first
+        // pitch hasn't been thrown — so it isn't really started and its props
+        // are still bettable pregame. Exclude it so the board doesn't flash LIVE
+        // and the parlay builder doesn't drop the game before it actually starts.
+        isLive:        g.status?.abstractGameState === 'Live' && g.status?.detailedState !== 'Warmup',
         isFinal:       g.status?.abstractGameState === 'Final',
         awayTeam:      {
           id:   g.teams?.away?.team?.id,
