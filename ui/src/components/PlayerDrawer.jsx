@@ -72,6 +72,24 @@ function useCountUp(target, ms = 550) {
 export default function PlayerDrawer({ batter: b, onClose, watched, inSlip, onToggleWatch, onToggleSlip, onOpenZone, onOpenPitcher }) {
   const trapRef = useFocusTrap()
   const liveMode = useLiveMode()
+  // Lock the background page while the sheet is open. Without this the main
+  // window scroller still moves behind the sheet, scrolling the board into view
+  // beneath it. iOS-safe approach: pin <body> in place (position:fixed at the
+  // current offset) and restore the scroll position on close.
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+    const body = document.body
+    const scrollY = window.scrollY
+    const prev = { position: body.style.position, top: body.style.top, width: body.style.width, overflow: body.style.overflow }
+    body.style.position = 'fixed'
+    body.style.top = `-${scrollY}px`
+    body.style.width = '100%'
+    body.style.overflow = 'hidden'
+    return () => {
+      Object.assign(body.style, prev)
+      window.scrollTo(0, scrollY)
+    }
+  }, [])
   if (!b) return null
   const g = b.grade?.label || 'SKIP'
   const color = gradeColor(g)
