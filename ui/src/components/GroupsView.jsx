@@ -6,7 +6,7 @@ import { buildGroups, lastFirst, isoOf } from '../lib/groups.js'
 import { useLiveMode } from '../lib/liveMode.js'
 
 const GROUP_GRADE_COLOR = { S: '#f5a623', A: '#32d74b', B: '#3b82f6', C: '#9aa6b6', D: '#6b7787' }
-const SIZE_TABS = [2, 3, 4, 5, 6, 7, 8].map((k) => ({ k, label: `${k}-leg` }))
+const SIZE_TABS = [2, 3, 4].map((k) => ({ k, label: `${k}-leg` }))
 
 const STRAT_LABEL = { top: 'Top Picks', stack: 'Signal Stack', hot: 'Hot Hand', power: 'Power Bats', matchup: 'Soft Matchup', park: 'Park & Air' }
 
@@ -14,7 +14,9 @@ const STRAT_LABEL = { top: 'Top Picks', stack: 'Signal Stack', hot: 'Hot Hand', 
 // server-side off frozen pregame combos vs actual HRs (server/parlay-combos.mjs).
 function ScoreCard({ sc }) {
   if (!sc || !sc.days || !sc.overall?.combos) return null
-  const sizes = Object.entries(sc.bySize || {}).sort((a, b) => Number(a[0]) - Number(b[0]))
+  const sizes = Object.entries(sc.bySize || {})
+    .filter(([k]) => Number(k) <= 4)
+    .sort((a, b) => Number(a[0]) - Number(b[0]))
   const strat = Object.entries(sc.byStrategy || {})
     .filter(([, v]) => v.combos >= 3)
     .sort((a, b) => (b[1].hitRate ?? 0) - (a[1].hitRate ?? 0))[0]
