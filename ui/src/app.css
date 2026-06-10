@@ -5600,3 +5600,14 @@ button.th:hover {
   color: var(--text-dim);
   text-align: right;
 }
+
+/* ============ Mobile uniform type override ============
+   Per request: force every text element to 9.5px on mobile. This intentionally
+   flattens the type hierarchy (headline numbers, names, labels all equal).
+   Self-contained — delete this whole block to revert. */
+@media (max-width: 560px) {
+  .app,
+  .app * {
+    font-size: 9.5px !important;
+  }
+}
