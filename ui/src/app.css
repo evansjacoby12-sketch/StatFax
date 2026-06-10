@@ -959,6 +959,10 @@ button.th:hover {
   box-shadow: var(--shadow-lg);
   display: flex;
   flex-direction: column;
+  /* Clip the body to the sheet box so a long scroll area can never spill out
+     and overlap the board behind it — the mobile bottom-sheet bug. The body
+     itself owns the scroll (see .drawer-body min-height:0 + overflow-y). */
+  overflow: hidden;
   animation: slideIn 0.26s cubic-bezier(0.22, 1, 0.36, 1);
 }
 /* The batter drawer's own scrim sits above the modals so the modal dims behind
@@ -1019,8 +1023,13 @@ button.th:hover {
   margin-top: 11px;
 }
 .drawer-body {
-  flex: 1;
+  flex: 1 1 auto;
+  /* Without min-height:0 a flex child won't shrink below its content size, so
+     overflow-y:auto never engages and the content overflows the sheet (iOS
+     Safari especially). This is what let the board show through on mobile. */
+  min-height: 0;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   padding: 18px 22px 40px;
 }
 .drawer-section {
