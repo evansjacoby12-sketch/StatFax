@@ -69,7 +69,10 @@ const STRATEGIES = [
     label: 'Soft Matchup',
     icon: 'Target',
     desc: 'facing HR-prone pitchers',
-    rank: (b) => b.pitcher?.season?.hrPer9 ?? 0,
+    // Anchor on batter quality (model HR prob) × the matchup tilt, so a soft
+    // matchup lifts a good bat rather than ranking a weak bat on hrPer9 alone
+    // (grade is 2.29× HR lift in the audit; the matchup signal alone is weak).
+    rank: (b) => (b.hrProbability ?? 0) * (b.pitcher?.season?.hrPer9 ?? 0),
     require: (b) => (b.pitcher?.season?.hrPer9 ?? 0) >= 1.3,
   },
   {
@@ -77,7 +80,9 @@ const STRATEGIES = [
     label: 'Park & Air',
     icon: 'Wind',
     desc: 'park × weather boosts HR',
-    rank: (b) => b.parkWeatherHandFactor ?? 0,
+    // Anchor on batter quality (model HR prob) × the park/air tilt, same reason
+    // as matchup — a launch pad should lift a good bat, not rank a weak one.
+    rank: (b) => (b.hrProbability ?? 0) * (b.parkWeatherHandFactor ?? 0),
     require: (b) => (b.parkWeatherHandFactor ?? 1) >= 1.05,
   },
   {

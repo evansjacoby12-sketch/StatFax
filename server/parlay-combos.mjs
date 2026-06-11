@@ -37,10 +37,17 @@ const signalCount = (b) => Object.keys(STACK_SIGNALS).reduce((n, k) => n + (b[k]
 const STRATEGIES = [
   { key: 'top',     rank: (b) => b.score,          require: null },
   { key: 'stack',   rank: signalScore,             require: (b) => signalCount(b) >= 2 },
-  { key: 'hot',     rank: (b) => b.score,          require: (b) => b.hot },
+  // hot ranks on the recent-form multiplier (a true heat tilt) rather than the
+  // overall score — otherwise it just re-picks `top`'s legs, since hot bats
+  // already score high.
+  { key: 'hot',     rank: (b) => b.heat ?? 0,      require: (b) => b.hot },
   { key: 'power',   rank: (b) => b.barrel ?? 0,    require: (b) => Number.isFinite(b.barrel) && b.barrel >= 9 },
-  { key: 'matchup', rank: (b) => b.pitcherHr9 ?? 0, require: (b) => Number.isFinite(b.pitcherHr9) && b.pitcherHr9 >= 1.3 },
-  { key: 'park',    rank: (b) => b.park ?? 0,      require: (b) => Number.isFinite(b.park) && b.park >= 1.05 },
+  // matchup & park anchor on batter quality (score) × the environmental tilt, so
+  // a homer-prone matchup / launch pad lifts a GOOD bat instead of ranking a
+  // weak bat purely on the ~1.0–1.3× environmental signal. (Badge audit: grade
+  // is 2.29× HR lift; park/matchup-alone are far weaker and were discarding it.)
+  { key: 'matchup', rank: (b) => (b.score ?? 0) * (b.pitcherHr9 ?? 0), require: (b) => Number.isFinite(b.pitcherHr9) && b.pitcherHr9 >= 1.3 },
+  { key: 'park',    rank: (b) => (b.score ?? 0) * (b.park ?? 0),       require: (b) => Number.isFinite(b.park) && b.park >= 1.05 },
 ];
 
 /**
@@ -68,6 +75,8 @@ export function comboRowFromSnapshot(row) {
     barrel,
     park,
     pitcherHr9: Number.isFinite(row.pitcher?.season?.hrPer9) ? row.pitcher.season.hrPer9 : null,
+    // Recent-form multiplier — the heat tilt the `hot` strategy ranks on.
+    heat: Number.isFinite(row.hotnessMultiplier) ? row.hotnessMultiplier : null,
     // Boolean signals (static — not decayed) for the Signal Stack strategy.
     hot:           row.hot === true,
     homeEdge:      row.homeEdge === true,
