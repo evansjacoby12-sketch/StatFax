@@ -5534,6 +5534,9 @@ button.th:hover {
 .combo-sc-cap, .combo-sc-best { font-size: 11px; line-height: 1.4; }
 .combo-sc-rows { display: grid; gap: 6px; }
 .combo-sc-row { display: grid; grid-template-columns: 48px 1fr 38px 44px; align-items: center; gap: 8px; }
+.combo-sc-row.strat { grid-template-columns: 92px 1fr 38px 44px; }
+.combo-sc-row.strat .combo-sc-k { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.combo-sc-sec { font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; margin-top: 2px; }
 .combo-sc-k { font-size: 11px; font-weight: 700; color: var(--text-dim); }
 .combo-sc-bar { height: 7px; border-radius: 99px; background: var(--card-2); overflow: hidden; }
 .combo-sc-fill { display: block; height: 100%; border-radius: 99px; background: var(--good); }

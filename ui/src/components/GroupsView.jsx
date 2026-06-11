@@ -17,9 +17,9 @@ function ScoreCard({ sc }) {
   const sizes = Object.entries(sc.bySize || {})
     .filter(([k]) => Number(k) <= 4)
     .sort((a, b) => Number(a[0]) - Number(b[0]))
-  const strat = Object.entries(sc.byStrategy || {})
-    .filter(([, v]) => v.combos >= 3)
-    .sort((a, b) => (b[1].hitRate ?? 0) - (a[1].hitRate ?? 0))[0]
+  const strats = Object.entries(sc.byStrategy || {})
+    .filter(([, v]) => v.combos > 0)
+    .sort((a, b) => (b[1].hitRate ?? 0) - (a[1].hitRate ?? 0) || (b[1].legHitRate ?? 0) - (a[1].legHitRate ?? 0))
   const ov = sc.overall
   return (
     <details className="combo-sc">
@@ -49,12 +49,24 @@ function ScoreCard({ sc }) {
             </div>
           ))}
         </div>
-        {strat && (
-          <div className="combo-sc-best dim">
-            Best strategy: <b>{STRAT_LABEL[strat[0]] || strat[0]}</b> {pct(strat[1].hitRate, 0)} ({strat[1].allHit}/{strat[1].combos})
-            {' · '}per-leg hit {pct(ov.legHitRate, 0)}
-          </div>
+        {strats.length > 0 && (
+          <>
+            <div className="combo-sc-sec dim">By strategy</div>
+            <div className="combo-sc-rows">
+              {strats.map(([k, v]) => (
+                <div className="combo-sc-row strat" key={k}>
+                  <span className="combo-sc-k" title={`per-leg hit ${pct(v.legHitRate, 0)}`}>{STRAT_LABEL[k] || k}</span>
+                  <span className="combo-sc-bar">
+                    <span className="combo-sc-fill" style={{ width: `${Math.round((v.hitRate ?? 0) * 100)}%` }} />
+                  </span>
+                  <span className="combo-sc-v mono">{pct(v.hitRate, 0)}</span>
+                  <span className="combo-sc-n dim">{v.allHit}/{v.combos}</span>
+                </div>
+              ))}
+            </div>
+          </>
         )}
+        <div className="combo-sc-best dim">Per-leg hit rate {pct(ov.legHitRate, 0)} · combos cash when every leg homers.</div>
       </div>
     </details>
   )
