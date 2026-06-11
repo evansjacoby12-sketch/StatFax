@@ -32,15 +32,35 @@ const STACK_SIGNALS = { hot: 3, barrelKing: 2, homeEdge: 2, bullpenLegend: 2, aw
 const signalScore = (b) => Object.entries(STACK_SIGNALS).reduce((s, [k, w]) => s + (b[k] ? w : 0), 0);
 const signalCount = (b) => Object.keys(STACK_SIGNALS).reduce((n, k) => n + (b[k] ? 1 : 0), 0);
 
+// Heat index — mirrors ui/src/lib/scout.js heatBreakdown().total (kept in sync
+// by hand, like the strategy math). Used so the `hot` strategy can rank on a
+// blend of BOTH heat signals: heatIndex × the recent-form multiplier.
+const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
+const isoOf = (s) => (s ? Math.max(0, (s.slg ?? 0) - (s.avg ?? 0)) : null);
+function heatIndexOf(row) {
+  const HEAT_BASE = 45;
+  let sum = 0;
+  const sIso = isoOf(row.season), rIso = isoOf(row.recent);
+  if (sIso != null && rIso != null && (row.recent?.ab ?? 0) >= 12) sum += Math.round(clamp((rIso - sIso) * 250, -25, 30));
+  const seasonBarrel = Number.isFinite(row.barrelPctBBE) ? row.barrelPctBBE : row.barrelPct;
+  if (Number.isFinite(row.recentBarrel?.recentBarrelPct) && Number.isFinite(seasonBarrel) && (row.recentBarrel?.recentBBE ?? 0) >= 6) {
+    sum += Math.round(clamp((row.recentBarrel.recentBarrelPct - seasonBarrel) * 1.5, -15, 22));
+  }
+  if (row.hot) sum += 13;
+  if (row.cold) sum += -20;
+  if (row.hrStreak) sum += 10;
+  return Math.round(clamp(HEAT_BASE + sum, 0, 100));
+}
+
 // Strategy menu — the no-odds subset of the UI's strategies. Each ranks the
 // eligible pool by its own metric; `require` gates which bats qualify.
 const STRATEGIES = [
   { key: 'top',     rank: (b) => b.score,          require: null },
   { key: 'stack',   rank: signalScore,             require: (b) => signalCount(b) >= 2 },
-  // hot ranks on the recent-form multiplier (a true heat tilt) rather than the
-  // overall score — otherwise it just re-picks `top`'s legs, since hot bats
-  // already score high.
-  { key: 'hot',     rank: (b) => b.heat ?? 0,      require: (b) => b.hot },
+  // hot ranks on heatIndex × recent-form multiplier (a blend of both heat
+  // signals) rather than the overall score — otherwise it just re-picks `top`'s
+  // legs, since hot bats already score high.
+  { key: 'hot',     rank: (b) => (b.heat ?? 0) * (b.heatMult ?? 1), require: (b) => b.hot },
   { key: 'power',   rank: (b) => b.barrel ?? 0,    require: (b) => Number.isFinite(b.barrel) && b.barrel >= 9 },
   // matchup & park anchor on batter quality (score) × the environmental tilt, so
   // a homer-prone matchup / launch pad lifts a GOOD bat instead of ranking a
@@ -75,8 +95,9 @@ export function comboRowFromSnapshot(row) {
     barrel,
     park,
     pitcherHr9: Number.isFinite(row.pitcher?.season?.hrPer9) ? row.pitcher.season.hrPer9 : null,
-    // Recent-form multiplier — the heat tilt the `hot` strategy ranks on.
-    heat: Number.isFinite(row.hotnessMultiplier) ? row.hotnessMultiplier : null,
+    // Heat signals the `hot` strategy ranks on: heatIndex × recent-form multiplier.
+    heat: heatIndexOf(row),
+    heatMult: Number.isFinite(row.hotnessMultiplier) ? row.hotnessMultiplier : 1,
     // Boolean signals (static — not decayed) for the Signal Stack strategy.
     hot:           row.hot === true,
     homeEdge:      row.homeEdge === true,

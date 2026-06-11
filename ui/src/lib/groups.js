@@ -53,7 +53,9 @@ const STRATEGIES = [
     label: 'Hot Hand',
     icon: 'Flame',
     desc: 'hottest bats on the slate',
-    rank: (b) => b.heatIndex ?? 0,
+    // Blend both heat signals: heatIndex × recent-form multiplier (mirrors the
+    // server's hot strategy in parlay-combos.mjs).
+    rank: (b) => (b.heatIndex ?? 0) * (b.hotnessMultiplier ?? 1),
     require: (b) => b.hot === true || (b.heatIndex ?? 0) >= HOT_HEAT,
   },
   {
