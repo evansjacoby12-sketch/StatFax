@@ -47,6 +47,12 @@ const UI_V2 = (() => {
   }
 })()
 
+// Flag on <html> too, so v2 tokens + styles reach the player sheet, which
+// portals to document.body (outside .app).
+if (UI_V2 && typeof document !== 'undefined') {
+  document.documentElement.classList.add('ui-v2')
+}
+
 const AUTO_REFRESH_MS = 60_000
 const LIVE_REFRESH_MS = 30_000 // faster cadence while a game is actually live
 

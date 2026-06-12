@@ -7,7 +7,9 @@
    lands on top of this.
    ========================================================================== */
 
-.app.v2 {
+/* Tokens live on .ui-v2 (the <html> flag) so they also reach the player sheet,
+   which portals to <body> outside .app. */
+.ui-v2 {
   /* Refreshed surfaces — a touch more depth and contrast than legacy, warmer
      amber accent. Components read these vars, so the whole app reskins. */
   --card: #131a24;
@@ -216,3 +218,55 @@
   }
 }
 
+
+/* ---- Player sheet (portals to <body>, so scope on .ui-v2 not .app.v2) ---- */
+.ui-v2 .drawer {
+  background: var(--panel);
+}
+
+@media (max-width: 560px) {
+  .ui-v2 .drawer {
+    border-top: 1px solid var(--border);
+    border-radius: 22px 22px 0 0;
+  }
+  /* Clean grab pill at the top (the element is also a tap-to-close button). */
+  .ui-v2 .drawer-grab {
+    width: 40px;
+    height: 5px;
+    min-height: 5px;
+    margin: 9px auto 2px;
+    padding: 0;
+    border: none;
+    border-radius: 99px;
+    background: var(--border);
+  }
+  .ui-v2 .drawer-head {
+    padding: 12px 18px 14px;
+  }
+  .ui-v2 .drawer-name-row h2 {
+    font-size: 22px;
+    letter-spacing: -0.02em;
+  }
+  /* Full-width modern CTAs: primary filled, Watch outlined. */
+  .ui-v2 .drawer-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 9px;
+    margin-top: 14px;
+  }
+  .ui-v2 .d-act {
+    height: 44px;
+    flex: 1;
+    justify-content: center;
+    border-radius: 12px;
+    font-size: 14px;
+  }
+  .ui-v2 .d-act.ghost {
+    background: var(--card-2);
+    border-color: var(--border);
+    color: var(--text);
+  }
+  .ui-v2 .drawer-section {
+    margin-bottom: 16px;
+  }
+}
