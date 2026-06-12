@@ -12,26 +12,27 @@
 
 /* ---------- Design tokens ---------- */
 .ui-v2 {
-  /* Surfaces — deep, cool slate with clear elevation steps */
-  --bg: #0a0e13;
-  --panel: #0e131a;
-  --card: #141a23;
-  --card-2: #1b2330;
-  --hover: #1f2937;
-  --border: #232d3b;
-  --border-soft: #18202b;
+  /* Surfaces — SharpEdge navy with clear elevation steps */
+  --bg: #0b1020;
+  --panel: #111827;
+  --card: #1f2937;
+  --card-2: #243244;
+  --hover: #2a3a4f;
+  --border: rgba(255, 255, 255, 0.08);
+  --border-soft: rgba(255, 255, 255, 0.05);
 
   /* Text */
-  --text: #eef2f7;
-  --text-dim: #98a4b4;
-  --text-faint: #5e6a79;
+  --text: #f5f7fa;
+  --text-dim: #9ca3af;
+  --text-faint: #6b7686;
 
-  /* Brand + semantic */
-  --accent: #f5b13d;
-  --accent-ink: #2a1c05;
-  --good: #34d27b;
-  --bad: #ff5d6c;
-  --blue: #4b9bff;
+  /* Accents — blue interactive, green positive, blue→purple hero gradient */
+  --accent: #60a5fa;
+  --accent-ink: #06121f;
+  --good: #22c55e;
+  --bad: #ef4444;
+  --blue: #60a5fa;
+  --grad: linear-gradient(135deg, #2563eb, #7c3aed);
 
   /* Type scale */
   --t-xs: 11px;
@@ -50,10 +51,10 @@
   --s5: 22px;
   --s6: 32px;
 
-  /* Radii + elevation */
-  --r-sm: 9px;
-  --r: 13px;
-  --r-lg: 17px;
+  /* Radii + elevation — rounder, softer (SharpEdge cards) */
+  --r-sm: 10px;
+  --r: 14px;
+  --r-lg: 18px;
   --r-xl: 22px;
   --shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
 
@@ -132,16 +133,15 @@
     column-gap: 9px;
     row-gap: 5px;
     align-items: center;
-    padding: var(--s2) 11px;
-    margin: 0 0 6px;
+    padding: var(--s3) 13px;
+    margin: 0 0 10px;
     background: var(--card);
     border: 1px solid var(--border);
-    border-left: 3px solid var(--row-accent);
-    border-radius: var(--r);
+    border-radius: var(--r-lg);
   }
   .app.v2 .board-row.selected {
-    border-color: var(--row-accent);
-    background: color-mix(in srgb, var(--row-accent) 9%, var(--card));
+    border-color: color-mix(in srgb, var(--row-accent) 60%, var(--border));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--row-accent) 40%, transparent);
   }
   .app.v2 .board-row.final { opacity: 0.62; }
 
@@ -239,4 +239,63 @@
   .app.v2 .main { padding-bottom: calc(var(--nav-total) + var(--s4)); }
   .app.v2 .slip { bottom: calc(var(--nav-total) + var(--s3)); }
   .app.v2 .back-to-top { bottom: calc(var(--nav-total) + var(--s3)); }
+}
+
+/* ---------- SharpEdge identity layer ---------- */
+
+/* Pick of the Day → gradient hero signal card */
+.app.v2 .potd {
+  background: var(--grad);
+  border: none;
+  border-radius: var(--r-xl);
+  color: #fff;
+  box-shadow: 0 10px 34px rgba(124, 58, 237, 0.28);
+}
+.app.v2 .potd::after { display: none; }
+.app.v2 .potd .potd-kicker,
+.app.v2 .potd .potd-name,
+.app.v2 .potd .potd-matchup,
+.app.v2 .potd .potd-prob,
+.app.v2 .potd .potd-meta,
+.app.v2 .potd .team-tag,
+.app.v2 .potd .opp-tag { color: #fff; }
+.app.v2 .potd .dim,
+.app.v2 .potd .potd-prob-cap,
+.app.v2 .potd .phand,
+.app.v2 .potd .dot-sep { color: rgba(255, 255, 255, 0.78); }
+/* Checks + setup read as light chips on the gradient */
+.app.v2 .potd .potd-checks > * {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.22);
+  color: #fff;
+  border-radius: 999px;
+}
+.app.v2 .potd .pitch-link { color: #fff; text-decoration-color: rgba(255, 255, 255, 0.6); }
+.app.v2 .potd-actions .d-act.ghost {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.25);
+  color: #fff;
+}
+.app.v2 .potd-actions .d-act:not(.ghost) {
+  background: #fff;
+  border-color: #fff;
+  color: #1a1f2e;
+}
+
+/* Signals → rounded pill metrics (SharpEdge .metric look) */
+.app.v2 .badge {
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 10.5px;
+  font-weight: 600;
+  background: color-mix(in srgb, var(--panel) 70%, transparent);
+}
+
+/* Interactive links pick up the blue accent */
+.app.v2 .section-title a,
+.app.v2 .pitch-link { color: var(--accent); }
+
+/* Search: rounded SharpEdge field */
+@media (max-width: 560px) {
+  .app.v2 .search { background: var(--panel); }
 }
