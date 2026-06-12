@@ -819,6 +819,33 @@
         "rfGap": 370,
         "rfLine": 335
       }
+    },
+    {
+      "team": "LV",
+      "name": "Las Vegas Ballpark",
+      "lat": 36.161,
+      "lon": -115.3275,
+      "bearing": 45,
+      "elevationFt": 2030,
+      "type": "Open",
+      "parkFactor": 1.28,
+      "parkFactorL": 1.27,
+      "parkFactorR": 1.29,
+      "homePlateLatLon": [
+        36.161,
+        -115.3275
+      ],
+      "centerFieldLatLon": [
+        36.16175,
+        -115.32675
+      ],
+      "fences": {
+        "lfLine": 339,
+        "lfGap": 374,
+        "cf": 405,
+        "rfGap": 374,
+        "rfLine": 339
+      }
     }
   ]
 }
