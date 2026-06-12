@@ -99,3 +99,118 @@
      bottom-anchored body padding already clears the home indicator; the nav
      sits above the scrim's z-index region only when a sheet is closed. */
 }
+
+/* ---- Board → stack of cards on phones ----
+   Reflow the existing .board-row grid (rank / batter / grade / prob / xhr /
+   heat / signals / actions) into a card with real hierarchy. No markup change:
+   each cell is reassigned a grid-area. */
+@media (max-width: 560px) {
+  .app.v2 .board-head {
+    display: none;
+  }
+
+  .app.v2 .board-row {
+    display: grid;
+    grid-template-columns: 15px minmax(0, 1fr) auto;
+    grid-template-areas:
+      'rank batter grade'
+      'rank batter prob'
+      'sig  sig    act'
+      'heat heat   act';
+    column-gap: 11px;
+    row-gap: 8px;
+    align-items: center;
+    padding: 13px 14px;
+    margin: 0 0 9px 0;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--row-accent);
+    border-radius: 15px;
+  }
+  .app.v2 .board-row.selected {
+    border-color: var(--row-accent);
+    background: color-mix(in srgb, var(--row-accent) 9%, var(--card));
+  }
+  .app.v2 .board-row.final {
+    opacity: 0.66;
+  }
+
+  .app.v2 .col-rank {
+    grid-area: rank;
+    align-self: start;
+    padding-top: 3px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-faint);
+  }
+  .app.v2 .col-batter {
+    grid-area: batter;
+    min-width: 0;
+  }
+  .app.v2 .col-grade {
+    grid-area: grade;
+    justify-self: end;
+    align-self: start;
+  }
+  .app.v2 .col-prob {
+    grid-area: prob;
+    justify-self: end;
+    align-self: center;
+  }
+  .app.v2 .col-signals {
+    grid-area: sig;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+  .app.v2 .col-rating {
+    grid-area: heat;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .app.v2 .col-rating .rating-meter {
+    flex: 1;
+    height: 5px;
+  }
+  .app.v2 .col-rating .rating-num {
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+  .app.v2 .col-actions {
+    grid-area: act;
+    justify-self: end;
+    align-self: center;
+    display: flex;
+    gap: 7px;
+  }
+  .app.v2 .col-actions .row-chev {
+    display: none;
+  }
+  .app.v2 .col-actions .act-btn {
+    width: 36px;
+    height: 36px;
+  }
+  .app.v2 .col-xhr {
+    display: none; /* secondary stat — lives in the player sheet */
+  }
+
+  /* Real type hierarchy in the batter block */
+  .app.v2 .batter-name {
+    font-size: 15.5px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+  .app.v2 .batter-line1 {
+    gap: 6px;
+  }
+  .app.v2 .batter-line2 {
+    font-size: 12px;
+    margin-top: 3px;
+  }
+  .app.v2 .batter-reason {
+    font-size: 11px;
+    margin-top: 3px;
+  }
+}
+
