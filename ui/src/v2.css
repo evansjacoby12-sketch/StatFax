@@ -309,3 +309,42 @@
     height: 32px;
   }
 }
+
+/* ---- Filters → cleaner search + even grade pills on phones ---- */
+@media (max-width: 560px) {
+  .app.v2 .filters {
+    padding: 10px 12px;
+  }
+  .app.v2 .filters-row {
+    gap: 8px;
+  }
+  /* Search takes its own full-width line, softer rounded field. */
+  .app.v2 .search {
+    flex: 1 1 100%;
+    min-width: 0;
+    height: 40px;
+    border-radius: 12px;
+    background: var(--card-2);
+  }
+  /* Grade pills fill the next line evenly. */
+  .app.v2 .grade-pills {
+    flex: 1 1 100%;
+    gap: 6px;
+  }
+  .app.v2 .grade-pill {
+    flex: 1 1 0;
+    min-width: 0;
+    justify-content: center;
+    height: 34px;
+    padding: 0 6px;
+    border-radius: 10px;
+  }
+  .app.v2 .grade-pill.on {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 12%, var(--card));
+    color: var(--text);
+  }
+  .app.v2 .filters-spacer {
+    display: none;
+  }
+}
