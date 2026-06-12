@@ -56,12 +56,13 @@ function heatIndexOf(row) {
 // eligible pool by its own metric; `require` gates which bats qualify.
 // Best Mix — a cross-metric blend so a great-overall bat and an elite-barrel
 // bat can land in the SAME combo (the single-metric strategies silo them).
-// Weights: grade/score 0.5, barrel 0.3, heat 0.2 — score leads (it's the
-// dominant HR signal) but power/heat get real pull. Mirrors ui/groups.js.
+// Weights: grade/score 0.5, barrel 0.25, heat 0.25 — score leads (grade is the
+// dominant HR signal, PRIME 2.29x in the audit); barrel (1.68x) and heat
+// (1.75x) are ~tied secondary signals, so they split the rest. Mirrors ui/groups.js.
 const mixRank = (b) =>
   0.5 * ((b.score ?? 0) / 100) +
-  0.3 * clamp((b.barrel ?? 0) / 25, 0, 1) +
-  0.2 * ((b.heat ?? 0) / 100);
+  0.25 * clamp((b.barrel ?? 0) / 25, 0, 1) +
+  0.25 * ((b.heat ?? 0) / 100);
 
 const STRATEGIES = [
   { key: 'top',     rank: (b) => b.score,          require: null },

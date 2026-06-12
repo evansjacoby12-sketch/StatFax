@@ -39,11 +39,11 @@ const STRATEGIES = [
     desc: 'best blend of grade, power & heat',
     // Cross-metric blend so a great-overall bat and an elite-barrel bat can pair
     // in one combo (single-metric strategies silo them). Mirrors the server's
-    // mixRank: score 0.5, barrel 0.3, heat 0.2.
+    // mixRank: score 0.5, barrel 0.25, heat 0.25 (barrel & heat ~tied in the audit).
     rank: (b) =>
       0.5 * ((b.score ?? 0) / 100) +
-      0.3 * Math.min(1, Math.max(0, (barrelOf(b) ?? 0) / 25)) +
-      0.2 * ((b.heatIndex ?? 0) / 100),
+      0.25 * Math.min(1, Math.max(0, (barrelOf(b) ?? 0) / 25)) +
+      0.25 * ((b.heatIndex ?? 0) / 100),
   },
   {
     key: 'stack',
