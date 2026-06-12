@@ -8,7 +8,7 @@ import { useLiveMode } from '../lib/liveMode.js'
 const GROUP_GRADE_COLOR = { S: '#f5a623', A: '#32d74b', B: '#3b82f6', C: '#9aa6b6', D: '#6b7787' }
 const SIZE_TABS = [2, 3, 4].map((k) => ({ k, label: `${k}-leg` }))
 
-const STRAT_LABEL = { top: 'Top Picks', stack: 'Signal Stack', hot: 'Hot Hand', power: 'Power Bats', matchup: 'Soft Matchup', park: 'Park & Air' }
+const STRAT_LABEL = { top: 'Top Picks', mix: 'Best Mix', stack: 'Signal Stack', hot: 'Hot Hand', power: 'Power Bats', matchup: 'Soft Matchup', park: 'Park & Air' }
 
 // Rolling combo scorecard — the real "have our combos hit?" record, graded
 // server-side off frozen pregame combos vs actual HRs (server/parlay-combos.mjs).

@@ -54,8 +54,18 @@ function heatIndexOf(row) {
 
 // Strategy menu — the no-odds subset of the UI's strategies. Each ranks the
 // eligible pool by its own metric; `require` gates which bats qualify.
+// Best Mix — a cross-metric blend so a great-overall bat and an elite-barrel
+// bat can land in the SAME combo (the single-metric strategies silo them).
+// Weights: grade/score 0.5, barrel 0.3, heat 0.2 — score leads (it's the
+// dominant HR signal) but power/heat get real pull. Mirrors ui/groups.js.
+const mixRank = (b) =>
+  0.5 * ((b.score ?? 0) / 100) +
+  0.3 * clamp((b.barrel ?? 0) / 25, 0, 1) +
+  0.2 * ((b.heat ?? 0) / 100);
+
 const STRATEGIES = [
   { key: 'top',     rank: (b) => b.score,          require: null },
+  { key: 'mix',     rank: mixRank,                 require: null },
   { key: 'stack',   rank: signalScore,             require: (b) => signalCount(b) >= 2 },
   // hot ranks on heatIndex × recent-form multiplier (a blend of both heat
   // signals) rather than the overall score — otherwise it just re-picks `top`'s
