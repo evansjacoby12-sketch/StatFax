@@ -21,10 +21,11 @@
   --text-dim: #9fadbf;
   --accent: #ffb43d;
 
-  --v2nav-h: 52px;
-  /* Trim the safe-area reserve — in Safari (vs an installed PWA) the full inset
-     over-reserves and leaves a gap below the labels. Keep a little clearance. */
-  --v2nav-safe: max(calc(env(safe-area-inset-bottom, 0px) - 10px), 0px);
+  --v2nav-h: 50px;
+  /* Cap the home-indicator reserve small — in a Safari tab there's no indicator
+     over our bar, so a big reserve just reads as empty space. A PWA install
+     still gets a little clearance. */
+  --v2nav-safe: min(env(safe-area-inset-bottom, 0px), 6px);
   --v2nav-total: calc(var(--v2nav-h) + var(--v2nav-safe));
 }
 
@@ -44,7 +45,7 @@
     z-index: 60;
     height: var(--v2nav-total);
     padding-bottom: var(--v2nav-safe);
-    background: color-mix(in srgb, var(--panel) 86%, transparent);
+    background: color-mix(in srgb, var(--panel) 97%, transparent);
     -webkit-backdrop-filter: saturate(160%) blur(18px);
     backdrop-filter: saturate(160%) blur(18px);
     border-top: 1px solid var(--border);
