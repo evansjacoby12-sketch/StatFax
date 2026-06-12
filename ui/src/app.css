@@ -5537,6 +5537,19 @@ button.th:hover {
 .combo-sc-row.strat { grid-template-columns: 92px 1fr 38px 44px; }
 .combo-sc-row.strat .combo-sc-k { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .combo-sc-sec { font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; margin-top: 2px; }
+.combo-sc-ba {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 9px;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--good) 9%, transparent);
+  border: 1px solid color-mix(in srgb, var(--good) 22%, transparent);
+  font-size: 11.5px;
+}
+.combo-sc-ba > svg { color: var(--good); flex: none; }
+.combo-sc-ba-txt b { color: var(--good); }
+.combo-sc-ba-days { margin-left: auto; white-space: nowrap; }
 .combo-sc-k { font-size: 11px; font-weight: 700; color: var(--text-dim); }
 .combo-sc-bar { height: 7px; border-radius: 99px; background: var(--card-2); overflow: hidden; }
 .combo-sc-fill { display: block; height: 100%; border-radius: 99px; background: var(--good); }

@@ -159,6 +159,26 @@ export function buildComboRecords(rows) {
 }
 
 /**
+ * Best all-hit parlay that WAS available from the recommended pool — the most
+ * legs you could have gone perfect on (one PRIME/STRONG bat per game that
+ * homered). Separates grading quality from combo construction: if this is 2+ on
+ * a day the canonical combos went 0-fer, the grades were right and it was combo
+ * variance, not a model miss.
+ */
+export function bestAvailableCombo(rows, homerers, tiers = ['PRIME', 'STRONG']) {
+  const byGame = new Map();
+  for (const b of rows) {
+    if (!b || b.gamePk == null) continue;
+    if (!tiers.includes(b.grade)) continue;
+    if (!homerers.has(Number(b.playerId))) continue;
+    const cur = byGame.get(b.gamePk);
+    if (!cur || (b.score ?? 0) > (cur.score ?? 0)) byGame.set(b.gamePk, b);
+  }
+  const legs = [...byGame.values()].sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+  return { n: legs.length, legs: legs.map((l) => ({ playerId: l.playerId, name: l.name, grade: l.grade })) };
+}
+
+/**
  * Grade combos against a Set<number> of playerIds who homered. Adds nHit (legs
  * that homered) and allHit (the parlay cashed).
  */
@@ -175,13 +195,17 @@ export function gradeCombos(combos, homerers) {
  * free. Idempotent per date; trims to the backtest log's own rolling date window
  * so combos and reconciled records expire together.
  */
-export function appendComboDay(log, date, gradedCombos) {
+export function appendComboDay(log, date, gradedCombos, bestAvailable) {
   const combos = log?.combos && typeof log.combos === 'object' ? { ...log.combos } : {};
   const byDate = { ...(combos.byDate || {}) };
   if (!byDate[date]) byDate[date] = gradedCombos;
+  const bestByDate = { ...(combos.bestByDate || {}) };
+  if (bestAvailable && !bestByDate[date]) bestByDate[date] = bestAvailable;
   const keep = new Set(log?.dates?.length ? log.dates : Object.keys(byDate));
   for (const d of Object.keys(byDate)) if (!keep.has(d)) delete byDate[d];
+  for (const d of Object.keys(bestByDate)) if (!keep.has(d)) delete bestByDate[d];
   combos.byDate = byDate;
+  combos.bestByDate = bestByDate;
   return { ...log, combos };
 }
 
@@ -210,11 +234,25 @@ export function comboScorecard(log) {
     hitRate: x.combos ? x.allHit / x.combos : null,
     legHitRate: x.legs ? x.legHits / x.legs : null,
   });
+  // Best-available diagnostic: the perfect parlay that WAS sittable each day,
+  // and how often a winning combo (2+ legs) existed at all — a read on grading
+  // quality independent of which combos the strategies actually built.
+  const bestByDate = log?.combos?.bestByDate || {};
+  const bestDates = Object.keys(bestByDate).sort();
+  const latestDate = bestDates[bestDates.length - 1] || null;
+  const bestAvailable = latestDate
+    ? {
+        latest: { date: latestDate, ...bestByDate[latestDate] },
+        daysAvailable: bestDates.filter((d) => (bestByDate[d]?.n ?? 0) >= 2).length,
+        days: bestDates.length,
+      }
+    : null;
   return {
     days: dates.length,
     overall: finalize(overall),
     byStrategy: Object.fromEntries(Object.entries(byStrategy).map(([k, v]) => [k, finalize(v)])),
     bySize: Object.fromEntries(Object.entries(bySize).map(([k, v]) => [k, finalize(v)])),
+    bestAvailable,
     updatedAt: new Date().toISOString(),
   };
 }

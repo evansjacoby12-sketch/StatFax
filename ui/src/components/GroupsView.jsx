@@ -21,6 +21,7 @@ function ScoreCard({ sc }) {
     .filter(([, v]) => v.combos > 0)
     .sort((a, b) => (b[1].hitRate ?? 0) - (a[1].hitRate ?? 0) || (b[1].legHitRate ?? 0) - (a[1].legHitRate ?? 0))
   const ov = sc.overall
+  const ba = sc.bestAvailable
   return (
     <details className="combo-sc">
       <summary className="combo-sc-sum">
@@ -37,6 +38,25 @@ function ScoreCard({ sc }) {
         <div className="combo-sc-cap dim">
           Canonical pregame combos (one per strategy &amp; size), graded against actual home runs.
         </div>
+        {ba?.latest && (
+          <div className="combo-sc-ba" title="The perfect parlay that was sittable from the PRIME/STRONG pool — one bat per game that homered. Gauges grading quality apart from which combos the strategies built.">
+            <Icon name="Sparkles" size={12} />
+            <span className="combo-sc-ba-txt">
+              Best available {ba.latest.date.slice(5)}:{' '}
+              {ba.latest.n >= 2 ? (
+                <>
+                  <b className="mono">{ba.latest.n}/{ba.latest.n}</b>
+                  {ba.latest.legs?.length > 0 && (
+                    <span className="dim"> · {ba.latest.legs.slice(0, 5).map((l) => lastFirst(l.name).split(',')[0]).join(' + ')}</span>
+                  )}
+                </>
+              ) : (
+                <span className="dim">no 2+ combo was sittable</span>
+              )}
+            </span>
+            <span className="combo-sc-ba-days dim">won {ba.daysAvailable}/{ba.days}d</span>
+          </div>
+        )}
         <div className="combo-sc-rows">
           {sizes.map(([k, v]) => (
             <div className="combo-sc-row" key={k}>

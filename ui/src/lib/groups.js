@@ -54,14 +54,6 @@ const STRATEGIES = [
     require: (b) => signalCount(b) >= 2, // a real stack, not a lone badge
   },
   {
-    key: 'value',
-    label: 'Best Value',
-    icon: 'Percent',
-    desc: 'biggest edge vs the market',
-    rank: (b) => b.edge ?? -Infinity,
-    require: (b) => Number.isFinite(b.edge) && b.edge > 0,
-  },
-  {
     key: 'hot',
     label: 'Hot Hand',
     icon: 'Flame',
@@ -99,14 +91,6 @@ const STRATEGIES = [
     // as matchup — a launch pad should lift a good bat, not rank a weak one.
     rank: (b) => (b.hrProbability ?? 0) * (b.parkWeatherHandFactor ?? 0),
     require: (b) => (b.parkWeatherHandFactor ?? 1) >= 1.05,
-  },
-  {
-    key: 'longshot',
-    label: 'Long Shots',
-    icon: 'Zap',
-    desc: 'longest odds, biggest payout',
-    rank: (b) => b.odds?.best?.decimal ?? 0,
-    require: (b) => (b.odds?.best?.decimal ?? 0) >= 4, // ~+300 or longer
   },
 ]
 

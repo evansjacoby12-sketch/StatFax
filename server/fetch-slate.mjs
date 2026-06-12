@@ -240,6 +240,7 @@ import {
   comboRowFromSnapshot,
   buildComboRecords,
   gradeCombos,
+  bestAvailableCombo,
   appendComboDay,
   comboScorecard,
 } from './parlay-combos.mjs';
@@ -1718,9 +1719,10 @@ async function main() {
   try {
     if (comboRows.length && yesterdayOutcomes?.allFinal && !backtestLog?.combos?.byDate?.[yesterdayCT]) {
       const graded = gradeCombos(buildComboRecords(comboRows), yesterdayOutcomes.homerers);
-      backtestLog = appendComboDay(backtestLog, yesterdayCT, graded);
+      const best = bestAvailableCombo(comboRows, yesterdayOutcomes.homerers);
+      backtestLog = appendComboDay(backtestLog, yesterdayCT, graded, best);
       const hit = graded.filter((c) => c.allHit).length;
-      console.log(`[combo] graded ${graded.length} pregame combos for ${yesterdayCT} — ${hit} cashed`);
+      console.log(`[combo] graded ${graded.length} pregame combos for ${yesterdayCT} — ${hit} cashed · best available ${best.n}/${best.n}`);
     }
   } catch (e) {
     console.warn(`[combo] scorecard skipped: ${e?.message}`);
