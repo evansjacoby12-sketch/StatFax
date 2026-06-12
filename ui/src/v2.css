@@ -21,8 +21,11 @@
   --text-dim: #9fadbf;
   --accent: #ffb43d;
 
-  --v2nav-h: 56px;
-  --v2nav-total: calc(var(--v2nav-h) + env(safe-area-inset-bottom, 0px));
+  --v2nav-h: 52px;
+  /* Trim the safe-area reserve — in Safari (vs an installed PWA) the full inset
+     over-reserves and leaves a gap below the labels. Keep a little clearance. */
+  --v2nav-safe: max(calc(env(safe-area-inset-bottom, 0px) - 10px), 0px);
+  --v2nav-total: calc(var(--v2nav-h) + var(--v2nav-safe));
 }
 
 /* ---- Bottom tab bar (mobile primary nav) ---- */
@@ -40,7 +43,7 @@
     bottom: 0;
     z-index: 60;
     height: var(--v2nav-total);
-    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-bottom: var(--v2nav-safe);
     background: color-mix(in srgb, var(--panel) 86%, transparent);
     -webkit-backdrop-filter: saturate(160%) blur(18px);
     backdrop-filter: saturate(160%) blur(18px);
