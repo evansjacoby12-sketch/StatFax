@@ -26,32 +26,8 @@ import BackToTop from './components/BackToTop.jsx'
 import PullToRefresh from './components/PullToRefresh.jsx'
 import PickOfDay from './components/PickOfDay.jsx'
 import UpdateBanner from './components/UpdateBanner.jsx'
-import BottomNav from './components/BottomNav.jsx'
 import Icon from './components/Icon.jsx'
 import './app.css'
-import './v2.css'
-
-// Opt-in v2 redesign preview. Enable with ?v2=1 (persists), disable with ?v2=0.
-// Production default is unchanged until v2 is promoted.
-const UI_V2 = (() => {
-  try {
-    const p = new URLSearchParams(location.search)
-    if (p.has('v2')) {
-      const on = p.get('v2') !== '0'
-      localStorage.setItem('uiV2', on ? '1' : '0')
-      return on
-    }
-    return localStorage.getItem('uiV2') === '1'
-  } catch {
-    return false
-  }
-})()
-
-// Flag on <html> too, so v2 tokens + styles reach the player sheet, which
-// portals to document.body (outside .app).
-if (UI_V2 && typeof document !== 'undefined') {
-  document.documentElement.classList.add('ui-v2')
-}
 
 const AUTO_REFRESH_MS = 60_000
 const LIVE_REFRESH_MS = 30_000 // faster cadence while a game is actually live
@@ -375,7 +351,7 @@ export default function App() {
 
   return (
     <LiveModeContext.Provider value={liveScores}>
-    <div className={`app${UI_V2 ? ' v2' : ''}`}>
+    <div className="app">
       <div className="topbar" ref={topbarRef}>
         <Header
           meta={data.meta}
@@ -608,7 +584,6 @@ export default function App() {
       <BackToTop />
       <PullToRefresh onRefresh={load} />
       <UpdateBanner />
-      {UI_V2 && <BottomNav view={view} onView={setView} />}
     </div>
     </LiveModeContext.Provider>
   )

@@ -5625,11 +5625,10 @@ button.th:hover {
 }
 
 /* ============ Mobile uniform type override ============
-   Force every text element to 9.5px on mobile — the legacy "flat" look. Scoped
-   to :not(.v2) so the new v2 design restores a real type hierarchy. */
+   Force every text element to 9.5px on mobile. */
 @media (max-width: 560px) {
-  .app:not(.v2),
-  .app:not(.v2) * {
+  .app,
+  .app * {
     font-size: 9.5px !important;
   }
 }
