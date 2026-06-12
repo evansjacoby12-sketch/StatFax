@@ -299,3 +299,34 @@
 @media (max-width: 560px) {
   .app.v2 .search { background: var(--panel); }
 }
+
+/* ---------- Games + Groups: SharpEdge cards ---------- */
+.app.v2 .game-card {
+  border-radius: var(--r-lg);
+  border-color: var(--border);
+  background: var(--card);
+}
+/* Featured game-of-day: clean card with a subtle blue edge (legacy used amber) */
+.app.v2 .god-card {
+  border-radius: var(--r-lg);
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 8%, var(--card)), var(--card) 60%);
+}
+.app.v2 .god-fac {
+  background: color-mix(in srgb, var(--panel) 70%, transparent);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 11px;
+}
+
+/* Combo group cards */
+.app.v2 .grp-card {
+  border-radius: var(--r-lg);
+  border-color: var(--border);
+}
+.app.v2 .grp-legbadge {
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+.app.v2 .combo-sc { border-radius: var(--r-lg); }
