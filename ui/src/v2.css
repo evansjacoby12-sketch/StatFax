@@ -86,6 +86,17 @@
     line-height: 1;
   }
 
+  /* iOS: bottom:0 pins to the static viewport, so with Safari's toolbar
+     collapsed the bar floats above the true bottom. Anchor by dvh (tracks the
+     dynamic viewport) so it hugs the actual visible bottom. bottom:0 stays as
+     the fallback for engines without dvh. */
+  @supports (height: 100dvh) {
+    .ui-v2 .v2nav {
+      bottom: auto;
+      top: calc(100dvh - var(--v2nav-total));
+    }
+  }
+
   /* The bottom bar replaces the cramped top view pills on mobile. */
   .app.v2 .view-toggle {
     display: none !important;
