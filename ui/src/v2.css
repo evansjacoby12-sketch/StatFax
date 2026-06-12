@@ -1,0 +1,101 @@
+/* =============================================================================
+   v2 — mobile-first redesign preview layer.
+   Everything here is scoped under .app.v2, so production (.app without .v2) is
+   completely untouched. Enable with ?v2=1. This is iteration 1: a modern
+   bottom-tab shell, restored type hierarchy (the flat 9.5px is disabled for
+   v2 in app.css), and a refreshed surface palette. Deeper per-screen work
+   lands on top of this.
+   ========================================================================== */
+
+.app.v2 {
+  /* Refreshed surfaces — a touch more depth and contrast than legacy, warmer
+     amber accent. Components read these vars, so the whole app reskins. */
+  --card: #131a24;
+  --card-2: #1a2230;
+  --hover: #1d2634;
+  --border: #232d3c;
+  --border-soft: #161d27;
+  --text: #f2f6fb;
+  --text-dim: #9fadbf;
+  --accent: #ffb43d;
+
+  --v2nav-h: 56px;
+  --v2nav-total: calc(var(--v2nav-h) + env(safe-area-inset-bottom, 0px));
+}
+
+/* ---- Bottom tab bar (mobile primary nav) ---- */
+.v2nav {
+  display: none;
+}
+
+@media (max-width: 820px) {
+  .app.v2 .v2nav {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 60;
+    height: var(--v2nav-total);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    background: color-mix(in srgb, var(--panel) 86%, transparent);
+    -webkit-backdrop-filter: saturate(160%) blur(18px);
+    backdrop-filter: saturate(160%) blur(18px);
+    border-top: 1px solid var(--border);
+  }
+  .app.v2 .v2nav-tab {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    background: none;
+    border: none;
+    color: var(--text-faint);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    cursor: pointer;
+    position: relative;
+    transition: color 0.15s ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .app.v2 .v2nav-tab:active {
+    transform: scale(0.94);
+  }
+  .app.v2 .v2nav-tab.on {
+    color: var(--accent);
+  }
+  .app.v2 .v2nav-tab.on::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    width: 28px;
+    height: 3px;
+    border-radius: 0 0 3px 3px;
+    background: var(--accent);
+  }
+  .app.v2 .v2nav-lbl {
+    line-height: 1;
+  }
+
+  /* The bottom bar replaces the cramped top view pills on mobile. */
+  .app.v2 .view-toggle {
+    display: none !important;
+  }
+
+  /* Keep fixed/overlay UI clear of the nav. */
+  .app.v2 .main {
+    padding-bottom: calc(var(--v2nav-total) + 16px);
+  }
+  .app.v2 .slip {
+    bottom: calc(var(--v2nav-total) + 14px);
+  }
+  .app.v2 .back-to-top {
+    bottom: calc(var(--v2nav-total) + 14px);
+  }
+  /* The player sheet portals to <body>, so it isn't under .app — but its own
+     bottom-anchored body padding already clears the home indicator; the nav
+     sits above the scrim's z-index region only when a sheet is closed. */
+}
