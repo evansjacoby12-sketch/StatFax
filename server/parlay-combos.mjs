@@ -174,8 +174,13 @@ export function bestAvailableCombo(rows, homerers, tiers = ['PRIME', 'STRONG']) 
     const cur = byGame.get(b.gamePk);
     if (!cur || (b.score ?? 0) > (cur.score ?? 0)) byGame.set(b.gamePk, b);
   }
-  const legs = [...byGame.values()].sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
-  return { n: legs.length, legs: legs.map((l) => ({ playerId: l.playerId, name: l.name, grade: l.grade })) };
+  const all = [...byGame.values()].sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+  // Cap at the largest buildable combo size — a perfect parlay you couldn't have
+  // built (more legs than the max size) isn't actionable. `games` keeps the raw
+  // count so we can note when even more were sittable.
+  const cap = Math.max(...SIZES);
+  const legs = all.slice(0, cap);
+  return { n: legs.length, games: all.length, legs: legs.map((l) => ({ playerId: l.playerId, name: l.name, grade: l.grade })) };
 }
 
 /**

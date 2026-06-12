@@ -39,19 +39,19 @@ function ScoreCard({ sc }) {
           Canonical pregame combos (one per strategy &amp; size), graded against actual home runs.
         </div>
         {ba?.latest && (
-          <div className="combo-sc-ba" title="The perfect parlay that was sittable from the PRIME/STRONG pool — one bat per game that homered. Gauges grading quality apart from which combos the strategies built.">
+          <div className="combo-sc-ba" title="The best perfect parlay that was sittable from the PRIME/STRONG pool — one bat per game that homered, capped at the max combo size. Gauges grading quality apart from which combos the strategies built.">
             <Icon name="Sparkles" size={12} />
             <span className="combo-sc-ba-txt">
-              Best available {ba.latest.date.slice(5)}:{' '}
               {ba.latest.n >= 2 ? (
                 <>
-                  <b className="mono">{ba.latest.n}/{ba.latest.n}</b>
+                  Best {ba.latest.n}-leg available {ba.latest.date.slice(5)}: <b className="mono">{ba.latest.n}/{ba.latest.n}</b>
                   {ba.latest.legs?.length > 0 && (
-                    <span className="dim"> · {ba.latest.legs.slice(0, 5).map((l) => lastFirst(l.name).split(',')[0]).join(' + ')}</span>
+                    <span className="dim"> · {ba.latest.legs.map((l) => lastFirst(l.name).split(',')[0]).join(' + ')}</span>
                   )}
+                  {ba.latest.games > ba.latest.n && <span className="dim"> (+{ba.latest.games - ba.latest.n} more games)</span>}
                 </>
               ) : (
-                <span className="dim">no 2+ combo was sittable</span>
+                <span>Best available {ba.latest.date.slice(5)}: <span className="dim">no 2+ combo was sittable</span></span>
               )}
             </span>
             <span className="combo-sc-ba-days dim">won {ba.daysAvailable}/{ba.days}d</span>
