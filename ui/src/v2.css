@@ -1,130 +1,125 @@
 /* =============================================================================
-   v2 — mobile-first redesign preview layer.
-   Everything here is scoped under .app.v2, so production (.app without .v2) is
-   completely untouched. Enable with ?v2=1. This is iteration 1: a modern
-   bottom-tab shell, restored type hierarchy (the flat 9.5px is disabled for
-   v2 in app.css), and a refreshed surface palette. Deeper per-screen work
-   lands on top of this.
+   StatFax v2 — clean-room redesign. Built from a blank canvas as an opt-in
+   preview (?v2=1); the legacy UI is untouched until this is promoted to default.
+
+   Architecture:
+   - Tokens + base live on .ui-v2 (the <html> flag) so they also reach the
+     player sheet, which portals to <body> outside .app.
+   - Screen styling is scoped .app.v2 (in-app) / .ui-v2 (portaled overlays).
+   - Mobile-first: phone layout is the source of truth (<=560), tablet/desktop
+     widen from there.
    ========================================================================== */
 
-/* Tokens live on .ui-v2 (the <html> flag) so they also reach the player sheet,
-   which portals to <body> outside .app. */
+/* ---------- Design tokens ---------- */
 .ui-v2 {
-  /* Refreshed surfaces — a touch more depth and contrast than legacy, warmer
-     amber accent. Components read these vars, so the whole app reskins. */
-  --card: #131a24;
-  --card-2: #1a2230;
-  --hover: #1d2634;
-  --border: #232d3c;
-  --border-soft: #161d27;
-  --text: #f2f6fb;
-  --text-dim: #9fadbf;
-  --accent: #ffb43d;
+  /* Surfaces — deep, cool slate with clear elevation steps */
+  --bg: #0a0e13;
+  --panel: #0e131a;
+  --card: #141a23;
+  --card-2: #1b2330;
+  --hover: #1f2937;
+  --border: #232d3b;
+  --border-soft: #18202b;
 
-  --v2nav-h: 50px;
-  /* Cap the home-indicator reserve small — in a Safari tab there's no indicator
-     over our bar, so a big reserve just reads as empty space. A PWA install
-     still gets a little clearance. */
-  --v2nav-safe: min(env(safe-area-inset-bottom, 0px), 6px);
-  --v2nav-total: calc(var(--v2nav-h) + var(--v2nav-safe));
+  /* Text */
+  --text: #eef2f7;
+  --text-dim: #98a4b4;
+  --text-faint: #5e6a79;
+
+  /* Brand + semantic */
+  --accent: #f5b13d;
+  --accent-ink: #2a1c05;
+  --good: #34d27b;
+  --bad: #ff5d6c;
+  --blue: #4b9bff;
+
+  /* Type scale */
+  --t-xs: 11px;
+  --t-sm: 12.5px;
+  --t-base: 14px;
+  --t-md: 16px;
+  --t-lg: 19px;
+  --t-xl: 24px;
+  --t-2xl: 30px;
+
+  /* Spacing scale */
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 22px;
+  --s6: 32px;
+
+  /* Radii + elevation */
+  --r-sm: 9px;
+  --r: 13px;
+  --r-lg: 17px;
+  --r-xl: 22px;
+  --shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+
+  /* Bottom nav metrics */
+  --nav-h: 52px;
+  --nav-safe: min(env(safe-area-inset-bottom, 0px), 6px);
+  --nav-total: calc(var(--nav-h) + var(--nav-safe));
 }
 
-/* ---- Bottom tab bar (mobile primary nav) ---- */
-.v2nav {
-  display: none;
+/* ---------- Base ---------- */
+.app.v2 {
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  letter-spacing: -0.005em;
 }
 
-@media (max-width: 820px) {
-  .ui-v2 .v2nav {
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 60;
-    height: var(--v2nav-total);
-    padding-bottom: var(--v2nav-safe);
-    background: color-mix(in srgb, var(--panel) 97%, transparent);
-    -webkit-backdrop-filter: saturate(160%) blur(18px);
-    backdrop-filter: saturate(160%) blur(18px);
-    border-top: 1px solid var(--border);
-  }
-  .ui-v2 .v2nav-tab {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 3px;
-    background: none;
-    border: none;
-    color: var(--text-faint);
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: 0.01em;
-    cursor: pointer;
-    position: relative;
-    transition: color 0.15s ease;
-    -webkit-tap-highlight-color: transparent;
-  }
-  .ui-v2 .v2nav-tab:active {
-    transform: scale(0.94);
-  }
-  .ui-v2 .v2nav-tab.on {
-    color: var(--accent);
-  }
-  .ui-v2 .v2nav-tab.on::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    width: 28px;
-    height: 3px;
-    border-radius: 0 0 3px 3px;
-    background: var(--accent);
-  }
-  .ui-v2 .v2nav-lbl {
-    line-height: 1;
-  }
-
-  /* iOS: bottom:0 pins to the static viewport, so with Safari's toolbar
-     collapsed the bar floats above the true bottom. Anchor by dvh (tracks the
-     dynamic viewport) so it hugs the actual visible bottom. bottom:0 stays as
-     the fallback for engines without dvh. */
-  @supports (height: 100dvh) {
-    .ui-v2 .v2nav {
-      bottom: auto;
-      top: calc(100dvh - var(--v2nav-total));
-    }
-  }
-
-  /* The bottom bar replaces the cramped top view pills on mobile. */
-  .app.v2 .view-toggle {
-    display: none !important;
-  }
-
-  /* Keep fixed/overlay UI clear of the nav. */
-  .app.v2 .main {
-    padding-bottom: calc(var(--v2nav-total) + 16px);
-  }
-  .app.v2 .slip {
-    bottom: calc(var(--v2nav-total) + 14px);
-  }
-  .app.v2 .back-to-top {
-    bottom: calc(var(--v2nav-total) + 14px);
-  }
-  /* The player sheet portals to <body>, so it isn't under .app — but its own
-     bottom-anchored body padding already clears the home indicator; the nav
-     sits above the scrim's z-index region only when a sheet is closed. */
-}
-
-/* ---- Board → stack of cards on phones ----
-   Reflow the existing .board-row grid (rank / batter / grade / prob / xhr /
-   heat / signals / actions) into a card with real hierarchy. No markup change:
-   each cell is reassigned a grid-area. */
+/* ---------- Header (slim, single tidy band) ---------- */
 @media (max-width: 560px) {
-  .app.v2 .board-head {
-    display: none;
+  .app.v2 .header {
+    padding: calc(var(--s2) + env(safe-area-inset-top, 0px)) var(--s3) var(--s2);
+    gap: var(--s2);
+    background: color-mix(in srgb, var(--bg) 82%, transparent);
   }
+  .app.v2 .brand-mark { width: 28px; height: 28px; border-radius: var(--r-sm); }
+  .app.v2 .brand-name { font-size: var(--t-md); }
+  .app.v2 .brand-sub { display: none; }
+  .app.v2 .slate-meta { font-size: var(--t-sm); gap: var(--s1); }
+  .app.v2 .header-right { gap: var(--s1); }
+  .app.v2 .metric-pill { padding: 5px 8px; gap: 6px; }
+  .app.v2 .toggle-btn { height: 32px; padding: 0 9px; gap: 5px; }
+  .app.v2 .header .icon-btn { width: 32px; height: 32px; }
+}
+
+/* ---------- Filters ---------- */
+@media (max-width: 560px) {
+  .app.v2 .filters { padding: var(--s2) var(--s3); }
+  .app.v2 .filters-row { gap: var(--s2); }
+  .app.v2 .filters-spacer { display: none; }
+  .app.v2 .search {
+    flex: 1 1 100%;
+    min-width: 0;
+    height: 40px;
+    border-radius: var(--r);
+    background: var(--card-2);
+    border-color: var(--border);
+  }
+  .app.v2 .grade-pills { flex: 1 1 100%; gap: 6px; }
+  .app.v2 .grade-pill {
+    flex: 1 1 0;
+    min-width: 0;
+    justify-content: center;
+    height: 34px;
+    padding: 0 6px;
+    border-radius: var(--r-sm);
+  }
+  .app.v2 .grade-pill.on {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 13%, var(--card));
+    color: var(--text);
+  }
+}
+
+/* ---------- Board: stack of cards ---------- */
+@media (max-width: 560px) {
+  .app.v2 .board-head { display: none; }
 
   .app.v2 .board-row {
     display: grid;
@@ -137,38 +132,29 @@
     column-gap: 9px;
     row-gap: 5px;
     align-items: center;
-    padding: 8px 11px;
-    margin: 0 0 6px 0;
+    padding: var(--s2) 11px;
+    margin: 0 0 6px;
     background: var(--card);
     border: 1px solid var(--border);
     border-left: 3px solid var(--row-accent);
-    border-radius: 12px;
+    border-radius: var(--r);
   }
   .app.v2 .board-row.selected {
     border-color: var(--row-accent);
     background: color-mix(in srgb, var(--row-accent) 9%, var(--card));
   }
-  .app.v2 .board-row.final {
-    opacity: 0.66;
-  }
+  .app.v2 .board-row.final { opacity: 0.62; }
 
   .app.v2 .col-rank {
     grid-area: rank;
     align-self: start;
     padding-top: 3px;
-    font-size: 11px;
+    font-size: var(--t-xs);
     font-weight: 700;
     color: var(--text-faint);
   }
-  .app.v2 .col-batter {
-    grid-area: batter;
-    min-width: 0;
-  }
-  .app.v2 .col-grade {
-    grid-area: grade;
-    justify-self: end;
-    align-self: start;
-  }
+  .app.v2 .col-batter { grid-area: batter; min-width: 0; }
+  .app.v2 .col-grade { grid-area: grade; justify-self: end; align-self: start; }
   .app.v2 .col-prob {
     grid-area: prob;
     justify-self: end;
@@ -176,190 +162,81 @@
     transform: scale(0.82);
     transform-origin: right center;
   }
-  .app.v2 .col-signals {
-    grid-area: sig;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 5px;
-  }
-  .app.v2 .col-rating {
-    grid-area: heat;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  .app.v2 .col-rating .rating-meter {
-    flex: 1;
-    height: 4px;
-  }
-  .app.v2 .col-rating .rating-num {
-    font-size: 10.5px;
-    color: var(--text-dim);
-  }
-  .app.v2 .col-actions {
-    grid-area: act;
-    justify-self: end;
-    align-self: center;
-    display: flex;
-    gap: 5px;
-  }
-  .app.v2 .col-actions .row-chev {
-    display: none;
-  }
-  .app.v2 .col-actions .act-btn {
-    width: 30px;
-    height: 30px;
-  }
-  .app.v2 .col-xhr {
-    display: none; /* secondary stat — lives in the player sheet */
-  }
+  .app.v2 .col-signals { grid-area: sig; display: flex; flex-wrap: wrap; gap: 5px; }
+  .app.v2 .col-rating { grid-area: heat; display: flex; align-items: center; gap: var(--s2); }
+  .app.v2 .col-rating .rating-meter { flex: 1; height: 4px; }
+  .app.v2 .col-rating .rating-num { font-size: var(--t-xs); color: var(--text-dim); }
+  .app.v2 .col-actions { grid-area: act; justify-self: end; align-self: center; display: flex; gap: 5px; }
+  .app.v2 .col-actions .row-chev { display: none; }
+  .app.v2 .col-actions .act-btn { width: 30px; height: 30px; }
+  .app.v2 .col-xhr { display: none; }
 
-  /* Real type hierarchy in the batter block */
-  .app.v2 .batter-name {
-    font-size: 13.5px;
-    font-weight: 700;
-    letter-spacing: -0.01em;
-  }
-  .app.v2 .batter-line1 {
-    gap: 5px;
-  }
-  .app.v2 .batter-line2 {
-    font-size: 11px;
-    margin-top: 2px;
-  }
-  .app.v2 .batter-reason {
-    font-size: 10.5px;
-    margin-top: 2px;
-  }
+  .app.v2 .batter-name { font-size: 13.5px; font-weight: 700; }
+  .app.v2 .batter-line2 { font-size: var(--t-xs); margin-top: 2px; }
+  .app.v2 .batter-reason { font-size: 10.5px; margin-top: 2px; }
 }
 
-
-/* ---- Player sheet (portals to <body>, so scope on .ui-v2 not .app.v2) ---- */
-.ui-v2 .drawer {
-  background: var(--panel);
-}
+/* ---------- Player sheet (portaled to body → scope on .ui-v2) ---------- */
+.ui-v2 .drawer { background: var(--panel); }
 
 @media (max-width: 560px) {
-  .ui-v2 .drawer {
-    border-top: 1px solid var(--border);
-    border-radius: 22px 22px 0 0;
-  }
-  /* Clean grab pill at the top (the element is also a tap-to-close button). */
+  .ui-v2 .drawer { border-top: 1px solid var(--border); border-radius: var(--r-xl) var(--r-xl) 0 0; }
   .ui-v2 .drawer-grab {
-    width: 40px;
-    height: 5px;
-    min-height: 5px;
-    margin: 9px auto 2px;
-    padding: 0;
-    border: none;
-    border-radius: 99px;
-    background: var(--border);
+    width: 40px; height: 5px; min-height: 5px;
+    margin: 9px auto 2px; padding: 0;
+    border: none; border-radius: 99px; background: var(--border);
   }
-  .ui-v2 .drawer-head {
-    padding: 12px 18px 14px;
-  }
-  .ui-v2 .drawer-name-row h2 {
-    font-size: 22px;
-    letter-spacing: -0.02em;
-  }
-  /* Full-width modern CTAs: primary filled, Watch outlined. */
-  .ui-v2 .drawer-actions {
+  .ui-v2 .drawer-head { padding: var(--s3) var(--s4) var(--s4); }
+  .ui-v2 .drawer-name-row h2 { font-size: var(--t-xl); letter-spacing: -0.02em; }
+  .ui-v2 .drawer-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: var(--s4); }
+  .ui-v2 .d-act { height: 44px; flex: 1; justify-content: center; border-radius: var(--r); font-size: var(--t-base); }
+  .ui-v2 .d-act.ghost { background: var(--card-2); border-color: var(--border); color: var(--text); }
+  .ui-v2 .drawer-section { margin-bottom: var(--s4); }
+}
+
+/* ---------- Bottom tab bar (portaled to body, dvh-anchored) ---------- */
+.v2nav { display: none; }
+
+@media (max-width: 820px) {
+  .ui-v2 .v2nav {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 9px;
-    margin-top: 14px;
+    grid-template-columns: repeat(5, 1fr);
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    z-index: 60;
+    height: var(--nav-total);
+    padding-bottom: var(--nav-safe);
+    background: color-mix(in srgb, var(--panel) 97%, transparent);
+    -webkit-backdrop-filter: saturate(160%) blur(18px);
+    backdrop-filter: saturate(160%) blur(18px);
+    border-top: 1px solid var(--border);
   }
-  .ui-v2 .d-act {
-    height: 44px;
-    flex: 1;
-    justify-content: center;
-    border-radius: 12px;
-    font-size: 14px;
+  /* dvh tracks the dynamic viewport so the bar hugs the true bottom in Safari */
+  @supports (height: 100dvh) {
+    .ui-v2 .v2nav { bottom: auto; top: calc(100dvh - var(--nav-total)); }
   }
-  .ui-v2 .d-act.ghost {
-    background: var(--card-2);
-    border-color: var(--border);
-    color: var(--text);
+  .ui-v2 .v2nav-tab {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 3px;
+    background: none; border: none;
+    color: var(--text-faint);
+    font-size: 10px; font-weight: 600;
+    cursor: pointer; position: relative;
+    transition: color 0.15s ease;
+    -webkit-tap-highlight-color: transparent;
   }
-  .ui-v2 .drawer-section {
-    margin-bottom: 16px;
+  .ui-v2 .v2nav-tab:active { transform: scale(0.94); }
+  .ui-v2 .v2nav-tab.on { color: var(--accent); }
+  .ui-v2 .v2nav-tab.on::before {
+    content: ''; position: absolute; top: 0;
+    width: 28px; height: 3px; border-radius: 0 0 3px 3px;
+    background: var(--accent);
   }
-}
+  .ui-v2 .v2nav-lbl { line-height: 1; }
 
-/* ---- Header → slimmer chrome on phones, more room for the board ---- */
-@media (max-width: 560px) {
-  .app.v2 .header {
-    padding: calc(9px + env(safe-area-inset-top, 0px)) 12px 9px;
-    gap: 8px;
-  }
-  .app.v2 .brand-mark {
-    width: 28px;
-    height: 28px;
-    border-radius: 8px;
-  }
-  .app.v2 .brand-name {
-    font-size: 15px;
-  }
-  .app.v2 .brand-sub {
-    display: none; /* "Model Board" subtitle — redundant on mobile */
-  }
-  .app.v2 .slate-meta {
-    font-size: 11.5px;
-    gap: 5px;
-  }
-  .app.v2 .header-right {
-    gap: 6px;
-  }
-  .app.v2 .metric-pill {
-    padding: 5px 8px;
-    gap: 6px;
-  }
-  .app.v2 .toggle-btn {
-    height: 32px;
-    padding: 0 9px;
-    gap: 5px;
-  }
-  .app.v2 .header .icon-btn {
-    width: 32px;
-    height: 32px;
-  }
-}
-
-/* ---- Filters → cleaner search + even grade pills on phones ---- */
-@media (max-width: 560px) {
-  .app.v2 .filters {
-    padding: 10px 12px;
-  }
-  .app.v2 .filters-row {
-    gap: 8px;
-  }
-  /* Search takes its own full-width line, softer rounded field. */
-  .app.v2 .search {
-    flex: 1 1 100%;
-    min-width: 0;
-    height: 40px;
-    border-radius: 12px;
-    background: var(--card-2);
-  }
-  /* Grade pills fill the next line evenly. */
-  .app.v2 .grade-pills {
-    flex: 1 1 100%;
-    gap: 6px;
-  }
-  .app.v2 .grade-pill {
-    flex: 1 1 0;
-    min-width: 0;
-    justify-content: center;
-    height: 34px;
-    padding: 0 6px;
-    border-radius: 10px;
-  }
-  .app.v2 .grade-pill.on {
-    border-color: var(--accent);
-    background: color-mix(in srgb, var(--accent) 12%, var(--card));
-    color: var(--text);
-  }
-  .app.v2 .filters-spacer {
-    display: none;
-  }
+  /* Bottom bar replaces the top view pills; clear fixed UI above the nav. */
+  .app.v2 .view-toggle { display: none !important; }
+  .app.v2 .main { padding-bottom: calc(var(--nav-total) + var(--s4)); }
+  .app.v2 .slip { bottom: calc(var(--nav-total) + var(--s3)); }
+  .app.v2 .back-to-top { bottom: calc(var(--nav-total) + var(--s3)); }
 }
