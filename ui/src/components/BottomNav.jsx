@@ -1,8 +1,10 @@
+import { createPortal } from 'react-dom'
 import Icon from './Icon.jsx'
 
 // Mobile bottom tab bar — the v2 primary navigation, replacing the cramped
-// top view pills. Fixed to the bottom with safe-area padding so it clears the
-// home indicator.
+// top view pills. Portaled to <body> (like the player sheet) because a fixed
+// element inside .app gets mis-positioned by an ancestor containing block on
+// iOS — it floated to mid-screen instead of pinning to the bottom.
 const TABS = [
   { key: 'board', label: 'Board', icon: 'List' },
   { key: 'games', label: 'Games', icon: 'LayoutGrid' },
@@ -12,7 +14,7 @@ const TABS = [
 ]
 
 export default function BottomNav({ view, onView }) {
-  return (
+  const nav = (
     <nav className="v2nav" role="tablist" aria-label="Primary">
       {TABS.map((t) => {
         const on = view === t.key
@@ -32,4 +34,5 @@ export default function BottomNav({ view, onView }) {
       })}
     </nav>
   )
+  return typeof document === 'undefined' ? nav : createPortal(nav, document.body)
 }
