@@ -111,21 +111,21 @@
 
   .app.v2 .board-row {
     display: grid;
-    grid-template-columns: 15px minmax(0, 1fr) auto;
+    grid-template-columns: 14px minmax(0, 1fr) auto;
     grid-template-areas:
       'rank batter grade'
       'rank batter prob'
       'sig  sig    act'
       'heat heat   act';
-    column-gap: 11px;
-    row-gap: 8px;
+    column-gap: 9px;
+    row-gap: 5px;
     align-items: center;
-    padding: 13px 14px;
-    margin: 0 0 9px 0;
+    padding: 8px 11px;
+    margin: 0 0 6px 0;
     background: var(--card);
     border: 1px solid var(--border);
     border-left: 3px solid var(--row-accent);
-    border-radius: 15px;
+    border-radius: 12px;
   }
   .app.v2 .board-row.selected {
     border-color: var(--row-accent);
@@ -156,6 +156,8 @@
     grid-area: prob;
     justify-self: end;
     align-self: center;
+    transform: scale(0.82);
+    transform-origin: right center;
   }
   .app.v2 .col-signals {
     grid-area: sig;
@@ -171,10 +173,10 @@
   }
   .app.v2 .col-rating .rating-meter {
     flex: 1;
-    height: 5px;
+    height: 4px;
   }
   .app.v2 .col-rating .rating-num {
-    font-size: 11px;
+    font-size: 10.5px;
     color: var(--text-dim);
   }
   .app.v2 .col-actions {
@@ -182,14 +184,14 @@
     justify-self: end;
     align-self: center;
     display: flex;
-    gap: 7px;
+    gap: 5px;
   }
   .app.v2 .col-actions .row-chev {
     display: none;
   }
   .app.v2 .col-actions .act-btn {
-    width: 36px;
-    height: 36px;
+    width: 30px;
+    height: 30px;
   }
   .app.v2 .col-xhr {
     display: none; /* secondary stat — lives in the player sheet */
@@ -197,20 +199,20 @@
 
   /* Real type hierarchy in the batter block */
   .app.v2 .batter-name {
-    font-size: 15.5px;
+    font-size: 13.5px;
     font-weight: 700;
     letter-spacing: -0.01em;
   }
   .app.v2 .batter-line1 {
-    gap: 6px;
+    gap: 5px;
   }
   .app.v2 .batter-line2 {
-    font-size: 12px;
-    margin-top: 3px;
+    font-size: 11px;
+    margin-top: 2px;
   }
   .app.v2 .batter-reason {
-    font-size: 11px;
-    margin-top: 3px;
+    font-size: 10.5px;
+    margin-top: 2px;
   }
 }
 
