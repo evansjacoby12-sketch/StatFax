@@ -29,7 +29,7 @@
  * @property {number}  version       Schema version (currently 4).
  * @property {string}  generatedAt   ISO UTC timestamp when cron started.
  * @property {string}  finishedAt    ISO UTC timestamp when cron finished.
- * @property {string}  date          'YYYY-MM-DD' in America/Chicago.
+ * @property {string}  date          'YYYY-MM-DD' in America/New_York (rolls 12 AM ET).
  *                                   Client rejects if !== todayInCT()
  *                                   (with weather-only venue fallback —
  *                                   see BackendService.getSnapshotWeatherByVenue).
@@ -390,10 +390,14 @@ async function pMap(items, fn, concurrency = 8) {
 
 // ─── Date helpers ────────────────────────────────────────────────────────────
 
-function todayInTZ(timeZone = 'America/Chicago') {
-  // Anchor to Central time so the script's "today" matches the user-facing
-  // slate roll-over. Otherwise a UTC-anchored "today" would tick to tomorrow
-  // at 7pm ET on game nights, breaking late-evening reconciliation.
+// Operating-day anchor: the slate's "today" rolls over at midnight in this zone.
+// Eastern (MLB's standard game-date reference) → new slate at 12 AM ET.
+const SLATE_TZ = 'America/New_York';
+
+function todayInTZ(timeZone = SLATE_TZ) {
+  // Anchor to the operating zone so the script's "today" matches the
+  // user-facing slate roll-over. A UTC-anchored "today" would tick to tomorrow
+  // mid-evening on game nights, breaking late reconciliation.
   const fmt = new Intl.DateTimeFormat('en-CA', {
     timeZone, year: 'numeric', month: '2-digit', day: '2-digit',
   });
@@ -1624,20 +1628,20 @@ async function fetchFromR2(url) {
 }
 
 /**
- * Compute YYYY-MM-DD for `daysBack` days ago, anchored to America/Chicago.
- * Matches the existing todayInTZ() formatter so calibration log dates and
- * snapshot dates line up exactly.
+ * Compute YYYY-MM-DD for `daysBack` days ago, anchored to the operating zone
+ * (SLATE_TZ). Matches todayInTZ() so calibration log dates and snapshot dates
+ * line up exactly.
  */
 function ctDateMinusDays(daysBack) {
   const d = new Date(Date.now() - daysBack * 86400000);
   return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/Chicago', year: 'numeric', month: '2-digit', day: '2-digit',
+    timeZone: SLATE_TZ, year: 'numeric', month: '2-digit', day: '2-digit',
   }).format(d);
 }
 
 async function main() {
   const startedAt = new Date();
-  const date      = todayInTZ('America/Chicago');
+  const date      = todayInTZ(); // operating day (SLATE_TZ = Eastern → rolls at 12 AM ET)
   // Print BOTH wall-clock UTC and resolved CT date so when the cron logs
   // are reviewed we can immediately see if the day boundary calculation
   // matches expectations — without this, debugging stale snapshots
