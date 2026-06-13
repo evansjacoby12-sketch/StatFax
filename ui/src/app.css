@@ -5632,3 +5632,49 @@ button.th:hover {
     font-size: 9.5px !important;
   }
 }
+
+/* ============ Same-Game Parlays ============ */
+.sgp-intro {
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 0 0 14px;
+  padding: 11px 13px;
+  border-radius: 12px;
+  background: var(--card);
+  border: 1px solid var(--border-soft);
+}
+.sgp-card .grp-legs {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+.sgp-leg {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 5px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.sgp-leg:hover {
+  background: var(--hover);
+}
+.sgp-leg-ord {
+  width: 15px;
+  font-size: 11px;
+  color: var(--text-faint);
+}
+.sgp-leg-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  font-size: 13.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sgp-leg-prob {
+  font-size: 12px;
+  color: var(--text-dim);
+}

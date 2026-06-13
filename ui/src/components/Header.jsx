@@ -4,7 +4,7 @@ import { timeAgo, pct } from '../lib/format.js'
 import { GRADE_ORDER, gradeColor } from '../lib/badges.js'
 
 // Help dropdown anchored to the header info button: Groups, Guide, How to Pick, Legend.
-function HelpMenu({ onOpenGroups, onOpenSplits, onOpenBacktest, onOpenGuide, onOpenHowTo, onOpenLegend }) {
+function HelpMenu({ onOpenGroups, onOpenSGP, onOpenSplits, onOpenBacktest, onOpenGuide, onOpenHowTo, onOpenLegend }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
   useEffect(() => {
@@ -22,6 +22,7 @@ function HelpMenu({ onOpenGroups, onOpenSplits, onOpenBacktest, onOpenGuide, onO
   }, [open])
   const items = [
     { label: 'Parlay Combos', desc: 'Auto-built combos — chalk, value, heat, power, lottery', icon: 'Layers', fn: onOpenGroups },
+    { label: 'Same-Game Parlays', desc: 'Best 2–4 leg SGP per game (correlated)', icon: 'Zap', fn: onOpenSGP },
     { label: 'Cheat Sheet', desc: 'HR plays, barrels, splits, weak arms & parks', icon: 'LayoutGrid', fn: onOpenSplits },
     { label: 'Signal Backtest', desc: 'Hit rates by grade + signals', icon: 'Activity', fn: onOpenBacktest },
     { label: 'How to Pick', desc: 'HR-selection playbook', icon: 'Target', fn: onOpenHowTo },
@@ -81,6 +82,7 @@ export default function Header({
   onOpenGuide,
   onOpenHowTo,
   onOpenGroups,
+  onOpenSGP,
   onOpenSplits,
   onOpenBacktest,
 }) {
@@ -183,7 +185,7 @@ export default function Header({
           Auto
         </button>
 
-        <HelpMenu onOpenGroups={onOpenGroups} onOpenSplits={onOpenSplits} onOpenBacktest={onOpenBacktest} onOpenGuide={onOpenGuide} onOpenHowTo={onOpenHowTo} onOpenLegend={onOpenLegend} />
+        <HelpMenu onOpenGroups={onOpenGroups} onOpenSGP={onOpenSGP} onOpenSplits={onOpenSplits} onOpenBacktest={onOpenBacktest} onOpenGuide={onOpenGuide} onOpenHowTo={onOpenHowTo} onOpenLegend={onOpenLegend} />
 
         <button
           className={`icon-btn ${refreshing ? 'refreshing' : ''}`}
