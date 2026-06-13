@@ -207,7 +207,7 @@ function HeroNumbers({ b, color }) {
         <div className="hero-main-info">
           <div className="hero-main-label">HR Probability</div>
           <div className="hero-main-val mono" style={{ color }}>
-            {pct(shownProb, 1)}
+            {pct(shownProb, 2)}
           </div>
           <div className="hero-main-sub">raw score {num(b.rawScore)}</div>
         </div>
@@ -216,7 +216,7 @@ function HeroNumbers({ b, color }) {
       <div className="hero-side">
         <KV k="Expected HRs" v={num(b.expectedHRs, 3)} />
         <KV k="Expected PAs" v={num(b.expectedPAs, 1)} />
-        <KV k="Sim HR%" v={pct(b.simHRProb, 1)} />
+        <KV k="Sim HR%" v={pct(b.simHRProb, 2)} />
         <KV k="Ensemble" v={num(b.ensembleScore)} />
         {vegas != null && <KV k="Market implied" v={pct(vegas, 1)} />}
         {diff != null && (
@@ -677,7 +677,7 @@ function OddsSection({ b }) {
           ))}
       </div>
       <div className="odds-foot">
-        Model {pct(b.hrProbability, 1)} vs market {pct(o.marketImplied, 1)} · positive edge = model sees value
+        Model {pct(b.hrProbability, 2)} vs market {pct(o.marketImplied, 2)} · positive edge = model sees value
       </div>
     </Section>
   )

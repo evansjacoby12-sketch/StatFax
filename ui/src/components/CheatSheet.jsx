@@ -114,7 +114,7 @@ export default function CheatSheet({ batters, onSelect, onOpenPitcher }) {
       name: b.name,
       meta: b.pitcher?.name ? `vs ${lastName(b.pitcher.name)} ${Number.isFinite(b.pitcher.season?.hrPer9) ? num(b.pitcher.season.hrPer9, 2) : '–'}` : b.team,
       badge: gradeBadge(b),
-      val: pct(b.hrProbability, 1),
+      val: pct(b.hrProbability, 2),
       onClick: () => onSelect(b),
     }))
   const barrels = B({ get: (b) => b.barrelPctBBE ?? b.barrelPct, fmt: (v) => `${num(v, 1)}%` })
@@ -147,7 +147,7 @@ export default function CheatSheet({ batters, onSelect, onOpenPitcher }) {
     .filter((b) => b.battingOrder >= 1 && b.battingOrder <= 3 && Number.isFinite(b.hrProbability))
     .sort((a, b) => b.hrProbability - a.hrProbability)
     .slice(0, 12)
-    .map((b) => ({ key: b.id, name: b.name, meta: `#${b.battingOrder} vs ${lastName(b.pitcher?.name)}`, badge: gradeBadge(b), val: pct(b.hrProbability, 1), onClick: () => onSelect(b) }))
+    .map((b) => ({ key: b.id, name: b.name, meta: `#${b.battingOrder} vs ${lastName(b.pitcher?.name)}`, badge: gradeBadge(b), val: pct(b.hrProbability, 2), onClick: () => onSelect(b) }))
 
   // ── Splits ──
   const night = B({ get: (b) => b.dayNightSplits?.nightHRRate, ab: (b) => b.dayNightSplits?.nightAB, minAb: 25, fmt: (v) => pct(v, 1), filter: (b) => isDayGame(b) === false })

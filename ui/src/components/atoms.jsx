@@ -57,7 +57,7 @@ export function ProbBar({ value, max = 0.28, color = 'var(--prime)', showLabel =
       <div className="probbar-track">
         <div className="probbar-fill" style={{ width: `${w}%`, background: color }} />
       </div>
-      {showLabel && <span className="probbar-label mono">{pct(value, 1)}</span>}
+      {showLabel && <span className="probbar-label mono">{pct(value, 2)}</span>}
     </div>
   )
 }
@@ -83,9 +83,9 @@ export function ProbRing({ value, color = 'var(--prime)', size = 48 }) {
       height={h}
       viewBox={`0 0 ${size} ${h}`}
       role="img"
-      aria-label={has ? `HR probability ${pct(value, 1)}` : 'No probability'}
+      aria-label={has ? `HR probability ${pct(value, 2)}` : 'No probability'}
     >
-      <title>{has ? `HR probability ${pct(value, 1)}` : 'No probability'}</title>
+      <title>{has ? `HR probability ${pct(value, 2)}` : 'No probability'}</title>
       <path className="pr-track" d={arc} fill="none" strokeWidth={stroke} strokeLinecap="round" />
       {has && (
         <path
@@ -99,7 +99,7 @@ export function ProbRing({ value, color = 'var(--prime)', size = 48 }) {
         />
       )}
       <text className="pr-val mono" x={cx} y={cy + size * 0.15} textAnchor="middle" dominantBaseline="central" fill={color}>
-        {has ? pctVal.toFixed(1) : '—'}
+        {has ? pctVal.toFixed(2) : '—'}
       </text>
     </svg>
   )

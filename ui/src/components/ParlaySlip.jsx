@@ -69,7 +69,7 @@ export default function ParlaySlip({ legs, onRemove, onClear, onSelect }) {
             {weak && (
               <span className="slip-weak-note">
                 {' '}
-                <Icon name="TriangleAlert" size={11} /> Weak link: <b>{weak.name}</b> ({pct(weak.hrProbability, 1)}).
+                <Icon name="TriangleAlert" size={11} /> Weak link: <b>{weak.name}</b> ({pct(weak.hrProbability, 2)}).
               </span>
             )}
           </div>
@@ -109,7 +109,7 @@ export default function ParlaySlip({ legs, onRemove, onClear, onSelect }) {
                   )}
                 </button>
                 <GradeChip grade={b.grade} size="sm" score={b.score} />
-                <span className="slip-leg-prob mono">{pct(b.hrProbability, 1)}</span>
+                <span className="slip-leg-prob mono">{pct(b.hrProbability, 2)}</span>
                 <span className="slip-leg-odds mono">{b.odds?.best ? american(b.odds.best.american) : '—'}</span>
                 <button className="slip-leg-remove" onClick={() => onRemove(b.id)} aria-label={`Remove ${b.name}`}>
                   <Icon name="X" size={13} />

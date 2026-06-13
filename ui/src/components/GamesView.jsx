@@ -103,7 +103,7 @@ function GameOfDay({ god, onSelect, onOpenPitcher }) {
         <span className="god-threats-k dim">Top threats</span>
         {god.threats.map((b) => (
           <button key={b.id} className="god-threat" onClick={() => onSelect(b)} style={{ '--row-accent': gradeColor(b.grade?.label) }}>
-            {lastName(b.name)} <span className="mono">{pct(b.hrProbability, 1)}</span>
+            {lastName(b.name)} <span className="mono">{pct(b.hrProbability, 2)}</span>
           </button>
         ))}
       </div>

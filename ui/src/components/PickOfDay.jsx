@@ -110,7 +110,7 @@ export default function PickOfDay({ batter: b, onSelect, watched, inSlip, onTogg
         </div>
         <div className="potd-prob">
           <ProbRing value={b.hrProbability} color={color} size={66} />
-          <span className="potd-prob-cap dim">{pct(b.hrProbability, 1)} HR</span>
+          <span className="potd-prob-cap dim">{pct(b.hrProbability, 2)} HR</span>
         </div>
       </div>
 

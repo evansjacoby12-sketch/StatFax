@@ -291,7 +291,7 @@ function GroupLeg({ b, idx, onSelect, selected }) {
       </div>
       <div className="grp-leg-right">
         {hotTone && <span className={`grp-mult ${hotTone}`}>{hotLabel} {num(hm, 2)}×</span>}
-        <span className="grp-prob mono">{pct(b.hrProbability, 1)}</span>
+        <span className="grp-prob mono">{pct(b.hrProbability, 2)}</span>
         <GradeChip grade={b.grade} size="sm" score={b.score} />
       </div>
     </li>
