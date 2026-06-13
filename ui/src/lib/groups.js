@@ -68,7 +68,13 @@ const STRATEGIES = [
     label: 'Power Bats',
     icon: 'Crosshair',
     desc: 'elite barrel rate',
-    rank: (b) => barrelOf(b) ?? 0,
+    // Blend season barrel (60%) with recent L14 barrel (40%) so it rewards
+    // current form, not just career barrel leaders (mirrors parlay-combos.mjs).
+    rank: (b) => {
+      const s = barrelOf(b) ?? 0
+      const r = b.recentBarrel?.recentBarrelPct
+      return Number.isFinite(r) && (b.recentBarrel?.recentBBE ?? 0) >= 6 ? 0.6 * s + 0.4 * r : s
+    },
     require: (b) => Number.isFinite(barrelOf(b)) && barrelOf(b) >= 9,
   },
   {

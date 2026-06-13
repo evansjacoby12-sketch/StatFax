@@ -72,7 +72,10 @@ const STRATEGIES = [
   // signals) rather than the overall score — otherwise it just re-picks `top`'s
   // legs, since hot bats already score high.
   { key: 'hot',     rank: (b) => (b.heat ?? 0) * (b.heatMult ?? 1), require: (b) => b.hot },
-  { key: 'power',   rank: (b) => b.barrel ?? 0,    require: (b) => Number.isFinite(b.barrel) && b.barrel >= 9 },
+  // power: blend season barrel (60%) with recent L14 barrel (40%) so it rewards
+  // current form, not just career barrel kings. Eligibility still gates on the
+  // stable season number. Falls back to season when there's no recent sample.
+  { key: 'power',   rank: (b) => (Number.isFinite(b.recentBarrel) ? 0.6 * (b.barrel ?? 0) + 0.4 * b.recentBarrel : (b.barrel ?? 0)), require: (b) => Number.isFinite(b.barrel) && b.barrel >= 9 },
   // matchup & park anchor on batter quality (score) × the environmental tilt, so
   // a homer-prone matchup / launch pad lifts a GOOD bat instead of ranking a
   // weak bat purely on the ~1.0–1.3× environmental signal. (Badge audit: grade
@@ -104,6 +107,12 @@ export function comboRowFromSnapshot(row) {
     score,
     grade,
     barrel,
+    // Recent (L14) barrel%, when a real sample — blended into the power rank so
+    // it isn't always the same season-barrel leaders. null => fall back to season.
+    recentBarrel:
+      Number.isFinite(row.recentBarrel?.recentBarrelPct) && (row.recentBarrel?.recentBBE ?? 0) >= 6
+        ? row.recentBarrel.recentBarrelPct
+        : null,
     park,
     pitcherHr9: Number.isFinite(row.pitcher?.season?.hrPer9) ? row.pitcher.season.hrPer9 : null,
     // Heat signals the `hot` strategy ranks on: heatIndex × recent-form multiplier.
