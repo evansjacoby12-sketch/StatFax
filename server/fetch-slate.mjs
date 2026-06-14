@@ -1664,6 +1664,28 @@ async function main() {
   // Verified Oct 2025.
   let backtestLog = (await fetchFromR2(BACKTEST_URL)) || { dates: [], records: {} };
 
+  // The combo scorecard (log.combos) only persists in the GitHub Actions cache
+  // of the local dist file — R2 never gets it written back, so loading from R2
+  // alone silently drops the combo history every run (scorecard stuck at 0-1
+  // days). The Actions cache restores the prior run's dist/backtest-log.json
+  // before this runs, so merge its combos back in. Defensive: if the local file
+  // has more reconciled dates, use it as the base; always union the combo log.
+  try {
+    if (existsSync(BACKTEST_OUT_PATH)) {
+      const local = JSON.parse(readFileSync(BACKTEST_OUT_PATH, 'utf8'));
+      if ((local?.dates?.length || 0) > (backtestLog?.dates?.length || 0)) backtestLog = local;
+      const lc = local?.combos, bc = backtestLog?.combos;
+      if (lc?.byDate || bc?.byDate) {
+        backtestLog.combos = {
+          byDate:     { ...(bc?.byDate || {}),     ...(lc?.byDate || {}) },
+          bestByDate: { ...(bc?.bestByDate || {}), ...(lc?.bestByDate || {}) },
+        };
+      }
+    }
+  } catch (e) {
+    console.warn(`[combo] local backtest merge skipped: ${e?.message}`);
+  }
+
   const yesterdayCT = ctDateMinusDays(1);
   let reconcilePredictions = null;
   let calibSnapshot = null;

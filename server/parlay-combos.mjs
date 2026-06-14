@@ -114,7 +114,12 @@ export function comboRowFromSnapshot(row) {
         ? row.recentBarrel.recentBarrelPct
         : null,
     park,
-    pitcherHr9: Number.isFinite(row.pitcher?.season?.hrPer9) ? row.pitcher.season.hrPer9 : null,
+    // Opposing-pitcher HR/9. Fall back to a league-average prior (~1.25) for an
+    // arm with no current-season sample (call-up / season debut, e.g. Estes) so
+    // the matchup strategy treats him as neutral rather than blind — it won't
+    // falsely flag him homer-prone (prior < the 1.3 gate), just stops nulling him.
+    pitcherHr9: Number.isFinite(row.pitcher?.season?.hrPer9) ? row.pitcher.season.hrPer9
+      : (row.pitcher?.id != null ? 1.25 : null),
     // Heat signals the `hot` strategy ranks on: heatIndex × recent-form multiplier.
     heat: heatIndexOf(row),
     heatMult: Number.isFinite(row.hotnessMultiplier) ? row.hotnessMultiplier : 1,
@@ -150,17 +155,29 @@ function topPerGame(rows, rank, require) {
  * comboRowFromSnapshot rows. Returns compact records: { strategy, size, legs:
  * [playerId, …] } — just enough to grade and report.
  */
-export function buildComboRecords(rows) {
+export function buildComboRecords(rows, { maxPerBat = 3 } = {}) {
   const pools = STRATEGIES.map((s) => ({ s, pool: topPerGame(rows, s.rank, s.require) }));
   const out = [];
   const seen = new Set();
   for (const size of SIZES) {
+    // Diversity cap: a bat can anchor at most `maxPerBat` combos at this size,
+    // so the same studs don't pile into all 7 strategies (correlated wipeout —
+    // one cold bat kills the whole board). Strategies run in array order, so the
+    // headline ones (top, mix) keep their purest picks; the tail diversifies.
+    const used = {};
     for (const { s, pool } of pools) {
       if (pool.length < size) continue;
-      const legs = pool.slice(0, size);
+      let legs = [];
+      for (const b of pool) {
+        if (legs.length >= size) break;
+        if ((used[b.playerId] || 0) >= maxPerBat) continue;
+        legs.push(b);
+      }
+      if (legs.length < size) legs = pool.slice(0, size); // not enough under-cap bats — keep the strategy pure rather than drop it
       const sig = `${size}:` + legs.map((l) => l.playerId).slice().sort().join('-');
       if (seen.has(sig)) continue; // identical leg set from another strategy
       seen.add(sig);
+      for (const l of legs) used[l.playerId] = (used[l.playerId] || 0) + 1;
       out.push({ strategy: s.key, size, legs: legs.map((l) => l.playerId) });
     }
   }
