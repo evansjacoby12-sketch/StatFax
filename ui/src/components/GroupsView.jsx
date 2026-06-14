@@ -7,6 +7,9 @@ import { useLiveMode } from '../lib/liveMode.js'
 
 const GROUP_GRADE_COLOR = { S: '#f5a623', A: '#32d74b', B: '#3b82f6', C: '#9aa6b6', D: '#6b7787' }
 const SIZE_TABS = [2, 3, 4].map((k) => ({ k, label: `${k}-leg` }))
+// How many combos to SHOW per size, strongest first. 2-leg is the cashable tier
+// (show all); 4-leg is lottery (trim hard). The scorecard still grades all 7.
+const DISPLAY_CAP = { 2: Infinity, 3: 5, 4: 3 }
 
 const STRAT_LABEL = { top: 'Top Picks', mix: 'Best Mix', stack: 'Signal Stack', hot: 'Hot Hand', power: 'Power Bats', matchup: 'Soft Matchup', park: 'Park & Air' }
 
@@ -130,6 +133,10 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard })
   const available = SIZE_TABS.filter((t) => bySize[t.k]?.length)
   const activeSize = bySize[size]?.length ? size : available[0]?.k
   const groups = activeSize ? bySize[activeSize] : []
+  // Display cap: strongest-first, trimmed per size (4-leg lottery → top 3).
+  const shownGroups = [...groups]
+    .sort((a, b) => (b.allHit ?? 0) - (a.allHit ?? 0))
+    .slice(0, DISPLAY_CAP[activeSize] ?? Infinity)
 
   const toggleGame = (pk) =>
     setGames((prev) => {
@@ -183,9 +190,14 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard })
       </div>
       {available.length ? (
         <div className="grp-list">
-          {groups.map((g) => (
+          {shownGroups.map((g) => (
             <GroupCard key={g.id} g={g} onSelect={onSelect} selectedId={selectedId} />
           ))}
+          {groups.length > shownGroups.length && (
+            <div className="grp-trim dim">
+              Showing the top {shownGroups.length} {activeSize}-leg combos · {groups.length - shownGroups.length} weaker hidden ({activeSize}-leg is a longshot tier)
+            </div>
+          )}
         </div>
       ) : (
         <div className="empty-note">
