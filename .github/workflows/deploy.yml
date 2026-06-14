@@ -81,6 +81,15 @@ jobs:
           npm run build-model
           npm run slate
 
+      # LLM soft-factor layer (injuries/lineups/weather/bullpen → dist/context.json).
+      # Advisory only — never touches predictions. Skips itself if the key is unset,
+      # and `|| true` ensures a flaky API call can never block the deploy.
+      - name: Context pass (Claude)
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CONTEXT_MODEL: ${{ vars.CONTEXT_MODEL || 'claude-haiku-4-5-20251001' }}
+        run: npm run context || true
+
       - name: Build UI
         env:
           # Worker /parse endpoint for the natural-language Signal Backtest box.

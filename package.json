@@ -8,6 +8,7 @@
     "serve": "node server/serve.mjs",
     "build-model": "node server/build-model.mjs",
     "slate": "node server/fetch-slate.mjs",
+    "context": "node server/context-pass.mjs",
     "reconcile": "node server/reconcile.mjs",
     "lab:pull": "node model-lab/pull-data.mjs",
     "lab:backtest": "node model-lab/backtest.mjs",
