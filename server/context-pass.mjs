@@ -27,6 +27,22 @@ const OUT_PATH = resolve(__dirname, '../dist/context.json');
 const R2_SLATE = 'https://pub-f7f0c61cfc5840ce8b07ddb42902aa48.r2.dev/daily.json';
 const MODEL = process.env.CONTEXT_MODEL || 'claude-haiku-4-5-20251001';
 const DRY_RUN = process.argv.includes('--dry-run');
+// The pipeline ticks every ~10 min; only re-run the (paid) research this often.
+const STALE_HOURS = Number(process.env.CONTEXT_STALE_HOURS || 3);
+
+// Reuse the prior context.json if it's for today, succeeded, and is recent —
+// so we hit the API a handful of times a day (refreshing as lineups/news firm
+// up), not 144×. Retries when the prior run was empty/skipped/failed.
+function priorIsFresh(slateDate) {
+  try {
+    if (!existsSync(OUT_PATH)) return false;
+    const prev = JSON.parse(readFileSync(OUT_PATH, 'utf8'));
+    if (prev.skipped || prev.error || prev.date !== slateDate) return false;
+    return (Date.now() - new Date(prev.generatedAt).getTime()) / 3600e3 < STALE_HOURS;
+  } catch {
+    return false;
+  }
+}
 
 function write(obj) {
   writeFileSync(OUT_PATH, JSON.stringify(obj));
@@ -143,6 +159,14 @@ async function main() {
   if (!process.env.ANTHROPIC_API_KEY) {
     console.warn('[context] ANTHROPIC_API_KEY not set — skipping (model predictions unaffected)');
     return write({ ...base, skipped: true });
+  }
+  // The pipeline ticks every ~10 min; reuse a recent good run instead of paying
+  // for ~144 web-search calls/day. Refreshes every STALE_HOURS as news firms up.
+  if (priorIsFresh(slate.date)) {
+    const prev = JSON.parse(readFileSync(OUT_PATH, 'utf8'));
+    const ageMin = Math.round((Date.now() - new Date(prev.generatedAt).getTime()) / 60000);
+    console.log(`[context] reusing today's context.json (${ageMin}m old, < ${STALE_HOURS}h) — no API call`);
+    return; // leave the existing file in place
   }
   try {
     const text = await callClaude(prompt);

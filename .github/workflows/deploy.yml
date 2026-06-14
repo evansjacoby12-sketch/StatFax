@@ -70,6 +70,16 @@ jobs:
           key: pregame-freeze-${{ github.run_id }}
           restore-keys: pregame-freeze-
 
+      # Carry the prior LLM context.json across runs so the context pass can see
+      # it and reuse a recent result — without this every fresh container starts
+      # empty and the staleness guard would re-pay the API on every 10-min tick.
+      - name: Restore context pass
+        uses: actions/cache@v4
+        with:
+          path: dist/context.json
+          key: context-${{ github.run_id }}
+          restore-keys: context-
+
       - name: Install brain deps
         run: npm install
 
