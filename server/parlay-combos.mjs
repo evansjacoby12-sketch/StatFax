@@ -28,7 +28,7 @@ const SIZES = [2, 3, 4];
 // Proven HR signals, weighted by the badge audit's within-grade lift — the same
 // set + weighting the UI's Signal Stack uses (minus odds-only signals). "due" is
 // excluded (the falsified gambler's-fallacy signal).
-const STACK_SIGNALS = { hot: 3, barrelKing: 2, homeEdge: 2, bullpenLegend: 2, awayEdge: 1.5, launchPad: 1, wxEdge: 0.5 };
+const STACK_SIGNALS = { hot: 3, barrelKing: 2, homeEdge: 2, bullpenLegend: 2, awayEdge: 1.5 };
 const signalScore = (b) => Object.entries(STACK_SIGNALS).reduce((s, [k, w]) => s + (b[k] ? w : 0), 0);
 const signalCount = (b) => Object.keys(STACK_SIGNALS).reduce((n, k) => n + (b[k] ? 1 : 0), 0);
 
@@ -81,7 +81,7 @@ const STRATEGIES = [
   // weak bat purely on the ~1.0–1.3× environmental signal. (Badge audit: grade
   // is 2.29× HR lift; park/matchup-alone are far weaker and were discarding it.)
   { key: 'matchup', rank: (b) => (b.score ?? 0) * (b.pitcherHr9 ?? 0), require: (b) => Number.isFinite(b.pitcherHr9) && b.pitcherHr9 >= 1.3 },
-  { key: 'park',    rank: (b) => (b.score ?? 0) * (b.park ?? 0),       require: (b) => Number.isFinite(b.park) && b.park >= 1.05 },
+  { key: 'park',    rank: (b) => (b.score ?? 0) * (b.air ?? 0),         require: (b) => Number.isFinite(b.air) && b.air >= 1.05 },
 ];
 
 /**
@@ -114,6 +114,7 @@ export function comboRowFromSnapshot(row) {
         ? row.recentBarrel.recentBarrelPct
         : null,
     park,
+    air, // park × weather × hand — the Park & Air strategy ranks on this
     // Opposing-pitcher HR/9. Fall back to a league-average prior (~1.25) for an
     // arm with no current-season sample (call-up / season debut, e.g. Estes) so
     // the matchup strategy treats him as neutral rather than blind — it won't

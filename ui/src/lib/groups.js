@@ -16,7 +16,9 @@ const barrelOf = (b) => (Number.isFinite(b.barrelPctBBE) ? b.barrelPctBBE : b.ba
 // the gambler's-fallacy signal we falsified. Drives the Signal Stack combo,
 // which groups bats that light up the SAME signals — what the per-metric
 // strategies miss (they rank on one number, never on shared badges).
-const STACK_SIGNALS = { hot: 3, barrelKing: 2, homeEdge: 2, bullpenLegend: 2, awayEdge: 1.5, pitchEdge: 1, wxEdge: 0.5 }
+// Kept identical to server/parlay-combos.mjs so the page and the scorecard build
+// the SAME combos. (Dropped pitchEdge/wxEdge — weakest signals + shape-divergent.)
+const STACK_SIGNALS = { hot: 3, barrelKing: 2, homeEdge: 2, bullpenLegend: 2, awayEdge: 1.5 }
 const signalScore = (b) => Object.entries(STACK_SIGNALS).reduce((s, [k, w]) => s + (b[k] ? w : 0), 0)
 const signalCount = (b) => Object.keys(STACK_SIGNALS).reduce((n, k) => n + (b[k] ? 1 : 0), 0)
 
@@ -28,9 +30,10 @@ const STRATEGIES = [
     key: 'top',
     label: 'Top Picks',
     icon: 'TrendingUp',
-    desc: 'highest HR probability',
-    rank: (b) => b.hrProbability ?? 0,
-    tiers: 2,
+    desc: 'highest model score',
+    // Match the server: rank by score (uncapped, so it separates the elite tier
+    // that HR% pins together). No tiers — the server builds one combo per strategy.
+    rank: (b) => b.score ?? 0,
   },
   {
     key: 'mix',
@@ -87,7 +90,7 @@ const STRATEGIES = [
     // (grade is 2.29× HR lift in the audit; the matchup signal alone is weak).
     // No-season-sample arms (call-ups) fall back to a league prior (~1.25) so
     // they read as neutral, not blind — still below the 1.3 gate.
-    rank: (b) => (b.hrProbability ?? 0) * (b.pitcher?.season?.hrPer9 ?? (b.pitcher?.id != null ? 1.25 : 0)),
+    rank: (b) => (b.score ?? 0) * (b.pitcher?.season?.hrPer9 ?? (b.pitcher?.id != null ? 1.25 : 0)),
     require: (b) => (b.pitcher?.season?.hrPer9 ?? (b.pitcher?.id != null ? 1.25 : 0)) >= 1.3,
   },
   {
@@ -97,7 +100,7 @@ const STRATEGIES = [
     desc: 'park × weather boosts HR',
     // Anchor on batter quality (model HR prob) × the park/air tilt, same reason
     // as matchup — a launch pad should lift a good bat, not rank a weak one.
-    rank: (b) => (b.hrProbability ?? 0) * (b.parkWeatherHandFactor ?? 0),
+    rank: (b) => (b.score ?? 0) * (b.parkWeatherHandFactor ?? 0),
     require: (b) => (b.parkWeatherHandFactor ?? 1) >= 1.05,
   },
 ]
