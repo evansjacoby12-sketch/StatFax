@@ -11,6 +11,23 @@ const SIZE_TABS = [2, 3, 4].map((k) => ({ k, label: `${k}-leg` }))
 // (show all); 4-leg is lottery (trim hard). The scorecard still grades all 7.
 const DISPLAY_CAP = { 2: Infinity, 3: 5, 4: 3 }
 
+// Tail (green) vs caution (yellow): a combo glows green when every leg is clean,
+// yellow when any leg trips a data flag — same checks as the manual audits.
+const STINGY_HR9 = 0.85
+const LOW_BARREL = 13
+function comboCautions(g) {
+  const f = []
+  for (const b of g.legs) {
+    const nm = lastFirst(b.name).split(',')[0]
+    const sb = Number.isFinite(b.barrelPctBBE) ? b.barrelPctBBE : b.barrelPct
+    const hr9 = b.pitcher?.season?.hrPer9
+    if ((b.grade?.label || b.grade) !== 'PRIME') f.push(`${nm}: ${b.grade?.label || b.grade || 'SKIP'} (not PRIME)`)
+    if (Number.isFinite(sb) && sb < LOW_BARREL) f.push(`${nm}: low barrel ${sb.toFixed(0)}%`)
+    if (Number.isFinite(hr9) && hr9 < STINGY_HR9) f.push(`${nm}: HR-stingy arm ${hr9.toFixed(2)}`)
+  }
+  return f
+}
+
 const STRAT_LABEL = { top: 'Top Picks', mix: 'Best Mix', stack: 'Signal Stack', hot: 'Hot Hand', power: 'Power Bats', matchup: 'Soft Matchup', park: 'Park & Air' }
 
 // Rolling combo scorecard — the real "have our combos hit?" record, graded
@@ -213,8 +230,14 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard })
 function GroupCard({ g, onSelect, selectedId }) {
   const gc = GROUP_GRADE_COLOR[g.grade] || '#6b7787'
   const names = g.legs.map((b) => lastFirst(b.name).split(',')[0]).join(' + ')
+  const cautions = comboCautions(g)
+  const tone = cautions.length ? 'caution' : 'tail'
   return (
-    <section className="grp-card" style={{ '--gc': gc }}>
+    <section
+      className={`grp-card tone-${tone}`}
+      style={{ '--gc': gc }}
+      title={cautions.length ? `⚠️ Caution — ${cautions.join(' · ')}` : '✅ Tail — every leg is clean'}
+    >
       <header className="grp-head">
         <span className="grp-legbadge">{g.size}-LEG</span>
         <span className="grp-strategy">

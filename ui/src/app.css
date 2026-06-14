@@ -5686,3 +5686,13 @@ button.th:hover {
   border: 1px dashed var(--border);
   border-radius: 10px;
 }
+
+/* Tail (green) / caution (yellow) glow on parlay combo cards */
+.grp-card.tone-tail {
+  border-color: color-mix(in srgb, var(--good) 45%, var(--border));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--good) 30%, transparent), 0 0 16px -4px color-mix(in srgb, var(--good) 55%, transparent);
+}
+.grp-card.tone-caution {
+  border-color: color-mix(in srgb, var(--warn, #ffb02e) 45%, var(--border));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--warn, #ffb02e) 30%, transparent), 0 0 16px -4px color-mix(in srgb, var(--warn, #ffb02e) 55%, transparent);
+}
