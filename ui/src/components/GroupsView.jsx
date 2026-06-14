@@ -11,21 +11,47 @@ const SIZE_TABS = [2, 3, 4].map((k) => ({ k, label: `${k}-leg` }))
 // (show all); 4-leg is lottery (trim hard). The scorecard still grades all 7.
 const DISPLAY_CAP = { 2: Infinity, 3: 5, 4: 3 }
 
-// Tail (green) vs caution (yellow): a combo glows green when every leg is clean,
-// yellow when any leg trips a data flag — same checks as the manual audits.
+// Per-leg weakness — the same checks as the manual combo audits, but scored on
+// ONE leg so the card can point at *which* leg is the risk, not just glow.
 const STINGY_HR9 = 0.85
 const LOW_BARREL = 13
-function comboCautions(g) {
+const PITCHER_PARK = 0.92
+const LONGSHOT_PROB = 0.18
+function legFlags(b) {
   const f = []
-  for (const b of g.legs) {
-    const nm = lastFirst(b.name).split(',')[0]
-    const sb = Number.isFinite(b.barrelPctBBE) ? b.barrelPctBBE : b.barrelPct
-    const hr9 = b.pitcher?.season?.hrPer9
-    if ((b.grade?.label || b.grade) !== 'PRIME') f.push(`${nm}: ${b.grade?.label || b.grade || 'SKIP'} (not PRIME)`)
-    if (Number.isFinite(sb) && sb < LOW_BARREL) f.push(`${nm}: low barrel ${sb.toFixed(0)}%`)
-    if (Number.isFinite(hr9) && hr9 < STINGY_HR9) f.push(`${nm}: HR-stingy arm ${hr9.toFixed(2)}`)
-  }
+  const grade = b.grade?.label || b.grade
+  const sb = Number.isFinite(b.barrelPctBBE) ? b.barrelPctBBE : b.barrelPct
+  const hr9 = b.pitcher?.season?.hrPer9
+  const park = b.gameParkHRFactor
+  if (grade !== 'PRIME') f.push(`${grade || 'SKIP'} (not PRIME)`)
+  if (Number.isFinite(sb) && sb < LOW_BARREL) f.push(`low barrel ${sb.toFixed(0)}%`)
+  if (Number.isFinite(hr9) && hr9 < STINGY_HR9) f.push(`HR-stingy arm ${hr9.toFixed(2)}`)
+  if (Number.isFinite(park) && park <= PITCHER_PARK) f.push(`pitcher's park ${park.toFixed(2)}`)
   return f
+}
+// "Really bad" = a leg likely to sink the whole parlay: a long-shot HR prob, a
+// tiny barrel under a sub-PRIME grade, or 2+ flags stacking. These turn the card
+// red and earn the leg a WEAK badge.
+function legIsBad(b, flags = legFlags(b)) {
+  const grade = b.grade?.label || b.grade
+  const sb = Number.isFinite(b.barrelPctBBE) ? b.barrelPctBBE : b.barrelPct
+  if (Number.isFinite(b.hrProbability) && b.hrProbability < LONGSHOT_PROB) return true
+  if (grade !== 'PRIME' && Number.isFinite(sb) && sb < 8) return true
+  return flags.length >= 2
+}
+// Score each leg + find the single weakest (lowest HR prob). Card tone: green
+// when every leg is clean, red when a leg is really bad (the weakest one gets
+// flagged), yellow for minor flags in between.
+function assessCombo(g) {
+  const legs = g.legs.map((b) => { const flags = legFlags(b); return { flags, bad: legIsBad(b, flags) } })
+  const anyBad = legs.some((l) => l.bad)
+  const anyFlag = legs.some((l) => l.flags.length)
+  let weakestIdx = 0, minP = Infinity
+  g.legs.forEach((b, i) => {
+    const p = Number.isFinite(b.hrProbability) ? b.hrProbability : 1
+    if (p < minP) { minP = p; weakestIdx = i }
+  })
+  return { legs, weakestIdx, tone: anyBad ? 'risk' : anyFlag ? 'caution' : 'tail' }
 }
 
 const STRAT_LABEL = { top: 'Top Picks', mix: 'Best Mix', stack: 'Signal Stack', hot: 'Hot Hand', power: 'Power Bats', matchup: 'Soft Matchup', park: 'Park & Air' }
@@ -230,14 +256,21 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard })
 function GroupCard({ g, onSelect, selectedId }) {
   const gc = GROUP_GRADE_COLOR[g.grade] || '#6b7787'
   const names = g.legs.map((b) => lastFirst(b.name).split(',')[0]).join(' + ')
-  const cautions = comboCautions(g)
-  const tone = cautions.length ? 'caution' : 'tail'
+  const { legs: legInfo, weakestIdx, tone } = assessCombo(g)
+  const title =
+    tone === 'risk'
+      ? `🔴 Weak leg — ${g.legs
+          .map((b, i) => (legInfo[i].bad ? `${lastFirst(b.name).split(',')[0]}: ${legInfo[i].flags.join(', ') || 'long-shot HR%'}` : null))
+          .filter(Boolean)
+          .join(' · ')}`
+      : tone === 'caution'
+        ? `⚠️ Caution — ${g.legs
+            .map((b, i) => (legInfo[i].flags.length ? `${lastFirst(b.name).split(',')[0]}: ${legInfo[i].flags.join(', ')}` : null))
+            .filter(Boolean)
+            .join(' · ')}`
+        : '✅ Tail — every leg is clean'
   return (
-    <section
-      className={`grp-card tone-${tone}`}
-      style={{ '--gc': gc }}
-      title={cautions.length ? `⚠️ Caution — ${cautions.join(' · ')}` : '✅ Tail — every leg is clean'}
-    >
+    <section className={`grp-card tone-${tone}`} style={{ '--gc': gc }} title={title}>
       <header className="grp-head">
         <span className="grp-legbadge">{g.size}-LEG</span>
         <span className="grp-strategy">
@@ -259,7 +292,16 @@ function GroupCard({ g, onSelect, selectedId }) {
       </div>
       <ul className="grp-legs">
         {g.legs.map((b, i) => (
-          <GroupLeg key={b.id} b={b} idx={i + 1} onSelect={onSelect} selected={selectedId === b.id} />
+          <GroupLeg
+            key={b.id}
+            b={b}
+            idx={i + 1}
+            onSelect={onSelect}
+            selected={selectedId === b.id}
+            bad={legInfo[i].bad}
+            weakest={i === weakestIdx && legInfo[i].bad}
+            reasons={legInfo[i].flags}
+          />
         ))}
       </ul>
       <footer className="grp-foot dim">
@@ -269,7 +311,7 @@ function GroupCard({ g, onSelect, selectedId }) {
   )
 }
 
-function GroupLeg({ b, idx, onSelect, selected }) {
+function GroupLeg({ b, idx, onSelect, selected, bad, weakest, reasons }) {
   const liveMode = useLiveMode()
   const hm = b.hotnessMultiplier
   const hotTone = hm > 1.02 ? 'good' : hm < 0.98 ? 'bad' : ''
@@ -283,7 +325,7 @@ function GroupLeg({ b, idx, onSelect, selected }) {
   const hrToday = liveMode && b.liveContext?.isHRThisGame
   return (
     <li
-      className={`grp-leg ${selected ? 'selected' : ''}`}
+      className={`grp-leg ${selected ? 'selected' : ''} ${bad ? 'weak-leg' : ''}`}
       role="button"
       tabIndex={0}
       onClick={() => onSelect(b)}
@@ -299,6 +341,11 @@ function GroupLeg({ b, idx, onSelect, selected }) {
         <div className="grp-leg-l1">
           <span className={`grp-leg-name ${hrToday ? 'hr-glow' : ''}`}>{lastFirst(b.name)}</span>
           <span className="grp-team">{b.team}</span>
+          {bad && (
+            <span className="grp-chip weak" title={`Weak leg — ${reasons?.length ? reasons.join(' · ') : 'long-shot HR%'} — most likely to sink this parlay`}>
+              <Icon name="TriangleAlert" size={10} /> {weakest ? 'WEAKEST' : 'WEAK'}
+            </span>
+          )}
           {b.hot && <Icon name="Flame" size={12} className="grp-fire" />}
           {(condUp || condDown) && <span className={`grp-chip ${condUp ? 'good' : 'bad'}`}>COND{condUp ? '↑' : '↓'}</span>}
           {b.primaryPitchEdge?.passes && (

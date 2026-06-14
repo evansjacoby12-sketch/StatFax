@@ -5687,7 +5687,7 @@ button.th:hover {
   border-radius: 10px;
 }
 
-/* Tail (green) / caution (yellow) glow on parlay combo cards */
+/* Tail (green) / caution (yellow) / risk (red) glow on parlay combo cards */
 .grp-card.tone-tail {
   border-color: color-mix(in srgb, var(--good) 45%, var(--border));
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--good) 30%, transparent), 0 0 16px -4px color-mix(in srgb, var(--good) 55%, transparent);
@@ -5695,4 +5695,19 @@ button.th:hover {
 .grp-card.tone-caution {
   border-color: color-mix(in srgb, var(--warn, #ffb02e) 45%, var(--border));
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--warn, #ffb02e) 30%, transparent), 0 0 16px -4px color-mix(in srgb, var(--warn, #ffb02e) 55%, transparent);
+}
+/* Red: this combo carries a leg likely to sink it — the leg is badged WEAK. */
+.grp-card.tone-risk {
+  border-color: color-mix(in srgb, var(--bad) 50%, var(--border));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--bad) 32%, transparent), 0 0 16px -4px color-mix(in srgb, var(--bad) 60%, transparent);
+}
+/* The weak leg itself — red badge + a faint red wash + left edge on its row. */
+.grp-chip.weak {
+  color: var(--bad);
+  border-color: color-mix(in srgb, var(--bad) 55%, transparent);
+  background: color-mix(in srgb, var(--bad) 15%, transparent);
+}
+.grp-leg.weak-leg {
+  background: color-mix(in srgb, var(--bad) 7%, transparent);
+  box-shadow: inset 2px 0 0 0 color-mix(in srgb, var(--bad) 60%, transparent);
 }
