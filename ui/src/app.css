@@ -1671,9 +1671,7 @@ button.th:hover {
     padding: 0 9px;
   }
   .header {
-    /* Restore the notch/status-bar inset (the base rule had it; this override
-       dropped it) + extra top breathing room so the header isn't crammed up top. */
-    padding: calc(16px + env(safe-area-inset-top, 0px)) 12px 12px;
+    padding: calc(10px + env(safe-area-inset-top, 0px)) 12px 10px;
   }
   .filters {
     padding: 10px 12px;
@@ -2636,6 +2634,12 @@ button.th:hover {
   .header {
     flex-wrap: wrap;
     gap: 10px;
+  }
+  /* Space out the right-side controls (Pregame · help chevron · refresh) so they
+     aren't crammed together on phones. */
+  .header-right {
+    gap: 16px;
+    margin-left: auto;
   }
   /* Redundant with the grade pills' counts — drop it to declutter the header. */
   .grade-bar {
