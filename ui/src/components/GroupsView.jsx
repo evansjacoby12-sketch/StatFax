@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import Icon from './Icon.jsx'
 import { GradeChip } from './atoms.jsx'
 import { pct, num, rate, american, signedPct } from '../lib/format.js'
@@ -185,6 +185,32 @@ const fmtTime = (iso) => {
   }
 }
 
+// Cluster the slate's games into start WINDOWS by gap-detecting first-pitch times
+// (a >2h gap starts a new window). Lets you build same-window combos — every leg
+// confirmable + lockable together, no staggered-start trap. Schedule-agnostic:
+// works off the real times, so it adapts to day games, getaway splits, west-coast
+// nightcaps, etc. Returns [{ pks:Set, label, minT }].
+const WINDOW_GAP_MS = 2 * 3600e3
+function computeWindows(gameList) {
+  const sorted = (gameList || []).filter((g) => g.time).slice().sort((a, b) => a.time.localeCompare(b.time))
+  const out = []
+  for (const g of sorted) {
+    const t = new Date(g.time).getTime()
+    const last = out[out.length - 1]
+    if (last && t - last.maxT <= WINDOW_GAP_MS) {
+      last.pks.add(g.gamePk); last.maxT = Math.max(last.maxT, t); last.minT = Math.min(last.minT, t)
+    } else {
+      out.push({ pks: new Set([g.gamePk]), minT: t, maxT: t })
+    }
+  }
+  const short = (ms) => new Date(ms).toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' })
+  return out.map((w) => ({
+    pks: w.pks,
+    minT: w.minT,
+    label: w.minT === w.maxT ? `${short(w.minT)}` : `${short(w.minT)}–${short(w.maxT).replace(/ /g, '')}`,
+  }))
+}
+
 // Cross-Game HR Groups — auto-built multi-leg parlays, one best bat per game.
 export default function GroupsView({ batters, onSelect, selectedId, scorecard, generatedAt }) {
   const [size, setSize] = useState(2)
@@ -193,6 +219,14 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard, g
   // live, so combos built on started games are usually unplaceable.
   const [hideStarted, setHideStarted] = useState(true)
   const [confirmedOnly, setConfirmedOnly] = useState(false)
+  // Optional setting (persisted): cluster the slate into start windows so you can
+  // build same-window combos. Off by default.
+  const [windowMode, setWindowMode] = useState(() => {
+    try { return localStorage.getItem('sf.combos.windows') === '1' } catch { return false }
+  })
+  useEffect(() => {
+    try { localStorage.setItem('sf.combos.windows', windowMode ? '1' : '0') } catch { /* ignore */ }
+  }, [windowMode])
 
   // Distinct, still-playable games in the pool — for the game selector.
   const gameList = useMemo(() => {
@@ -206,6 +240,10 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard, g
     }
     return [...m.values()].sort((x, y) => x.time.localeCompare(y.time) || x.label.localeCompare(y.label))
   }, [batters, hideStarted])
+
+  const windows = useMemo(() => computeWindows(gameList), [gameList])
+  // A window is "active" when the game selection exactly matches its games.
+  const activeWindowIdx = windows.findIndex((w) => w.pks.size === games.size && [...w.pks].every((pk) => games.has(pk)))
 
   // Restrict the combo pool: selected games (none = all), pregame-only and
   // confirmed-lineup-only when those chips are on.
@@ -253,21 +291,39 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard, g
           {asOf && <span className="grp-stamp-time dim">as of {asOf}</span>}
         </div>
       )}
-      {gameList.length > 1 && (
-        <div className="grp-games" role="group" aria-label="Filter by game">
+      {windowMode && windows.length > 1 ? (
+        <div className="grp-games" role="group" aria-label="Filter by start window">
           <button className={`badge-toggle ${games.size === 0 ? 'on' : ''}`} onClick={() => setGames(new Set())}>
-            All games
+            All windows
           </button>
-          {gameList.map((g) => (
+          {windows.map((w, i) => (
             <button
-              key={g.gamePk}
-              className={`badge-toggle ${games.has(g.gamePk) ? 'on' : ''}`}
-              onClick={() => toggleGame(g.gamePk)}
+              key={i}
+              className={`badge-toggle ${activeWindowIdx === i ? 'on' : ''}`}
+              onClick={() => setGames(new Set(w.pks))}
+              title={`${w.pks.size} game${w.pks.size > 1 ? 's' : ''} in this start window — same-window combos lock together, no spread trap`}
             >
-              {g.label}
+              <Icon name="Clock" size={11} /> {w.label} <span className="dim">·{w.pks.size}</span>
             </button>
           ))}
         </div>
+      ) : (
+        gameList.length > 1 && (
+          <div className="grp-games" role="group" aria-label="Filter by game">
+            <button className={`badge-toggle ${games.size === 0 ? 'on' : ''}`} onClick={() => setGames(new Set())}>
+              All games
+            </button>
+            {gameList.map((g) => (
+              <button
+                key={g.gamePk}
+                className={`badge-toggle ${games.has(g.gamePk) ? 'on' : ''}`}
+                onClick={() => toggleGame(g.gamePk)}
+              >
+                {g.label}
+              </button>
+            ))}
+          </div>
+        )
       )}
       <div className="grp-controls" role="group" aria-label="Group size">
         {available.map((t) => (
@@ -291,6 +347,14 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard, g
           title="Only batters in a confirmed lineup"
         >
           <Icon name="UserCheck" size={12} /> Confirmed only
+        </button>
+        <button
+          className={`badge-toggle ${windowMode ? 'on' : ''}`}
+          onClick={() => setWindowMode((v) => !v)}
+          aria-pressed={windowMode}
+          title="Group games into start windows — build same-window combos that lock together (no staggered-start trap)"
+        >
+          <Icon name="Clock" size={12} /> Windows
         </button>
       </div>
       {available.length ? (
