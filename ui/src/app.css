@@ -2635,11 +2635,10 @@ button.th:hover {
     flex-wrap: wrap;
     gap: 10px;
   }
-  /* Space out the right-side controls (Pregame · help chevron · refresh) so they
-     aren't crammed together on phones. */
+  /* A touch more room between the right-side controls (Pregame · help chevron ·
+     refresh) than the cramped 10px default — but not so far they float apart. */
   .header-right {
-    gap: 16px;
-    margin-left: auto;
+    gap: 12px;
   }
   /* Redundant with the grade pills' counts — drop it to declutter the header. */
   .grade-bar {
