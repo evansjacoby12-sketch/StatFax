@@ -4719,18 +4719,27 @@ button.th:hover {
   opacity: 0.62;
   border-style: dashed;
 }
-.grp-prov-tag {
+.grp-prov-tag,
+.grp-locked-tag {
   display: inline-flex;
   align-items: center;
   gap: 3px;
   font-size: 9.5px;
   font-weight: 800;
   letter-spacing: 0.04em;
-  color: var(--warn, #ffb02e);
-  border: 1px solid color-mix(in srgb, var(--warn, #ffb02e) 50%, transparent);
-  background: color-mix(in srgb, var(--warn, #ffb02e) 12%, transparent);
   border-radius: 5px;
   padding: 1px 5px;
+  border: 1px solid;
+}
+.grp-prov-tag {
+  color: var(--warn, #ffb02e);
+  border-color: color-mix(in srgb, var(--warn, #ffb02e) 50%, transparent);
+  background: color-mix(in srgb, var(--warn, #ffb02e) 12%, transparent);
+}
+.grp-locked-tag {
+  color: var(--good);
+  border-color: color-mix(in srgb, var(--good) 50%, transparent);
+  background: color-mix(in srgb, var(--good) 12%, transparent);
 }
 .grp-chip.unconf {
   color: var(--warn, #ffb02e);

@@ -402,7 +402,13 @@ function GroupCard({ g, onSelect, selectedId }) {
         <span className="grp-strategy">
           <Icon name={g.icon} size={13} /> {g.label}
         </span>
-        {provisional && <span className="grp-prov-tag"><Icon name="Clock" size={10} /> PROVISIONAL</span>}
+        {provisional ? (
+          <span className="grp-prov-tag"><Icon name="Clock" size={10} /> PROVISIONAL</span>
+        ) : (
+          <span className="grp-locked-tag" title="All lineups confirmed — this combo is locked in & bettable, and it's the version that gets graded for the record.">
+            <Icon name="Lock" size={10} /> LOCKED
+          </span>
+        )}
         <span className="grp-grade" style={{ color: gc, borderColor: gc }}>{g.grade}</span>
       </header>
       <div className="grp-sub dim">

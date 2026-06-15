@@ -47,6 +47,7 @@ import {
   LayoutGrid,
   UserCheck,
   Sparkles,
+  Lock,
 } from 'lucide-react'
 
 const REGISTRY = {
@@ -98,6 +99,7 @@ const REGISTRY = {
   LayoutGrid,
   UserCheck,
   Sparkles,
+  Lock,
 }
 
 export default function Icon({ name, size = 16, ...rest }) {
