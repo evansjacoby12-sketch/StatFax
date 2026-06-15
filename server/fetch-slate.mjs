@@ -2861,7 +2861,10 @@ async function main() {
   // improve on a 22-day held-out split). Conservative bounded delta centered on
   // league-average blast: elite blasters get a small boost, weak ones a small
   // ding. Capped so it nudges like park-weather, never dominates the composite.
-  const BLAST_MAX_DELTA   = 4;
+  // Parked at 0 (display/combos-only) until the 6-29 forward re-check confirms
+  // blast on real game-time data, not the season proxy it was sized on. Set to 4
+  // to re-enable the validated ±4 nudge. See model-lab/BLAST-RECHECK.md.
+  const BLAST_MAX_DELTA   = 0;
   const LEAGUE_AVG_BLAST  = 15;  // ≈ median blasts-per-squared-up-contact %
   const BLAST_DELTA_K     = 0.4; // pts per % blast above/below average
   // Hotness with a synthetic 2-point series (recent30 → recent7) has

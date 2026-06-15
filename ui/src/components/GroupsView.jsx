@@ -6,11 +6,10 @@ import { buildGroups, lastFirst, isoOf, blastOf, blastMixOf, blastVsHandOf } fro
 import { useLiveMode } from '../lib/liveMode.js'
 
 const GROUP_GRADE_COLOR = { S: '#f5a623', A: '#32d74b', B: '#3b82f6', C: '#9aa6b6', D: '#6b7787' }
-// 4-leg is treated as a lottery and hidden from the bettable board (the server
-// still grades it for the record). 2-leg is the cashable tier, 3-leg the stretch.
-const SIZE_TABS = [2, 3].map((k) => ({ k, label: `${k}-leg` }))
-// How many combos to SHOW per size, strongest first. 2-leg shows all; 3-leg trims.
-const DISPLAY_CAP = { 2: Infinity, 3: 5 }
+const SIZE_TABS = [2, 3, 4].map((k) => ({ k, label: `${k}-leg` }))
+// How many combos to SHOW per size, strongest first. 2-leg is the cashable tier
+// (show all); 4-leg is lottery (trim hard).
+const DISPLAY_CAP = { 2: Infinity, 3: 5, 4: 3 }
 
 // Per-leg weakness — the same checks as the manual combo audits, but scored on
 // ONE leg so the card can point at *which* leg is the risk, not just glow.
@@ -62,7 +61,7 @@ const STRAT_LABEL = { top: 'Top Picks', mix: 'Best Mix', stack: 'Signal Stack', 
 function ScoreCard({ sc }) {
   if (!sc || !sc.days || !sc.overall?.combos) return null
   const sizes = Object.entries(sc.bySize || {})
-    .filter(([k]) => Number(k) <= 3) // 4-leg is a lotto — excluded from the board + P&L
+    .filter(([k]) => Number(k) <= 4)
     .sort((a, b) => Number(a[0]) - Number(b[0]))
   const strats = Object.entries(sc.byStrategy || {})
     .filter(([, v]) => v.combos > 0)

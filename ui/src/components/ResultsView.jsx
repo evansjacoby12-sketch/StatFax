@@ -30,6 +30,7 @@ export default function ResultsView({ meta }) {
   const [hrDay, setHrDay] = useState(null) // null = all days
   const [comboDay, setComboDay] = useState(null) // null = latest
   const [comboBoard, setComboBoard] = useState('final') // 'final' = all-slate · 'late' = evening bettable
+  const [comboSize, setComboSize] = useState(0) // 0 = all sizes, else 2 or 3
   useEffect(() => {
     let alive = true
     fetch(`${import.meta.env.BASE_URL}data/backtest-log.json`, { cache: 'no-store' })
@@ -108,6 +109,7 @@ export default function ResultsView({ meta }) {
     const recs = recByDay(activeComboDay)
     const src = board === 'late' ? comboLateByDate[activeComboDay] : comboByDate[activeComboDay]
     return (src || [])
+      .filter((c) => c.size <= 3 && (!comboSize || c.size === comboSize)) // 4-leg lottos excluded; size filter
       .map((c) => {
         const legs = (c.legs || []).map((pid) => {
           const r = recs.get(Number(pid))
@@ -229,6 +231,13 @@ export default function ResultsView({ meta }) {
               ))}
             </div>
           )}
+          <div className="hr-days" role="group" aria-label="Combo size">
+            {[[0, 'All'], [2, '2-leg'], [3, '3-leg']].map(([k, label]) => (
+              <button key={k} className={`hr-day ${comboSize === k ? 'on' : ''}`} onClick={() => setComboSize(k)}>
+                {label}
+              </button>
+            ))}
+          </div>
           <p className="chart-cap dim" style={{ marginTop: 2 }}>
             {board === 'late'
               ? 'Evening board — the latest combos built only from games that hadn’t started, i.e. what you could realistically still bet late.'
