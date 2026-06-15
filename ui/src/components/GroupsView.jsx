@@ -300,6 +300,13 @@ function GroupCard({ g, onSelect, selectedId }) {
   // reshuffle before first pitch — not safe to bet (the 6 AM-board trap).
   const unconfirmed = g.legs.filter((b) => b.lineupConfirmed !== true)
   const provisional = unconfirmed.length > 0
+  // Start-time spread: a parlay locks at the EARLIEST leg's first pitch, but a
+  // much-later leg's lineup won't be posted by then — so you're forced to bet it
+  // blind. Warn when legs are >2.5h apart (mixing an early + late game).
+  const times = g.legs.map((b) => (b.game?.gameDate ? new Date(b.game.gameDate).getTime() : null)).filter(Boolean)
+  const spreadHrs = times.length >= 2 ? (Math.max(...times) - Math.min(...times)) / 3600e3 : 0
+  const spreadWarn = spreadHrs > 2.5
+  const earliestTime = times.length ? fmtTime(new Date(Math.min(...times)).toISOString()) : null
   const title =
     tone === 'risk'
       ? `🔴 Weak leg — ${g.legs
@@ -338,6 +345,11 @@ function GroupCard({ g, onSelect, selectedId }) {
           <span className={`grp-edge ${g.edge >= 0 ? 'pos' : 'neg'}`}> · {signedPct(g.edge, 0)} edge</span>
         )}
       </div>
+      {spreadWarn && (
+        <div className="grp-spread-warn" title="A parlay locks at the earliest leg's first pitch. The later game's lineup won't be posted by then, so you'd bet that leg before its lineup is confirmed.">
+          <Icon name="Clock" size={11} /> Legs {spreadHrs.toFixed(1)}h apart — ticket locks at {earliestTime}, but the late leg's lineup won't be set yet
+        </div>
+      )}
       <ul className="grp-legs">
         {g.legs.map((b, i) => (
           <GroupLeg
