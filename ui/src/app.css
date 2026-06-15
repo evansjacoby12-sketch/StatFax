@@ -3803,6 +3803,32 @@ button.th:hover {
   line-height: 1.5;
   margin: 0 0 10px;
 }
+.guide-subhead {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 12px 0 6px;
+}
+.guide-callout {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 14px 0 4px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--warn, #ffb02e) 40%, transparent);
+  background: color-mix(in srgb, var(--warn, #ffb02e) 9%, transparent);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.guide-callout-h {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 800;
+  color: var(--warn, #ffb02e);
+}
 .guide-grades {
   display: flex;
   gap: 6px;
