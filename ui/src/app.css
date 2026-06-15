@@ -5582,6 +5582,7 @@ button.th:hover {
 /* Combo scorecard (Parlay Combos header) — rolling graded hit rate */
 .combo-sc {
   margin-top: 12px;
+  margin-bottom: 12px;
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--card);
