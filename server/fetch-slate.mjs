@@ -292,9 +292,44 @@ function appendBoardSnapshot(scoredBatters, games, date) {
   }
 }
 
-// Phase 3 ensemble scaffold — pure ESM, direct import OK. The other math
-// helpers (vegasBlend, isotonic, etc.) ride along inside model.mjs via
-// the build-model.mjs esbuild bundle and are destructured from there
+// Per-window combo boards — split the slate into start WINDOWS you could bet as
+// one ticket (games within ~2.5h of the window's first pitch, so the latest
+// leg's lineup posts before the earliest locks), then build each window's own
+// combos from frozen pregame values. Lets the Results page grade the board you
+// actually bet in each window (early vs late), not just the idealized all-slate
+// board. Returns null when the day doesn't split (one window == the full board).
+const WINDOW_SPAN_MS = 2.5 * 3600e3;
+function buildWindowBoards(scoredBatters, games) {
+  const sorted = (games || [])
+    .filter((g) => g.gameDate)
+    .map((g) => ({ pk: g.gamePk, t: new Date(g.gameDate).getTime() }))
+    .sort((a, b) => a.t - b.t);
+  if (!sorted.length) return null;
+  const wins = [];
+  for (const g of sorted) {
+    const last = wins[wins.length - 1];
+    if (last && g.t - last.minT <= WINDOW_SPAN_MS) { last.pks.add(g.pk); last.maxT = g.t; }
+    else wins.push({ pks: new Set([g.pk]), minT: g.t, maxT: g.t });
+  }
+  if (wins.length < 2) return null; // single window — full board already covers it
+  const rows = Object.values(scoredBatters || {});
+  const seen = new Set();
+  const cr = [];
+  for (const r of rows) {
+    if (r.playerId == null || seen.has(r.playerId)) continue;
+    seen.add(r.playerId);
+    const x = comboRowFromSnapshot(r);
+    if (x) cr.push(x);
+  }
+  const short = (ms) => new Date(ms).toLocaleTimeString('en-US', { timeZone: SLATE_TZ, hour: 'numeric', minute: '2-digit' });
+  return wins.map((w) => ({
+    label: w.minT === w.maxT ? short(w.minT) : `${short(w.minT)}–${short(w.maxT)}`,
+    minT: w.minT,
+    games: w.pks.size,
+    combos: buildComboRecords(cr.filter((r) => w.pks.has(r.gamePk))).map((c) => ({ strategy: c.strategy, size: c.size, legs: c.legs })),
+  }));
+}
+
 // below — see the second import block right after buildModel() runs.
 import { combineModels, scoreWithML, loadMLModel, DEFAULT_ENSEMBLE_OPTS, weightsFromBrier } from './models/ensemble.mjs';
 import { trainEnsembleWeights, extractFeatures } from './models/trainEnsembleWeights.mjs';
@@ -1824,11 +1859,12 @@ async function main() {
       const local = JSON.parse(readFileSync(BACKTEST_OUT_PATH, 'utf8'));
       if ((local?.dates?.length || 0) > (backtestLog?.dates?.length || 0)) backtestLog = local;
       const lc = local?.combos, bc = backtestLog?.combos;
-      if (lc?.byDate || bc?.byDate || lc?.lateByDate || bc?.lateByDate) {
+      if (lc?.byDate || bc?.byDate || lc?.lateByDate || bc?.lateByDate || lc?.windowsByDate || bc?.windowsByDate) {
         backtestLog.combos = {
-          byDate:     { ...(bc?.byDate || {}),     ...(lc?.byDate || {}) },
-          bestByDate: { ...(bc?.bestByDate || {}), ...(lc?.bestByDate || {}) },
-          lateByDate: { ...(bc?.lateByDate || {}), ...(lc?.lateByDate || {}) },
+          byDate:        { ...(bc?.byDate || {}),        ...(lc?.byDate || {}) },
+          bestByDate:    { ...(bc?.bestByDate || {}),    ...(lc?.bestByDate || {}) },
+          lateByDate:    { ...(bc?.lateByDate || {}),    ...(lc?.lateByDate || {}) },
+          windowsByDate: { ...(bc?.windowsByDate || {}), ...(lc?.windowsByDate || {}) },
         };
       }
     }
@@ -3715,6 +3751,17 @@ async function main() {
     backtestLog.combos.lateByDate[date] = liveBoard.combos;
     const keys = Object.keys(backtestLog.combos.lateByDate).sort();
     for (const d of keys.slice(0, -14)) delete backtestLog.combos.lateByDate[d]; // keep ~2 weeks
+  }
+  // Per-start-window boards (early / late / …) so Results can grade the board you
+  // actually bet in each confirmable window — not just the all-slate board.
+  const windowBoards = buildWindowBoards(payload.scoredBatters, payload.games);
+  if (windowBoards) {
+    backtestLog.combos = backtestLog.combos || {};
+    backtestLog.combos.windowsByDate = backtestLog.combos.windowsByDate || {};
+    backtestLog.combos.windowsByDate[date] = windowBoards;
+    const wk = Object.keys(backtestLog.combos.windowsByDate).sort();
+    for (const d of wk.slice(0, -14)) delete backtestLog.combos.windowsByDate[d];
+    console.log(`[windows] ${date}: ${windowBoards.length} windows (${windowBoards.map((w) => `${w.label}·${w.games}g·${w.combos.length}c`).join(', ')})`);
   }
 
   // Freeze this run's scoreBatter() inputs alongside the slate so the offline
