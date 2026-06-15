@@ -5634,6 +5634,26 @@ button.th:hover {
 .combo-sc-n { font-size: 11px; text-align: right; }
 .combo-sc-best b { color: var(--text); }
 
+/* Scorecard P&L estimate (your stake) */
+.combo-sc-pnl {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin: 8px 0 2px;
+  padding: 7px 9px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: var(--card-2, rgba(255,255,255,0.02));
+}
+.combo-sc-pnl-l { display: flex; align-items: center; gap: 8px; }
+.combo-sc-pnl-cap { font-size: 11px; }
+.combo-sc-roi { font-size: 13px; font-weight: 800; }
+.combo-sc-pnl-r { font-size: 12px; }
+.combo-sc-roi.pos, .combo-sc-pnl-r b.pos { color: var(--good); }
+.combo-sc-roi.neg, .combo-sc-pnl-r b.neg { color: var(--bad); }
+
 /* divider between size tabs and pool filters in Parlay Combos controls */
 .grp-ctrl-sep {
   width: 1px;

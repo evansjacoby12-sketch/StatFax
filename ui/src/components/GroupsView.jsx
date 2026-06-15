@@ -68,6 +68,17 @@ function ScoreCard({ sc }) {
     .sort((a, b) => (b[1].hitRate ?? 0) - (a[1].hitRate ?? 0) || (b[1].legHitRate ?? 0) - (a[1].legHitRate ?? 0))
   const ov = sc.overall
   const ba = sc.bestAvailable
+  // Estimated P&L at your stake: price each HR-prop leg at ≈+250 (decimal 3.5) —
+  // a fair midpoint for these PRIME bats — and assume you bet every canonical
+  // combo. Rough "are these +EV at my price" gauge; not exact (no odds feed).
+  const PER_LEG_DEC = 3.5
+  let stakeUnits = 0, returnUnits = 0
+  for (const [k, v] of sizes) {
+    stakeUnits += v.combos || 0
+    returnUnits += (v.allHit || 0) * Math.pow(PER_LEG_DEC, Number(k))
+  }
+  const roi = stakeUnits ? (returnUnits - stakeUnits) / stakeUnits : 0
+  const netAt = (stake) => Math.round((returnUnits - stakeUnits) * stake)
   return (
     <details className="combo-sc">
       <summary className="combo-sc-sum">
@@ -131,6 +142,18 @@ function ScoreCard({ sc }) {
               ))}
             </div>
           </>
+        )}
+        {stakeUnits > 0 && (
+          <div className="combo-sc-pnl">
+            <div className="combo-sc-pnl-l">
+              <span className="combo-sc-pnl-cap dim">Est. P&amp;L · every combo · ≈+250/leg</span>
+              <span className={`combo-sc-roi ${roi >= 0 ? 'pos' : 'neg'}`}>{roi >= 0 ? '+' : ''}{(roi * 100).toFixed(0)}% ROI</span>
+            </div>
+            <div className="combo-sc-pnl-r dim">
+              $5/combo → <b className={netAt(5) >= 0 ? 'pos' : 'neg'}>{netAt(5) >= 0 ? '+' : '−'}${Math.abs(netAt(5))}</b>
+              {' · '}$10 → <b className={netAt(10) >= 0 ? 'pos' : 'neg'}>{netAt(10) >= 0 ? '+' : '−'}${Math.abs(netAt(10))}</b>
+            </div>
+          </div>
         )}
         <div className="combo-sc-best dim">Per-leg hit rate {pct(ov.legHitRate, 0)} · combos cash when every leg homers.</div>
       </div>
