@@ -185,20 +185,20 @@ const fmtTime = (iso) => {
   }
 }
 
-// Cluster the slate's games into start WINDOWS by gap-detecting first-pitch times
-// (a >2h gap starts a new window). Lets you build same-window combos — every leg
-// confirmable + lockable together, no staggered-start trap. Schedule-agnostic:
-// works off the real times, so it adapts to day games, getaway splits, west-coast
-// nightcaps, etc. Returns [{ pks:Set, label, minT }].
-const WINDOW_GAP_MS = 2 * 3600e3
+// Cluster the slate's games into start WINDOWS — games within ~2.5h of the
+// window's first pitch, so the latest leg's lineup posts before the earliest
+// locks (a same-window combo confirms + locks together, no staggered-start
+// trap). Span-based, matching the server grader (buildWindowBoards). Schedule-
+// agnostic: splits day/night, getaway-day, and early/late-cluster slates.
+const WINDOW_SPAN_MS = 2.5 * 3600e3
 function computeWindows(gameList) {
   const sorted = (gameList || []).filter((g) => g.time).slice().sort((a, b) => a.time.localeCompare(b.time))
   const out = []
   for (const g of sorted) {
     const t = new Date(g.time).getTime()
     const last = out[out.length - 1]
-    if (last && t - last.maxT <= WINDOW_GAP_MS) {
-      last.pks.add(g.gamePk); last.maxT = Math.max(last.maxT, t); last.minT = Math.min(last.minT, t)
+    if (last && t - last.minT <= WINDOW_SPAN_MS) { // span from the window's START, not gap
+      last.pks.add(g.gamePk); last.maxT = Math.max(last.maxT, t)
     } else {
       out.push({ pks: new Set([g.gamePk]), minT: t, maxT: t })
     }
