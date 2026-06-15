@@ -538,6 +538,7 @@ export default function App() {
                 onSelect={(b) => setSelectedId(b.id)}
                 selectedId={selectedId}
                 scorecard={data.meta?.comboScorecard}
+                generatedAt={data.meta?.generatedAt}
               />
             </div>
           </div>

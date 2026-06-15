@@ -138,8 +138,32 @@ function ScoreCard({ sc }) {
   )
 }
 
+// Lineup-confirmation summary for the pool: distinct still-playable games and
+// how many have their lineup posted. Early in the day (no lineups) the board is
+// PROVISIONAL — its bats shift as lineups/probables confirm, so combos locked
+// then often aren't the ones that grade. This drives the "as of" stamp + guard.
+function confirmSummary(batters) {
+  const games = new Map() // gamePk -> confirmed?
+  for (const b of batters || []) {
+    if (b.gamePk == null || b.game?.isFinal || b.game?.isLive) continue
+    const prev = games.get(b.gamePk) || false
+    games.set(b.gamePk, prev || b.lineupConfirmed === true)
+  }
+  const total = games.size
+  const confirmed = [...games.values()].filter(Boolean).length
+  return { total, confirmed, allIn: total > 0 && confirmed === total }
+}
+const fmtTime = (iso) => {
+  if (!iso) return null
+  try {
+    return new Date(iso).toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' }) + ' ET'
+  } catch {
+    return null
+  }
+}
+
 // Cross-Game HR Groups — auto-built multi-leg parlays, one best bat per game.
-export default function GroupsView({ batters, onSelect, selectedId, scorecard }) {
+export default function GroupsView({ batters, onSelect, selectedId, scorecard, generatedAt }) {
   const [size, setSize] = useState(2)
   const [games, setGames] = useState(() => new Set()) // empty = all games
   // Hide started defaults ON: HR props can't be bet pregame once the game is
@@ -172,6 +196,8 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard })
       ),
     [batters, games, hideStarted, confirmedOnly],
   )
+  const conf = useMemo(() => confirmSummary(batters), [batters])
+  const asOf = fmtTime(generatedAt)
   const bySize = useMemo(() => buildGroups(pool), [pool])
   const available = SIZE_TABS.filter((t) => bySize[t.k]?.length)
   const activeSize = bySize[size]?.length ? size : available[0]?.k
@@ -191,6 +217,19 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard })
   return (
     <>
       <ScoreCard sc={scorecard} />
+      {conf.total > 0 && (
+        <div className={`grp-stamp ${conf.allIn ? 'ready' : 'provisional'}`}>
+          <Icon name={conf.allIn ? 'UserCheck' : 'Clock'} size={13} />
+          <span className="grp-stamp-txt">
+            {conf.allIn ? (
+              <><b>Lineups in</b> ({conf.confirmed}/{conf.total} games) — combos are bettable</>
+            ) : (
+              <><b>Provisional board</b> — {conf.confirmed}/{conf.total} lineups confirmed. Bats shift as lineups post; wait before betting.</>
+            )}
+          </span>
+          {asOf && <span className="grp-stamp-time dim">as of {asOf}</span>}
+        </div>
+      )}
       {gameList.length > 1 && (
         <div className="grp-games" role="group" aria-label="Filter by game">
           <button className={`badge-toggle ${games.size === 0 ? 'on' : ''}`} onClick={() => setGames(new Set())}>
@@ -257,6 +296,10 @@ function GroupCard({ g, onSelect, selectedId }) {
   const gc = GROUP_GRADE_COLOR[g.grade] || '#6b7787'
   const names = g.legs.map((b) => lastFirst(b.name).split(',')[0]).join(' + ')
   const { legs: legInfo, weakestIdx, tone } = assessCombo(g)
+  // Provisional = a leg's lineup isn't posted yet, so this combo can still
+  // reshuffle before first pitch — not safe to bet (the 6 AM-board trap).
+  const unconfirmed = g.legs.filter((b) => b.lineupConfirmed !== true)
+  const provisional = unconfirmed.length > 0
   const title =
     tone === 'risk'
       ? `🔴 Weak leg — ${g.legs
@@ -270,12 +313,17 @@ function GroupCard({ g, onSelect, selectedId }) {
             .join(' · ')}`
         : '✅ Tail — every leg is clean'
   return (
-    <section className={`grp-card tone-${tone}`} style={{ '--gc': gc }} title={title}>
+    <section
+      className={`grp-card tone-${tone} ${provisional ? 'provisional' : ''}`}
+      style={{ '--gc': gc }}
+      title={provisional ? `⏳ Provisional — lineup not posted for ${unconfirmed.map((b) => lastFirst(b.name).split(',')[0]).join(', ')}. Can still reshuffle before first pitch.` : title}
+    >
       <header className="grp-head">
         <span className="grp-legbadge">{g.size}-LEG</span>
         <span className="grp-strategy">
           <Icon name={g.icon} size={13} /> {g.label}
         </span>
+        {provisional && <span className="grp-prov-tag"><Icon name="Clock" size={10} /> PROVISIONAL</span>}
         <span className="grp-grade" style={{ color: gc, borderColor: gc }}>{g.grade}</span>
       </header>
       <div className="grp-sub dim">
@@ -301,6 +349,7 @@ function GroupCard({ g, onSelect, selectedId }) {
             bad={legInfo[i].bad}
             weakest={i === weakestIdx && legInfo[i].bad}
             reasons={legInfo[i].flags}
+            unconfirmed={b.lineupConfirmed !== true}
           />
         ))}
       </ul>
@@ -311,7 +360,7 @@ function GroupCard({ g, onSelect, selectedId }) {
   )
 }
 
-function GroupLeg({ b, idx, onSelect, selected, bad, weakest, reasons }) {
+function GroupLeg({ b, idx, onSelect, selected, bad, weakest, reasons, unconfirmed }) {
   const liveMode = useLiveMode()
   const hm = b.hotnessMultiplier
   const hotTone = hm > 1.02 ? 'good' : hm < 0.98 ? 'bad' : ''
@@ -341,6 +390,11 @@ function GroupLeg({ b, idx, onSelect, selected, bad, weakest, reasons }) {
         <div className="grp-leg-l1">
           <span className={`grp-leg-name ${hrToday ? 'hr-glow' : ''}`}>{lastFirst(b.name)}</span>
           <span className="grp-team">{b.team}</span>
+          {unconfirmed && (
+            <span className="grp-chip unconf" title="Lineup not posted yet — this bat isn't confirmed in the order. Combo can still change before first pitch.">
+              <Icon name="Clock" size={10} /> NO LINEUP
+            </span>
+          )}
           {bad && (
             <span className="grp-chip weak" title={`Weak leg — ${reasons?.length ? reasons.join(' · ') : 'long-shot HR%'} — most likely to sink this parlay`}>
               <Icon name="TriangleAlert" size={10} /> {weakest ? 'WEAKEST' : 'WEAK'}
