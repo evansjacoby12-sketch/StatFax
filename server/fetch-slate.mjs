@@ -167,6 +167,7 @@ const BACKTEST_OUT_PATH    = resolve(__dirname, '../dist/backtest-log.json');
 // Actions cache mechanism as the backtest log.
 const FREEZE_OUT_PATH      = resolve(__dirname, '../dist/pregame-freeze.json');
 const ZONE_CACHE_OUT_PATH  = resolve(__dirname, '../dist/zone-cache.json');
+const BOARD_HISTORY_OUT_PATH = resolve(__dirname, '../dist/board-history.json');
 const MLB_BASE  = 'https://statsapi.mlb.com/api/v1';
 const MLB_V11   = 'https://statsapi.mlb.com/api/v1.1';
 const SEASON    = new Date().getFullYear();
@@ -244,6 +245,49 @@ import {
   appendComboDay,
   comboScorecard,
 } from './parlay-combos.mjs';
+
+// Intraday board history — append a compact snapshot of TODAY's canonical combos
+// (one per strategy/size) + lineup-confirmation state on every run, so we can
+// later measure how much the board changes morning → first pitch and prove
+// whether early (unconfirmed) boards are systematically worse. Rolls over daily,
+// capped. Non-fatal. Analyze with model-lab/board-evolution.mjs once a day settles.
+function appendBoardSnapshot(scoredBatters, games, date) {
+  try {
+    const liveOrFinal = new Set((games || []).filter(g => g.isLive || g.isFinal).map(g => g.gamePk));
+    const rows = Object.values(scoredBatters || {});
+    const seen = new Set();
+    const pool = [];
+    for (const r of rows) {
+      if (r.playerId == null || seen.has(r.playerId)) continue;
+      seen.add(r.playerId);
+      if (liveOrFinal.has(r.gamePk)) continue;      // bettable board = pregame games only
+      const cr = comboRowFromSnapshot(r);
+      if (cr) { cr.lineupConfirmed = r.lineupConfirmed === true; pool.push(cr); }
+    }
+    // Lineup-confirmation summary over still-playable games.
+    const gconf = new Map();
+    for (const r of rows) {
+      if (r.gamePk == null || liveOrFinal.has(r.gamePk)) continue;
+      gconf.set(r.gamePk, (gconf.get(r.gamePk) || false) || r.lineupConfirmed === true);
+    }
+    const combos = buildComboRecords(pool).map(c => ({ s: c.strategy, n: c.size, legs: c.legs }));
+    let hist = { date, snapshots: [] };
+    if (existsSync(BOARD_HISTORY_OUT_PATH)) {
+      try { const prev = JSON.parse(readFileSync(BOARD_HISTORY_OUT_PATH, 'utf8')); if (prev?.date === date && Array.isArray(prev.snapshots)) hist = prev; } catch {}
+    }
+    hist.snapshots.push({
+      at: new Date().toISOString(),
+      lineupsConfirmed: [...gconf.values()].filter(Boolean).length,
+      lineupsTotal: gconf.size,
+      combos,
+    });
+    if (hist.snapshots.length > 250) hist.snapshots = hist.snapshots.slice(-250);
+    writeFileSync(BOARD_HISTORY_OUT_PATH, JSON.stringify(hist));
+    console.log(`[board-history] +1 snapshot (${hist.snapshots.length} today) · lineups ${[...gconf.values()].filter(Boolean).length}/${gconf.size}`);
+  } catch (e) {
+    console.warn(`[board-history] non-fatal: ${e.message}`);
+  }
+}
 
 // Phase 3 ensemble scaffold — pure ESM, direct import OK. The other math
 // helpers (vegasBlend, isotonic, etc.) ride along inside model.mjs via
@@ -3650,6 +3694,9 @@ async function main() {
   writeFileSync(OUT_PATH, JSON.stringify(payload));
   const sizeKB = (JSON.stringify(payload).length / 1024).toFixed(1);
   console.log(`[slate] wrote ${OUT_PATH} (${sizeKB} KB) — took ${((Date.now() - startedAt.getTime()) / 1000).toFixed(1)}s`);
+
+  // Capture this run's bettable combo board into the intraday history.
+  appendBoardSnapshot(payload.scoredBatters, payload.games, date);
 
   // Freeze this run's scoreBatter() inputs alongside the slate so the offline
   // lab (`npm run lab:score`) can re-score engine variants on identical inputs.

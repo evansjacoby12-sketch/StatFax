@@ -80,6 +80,16 @@ jobs:
           key: context-${{ github.run_id }}
           restore-keys: context-
 
+      # Intraday combo-board history — accumulates this day's per-run snapshots so
+      # we can measure how the board shifts morning → first pitch. Same unique-key-
+      # saves / restore-by-prefix pattern (rolls over in-file on date change).
+      - name: Restore board history
+        uses: actions/cache@v4
+        with:
+          path: dist/board-history.json
+          key: board-history-${{ github.run_id }}
+          restore-keys: board-history-
+
       - name: Install brain deps
         run: npm install
 
