@@ -270,7 +270,8 @@ function appendBoardSnapshot(scoredBatters, games, date) {
       if (r.gamePk == null || liveOrFinal.has(r.gamePk)) continue;
       gconf.set(r.gamePk, (gconf.get(r.gamePk) || false) || r.lineupConfirmed === true);
     }
-    const combos = buildComboRecords(pool).map(c => ({ s: c.strategy, n: c.size, legs: c.legs }));
+    const records = buildComboRecords(pool);
+    const combos = records.map(c => ({ s: c.strategy, n: c.size, legs: c.legs }));
     let hist = { date, snapshots: [] };
     if (existsSync(BOARD_HISTORY_OUT_PATH)) {
       try { const prev = JSON.parse(readFileSync(BOARD_HISTORY_OUT_PATH, 'utf8')); if (prev?.date === date && Array.isArray(prev.snapshots)) hist = prev; } catch {}
@@ -284,8 +285,10 @@ function appendBoardSnapshot(scoredBatters, games, date) {
     if (hist.snapshots.length > 250) hist.snapshots = hist.snapshots.slice(-250);
     writeFileSync(BOARD_HISTORY_OUT_PATH, JSON.stringify(hist));
     console.log(`[board-history] +1 snapshot (${hist.snapshots.length} today) · lineups ${[...gconf.values()].filter(Boolean).length}/${gconf.size}`);
+    return { combos: records, gameCount: gconf.size };
   } catch (e) {
     console.warn(`[board-history] non-fatal: ${e.message}`);
+    return null;
   }
 }
 
@@ -1821,10 +1824,11 @@ async function main() {
       const local = JSON.parse(readFileSync(BACKTEST_OUT_PATH, 'utf8'));
       if ((local?.dates?.length || 0) > (backtestLog?.dates?.length || 0)) backtestLog = local;
       const lc = local?.combos, bc = backtestLog?.combos;
-      if (lc?.byDate || bc?.byDate) {
+      if (lc?.byDate || bc?.byDate || lc?.lateByDate || bc?.lateByDate) {
         backtestLog.combos = {
           byDate:     { ...(bc?.byDate || {}),     ...(lc?.byDate || {}) },
           bestByDate: { ...(bc?.bestByDate || {}), ...(lc?.bestByDate || {}) },
+          lateByDate: { ...(bc?.lateByDate || {}), ...(lc?.lateByDate || {}) },
         };
       }
     }
@@ -3695,8 +3699,20 @@ async function main() {
   const sizeKB = (JSON.stringify(payload).length / 1024).toFixed(1);
   console.log(`[slate] wrote ${OUT_PATH} (${sizeKB} KB) — took ${((Date.now() - startedAt.getTime()) / 1000).toFixed(1)}s`);
 
-  // Capture this run's bettable combo board into the intraday history.
-  appendBoardSnapshot(payload.scoredBatters, payload.games, date);
+  // Capture this run's bettable combo board into the intraday history, and stash
+  // the latest bettable board (≥2 pregame games) in the log as the "evening
+  // board" — what you could actually still bet late, after day games started.
+  // Overwrites each run, so by EOD it holds the last (latest) bettable board; it
+  // lives in the persisted log so it survives the daily board-history rollover
+  // and reaches the Results page (graded next day vs actual HRs).
+  const liveBoard = appendBoardSnapshot(payload.scoredBatters, payload.games, date);
+  if (liveBoard && liveBoard.gameCount >= 2 && liveBoard.combos.length) {
+    backtestLog.combos = backtestLog.combos || {};
+    backtestLog.combos.lateByDate = backtestLog.combos.lateByDate || {};
+    backtestLog.combos.lateByDate[date] = liveBoard.combos;
+    const keys = Object.keys(backtestLog.combos.lateByDate).sort();
+    for (const d of keys.slice(0, -14)) delete backtestLog.combos.lateByDate[d]; // keep ~2 weeks
+  }
 
   // Freeze this run's scoreBatter() inputs alongside the slate so the offline
   // lab (`npm run lab:score`) can re-score engine variants on identical inputs.

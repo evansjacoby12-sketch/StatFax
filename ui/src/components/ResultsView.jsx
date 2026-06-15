@@ -29,6 +29,7 @@ export default function ResultsView({ meta }) {
   const [err, setErr] = useState(null)
   const [hrDay, setHrDay] = useState(null) // null = all days
   const [comboDay, setComboDay] = useState(null) // null = latest
+  const [comboBoard, setComboBoard] = useState('final') // 'final' = all-slate · 'late' = evening bettable
   useEffect(() => {
     let alive = true
     fetch(`${import.meta.env.BASE_URL}data/backtest-log.json`, { cache: 'no-store' })
@@ -89,8 +90,14 @@ export default function ResultsView({ meta }) {
   // resolve each leg's name + HR from that day's records.
   const STRAT_LABEL = { top: 'Top Picks', mix: 'Best Mix', stack: 'Signal Stack', hot: 'Hot Hand', power: 'Power Bats', matchup: 'Soft Matchup', park: 'Park & Air' }
   const comboByDate = log.combos?.byDate || {}
+  const comboLateByDate = log.combos?.lateByDate || {}
+  // Day selection is driven by the settled (graded) FINAL board.
   const comboDates = Object.keys(comboByDate).filter((d) => (comboByDate[d] || []).length).sort().reverse()
   const activeComboDay = comboDay && comboDates.includes(comboDay) ? comboDay : comboDates[0] || null
+  // "Evening board" = the latest bettable board (still-pregame games only) — what
+  // you could actually bet late. Only offer the toggle when we have it for the day.
+  const hasLate = activeComboDay && (comboLateByDate[activeComboDay] || []).length > 0
+  const board = comboBoard === 'late' && hasLate ? 'late' : 'final'
   const recByDay = (d) => {
     const map = new Map()
     for (const r of log.records?.[d] || []) map.set(Number(r.playerId), r)
@@ -99,17 +106,16 @@ export default function ResultsView({ meta }) {
   const dayCombos = (() => {
     if (!activeComboDay) return []
     const recs = recByDay(activeComboDay)
-    return (comboByDate[activeComboDay] || [])
-      .map((c) => ({
-        strategy: c.strategy,
-        size: c.size,
-        allHit: c.allHit,
-        nHit: c.nHit ?? (c.legs || []).filter((pid) => recs.get(Number(pid))?.homered).length,
-        legs: (c.legs || []).map((pid) => {
+    const src = board === 'late' ? comboLateByDate[activeComboDay] : comboByDate[activeComboDay]
+    return (src || [])
+      .map((c) => {
+        const legs = (c.legs || []).map((pid) => {
           const r = recs.get(Number(pid))
           return { name: (r?.name || `#${pid}`).split(' ').slice(-1)[0], homered: r?.homered === true }
-        }),
-      }))
+        })
+        const nHit = legs.filter((l) => l.homered).length
+        return { strategy: c.strategy, size: c.size, nHit, allHit: legs.length > 0 && nHit === legs.length, legs }
+      })
       .sort((a, b) => Number(b.allHit) - Number(a.allHit) || a.size - b.size)
   })()
   const comboCashed = dayCombos.filter((c) => c.allHit).length
@@ -204,6 +210,16 @@ export default function ResultsView({ meta }) {
               · {comboCashed}/{dayCombos.length} cashed{activeComboDay ? ` on ${activeComboDay.slice(5)}` : ''}
             </span>
           </h3>
+          {hasLate && (
+            <div className="hr-days" role="group" aria-label="Board view">
+              <button className={`hr-day ${board === 'final' ? 'on' : ''}`} onClick={() => setComboBoard('final')} title="The full-slate confirmed board (all games, frozen pregame)">
+                Full board
+              </button>
+              <button className={`hr-day ${board === 'late' ? 'on' : ''}`} onClick={() => setComboBoard('late')} title="The latest bettable board — built only from games that hadn't started yet (what you could realistically bet late)">
+                Evening board
+              </button>
+            </div>
+          )}
           {comboDates.length > 1 && (
             <div className="hr-days">
               {comboDates.map((d) => (
@@ -213,6 +229,11 @@ export default function ResultsView({ meta }) {
               ))}
             </div>
           )}
+          <p className="chart-cap dim" style={{ marginTop: 2 }}>
+            {board === 'late'
+              ? 'Evening board — the latest combos built only from games that hadn’t started, i.e. what you could realistically still bet late.'
+              : 'Full board — all games, each bat frozen at its first pitch.'}
+          </p>
           <ul className="combo-res">
             {dayCombos.map((c, i) => (
               <li className={`combo-res-row ${c.allHit ? 'hit' : 'miss'}`} key={`${c.strategy}-${c.size}-${i}`}>
