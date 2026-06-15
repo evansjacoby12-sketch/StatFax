@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import Icon from './Icon.jsx'
 import { GradeChip } from './atoms.jsx'
 import { pct, num, rate, american, signedPct } from '../lib/format.js'
-import { buildGroups, lastFirst, isoOf } from '../lib/groups.js'
+import { buildGroups, lastFirst, isoOf, blastOf } from '../lib/groups.js'
 import { useLiveMode } from '../lib/liveMode.js'
 
 const GROUP_GRADE_COLOR = { S: '#f5a623', A: '#32d74b', B: '#3b82f6', C: '#9aa6b6', D: '#6b7787' }
@@ -347,6 +347,11 @@ function GroupLeg({ b, idx, onSelect, selected, bad, weakest, reasons }) {
             </span>
           )}
           {b.hot && <Icon name="Flame" size={12} className="grp-fire" />}
+          {b.blast && (
+            <span className="grp-chip blast" title={`Blasting ${num(blastOf(b), 0)}% lately — fast, squared-up contact (bat tracking)`}>
+              <Icon name="Zap" size={10} /> BLAST
+            </span>
+          )}
           {(condUp || condDown) && <span className={`grp-chip ${condUp ? 'good' : 'bad'}`}>COND{condUp ? '↑' : '↓'}</span>}
           {b.primaryPitchEdge?.passes && (
             <span className="grp-chip pitch" title={`Mashes the ${b.primaryPitchEdge.pitchName || 'top'} pitch`}>
@@ -366,6 +371,12 @@ function GroupLeg({ b, idx, onSelect, selected, bad, weakest, reasons }) {
             <>
               {' · '}
               <Icon name="Crosshair" size={10} /> {num(barrel, 0)}%
+            </>
+          )}
+          {blastOf(b) != null && (
+            <>
+              {' · '}
+              <span className={b.blast ? 'grp-blast-hot' : ''}><Icon name="Zap" size={10} /> {num(blastOf(b), 0)}%</span>
             </>
           )}
           {iso != null && <> · ISO {rate(iso)}</>}

@@ -1034,6 +1034,47 @@ async function fetchSavantBatterStatsAll(year = SEASON) {
 }
 
 /**
+ * League-wide Statcast BAT-TRACKING leaderboard (bat speed, blast rate,
+ * squared-up rate). Separate endpoint from the contact-quality leaderboards.
+ * "Blast" = a swing that's both fast AND squared-up — the most HR-predictive
+ * slice of bat tracking. Returns { [playerId]: { batSpeed, blastPct,
+ * blastPerContact, squaredUpPct, hardSwingPct, swingLength, swings } } with the
+ * rate fields as 0-100 percentages. Best-effort: {} if Savant rate-limits.
+ *
+ * Pass { dateStart, dateEnd } for a recent window (sharps watch recent blast
+ * rate — a bat blasting 40%+ over its last handful of games is a live power
+ * signal). minSwings is the sample gate ('q' = season-qualified; a number for
+ * windowed pulls where nobody qualifies yet).
+ */
+async function fetchSavantBatTracking(year = SEASON, { dateStart = '', dateEnd = '', minSwings = 'q' } = {}) {
+  const pf = v => (v != null && v !== '' ? parseFloat(v) : null);
+  const pct = v => { const n = pf(v); return n == null ? null : n * 100; }; // fraction → %
+  const out = {};
+  try {
+    const rows = await savantCSV(
+      `https://baseballsavant.mlb.com/leaderboard/bat-tracking` +
+      `?attackZone=&batSide=&contactType=&count=&dateStart=${dateStart}&dateEnd=${dateEnd}&gameType=&isHardHit=` +
+      `&minSwings=${minSwings}&minGroupSwings=1&pitchHand=&pitchType=&seasonStart=&seasonEnd=&team=` +
+      `&type=batter&year=${year}&csv=true`
+    );
+    for (const p of rows) {
+      const id = Number(p.id ?? p.player_id);
+      if (!id) continue;
+      out[id] = {
+        batSpeed:       pf(p.avg_bat_speed),              // mph
+        blastPct:       pct(p.blast_per_swing),           // blasts per competitive swing, %
+        blastPerContact: pct(p.blast_per_bat_contact),    // blasts per bat-contact, %
+        squaredUpPct:   pct(p.squared_up_per_swing),      // %
+        hardSwingPct:   pct(p.hard_swing_rate),           // fast-swing rate, %
+        swingLength:    pf(p.swing_length),               // ft
+        swings:         pf(p.swings_competitive),         // sample size
+      };
+    }
+  } catch { /* best-effort — model unaffected if bat tracking is unavailable */ }
+  return out;
+}
+
+/**
  * League-wide Statcast contact-quality + zone data for all qualified pitchers.
  * Returns { [pitcherId]: { hardHitPctAllowed, barrelPctAllowed, ... } }.
  */
@@ -2050,6 +2091,8 @@ async function main() {
     bullpenSplits,
     umpiresByGame,
     catcherFraming,
+    batTracking,
+    batTrackingRecent,
   ] = await Promise.all([
     fetchBatterStatsBatch(batterIdArr),
     fetchPitcherStatsBatch(pitcherIdArr),
@@ -2069,6 +2112,11 @@ async function main() {
     fetchBullpenSplitsBatch(batterIdArr),
     fetchHomePlateUmpires(games),
     fetchCatcherFraming(SEASON),
+    fetchSavantBatTracking(),
+    // Recent ~2-week bat-tracking window — the "blasting lately" signal sharps
+    // watch (40%+ recent blast rate = live power). minSwings low since nobody
+    // is season-qualified inside a 14-day slice.
+    fetchSavantBatTracking(SEASON, { dateStart: ctDateMinusDays(14), dateEnd: todayInTZ(), minSwings: 10 }),
   ]);
 
   // 7) Pitcher recent form (gameLog) — per-pitcher fetch, parallelized
@@ -2595,6 +2643,20 @@ async function main() {
           barrelPctBBE: savantStats?.barrelPctBBE ?? null,
           exitVelo:   savantStats?.exitVelo   ?? null,
           hardHitPct: savantStats?.hardHitPct ?? null,
+          // Bat tracking (Statcast 2024+): bat speed + BLAST rate. "Blast" =
+          // a swing that's fast AND squared-up — the most HR-predictive slice.
+          // We carry season + a recent ~2-week window (recentBlastPct), since a
+          // bat blasting 40%+ lately is a live power signal regardless of its
+          // season line. All rate fields are 0-100 %. Null when Savant is dry.
+          batTracking: (batTracking[id] || batTrackingRecent[id]) ? {
+            batSpeed:        batTracking[id]?.batSpeed ?? null,
+            blastPct:        batTracking[id]?.blastPct ?? null,            // per swing, season
+            blastPerContact: batTracking[id]?.blastPerContact ?? null,    // per bat-contact, season
+            squaredUpPct:    batTracking[id]?.squaredUpPct ?? null,
+            recentBlastPct:        batTrackingRecent[id]?.blastPct ?? null,         // per swing, ~14d
+            recentBlastPerContact: batTrackingRecent[id]?.blastPerContact ?? null,  // per bat-contact, ~14d
+            recentSwings:    batTrackingRecent[id]?.swings ?? null,
+          } : null,
           // Launch angle — was previously NOT surfaced on the row even
           // though scoreBatter uses it. Heat Index "LA in HR window" check
           // needs it; without it that check could never pass.

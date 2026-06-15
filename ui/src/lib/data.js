@@ -139,6 +139,18 @@ export async function loadSlate() {
       // Boolean signal: elite barrel rate (top ~10% of MLB, ≥13% of batted
       // balls). Matches the backend's barrelKing definition (backtest/reconcile).
       barrelKing: (b.barrelPctBBE ?? b.barrelPct ?? 0) >= 13,
+      // Boolean signal: elite BLAST rate (Statcast bat tracking) — fast,
+      // squared-up contact. Recent ~2wk blasts-per-squared-up-contact preferred
+      // (real swing sample), season fallback; flags the top blasters (≥25%, ≈
+      // top ~8% of the slate). Mirrors groups.js / parlay-combos.mjs.
+      blast: (() => {
+        const t = b.batTracking
+        if (!t) return false
+        const r = Number.isFinite(t.recentBlastPerContact) && (t.recentSwings ?? 0) >= 25
+          ? t.recentBlastPerContact
+          : Number.isFinite(t.blastPerContact) ? t.blastPerContact : null
+        return Number.isFinite(r) && r >= 25
+      })(),
       // Boolean signal: facing a fly-ball-prone starter (GO/AO well below the
       // ~1.15 league norm) — more balls in the air, an HR-friendly matchup.
       // (RudeBets' "vs FB Pitcher".) Needs a real IP sample to be trustworthy.

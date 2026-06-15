@@ -32,6 +32,18 @@ const STACK_SIGNALS = { hot: 3, barrelKing: 2, homeEdge: 2, bullpenLegend: 2, aw
 const signalScore = (b) => Object.entries(STACK_SIGNALS).reduce((s, [k, w]) => s + (b[k] ? w : 0), 0);
 const signalCount = (b) => Object.keys(STACK_SIGNALS).reduce((n, k) => n + (b[k] ? 1 : 0), 0);
 
+// Blast rate (Statcast bat tracking) — "blast" = a swing that's both fast and
+// squared-up, the most HR-predictive slice. Prefer the recent ~2-week window
+// (blasting lately = live power) when it has a real sample; fall back to season.
+// Returned as blasts-per-squared-up-contact %, matching the number sharps quote.
+const BLAST_ELITE = 25; // ≈ top ~8% of the slate (recent per-contact p90 ≈ 23)
+function blastRate(row) {
+  const t = row.batTracking;
+  if (!t) return null;
+  if (Number.isFinite(t.recentBlastPerContact) && (t.recentSwings ?? 0) >= 25) return t.recentBlastPerContact;
+  return Number.isFinite(t.blastPerContact) ? t.blastPerContact : null;
+}
+
 // Heat index — mirrors ui/src/lib/scout.js heatBreakdown().total (kept in sync
 // by hand, like the strategy math). Used so the `hot` strategy can rank on a
 // blend of BOTH heat signals: heatIndex × the recent-form multiplier.
@@ -64,6 +76,15 @@ const mixRank = (b) =>
   0.25 * clamp((b.barrel ?? 0) / 25, 0, 1) +
   0.25 * ((b.heat ?? 0) / 100);
 
+// Power rank — barrel (45%) + recent L14 barrel (30%) + blast rate (25%), all
+// normalized 0-1. Blast is the bat-speed/squared-up leg of raw power. Recent
+// barrel falls back to season when there's no L14 sample; blast to 0.
+const norm01 = (v, hi) => clamp((v ?? 0) / hi, 0, 1);
+const powerRank = (b) =>
+  0.45 * norm01(b.barrel, 25) +
+  0.30 * (Number.isFinite(b.recentBarrel) ? norm01(b.recentBarrel, 25) : norm01(b.barrel, 25)) +
+  0.25 * norm01(b.blast, 30);
+
 const STRATEGIES = [
   { key: 'top',     rank: (b) => b.score,          require: null },
   { key: 'mix',     rank: mixRank,                 require: null },
@@ -72,10 +93,11 @@ const STRATEGIES = [
   // signals) rather than the overall score — otherwise it just re-picks `top`'s
   // legs, since hot bats already score high.
   { key: 'hot',     rank: (b) => (b.heat ?? 0) * (b.heatMult ?? 1), require: (b) => b.hot },
-  // power: blend season barrel (60%) with recent L14 barrel (40%) so it rewards
-  // current form, not just career barrel kings. Eligibility still gates on the
-  // stable season number. Falls back to season when there's no recent sample.
-  { key: 'power',   rank: (b) => (Number.isFinite(b.recentBarrel) ? 0.6 * (b.barrel ?? 0) + 0.4 * b.recentBarrel : (b.barrel ?? 0)), require: (b) => Number.isFinite(b.barrel) && b.barrel >= 9 },
+  // power: blend season barrel, recent L14 barrel, and BLAST rate (bat tracking)
+  // — all normalized 0-1 — so it rewards true thump and current form, not just
+  // career barrel kings. Blast (fast + squared-up contact) is the bat-speed leg
+  // of power. Eligibility still gates on the stable season barrel.
+  { key: 'power',   rank: (b) => powerRank(b), require: (b) => Number.isFinite(b.barrel) && b.barrel >= 9 },
   // matchup & park anchor on batter quality (score) × the environmental tilt, so
   // a homer-prone matchup / launch pad lifts a GOOD bat instead of ranking a
   // weak bat purely on the ~1.0–1.3× environmental signal. (Badge audit: grade
@@ -115,6 +137,10 @@ export function comboRowFromSnapshot(row) {
         : null,
     park,
     air, // park × weather × hand — the Park & Air strategy ranks on this
+    // Blast rate (bat tracking) — recent-preferred blasts-per-squared-up-contact
+    // %, folded into the power rank. blastKing flags an elite blaster.
+    blast: blastRate(row),
+    blastKing: (() => { const r = blastRate(row); return Number.isFinite(r) && r >= BLAST_ELITE; })(),
     // Opposing-pitcher HR/9. Fall back to a league-average prior (~1.25) for an
     // arm with no current-season sample (call-up / season debut, e.g. Estes) so
     // the matchup strategy treats him as neutral rather than blind — it won't

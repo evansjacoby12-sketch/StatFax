@@ -11,6 +11,18 @@ const SIZES = [2, 3, 4, 5, 6, 7, 8]
 
 const barrelOf = (b) => (Number.isFinite(b.barrelPctBBE) ? b.barrelPctBBE : b.barrelPct)
 
+// Blast rate (Statcast bat tracking) — recent ~2wk blasts-per-squared-up-contact
+// preferred (needs a real swing sample), season as fallback. Mirrors
+// server/parlay-combos.mjs blastRate(). 0-100 %. BLAST_ELITE flags a top blaster.
+export const BLAST_ELITE = 25
+export const blastOf = (b) => {
+  const t = b.batTracking
+  if (!t) return null
+  if (Number.isFinite(t.recentBlastPerContact) && (t.recentSwings ?? 0) >= 25) return t.recentBlastPerContact
+  return Number.isFinite(t.blastPerContact) ? t.blastPerContact : null
+}
+const norm01 = (v, hi) => Math.min(1, Math.max(0, (v ?? 0) / hi))
+
 // Proven HR signals, weighted by the badge audit's within-grade lift (hot &
 // barrelKing carry the most; park/weather the least). "due" is excluded — it's
 // the gambler's-fallacy signal we falsified. Drives the Signal Stack combo,
@@ -70,13 +82,15 @@ const STRATEGIES = [
     key: 'power',
     label: 'Power Bats',
     icon: 'Crosshair',
-    desc: 'elite barrel rate',
-    // Blend season barrel (60%) with recent L14 barrel (40%) so it rewards
-    // current form, not just career barrel leaders (mirrors parlay-combos.mjs).
+    desc: 'barrel + blast rate',
+    // Barrel (45%) + recent L14 barrel (30%) + BLAST rate (25%), all normalized
+    // 0-1. Blast (fast + squared-up contact) is the bat-speed leg of raw power.
+    // Mirrors server/parlay-combos.mjs powerRank().
     rank: (b) => {
-      const s = barrelOf(b) ?? 0
-      const r = b.recentBarrel?.recentBarrelPct
-      return Number.isFinite(r) && (b.recentBarrel?.recentBBE ?? 0) >= 6 ? 0.6 * s + 0.4 * r : s
+      const barrel = norm01(barrelOf(b), 25)
+      const rb = b.recentBarrel?.recentBarrelPct
+      const recent = Number.isFinite(rb) && (b.recentBarrel?.recentBBE ?? 0) >= 6 ? norm01(rb, 25) : barrel
+      return 0.45 * barrel + 0.30 * recent + 0.25 * norm01(blastOf(b), 30)
     },
     require: (b) => Number.isFinite(barrelOf(b)) && barrelOf(b) >= 9,
   },
