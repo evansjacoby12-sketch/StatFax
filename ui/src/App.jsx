@@ -438,14 +438,14 @@ export default function App() {
                   <Icon name="TriangleAlert" size={15} className="lb-inline-icon" />
                   {lineupStatus.confirmed === 0 ? (
                     <>
-                      <b>Lineups not posted yet.</b> Projections use probable lineups — <b>only place bets on confirmed lineups.</b> Re-check near first pitch.
+                      <b>Lineups not posted yet.</b> Projections use probable lineups — <b>including the Pick of the Day below</b> — so <b>only place bets on confirmed lineups.</b> Re-check near first pitch.
                     </>
                   ) : (
                     <>
                       <b>
                         {lineupStatus.confirmed}/{lineupStatus.total} lineups confirmed.
                       </b>{' '}
-                      Unconfirmed bats are projections and may be benched — <b>only bet legs whose lineup is confirmed.</b>
+                      Unconfirmed bats are projections and may be benched — <b>only bet legs whose lineup is confirmed</b> (the Pick of the Day shows its own Confirmed / Projected status).
                     </>
                   )}
                 </p>
