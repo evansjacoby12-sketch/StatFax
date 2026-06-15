@@ -3814,6 +3814,33 @@ button.th:hover {
   transition: transform 0.15s;
 }
 .set-switch.on .set-knob { transform: translateX(17px); }
+
+/* Segmented selector (Off / Stars / %) in Settings */
+.set-seg {
+  flex: none;
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.set-seg-btn {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 5px 9px;
+  background: var(--card);
+  color: var(--text-dim);
+  border: none;
+  border-right: 1px solid var(--border);
+  cursor: pointer;
+}
+.set-seg-btn:last-child { border-right: none; }
+.set-seg-btn.on { background: color-mix(in srgb, var(--good) 55%, transparent); color: #fff; }
+
+/* Per-combo confidence badge (stars / %) on the combo card header */
+.grp-conf { font-size: 11px; font-weight: 700; letter-spacing: 0.5px; color: #f5a623; }
+.grp-conf-off { color: var(--border-soft, #444); }
+.grp-conf.pct { color: var(--good); font-size: 12px; letter-spacing: 0; }
+
 .guide-list {
   display: flex;
   flex-direction: column;

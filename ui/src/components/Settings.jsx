@@ -6,6 +6,8 @@ export default function Settings({
   liveScores, onToggleLive,
   autoRefresh, onToggleAuto,
   windowMode, onToggleWindows,
+  showDayRating, onToggleDayRating,
+  comboConf, onSetComboConf,
   onClose,
 }) {
   const groups = [
@@ -18,6 +20,13 @@ export default function Settings({
           desc: 'Show live scores + innings and auto-update while games are in progress. Off = a clean pregame look.',
           on: liveScores,
           toggle: onToggleLive,
+        },
+        {
+          icon: 'Gauge',
+          label: 'Day Rating',
+          desc: 'Show the 1-5★ "should I bet HR props today?" gauge at the top of the board.',
+          on: showDayRating,
+          toggle: onToggleDayRating,
         },
       ],
     },
@@ -42,6 +51,14 @@ export default function Settings({
           desc: 'Group the slate into start windows on the Combos page, so you can build same-window combos that lock together — no staggered-start trap.',
           on: windowMode,
           toggle: onToggleWindows,
+        },
+        {
+          icon: 'Trophy',
+          label: 'Combo confidence',
+          desc: 'Show a confidence level on each combo — Stars (quality: clean tail of strong legs = 5★) or % (the actual chance every leg homers).',
+          segments: [['off', 'Off'], ['stars', 'Stars'], ['percent', '%']],
+          value: comboConf,
+          onSet: onSetComboConf,
         },
       ],
     },
@@ -72,15 +89,30 @@ export default function Settings({
                     <b>{r.label}</b>
                     <span className="dim">{r.desc}</span>
                   </span>
-                  <button
-                    className={`set-switch ${r.on ? 'on' : ''}`}
-                    onClick={r.toggle}
-                    role="switch"
-                    aria-checked={r.on}
-                    aria-label={r.label}
-                  >
-                    <span className="set-knob" />
-                  </button>
+                  {r.segments ? (
+                    <span className="set-seg" role="group" aria-label={r.label}>
+                      {r.segments.map(([val, lbl]) => (
+                        <button
+                          key={val}
+                          className={`set-seg-btn ${r.value === val ? 'on' : ''}`}
+                          onClick={() => r.onSet(val)}
+                          aria-pressed={r.value === val}
+                        >
+                          {lbl}
+                        </button>
+                      ))}
+                    </span>
+                  ) : (
+                    <button
+                      className={`set-switch ${r.on ? 'on' : ''}`}
+                      onClick={r.toggle}
+                      role="switch"
+                      aria-checked={r.on}
+                      aria-label={r.label}
+                    >
+                      <span className="set-knob" />
+                    </button>
+                  )}
                 </div>
               ))}
             </div>

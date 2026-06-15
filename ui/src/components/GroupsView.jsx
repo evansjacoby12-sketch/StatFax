@@ -212,7 +212,18 @@ function computeWindows(gameList) {
 }
 
 // Cross-Game HR Groups — auto-built multi-leg parlays, one best bat per game.
-export default function GroupsView({ batters, onSelect, selectedId, scorecard, generatedAt, windowMode = false }) {
+// Combo confidence — Stars (quality: clean tail of strong legs → 5★, dinged by
+// caution/weak flags and weaker legs) and % (the real all-hit chance, g.allHit).
+function comboStars(g, tone) {
+  const probs = g.legs.map((b) => b.hrProbability).filter(Number.isFinite)
+  const avg = probs.length ? probs.reduce((s, p) => s + p, 0) / probs.length : 0
+  const normP = Math.min(1, Math.max(0, (avg - 0.15) / (0.27 - 0.15)))
+  const penalty = tone === 'risk' ? 0.45 : tone === 'caution' ? 0.2 : 0
+  const conf = Math.min(1, Math.max(0, normP - penalty))
+  return Math.max(1, Math.round(1 + conf * 4))
+}
+
+export default function GroupsView({ batters, onSelect, selectedId, scorecard, generatedAt, windowMode = false, comboConf = 'off' }) {
   const [size, setSize] = useState(2)
   const [games, setGames] = useState(() => new Set()) // empty = all games
   // Hide started defaults ON: HR props can't be bet pregame once the game is
@@ -355,7 +366,7 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard, g
       {available.length ? (
         <div className="grp-list">
           {shownGroups.map((g) => (
-            <GroupCard key={g.id} g={g} onSelect={onSelect} selectedId={selectedId} />
+            <GroupCard key={g.id} g={g} onSelect={onSelect} selectedId={selectedId} comboConf={comboConf} />
           ))}
           {groups.length > shownGroups.length && (
             <div className="grp-trim dim">
@@ -374,7 +385,7 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard, g
   )
 }
 
-function GroupCard({ g, onSelect, selectedId }) {
+function GroupCard({ g, onSelect, selectedId, comboConf = 'off' }) {
   const gc = GROUP_GRADE_COLOR[g.grade] || '#6b7787'
   const names = g.legs.map((b) => lastFirst(b.name).split(',')[0]).join(' + ')
   const { legs: legInfo, weakestIdx, tone } = assessCombo(g)
@@ -418,6 +429,14 @@ function GroupCard({ g, onSelect, selectedId }) {
           <span className="grp-locked-tag" title="All lineups confirmed — this combo is locked in & bettable, and it's the version that gets graded for the record.">
             <Icon name="Lock" size={10} /> LOCKED
           </span>
+        )}
+        {comboConf === 'stars' && (() => { const s = comboStars(g, tone); return (
+          <span className="grp-conf" title={`Confidence ${s}/5 — combo quality (leg strength minus caution/weak flags)`}>
+            {'★'.repeat(s)}<span className="grp-conf-off">{'★'.repeat(5 - s)}</span>
+          </span>
+        ) })()}
+        {comboConf === 'percent' && (
+          <span className="grp-conf pct" title="Chance every leg homers (all-hit probability)">{pct(g.allHit, g.allHit < 0.01 ? 2 : 1)}</span>
         )}
         <span className="grp-grade" style={{ color: gc, borderColor: gc }}>{g.grade}</span>
       </header>

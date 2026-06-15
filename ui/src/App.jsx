@@ -77,6 +77,8 @@ export default function App() {
   const [showBacktest, setShowBacktest] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [windowMode, setWindowMode] = useState(() => store.load('windowMode', true))
+  const [showDayRating, setShowDayRating] = useState(() => store.load('showDayRating', true))
+  const [comboConf, setComboConf] = useState(() => store.load('comboConf', 'off')) // 'off' | 'stars' | 'percent'
   const [watchlist, setWatchlist] = useState(() => new Set(store.load('watchlist', [])))
   const [slipIds, setSlipIds] = useState(() => store.load('slip', []))
   const [autoRefresh, setAutoRefresh] = useState(() => store.load('autoRefresh', false))
@@ -104,6 +106,8 @@ export default function App() {
   useEffect(() => store.save('slip', slipIds), [slipIds])
   useEffect(() => store.save('autoRefresh', autoRefresh), [autoRefresh])
   useEffect(() => store.save('windowMode', windowMode), [windowMode])
+  useEffect(() => store.save('showDayRating', showDayRating), [showDayRating])
+  useEffect(() => store.save('comboConf', comboConf), [comboConf])
   useEffect(() => store.save('podDismissed', podDismissedId), [podDismissedId])
   useEffect(() => {
     store.save('view', view)
@@ -430,7 +434,7 @@ export default function App() {
           />
         ) : (
           <>
-            <DayRating rating={data.meta?.dayRating} />
+            {showDayRating && <DayRating rating={data.meta?.dayRating} />}
             {lineupStatus.total > 0 && lineupStatus.confirmed < lineupStatus.total && !lineupNoticeOff && (
               <div className="lineup-banner" role="status">
                 <button className="lb-close icon-btn" onClick={() => setLineupNoticeOff(true)} aria-label="Dismiss">
@@ -547,6 +551,7 @@ export default function App() {
                 scorecard={data.meta?.comboScorecard}
                 generatedAt={data.meta?.generatedAt}
                 windowMode={windowMode}
+                comboConf={comboConf}
               />
             </div>
           </div>
@@ -619,6 +624,10 @@ export default function App() {
           onToggleAuto={() => setAutoRefresh((v) => !v)}
           windowMode={windowMode}
           onToggleWindows={() => setWindowMode((v) => !v)}
+          showDayRating={showDayRating}
+          onToggleDayRating={() => setShowDayRating((v) => !v)}
+          comboConf={comboConf}
+          onSetComboConf={setComboConf}
           onClose={() => setShowSettings(false)}
         />
       )}
