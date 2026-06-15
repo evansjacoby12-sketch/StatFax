@@ -15,7 +15,8 @@
     "lab:train": "node model-lab/train-logreg.mjs",
     "lab:score": "node model-lab/score-offline.mjs",
     "lab:audit": "node model-lab/badge-audit.mjs",
-    "lab:blast": "node model-lab/blast-audit.mjs"
+    "lab:blast": "node model-lab/blast-audit.mjs",
+    "lab:blast-model": "node model-lab/blast-model.mjs"
   },
   "devDependencies": {
     "esbuild": "^0.28.0"
