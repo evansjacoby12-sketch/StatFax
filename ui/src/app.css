@@ -3767,6 +3767,48 @@ button.th:hover {
 .guide-modal {
   width: 560px; /* base .modal keeps max-width:94vw so it fits phones */
 }
+
+/* Settings page */
+.settings-modal { width: 480px; }
+.set-list { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+.set-row {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 11px 12px;
+  border-radius: 11px;
+  border: 1px solid var(--border);
+  background: var(--card-2, rgba(255,255,255,0.02));
+}
+.set-ico { flex: none; color: var(--text-dim); display: inline-flex; }
+.set-txt { display: flex; flex-direction: column; gap: 2px; flex: 1; font-size: 12.5px; line-height: 1.4; }
+.set-txt b { font-weight: 700; }
+.set-switch {
+  flex: none;
+  width: 40px;
+  height: 23px;
+  border-radius: 99px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  position: relative;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.set-switch.on {
+  background: color-mix(in srgb, var(--good) 55%, transparent);
+  border-color: color-mix(in srgb, var(--good) 60%, transparent);
+}
+.set-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.15s;
+}
+.set-switch.on .set-knob { transform: translateX(17px); }
 .guide-list {
   display: flex;
   flex-direction: column;

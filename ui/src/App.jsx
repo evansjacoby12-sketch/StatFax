@@ -22,6 +22,7 @@ import ParlaySlip from './components/ParlaySlip.jsx'
 import Legend from './components/Legend.jsx'
 import Guide from './components/Guide.jsx'
 import HowToPick from './components/HowToPick.jsx'
+import Settings from './components/Settings.jsx'
 import Skeleton from './components/Skeleton.jsx'
 import BackToTop from './components/BackToTop.jsx'
 import PullToRefresh from './components/PullToRefresh.jsx'
@@ -73,6 +74,8 @@ export default function App() {
   const [showSGP, setShowSGP] = useState(false)
   const [showSplits, setShowSplits] = useState(false)
   const [showBacktest, setShowBacktest] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
+  const [windowMode, setWindowMode] = useState(() => store.load('windowMode', false))
   const [watchlist, setWatchlist] = useState(() => new Set(store.load('watchlist', [])))
   const [slipIds, setSlipIds] = useState(() => store.load('slip', []))
   const [autoRefresh, setAutoRefresh] = useState(() => store.load('autoRefresh', false))
@@ -99,6 +102,7 @@ export default function App() {
   useEffect(() => store.save('watchlist', [...watchlist]), [watchlist])
   useEffect(() => store.save('slip', slipIds), [slipIds])
   useEffect(() => store.save('autoRefresh', autoRefresh), [autoRefresh])
+  useEffect(() => store.save('windowMode', windowMode), [windowMode])
   useEffect(() => store.save('podDismissed', podDismissedId), [podDismissedId])
   useEffect(() => {
     store.save('view', view)
@@ -379,6 +383,7 @@ export default function App() {
           onOpenSGP={() => setShowSGP(true)}
           onOpenSplits={() => setShowSplits(true)}
           onOpenBacktest={() => setShowBacktest(true)}
+          onOpenSettings={() => setShowSettings(true)}
         />
 
         <Filters
@@ -539,6 +544,7 @@ export default function App() {
                 selectedId={selectedId}
                 scorecard={data.meta?.comboScorecard}
                 generatedAt={data.meta?.generatedAt}
+                windowMode={windowMode}
               />
             </div>
           </div>
@@ -603,6 +609,17 @@ export default function App() {
       {showLegend && <Legend onClose={() => setShowLegend(false)} />}
       {showGuide && <Guide onClose={() => setShowGuide(false)} />}
       {showHowTo && <HowToPick onClose={() => setShowHowTo(false)} />}
+      {showSettings && (
+        <Settings
+          liveScores={liveScores}
+          onToggleLive={() => setLiveScores((v) => !v)}
+          autoRefresh={autoRefresh}
+          onToggleAuto={() => setAutoRefresh((v) => !v)}
+          windowMode={windowMode}
+          onToggleWindows={() => setWindowMode((v) => !v)}
+          onClose={() => setShowSettings(false)}
+        />
+      )}
       <BackToTop />
       <PullToRefresh onRefresh={load} />
       <UpdateBanner />

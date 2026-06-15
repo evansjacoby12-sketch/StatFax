@@ -4,7 +4,7 @@ import { timeAgo, pct } from '../lib/format.js'
 import { GRADE_ORDER, gradeColor } from '../lib/badges.js'
 
 // Help dropdown anchored to the header info button: Groups, Guide, How to Pick, Legend.
-function HelpMenu({ onOpenGroups, onOpenSGP, onOpenSplits, onOpenBacktest, onOpenGuide, onOpenHowTo, onOpenLegend }) {
+function HelpMenu({ onOpenGroups, onOpenSGP, onOpenSplits, onOpenBacktest, onOpenGuide, onOpenHowTo, onOpenLegend, onOpenSettings }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
   useEffect(() => {
@@ -28,6 +28,7 @@ function HelpMenu({ onOpenGroups, onOpenSGP, onOpenSplits, onOpenBacktest, onOpe
     { label: 'How to Pick', desc: 'HR-selection playbook', icon: 'Target', fn: onOpenHowTo },
     { label: 'Guide', desc: 'How the board works', icon: 'Info', fn: onOpenGuide },
     { label: 'Legend', desc: 'Grades, signals & stats', icon: 'Trophy', fn: onOpenLegend },
+    { label: 'Settings', desc: 'Live, auto-refresh, combo windows', icon: 'SlidersHorizontal', fn: onOpenSettings },
   ]
   return (
     <div className="help-menu" ref={ref}>
@@ -85,6 +86,7 @@ export default function Header({
   onOpenSGP,
   onOpenSplits,
   onOpenBacktest,
+  onOpenSettings,
 }) {
   const m = meta.modelMetrics
   const brierEdge = m ? (m.baselineBrier - m.brier) / m.baselineBrier : null
@@ -175,17 +177,7 @@ export default function Header({
           {liveScores ? 'Live' : 'Pregame'}
         </button>
 
-        <button
-          className={`toggle-btn auto-btn ${autoRefresh ? 'on' : ''}`}
-          onClick={onToggleAuto}
-          title="Auto-refresh the slate every 60s (for live games)"
-          aria-pressed={autoRefresh}
-        >
-          <Icon name="Radio" size={14} className={autoRefresh ? 'spin-pulse' : ''} />
-          Auto
-        </button>
-
-        <HelpMenu onOpenGroups={onOpenGroups} onOpenSGP={onOpenSGP} onOpenSplits={onOpenSplits} onOpenBacktest={onOpenBacktest} onOpenGuide={onOpenGuide} onOpenHowTo={onOpenHowTo} onOpenLegend={onOpenLegend} />
+        <HelpMenu onOpenGroups={onOpenGroups} onOpenSGP={onOpenSGP} onOpenSplits={onOpenSplits} onOpenBacktest={onOpenBacktest} onOpenGuide={onOpenGuide} onOpenHowTo={onOpenHowTo} onOpenLegend={onOpenLegend} onOpenSettings={onOpenSettings} />
 
         <button
           className={`icon-btn ${refreshing ? 'refreshing' : ''}`}

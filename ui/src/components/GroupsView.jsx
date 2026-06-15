@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState } from 'react'
 import Icon from './Icon.jsx'
 import { GradeChip } from './atoms.jsx'
 import { pct, num, rate, american, signedPct } from '../lib/format.js'
@@ -212,21 +212,14 @@ function computeWindows(gameList) {
 }
 
 // Cross-Game HR Groups — auto-built multi-leg parlays, one best bat per game.
-export default function GroupsView({ batters, onSelect, selectedId, scorecard, generatedAt }) {
+export default function GroupsView({ batters, onSelect, selectedId, scorecard, generatedAt, windowMode = false }) {
   const [size, setSize] = useState(2)
   const [games, setGames] = useState(() => new Set()) // empty = all games
   // Hide started defaults ON: HR props can't be bet pregame once the game is
   // live, so combos built on started games are usually unplaceable.
   const [hideStarted, setHideStarted] = useState(true)
   const [confirmedOnly, setConfirmedOnly] = useState(false)
-  // Optional setting (persisted): cluster the slate into start windows so you can
-  // build same-window combos. Off by default.
-  const [windowMode, setWindowMode] = useState(() => {
-    try { return localStorage.getItem('sf.combos.windows') === '1' } catch { return false }
-  })
-  useEffect(() => {
-    try { localStorage.setItem('sf.combos.windows', windowMode ? '1' : '0') } catch { /* ignore */ }
-  }, [windowMode])
+  // windowMode (start-window grouping) is an app-level setting — see Settings.
 
   // Distinct, still-playable games in the pool — for the game selector.
   const gameList = useMemo(() => {
@@ -347,14 +340,6 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard, g
           title="Only batters in a confirmed lineup"
         >
           <Icon name="UserCheck" size={12} /> Confirmed only
-        </button>
-        <button
-          className={`badge-toggle ${windowMode ? 'on' : ''}`}
-          onClick={() => setWindowMode((v) => !v)}
-          aria-pressed={windowMode}
-          title="Group games into start windows — build same-window combos that lock together (no staggered-start trap)"
-        >
-          <Icon name="Clock" size={12} /> Windows
         </button>
       </div>
       {available.length ? (
