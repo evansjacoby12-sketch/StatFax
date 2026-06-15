@@ -28,6 +28,7 @@ export default function ResultsView({ meta }) {
   const [log, setLog] = useState(null)
   const [err, setErr] = useState(null)
   const [hrDay, setHrDay] = useState(null) // null = all days
+  const [comboDay, setComboDay] = useState(null) // null = latest
   useEffect(() => {
     let alive = true
     fetch(`${import.meta.env.BASE_URL}data/backtest-log.json`, { cache: 'no-store' })
@@ -82,6 +83,36 @@ export default function ResultsView({ meta }) {
       topHits: prime.filter((r) => r.homered).length,
     }
   })
+
+  // Exact graded combos per day — the canonical pregame parlays + which legs
+  // homered. log.combos.byDate stores { strategy, size, legs:[playerId], allHit };
+  // resolve each leg's name + HR from that day's records.
+  const STRAT_LABEL = { top: 'Top Picks', mix: 'Best Mix', stack: 'Signal Stack', hot: 'Hot Hand', power: 'Power Bats', matchup: 'Soft Matchup', park: 'Park & Air' }
+  const comboByDate = log.combos?.byDate || {}
+  const comboDates = Object.keys(comboByDate).filter((d) => (comboByDate[d] || []).length).sort().reverse()
+  const activeComboDay = comboDay && comboDates.includes(comboDay) ? comboDay : comboDates[0] || null
+  const recByDay = (d) => {
+    const map = new Map()
+    for (const r of log.records?.[d] || []) map.set(Number(r.playerId), r)
+    return map
+  }
+  const dayCombos = (() => {
+    if (!activeComboDay) return []
+    const recs = recByDay(activeComboDay)
+    return (comboByDate[activeComboDay] || [])
+      .map((c) => ({
+        strategy: c.strategy,
+        size: c.size,
+        allHit: c.allHit,
+        nHit: c.nHit ?? (c.legs || []).filter((pid) => recs.get(Number(pid))?.homered).length,
+        legs: (c.legs || []).map((pid) => {
+          const r = recs.get(Number(pid))
+          return { name: (r?.name || `#${pid}`).split(' ').slice(-1)[0], homered: r?.homered === true }
+        }),
+      }))
+      .sort((a, b) => Number(b.allHit) - Number(a.allHit) || a.size - b.size)
+  })()
+  const comboCashed = dayCombos.filter((c) => c.allHit).length
 
   const m = meta.modelMetrics
   const reliability = m?.reliability || []
@@ -164,6 +195,43 @@ export default function ResultsView({ meta }) {
         )}
         <p className="chart-cap dim">Every PRIME &amp; STRONG graded pick that homered, newest first. LEAN and SKIP are hidden.</p>
       </section>
+
+      {comboDates.length > 0 && (
+        <section className="results-card">
+          <h3 className="section-title">
+            <Icon name="Layers" size={14} /> Combo results
+            <span className="dim" style={{ fontWeight: 400, marginLeft: 6 }}>
+              · {comboCashed}/{dayCombos.length} cashed{activeComboDay ? ` on ${activeComboDay.slice(5)}` : ''}
+            </span>
+          </h3>
+          {comboDates.length > 1 && (
+            <div className="hr-days">
+              {comboDates.map((d) => (
+                <button key={d} className={`hr-day ${activeComboDay === d ? 'on' : ''}`} onClick={() => setComboDay(d)}>
+                  {d.slice(5)}
+                </button>
+              ))}
+            </div>
+          )}
+          <ul className="combo-res">
+            {dayCombos.map((c, i) => (
+              <li className={`combo-res-row ${c.allHit ? 'hit' : 'miss'}`} key={`${c.strategy}-${c.size}-${i}`}>
+                <span className="combo-res-badge">{c.allHit ? '🎯' : `${c.nHit}/${c.size}`}</span>
+                <span className="combo-res-strat">{STRAT_LABEL[c.strategy] || c.strategy}</span>
+                <span className="combo-res-size dim">{c.size}-leg</span>
+                <span className="combo-res-legs">
+                  {c.legs.map((l, j) => (
+                    <span key={j} className={`combo-res-leg ${l.homered ? 'hr' : 'no'}`}>
+                      {l.name}{l.homered ? ' ✅' : ' ❌'}{j < c.legs.length - 1 ? ' · ' : ''}
+                    </span>
+                  ))}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="chart-cap dim">The canonical pregame combos (one per strategy &amp; size) graded against actual HRs. 🎯 = every leg homered.</p>
+        </section>
+      )}
 
       <section className="results-card">
         <h3 className="section-title"><Icon name="Clock" size={14} /> Daily track record</h3>

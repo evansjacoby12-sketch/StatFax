@@ -3926,6 +3926,31 @@ button.th:hover {
   background: rgba(245, 158, 11, 0.1);
 }
 
+/* Exact graded combos on the Results page */
+.combo-res { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+.combo-res-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 7px 9px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  font-size: 12.5px;
+}
+.combo-res-row.hit {
+  border-color: color-mix(in srgb, var(--good) 40%, transparent);
+  background: color-mix(in srgb, var(--good) 8%, transparent);
+}
+.combo-res-row.miss { opacity: 0.78; }
+.combo-res-badge { font-size: 12px; font-weight: 800; min-width: 26px; text-align: center; }
+.combo-res-row.miss .combo-res-badge { color: var(--text-faint); font-weight: 700; }
+.combo-res-strat { font-weight: 700; }
+.combo-res-size { font-size: 11px; }
+.combo-res-legs { flex: 1 1 100%; font-size: 12px; }
+.combo-res-leg.hr { color: var(--good); font-weight: 600; }
+.combo-res-leg.no { color: var(--text-dim); }
+
 /* Name glows red when a batter has already homered today (live mode). */
 .hr-glow {
   color: #ff3b30 !important;
