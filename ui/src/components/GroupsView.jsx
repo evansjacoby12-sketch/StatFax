@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect, useRef } from 'react'
 import Icon from './Icon.jsx'
 import { GradeChip } from './atoms.jsx'
 import { pct, num, rate, american, signedPct } from '../lib/format.js'
@@ -237,6 +237,16 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard, g
   const windows = useMemo(() => computeWindows(gameList), [gameList])
   // A window is "active" when the game selection exactly matches its games.
   const activeWindowIdx = windows.findIndex((w) => w.pks.size === games.size && [...w.pks].every((pk) => games.has(pk)))
+  // With Windows on, land on the EARLY window by default (once) rather than the
+  // flickery all-games view — the all-slate board churns as unconfirmed late
+  // games wobble, the window board is stable. One-time so it never fights a tap.
+  const autoWindowed = useRef(false)
+  useEffect(() => {
+    if (windowMode && !autoWindowed.current && windows.length > 1 && games.size === 0) {
+      setGames(new Set(windows[0].pks))
+      autoWindowed.current = true
+    }
+  }, [windowMode, windows, games])
 
   // Restrict the combo pool: selected games (none = all), pregame-only and
   // confirmed-lineup-only when those chips are on.

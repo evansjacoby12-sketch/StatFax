@@ -75,7 +75,7 @@ export default function App() {
   const [showSplits, setShowSplits] = useState(false)
   const [showBacktest, setShowBacktest] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
-  const [windowMode, setWindowMode] = useState(() => store.load('windowMode', false))
+  const [windowMode, setWindowMode] = useState(() => store.load('windowMode', true))
   const [watchlist, setWatchlist] = useState(() => new Set(store.load('watchlist', [])))
   const [slipIds, setSlipIds] = useState(() => store.load('slip', []))
   const [autoRefresh, setAutoRefresh] = useState(() => store.load('autoRefresh', false))
