@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import Icon from './Icon.jsx'
 import { GradeChip } from './atoms.jsx'
 import { pct, num, rate, american, signedPct } from '../lib/format.js'
-import { buildGroups, lastFirst, isoOf, blastOf } from '../lib/groups.js'
+import { buildGroups, lastFirst, isoOf, blastOf, blastMixOf, blastVsHandOf } from '../lib/groups.js'
 import { useLiveMode } from '../lib/liveMode.js'
 
 const GROUP_GRADE_COLOR = { S: '#f5a623', A: '#32d74b', B: '#3b82f6', C: '#9aa6b6', D: '#6b7787' }
@@ -348,7 +348,14 @@ function GroupLeg({ b, idx, onSelect, selected, bad, weakest, reasons }) {
           )}
           {b.hot && <Icon name="Flame" size={12} className="grp-fire" />}
           {b.blast && (
-            <span className="grp-chip blast" title={`Blasting ${num(blastOf(b), 0)}% lately — fast, squared-up contact (bat tracking)`}>
+            <span
+              className="grp-chip blast"
+              title={[
+                `Blasting ${num(blastOf(b), 0)}% lately — fast, squared-up contact (bat tracking)`,
+                blastVsHandOf(b) != null ? `vs ${b.batTracking?.vsHand}HP ${num(blastVsHandOf(b), 0)}%` : null,
+                blastMixOf(b) != null ? `vs his mix ${num(blastMixOf(b), 0)}%` : null,
+              ].filter(Boolean).join(' · ')}
+            >
               <Icon name="Zap" size={10} /> BLAST
             </span>
           )}
@@ -378,6 +385,11 @@ function GroupLeg({ b, idx, onSelect, selected, bad, weakest, reasons }) {
               {' · '}
               <span className={b.blast ? 'grp-blast-hot' : ''}><Icon name="Zap" size={10} /> {num(blastOf(b), 0)}%</span>
             </>
+          )}
+          {blastMixOf(b) != null && (
+            <span className="grp-blast-mix" title="Blast rate vs the exact pitch mix today's starter throws (usage-weighted)">
+              {' · '}vs mix {num(blastMixOf(b), 0)}%
+            </span>
           )}
           {iso != null && <> · ISO {rate(iso)}</>}
         </div>

@@ -4586,6 +4586,10 @@ button.th:hover {
   color: var(--b-hot);
   font-weight: 700;
 }
+.grp-blast-mix {
+  color: var(--b-hot);
+  font-weight: 600;
+}
 .grp-leg-l2 {
   display: flex;
   align-items: center;

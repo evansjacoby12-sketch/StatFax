@@ -23,6 +23,17 @@ export const blastOf = (b) => {
 }
 const norm01 = (v, hi) => Math.min(1, Math.max(0, (v ?? 0) / hi))
 
+// Matchup-relevant blast cuts (display): vs today's starter's HAND, and the
+// usage-weighted blast vs his exact MIX (only when we cover ≥half the arsenal).
+export const blastVsHandOf = (b) => {
+  const t = b.batTracking
+  return t && Number.isFinite(t.vsHandBlast) && (t.vsHandSwings ?? 0) >= 8 ? t.vsHandBlast : null
+}
+export const blastMixOf = (b) => {
+  const t = b.batTracking
+  return t && Number.isFinite(t.vsMixBlast) && (t.vsMixCoverage ?? 0) >= 0.5 ? t.vsMixBlast : null
+}
+
 // Proven HR signals, weighted by the badge audit's within-grade lift (hot &
 // barrelKing carry the most; park/weather the least). "due" is excluded — it's
 // the gambler's-fallacy signal we falsified. Drives the Signal Stack combo,

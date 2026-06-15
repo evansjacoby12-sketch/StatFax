@@ -1046,7 +1046,7 @@ async function fetchSavantBatterStatsAll(year = SEASON) {
  * signal). minSwings is the sample gate ('q' = season-qualified; a number for
  * windowed pulls where nobody qualifies yet).
  */
-async function fetchSavantBatTracking(year = SEASON, { dateStart = '', dateEnd = '', minSwings = 'q' } = {}) {
+async function fetchSavantBatTracking(year = SEASON, { dateStart = '', dateEnd = '', minSwings = 'q', pitchHand = '', pitchType = '' } = {}) {
   const pf = v => (v != null && v !== '' ? parseFloat(v) : null);
   const pct = v => { const n = pf(v); return n == null ? null : n * 100; }; // fraction → %
   const out = {};
@@ -1054,7 +1054,7 @@ async function fetchSavantBatTracking(year = SEASON, { dateStart = '', dateEnd =
     const rows = await savantCSV(
       `https://baseballsavant.mlb.com/leaderboard/bat-tracking` +
       `?attackZone=&batSide=&contactType=&count=&dateStart=${dateStart}&dateEnd=${dateEnd}&gameType=&isHardHit=` +
-      `&minSwings=${minSwings}&minGroupSwings=1&pitchHand=&pitchType=&seasonStart=&seasonEnd=&team=` +
+      `&minSwings=${minSwings}&minGroupSwings=1&pitchHand=${pitchHand}&pitchType=${pitchType}&seasonStart=&seasonEnd=&team=` +
       `&type=batter&year=${year}&csv=true`
     );
     for (const p of rows) {
@@ -1071,6 +1071,67 @@ async function fetchSavantBatTracking(year = SEASON, { dateStart = '', dateEnd =
       };
     }
   } catch { /* best-effort — model unaffected if bat tracking is unavailable */ }
+  return out;
+}
+
+// Recent (~2wk) blast rate split by the PITCHER's hand — the matchup-relevant
+// "how's he blasting vs LHP/RHP lately" cut. Returns { L: Map<id,%>, R: Map }
+// of blasts-per-squared-up-contact with the swing sample, for the side that
+// matches today's starter. Two calls; best-effort.
+async function fetchBlastVsHand(year = SEASON, win = {}) {
+  const mk = async (hand) => {
+    const data = await fetchSavantBatTracking(year, { ...win, pitchHand: hand });
+    const m = new Map();
+    for (const [id, v] of Object.entries(data)) {
+      if (Number.isFinite(v.blastPerContact)) m.set(Number(id), { blast: v.blastPerContact, swings: v.swings });
+    }
+    return m;
+  };
+  try {
+    const [L, R] = await Promise.all([mk('L'), mk('R')]);
+    return { L, R };
+  } catch { return { L: new Map(), R: new Map() }; }
+}
+
+// Season blast rate per individual pitch type — so we can usage-weight a
+// batter's blast vs the exact MIX today's starter throws (the "vs his mix"
+// number sharps quote). Returns { [PITCH_CODE]: Map<id, blastPerContact%> }.
+// Season (not recent) so each pitch-type slice has a usable sample.
+const BLAST_PITCH_TYPES = ['FF', 'SI', 'FC', 'SL', 'CU', 'KC', 'CH', 'FS'];
+// pitchMix usage keys (server pitcher block) → Savant pitch-type codes.
+const PITCH_USAGE_KEY = { FF: 'ffPct', SI: 'siPct', FC: 'fcPct', SL: 'slPct', CU: 'cuPct', KC: 'kcPct', CH: 'chPct', FS: 'fsPct' };
+// A batter's blast rate vs the exact mix a starter throws: usage-weighted blend
+// of his per-pitch-type blast over the pitches the starter uses. coverage = the
+// share of the starter's arsenal we actually have a blast number for (so a
+// thin-sample read can be down-ranked / hidden).
+function blastVsMix(id, pitchMix, blastByPitch) {
+  if (!pitchMix || !blastByPitch) return null;
+  let wsum = 0, bsum = 0, cov = 0, total = 0;
+  for (const pt of BLAST_PITCH_TYPES) {
+    const usage = pitchMix[PITCH_USAGE_KEY[pt]];
+    if (!(usage > 0)) continue;
+    total += usage;
+    const b = blastByPitch[pt]?.get(id);
+    if (Number.isFinite(b)) { wsum += usage; bsum += usage * b; cov += usage; }
+  }
+  if (wsum <= 0 || total <= 0) return null;
+  return { blast: bsum / wsum, coverage: cov / total };
+}
+async function fetchBlastByPitchType(year = SEASON) {
+  const out = {};
+  try {
+    const results = await Promise.all(
+      BLAST_PITCH_TYPES.map(async (pt) => {
+        const data = await fetchSavantBatTracking(year, { minSwings: 10, pitchType: pt });
+        const m = new Map();
+        for (const [id, v] of Object.entries(data)) {
+          if (Number.isFinite(v.blastPerContact)) m.set(Number(id), v.blastPerContact);
+        }
+        return [pt, m];
+      }),
+    );
+    for (const [pt, m] of results) out[pt] = m;
+  } catch { /* best-effort */ }
   return out;
 }
 
@@ -2093,6 +2154,8 @@ async function main() {
     catcherFraming,
     batTracking,
     batTrackingRecent,
+    blastVsHand,
+    blastByPitch,
   ] = await Promise.all([
     fetchBatterStatsBatch(batterIdArr),
     fetchPitcherStatsBatch(pitcherIdArr),
@@ -2117,6 +2180,10 @@ async function main() {
     // watch (40%+ recent blast rate = live power). minSwings low since nobody
     // is season-qualified inside a 14-day slice.
     fetchSavantBatTracking(SEASON, { dateStart: ctDateMinusDays(14), dateEnd: todayInTZ(), minSwings: 10 }),
+    // Recent blast split by pitcher hand (vs-LHP / vs-RHP) — matchup-relevant.
+    fetchBlastVsHand(SEASON, { dateStart: ctDateMinusDays(14), dateEnd: todayInTZ(), minSwings: 5 }),
+    // Season blast per pitch type — to usage-weight "blast vs his mix" per game.
+    fetchBlastByPitchType(),
   ]);
 
   // 7) Pitcher recent form (gameLog) — per-pitcher fetch, parallelized
@@ -2656,6 +2723,14 @@ async function main() {
             recentBlastPct:        batTrackingRecent[id]?.blastPct ?? null,         // per swing, ~14d
             recentBlastPerContact: batTrackingRecent[id]?.blastPerContact ?? null,  // per bat-contact, ~14d
             recentSwings:    batTrackingRecent[id]?.swings ?? null,
+            // Matchup-relevant cuts: recent blast vs today's starter's HAND, and
+            // the usage-weighted blast vs his exact MIX (the number sharps quote).
+            // Display context — the model nudge still rides the validated metric.
+            vsHand:      pitcherHandForCarry || null,
+            vsHandBlast: (pitcherHandForCarry === 'L' ? blastVsHand.L : pitcherHandForCarry === 'R' ? blastVsHand.R : null)?.get(id)?.blast ?? null,
+            vsHandSwings: (pitcherHandForCarry === 'L' ? blastVsHand.L : pitcherHandForCarry === 'R' ? blastVsHand.R : null)?.get(id)?.swings ?? null,
+            vsMixBlast:    blastVsMix(id, pitchMix, blastByPitch)?.blast ?? null,
+            vsMixCoverage: blastVsMix(id, pitchMix, blastByPitch)?.coverage ?? null,
           } : null,
           // Launch angle — was previously NOT surfaced on the row even
           // though scoreBatter uses it. Heat Index "LA in HR window" check
