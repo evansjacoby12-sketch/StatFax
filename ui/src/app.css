@@ -1671,7 +1671,9 @@ button.th:hover {
     padding: 0 9px;
   }
   .header {
-    padding: 10px 12px;
+    /* Restore the notch/status-bar inset (the base rule had it; this override
+       dropped it) + extra top breathing room so the header isn't crammed up top. */
+    padding: calc(16px + env(safe-area-inset-top, 0px)) 12px 12px;
   }
   .filters {
     padding: 10px 12px;
