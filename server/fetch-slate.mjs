@@ -330,6 +330,65 @@ function buildWindowBoards(scoredBatters, games) {
   }));
 }
 
+// Day Rating (1–5★) — a "should I even bet HR props today?" gauge from the three
+// levers that actually move a slate: how homer-prone the starting pitching is
+// (the biggest one), the park/weather environment, and the supply of elite bats.
+// Bat *quality* per se barely varies day to day (top tier saturates ~26%), so
+// it's deliberately lightly weighted; pitching + conditions are what separate a
+// loaded slate from a skip.
+function computeDayRating(scoredBatters, games) {
+  const clamp01 = (x) => Math.max(0, Math.min(1, x));
+  const all = Object.values(scoredBatters || {});
+  const seen = new Set();
+  const rows = all.filter((r) => (r.playerId != null && !seen.has(r.playerId) ? (seen.add(r.playerId), true) : false));
+  const gamePks = new Set(rows.map((r) => r.gamePk).filter((p) => p != null));
+  const nGames = Math.max(1, gamePks.size);
+
+  // Supply (25%): PRIME bats per game — depth of playable HR threats.
+  const prime = rows.filter((b) => (b.grade?.label || b.grade) === 'PRIME').length;
+  const primePerGame = prime / nGames;
+  const supply = clamp01((primePerGame - 2.5) / (4.5 - 2.5));
+
+  // Pitching (45%): the biggest lever — homer-prone starters. Share with
+  // HR/9 ≥ 1.3, blended with the average HR/9 of today's starters.
+  const arms = [...new Map(
+    rows.filter((b) => b.pitcher?.id != null && Number.isFinite(b.pitcher?.season?.hrPer9))
+        .map((b) => [b.pitcher.id, b.pitcher.season.hrPer9]),
+  ).values()];
+  const softShare = arms.length ? arms.filter((h) => h >= 1.3).length / arms.length : 0;
+  const avgHr9 = arms.length ? arms.reduce((s, h) => s + h, 0) / arms.length : 1.2;
+  const pitching = (clamp01((softShare - 0.25) / 0.30) + clamp01((avgHr9 - 1.05) / 0.35)) / 2;
+
+  // Environment (30%): share of games in a hitter's park or favorable air/wind.
+  const byGame = new Map();
+  for (const b of rows) {
+    if (b.gamePk == null) continue;
+    const g = byGame.get(b.gamePk) || { air: 0, park: 0 };
+    if (Number.isFinite(b.parkWeatherHandFactor)) g.air = Math.max(g.air, b.parkWeatherHandFactor);
+    if (Number.isFinite(b.gameParkHRFactor)) g.park = Math.max(g.park, b.gameParkHRFactor);
+    byGame.set(b.gamePk, g);
+  }
+  let favGames = 0;
+  for (const [, g] of byGame) if (g.park >= 1.08 || g.air >= 1.05) favGames++;
+  const environment = clamp01((favGames / byGame.size) / 0.5);
+
+  const score = Math.round(100 * (0.45 * pitching + 0.30 * environment + 0.25 * supply));
+  const stars = score >= 80 ? 5 : score >= 62 ? 4 : score >= 45 ? 3 : score >= 30 ? 2 : 1;
+  const VERDICT = {
+    5: 'Loaded HR slate — lean in.',
+    4: 'Strong HR day — plenty of good spots.',
+    3: 'Average slate — be selective.',
+    2: 'Soft slate — few good spots, bet light.',
+    1: 'Skip-worthy — stingy arms / poor conditions.',
+  };
+  return {
+    stars, score, verdict: VERDICT[stars],
+    factors: { pitching: +pitching.toFixed(2), environment: +environment.toFixed(2), supply: +supply.toFixed(2) },
+    primePerGame: +primePerGame.toFixed(1), softArmPct: Math.round(softShare * 100),
+    favGames, games: byGame.size,
+  };
+}
+
 // below — see the second import block right after buildModel() runs.
 import { combineModels, scoreWithML, loadMLModel, DEFAULT_ENSEMBLE_OPTS, weightsFromBrier } from './models/ensemble.mjs';
 import { trainEnsembleWeights, extractFeatures } from './models/trainEnsembleWeights.mjs';
@@ -3633,6 +3692,8 @@ async function main() {
     // (one per strategy per size), graded against actual HR outcomes. The real,
     // accumulating answer to "have our combos hit?" — see server/parlay-combos.mjs.
     comboScorecard: comboScorecard(backtestLog),  // { days, overall, byStrategy, bySize }
+    // Day Rating (1-5★) — "should I bet HR props today?" gauge.
+    dayRating: computeDayRating(scoredBatters, games),
 
     // ensembleMeta: out-of-sample holdout comparison of the ML stacker vs the
     // rule model, and the gated blend weight actually applied to scores.

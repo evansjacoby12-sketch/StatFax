@@ -175,6 +175,7 @@ export async function loadSlate() {
     stats: d.stats || {},
     modelMetrics: d.modelMetrics || null,
     comboScorecard: d.comboScorecard || null,
+    dayRating: d.dayRating || null,
     ensembleMeta: d.ensembleMeta || null,
     scoreToProb: d.scoreToProb || null,
     oddsBooks: collectBooks(d.odds),

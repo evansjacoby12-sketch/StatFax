@@ -23,6 +23,7 @@ import Legend from './components/Legend.jsx'
 import Guide from './components/Guide.jsx'
 import HowToPick from './components/HowToPick.jsx'
 import Settings from './components/Settings.jsx'
+import DayRating from './components/DayRating.jsx'
 import Skeleton from './components/Skeleton.jsx'
 import BackToTop from './components/BackToTop.jsx'
 import PullToRefresh from './components/PullToRefresh.jsx'
@@ -429,6 +430,7 @@ export default function App() {
           />
         ) : (
           <>
+            <DayRating rating={data.meta?.dayRating} />
             {lineupStatus.total > 0 && lineupStatus.confirmed < lineupStatus.total && !lineupNoticeOff && (
               <div className="lineup-banner" role="status">
                 <button className="lb-close icon-btn" onClick={() => setLineupNoticeOff(true)} aria-label="Dismiss">

@@ -4689,6 +4689,44 @@ button.th:hover {
   font-weight: 600;
 }
 
+/* Day Rating — 1-5★ "should I bet today?" gauge at the top of the board */
+.day-rating {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+.day-rating.tone-great { border-color: color-mix(in srgb, var(--good) 45%, var(--border)); }
+.day-rating.tone-good  { border-color: color-mix(in srgb, var(--good) 32%, var(--border)); }
+.day-rating.tone-soft  { border-color: color-mix(in srgb, var(--warn, #ffb02e) 40%, var(--border)); }
+.day-rating.tone-skip  { border-color: color-mix(in srgb, var(--bad) 45%, var(--border)); }
+.dr-sum {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  cursor: pointer;
+  list-style: none;
+  flex-wrap: wrap;
+}
+.dr-sum::-webkit-details-marker { display: none; }
+.dr-head { font-size: 13px; font-weight: 700; }
+.dr-stars { letter-spacing: 1px; font-size: 14px; }
+.dr-star { color: var(--border-soft, #444); }
+.dr-star.on { color: #f5a623; }
+.dr-verdict { font-size: 12px; color: var(--text-dim); flex: 1; min-width: 140px; }
+.dr-chev { margin-left: auto; color: var(--text-faint); transition: transform 0.15s; }
+.day-rating[open] .dr-chev { transform: rotate(180deg); }
+.dr-body { padding: 0 12px 11px; }
+.dr-cap { font-size: 11px; line-height: 1.4; margin-bottom: 9px; }
+.dr-bars { display: flex; flex-direction: column; gap: 7px; }
+.dr-row { display: grid; grid-template-columns: 96px 1fr auto; align-items: center; gap: 9px; font-size: 11.5px; }
+.dr-k { font-weight: 600; }
+.dr-bar { height: 7px; border-radius: 99px; background: var(--card-2, rgba(255,255,255,0.05)); overflow: hidden; }
+.dr-fill { display: block; height: 100%; border-radius: 99px; background: #f5a623; }
+.dr-sub { font-size: 11px; white-space: nowrap; }
+
 /* "As of HH:MM · lineups X/Y" stamp above the combo board */
 .grp-stamp {
   display: flex;
