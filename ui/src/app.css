@@ -2781,14 +2781,14 @@ button.th:hover {
     height: 30px;
   }
 }
-@media (max-width: 440px) {
-  .auto-btn,
+/* On phones the Live/Pregame button is icon-only — the icon (+ tooltip) carries
+   it, and dropping the label declutters the header row. */
+@media (max-width: 768px) {
   .live-btn {
     gap: 0;
     padding: 0 11px;
     font-size: 0;
   }
-  .auto-btn svg,
   .live-btn svg {
     font-size: 14px;
   }
