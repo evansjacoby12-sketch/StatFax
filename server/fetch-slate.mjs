@@ -2733,6 +2733,14 @@ async function main() {
   // snapshot's score distribution stable across cron runs. (The Vegas blend
   // that used to add a ±6 cap here was removed with the odds integration.)
   const PARK_WEATHER_MAX_DELTA = 5;
+  // Blast-rate nudge (Statcast bat tracking) — validated to lift the HR
+  // probability out-of-sample (model-lab/blast-model.mjs: Brier/LogLoss/AUC all
+  // improve on a 22-day held-out split). Conservative bounded delta centered on
+  // league-average blast: elite blasters get a small boost, weak ones a small
+  // ding. Capped so it nudges like park-weather, never dominates the composite.
+  const BLAST_MAX_DELTA   = 4;
+  const LEAGUE_AVG_BLAST  = 15;  // ≈ median blasts-per-squared-up-contact %
+  const BLAST_DELTA_K     = 0.4; // pts per % blast above/below average
   // Hotness with a synthetic 2-point series (recent30 → recent7) has
   // less information density than the algorithm assumes (it was
   // designed for game-by-game logs). The posterior swings sharply,
@@ -2748,6 +2756,7 @@ async function main() {
   let hotnessApplied      = 0;
   let reverseSplitFlipped = 0;
   let parkWeatherApplied  = 0;
+  let blastApplied        = 0;
   let logOddsApplied      = 0;
   let mlScoresApplied     = 0;
   let featRanked          = 0;
@@ -2876,6 +2885,31 @@ async function main() {
       }
     } catch { /* graceful: weather/park lookup failures don't break scoring */ }
 
+    // 3b) Blast-rate nudge — bat tracking's most HR-predictive slice (fast +
+    //     squared-up contact). Prefer the recent ~2wk window (with a swing
+    //     sample), else season; per squared-up contact. Bounded delta centered
+    //     on league average so it only nudges. See blast-model.mjs validation.
+    try {
+      const bt = row.batTracking;
+      const blast = bt
+        ? (Number.isFinite(bt.recentBlastPerContact) && (bt.recentSwings ?? 0) >= 25
+            ? bt.recentBlastPerContact
+            : (Number.isFinite(bt.blastPerContact) ? bt.blastPerContact : null))
+        : null;
+      if (Number.isFinite(blast)) {
+        const rawDelta = Math.round((blast - LEAGUE_AVG_BLAST) * BLAST_DELTA_K);
+        const capped   = Math.max(-BLAST_MAX_DELTA, Math.min(BLAST_MAX_DELTA, rawDelta));
+        if (capped !== 0) {
+          const beforeBlast = row.score;
+          row.blastRate  = blast;
+          row.blastDelta = capped;
+          row.score = Math.max(0, Math.min(100, beforeBlast + capped));
+          row.grade = gradeFromScore(row.score);
+          blastApplied++;
+        }
+      }
+    } catch { /* graceful: bat-tracking gaps never break scoring */ }
+
     // 4) Vegas-anchor blend removed — statfax-brain scores on model signal
     //    only, so row.score is the finished composite here (no odds anchor,
     //    no market pull).
@@ -2944,7 +2978,7 @@ async function main() {
     else if (r.score >= 36) tierCounts.LEAN++;
     else                    tierCounts.SKIP++;
   }
-  console.log(`[math] post-process: hotness=${hotnessApplied} reverseSplit=${reverseSplitFlipped} parkXweather=${parkWeatherApplied} logOdds=${logOddsApplied} ml=${mlScoresApplied}/${mlModelHandle ? 'loaded' : 'no-weights'} featRank=${featRanked}@${featRankWeight.toFixed(2)} tiers=PRIME:${tierCounts.PRIME}/STRONG:${tierCounts.STRONG}/LEAN:${tierCounts.LEAN}/SKIP:${tierCounts.SKIP} (${((Date.now() - postProcessStart) / 1000).toFixed(2)}s)`);
+  console.log(`[math] post-process: hotness=${hotnessApplied} reverseSplit=${reverseSplitFlipped} parkXweather=${parkWeatherApplied} blast=${blastApplied} logOdds=${logOddsApplied} ml=${mlScoresApplied}/${mlModelHandle ? 'loaded' : 'no-weights'} featRank=${featRanked}@${featRankWeight.toFixed(2)} tiers=PRIME:${tierCounts.PRIME}/STRONG:${tierCounts.STRONG}/LEAN:${tierCounts.LEAN}/SKIP:${tierCounts.SKIP} (${((Date.now() - postProcessStart) / 1000).toFixed(2)}s)`);
 
   // 8.6) Zone matchup enrichment — for the top N batters per game, fetch
   // batter ISO-by-zone + opposing pitcher's location-frequency-by-zone,
