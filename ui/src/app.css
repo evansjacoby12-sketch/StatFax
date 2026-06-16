@@ -4755,6 +4755,34 @@ button.th:hover {
 .dr-sub { font-size: 11px; white-space: nowrap; }
 
 /* "As of HH:MM · lineups X/Y" stamp above the combo board */
+/* Heavy-overlap warning — board recombines the same studs; tailing all ≠ diversifying */
+.grp-overlap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  padding: 8px 10px;
+  border-radius: 9px;
+  margin-bottom: 10px;
+  color: var(--warn, #ffb02e);
+  border: 1px solid color-mix(in srgb, var(--warn, #ffb02e) 45%, transparent);
+  background: color-mix(in srgb, var(--warn, #ffb02e) 10%, transparent);
+}
+.grp-overlap-txt { flex: 1; min-width: 180px; line-height: 1.4; }
+.grp-overlap-txt b { font-weight: 700; }
+.grp-spread-btn {
+  flex: none;
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 7px;
+  cursor: pointer;
+  color: var(--bg);
+  background: var(--warn, #ffb02e);
+  border: none;
+}
+
 .grp-stamp {
   display: flex;
   align-items: center;

@@ -223,6 +223,31 @@ function comboStars(g, tone) {
   return Math.max(1, Math.round(1 + conf * 4))
 }
 
+// Spread picker — from a size's combos, greedily choose a set that shares the
+// FEWEST bats, so you get independent shots instead of the same anchors N times.
+// Start with the strongest, then keep adding the combo that brings the most new
+// bats (ties → higher all-hit). Caps the over-concentration the board produces.
+function spreadPick(groups, n = 4) {
+  const pool = [...groups].sort((a, b) => (b.allHit ?? 0) - (a.allHit ?? 0))
+  const picked = []
+  const used = new Set()
+  while (picked.length < n && picked.length < pool.length) {
+    let best = null, bestScore = -Infinity
+    for (const g of pool) {
+      if (picked.includes(g)) continue
+      const ids = g.legs.map((b) => b.id)
+      const overlap = ids.filter((id) => used.has(id)).length
+      const fresh = ids.length - overlap
+      const score = fresh * 100 - overlap * 60 + (g.allHit ?? 0) * 10
+      if (score > bestScore) { bestScore = score; best = g }
+    }
+    if (!best) break
+    picked.push(best)
+    for (const b of best.legs) used.add(b.id)
+  }
+  return picked
+}
+
 export default function GroupsView({ batters, onSelect, selectedId, scorecard, generatedAt, windowMode = false, comboConf = 'off' }) {
   const [size, setSize] = useState(2)
   const [games, setGames] = useState(() => new Set()) // empty = all games
@@ -230,6 +255,7 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard, g
   // live, so combos built on started games are usually unplaceable.
   const [hideStarted, setHideStarted] = useState(true)
   const [confirmedOnly, setConfirmedOnly] = useState(false)
+  const [spread, setSpread] = useState(false) // de-correlated subset (min bat overlap)
   // windowMode (start-window grouping) is an app-level setting — see Settings.
 
   // Distinct, still-playable games in the pool — for the game selector.
@@ -277,10 +303,22 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard, g
   const available = SIZE_TABS.filter((t) => bySize[t.k]?.length)
   const activeSize = bySize[size]?.length ? size : available[0]?.k
   const groups = activeSize ? bySize[activeSize] : []
-  // Display cap: strongest-first, trimmed per size (4-leg lottery → top 3).
-  const shownGroups = [...groups]
-    .sort((a, b) => (b.allHit ?? 0) - (a.allHit ?? 0))
-    .slice(0, DISPLAY_CAP[activeSize] ?? Infinity)
+  // Exposure across ALL sizes — the board recombines the same studs, so "tail
+  // everything" is really betting 2-3 bats many times. Flag the over-represented.
+  const exposure = useMemo(() => {
+    const all = [2, 3, 4].flatMap((k) => bySize[k] || [])
+    const count = new Map()
+    for (const g of all) for (const b of g.legs) count.set(b.name, (count.get(b.name) || 0) + 1)
+    const top = [...count.entries()].sort((a, b) => b[1] - a[1]).slice(0, 2)
+    return { total: all.length, top }
+  }, [bySize])
+  const overConc = exposure.top[0] && exposure.top[0][1] >= Math.max(4, Math.ceil(exposure.total * 0.35))
+  // Spread mode: show a de-correlated subset instead of the full (overlapping) list.
+  const shownGroups = spread
+    ? spreadPick(groups, 4)
+    : [...groups]
+        .sort((a, b) => (b.allHit ?? 0) - (a.allHit ?? 0))
+        .slice(0, DISPLAY_CAP[activeSize] ?? Infinity)
 
   const toggleGame = (pk) =>
     setGames((prev) => {
@@ -303,6 +341,15 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard, g
             )}
           </span>
           {asOf && <span className="grp-stamp-time dim">as of {asOf}</span>}
+        </div>
+      )}
+      {overConc && !spread && (
+        <div className="grp-overlap">
+          <Icon name="TriangleAlert" size={13} />
+          <span className="grp-overlap-txt">
+            <b>Heavy overlap</b> — {exposure.top.map(([n, c]) => `${n.split(' ').slice(-1)[0]} in ${c}`).join(', ')} of {exposure.total} combos. Tailing all isn’t diversifying — it’s betting those bats over and over.
+          </span>
+          <button className="grp-spread-btn" onClick={() => setSpread(true)}>Spread →</button>
         </div>
       )}
       {windowMode && windows.length > 1 ? (
@@ -362,13 +409,25 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard, g
         >
           <Icon name="UserCheck" size={12} /> Confirmed only
         </button>
+        <button
+          className={`badge-toggle ${spread ? 'on' : ''}`}
+          onClick={() => setSpread((v) => !v)}
+          aria-pressed={spread}
+          title="Show a de-correlated set — combos that share the fewest bats, so they're independent shots, not the same anchors repeated"
+        >
+          <Icon name="Layers" size={12} /> Spread
+        </button>
       </div>
       {available.length ? (
         <div className="grp-list">
           {shownGroups.map((g) => (
             <GroupCard key={g.id} g={g} onSelect={onSelect} selectedId={selectedId} comboConf={comboConf} />
           ))}
-          {groups.length > shownGroups.length && (
+          {spread ? (
+            <div className="grp-trim dim">
+              <b>Spread set</b> — {shownGroups.length} {activeSize}-leg combos chosen to share the fewest bats, so they're independent shots. Tap Spread off to see the full list.
+            </div>
+          ) : groups.length > shownGroups.length && (
             <div className="grp-trim dim">
               Showing the top {shownGroups.length} {activeSize}-leg combos · {groups.length - shownGroups.length} weaker hidden ({activeSize}-leg is a longshot tier)
             </div>
