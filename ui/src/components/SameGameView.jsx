@@ -103,9 +103,11 @@ export default function SameGameView({ batters, onSelect, favorConsistency = fal
                     return (
                       <li className={`sgp-leg ${info.bad ? 'weak-leg' : ''}`} key={b.id} onClick={() => onSelect(b)} role="button" tabIndex={0}>
                         <span className="sgp-leg-ord mono">{i + 1}</span>
-                        <span className="sgp-leg-name">{lastFirst(b.name)}</span>
-                        {info.unconfirmed && <span className="grp-chip unconf"><Icon name="Clock" size={10} /> NO LINEUP</span>}
-                        {info.bad && <span className="grp-chip weak" title={info.flags.join(' · ') || 'long-shot HR%'}><Icon name="TriangleAlert" size={10} /> WEAK</span>}
+                        <div className="sgp-leg-body">
+                          <span className="sgp-leg-name">{lastFirst(b.name)}</span>
+                          {info.unconfirmed && <span className="grp-chip unconf"><Icon name="Clock" size={10} /> NO LINEUP</span>}
+                          {info.bad && <span className="grp-chip weak" title={info.flags.join(' · ') || 'long-shot HR%'}><Icon name="TriangleAlert" size={10} /> WEAK</span>}
+                        </div>
                         <GradeChip grade={b.grade} score={b.score} size="sm" />
                         <span className="sgp-leg-prob mono">{pct(b.hrProbability, 2)}</span>
                       </li>
