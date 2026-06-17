@@ -1918,12 +1918,13 @@ async function main() {
       const local = JSON.parse(readFileSync(BACKTEST_OUT_PATH, 'utf8'));
       if ((local?.dates?.length || 0) > (backtestLog?.dates?.length || 0)) backtestLog = local;
       const lc = local?.combos, bc = backtestLog?.combos;
-      if (lc?.byDate || bc?.byDate || lc?.lateByDate || bc?.lateByDate || lc?.windowsByDate || bc?.windowsByDate) {
+      if (lc?.byDate || bc?.byDate || lc?.lateByDate || bc?.lateByDate || lc?.windowsByDate || bc?.windowsByDate || lc?.fullByDate || bc?.fullByDate) {
         backtestLog.combos = {
           byDate:        { ...(bc?.byDate || {}),        ...(lc?.byDate || {}) },
           bestByDate:    { ...(bc?.bestByDate || {}),    ...(lc?.bestByDate || {}) },
           lateByDate:    { ...(bc?.lateByDate || {}),    ...(lc?.lateByDate || {}) },
           windowsByDate: { ...(bc?.windowsByDate || {}), ...(lc?.windowsByDate || {}) },
+          fullByDate:    { ...(bc?.fullByDate || {}),    ...(lc?.fullByDate || {}) },
         };
       }
     }
@@ -1997,6 +1998,28 @@ async function main() {
     }
   } catch (e) {
     console.warn(`[combo] scorecard skipped: ${e?.message}`);
+  }
+
+  // Self-heal: backfill any recent day whose full board was captured live
+  // (combos.fullByDate) but never graded into byDate — e.g. the one-shot
+  // next-day grading above missed it because a late west-coast game wasn't Final
+  // at the rollover, and by the next run the frozen snapshot had moved on. Grades
+  // the persisted full board against that day's actual HRs. Keeps the scorecard
+  // + Results Full board from silently dropping a day.
+  try {
+    const recent = [...new Set([...(backtestLog.dates || [])])].sort().slice(-4);
+    for (const dd of recent) {
+      if (dd === yesterdayCT) continue; // just handled above
+      if (backtestLog?.combos?.byDate?.[dd]) continue;
+      const fb = backtestLog?.combos?.fullByDate?.[dd];
+      if (!fb?.length) continue;
+      const out = await fetchHomerersForDate(dd);
+      if (!out?.allFinal) continue;
+      backtestLog = appendComboDay(backtestLog, dd, gradeCombos(fb, out.homerers), null);
+      console.log(`[combo] self-healed ${dd} full board from fullByDate (${fb.length} combos)`);
+    }
+  } catch (e) {
+    console.warn(`[combo] self-heal skipped: ${e?.message}`);
   }
 
   const calibration = computeMultipliers(backtestLog);
@@ -3824,6 +3847,28 @@ async function main() {
     for (const d of wk.slice(0, -14)) delete backtestLog.combos.windowsByDate[d];
     console.log(`[windows] ${date}: ${windowBoards.length} windows (${windowBoards.map((w) => `${w.label}·${w.games}g·${w.combos.length}c`).join(', ')})`);
   }
+  // Full board (all games, frozen pregame) captured LIVE every run — overwritten
+  // so it ends as the frozen all-slate board. Persisting it (vs only the one-shot
+  // next-day grading) lets byDate self-heal if a late game wasn't Final at the
+  // rollover. The canonical record the scorecard + Results Full board read.
+  try {
+    const seenF = new Set();
+    const allCr = [];
+    for (const r of Object.values(payload.scoredBatters || {})) {
+      if (r.playerId == null || seenF.has(r.playerId)) continue;
+      seenF.add(r.playerId);
+      const x = comboRowFromSnapshot(r);
+      if (x) allCr.push(x);
+    }
+    const fullBoard = buildComboRecords(allCr).map((c) => ({ strategy: c.strategy, size: c.size, legs: c.legs }));
+    if (fullBoard.length) {
+      backtestLog.combos = backtestLog.combos || {};
+      backtestLog.combos.fullByDate = backtestLog.combos.fullByDate || {};
+      backtestLog.combos.fullByDate[date] = fullBoard;
+      const fk = Object.keys(backtestLog.combos.fullByDate).sort();
+      for (const d of fk.slice(0, -14)) delete backtestLog.combos.fullByDate[d];
+    }
+  } catch (e) { console.warn(`[combo] fullByDate capture skipped: ${e?.message}`); }
 
   // Freeze this run's scoreBatter() inputs alongside the slate so the offline
   // lab (`npm run lab:score`) can re-score engine variants on identical inputs.
