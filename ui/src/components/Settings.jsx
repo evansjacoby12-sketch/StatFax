@@ -8,6 +8,7 @@ export default function Settings({
   windowMode, onToggleWindows,
   showDayRating, onToggleDayRating,
   comboConf, onSetComboConf,
+  favorConsistency, onToggleConsistency,
   onClose,
 }) {
   const groups = [
@@ -59,6 +60,13 @@ export default function Settings({
           segments: [['off', 'Off'], ['stars', 'Stars'], ['percent', '%']],
           value: comboConf,
           onSet: onSetComboConf,
+        },
+        {
+          icon: 'Activity',
+          label: 'Favor consistency',
+          desc: 'Down-weight high-strikeout, boom-or-bust sluggers in the combos, so a streaky masher doesn’t anchor every combo. Trades some ceiling for steadier bats.',
+          on: favorConsistency,
+          toggle: onToggleConsistency,
         },
       ],
     },

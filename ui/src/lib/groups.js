@@ -23,6 +23,22 @@ export const blastOf = (b) => {
 }
 const norm01 = (v, hi) => Math.min(1, Math.max(0, (v ?? 0) / hi))
 
+// Strikeout rate (K / PA, approximated as k/(ab+bb)) — a proxy for how boom-or-
+// bust a bat is. Optional "favor consistency" lean down-weights high-K sluggers
+// in the combo ranking so a streaky masher doesn't auto-anchor every strategy.
+const kRateOf = (b) => {
+  const s = b.season
+  if (!s || !(s.ab > 0)) return null
+  const pa = (s.ab || 0) + (s.bb || 0)
+  return pa > 0 ? (s.k || 0) / pa : null
+}
+// 1.0 = no penalty at/below ~20% K; ramps to 0.75 for very high-K (~40%+) bats.
+const consistencyFactor = (b) => {
+  const k = kRateOf(b)
+  if (k == null) return 1
+  return 1 - Math.min(1, Math.max(0, (k - 0.20) / 0.20)) * 0.25
+}
+
 // Matchup-relevant blast cuts (display): vs today's starter's HAND, and the
 // usage-weighted blast vs his exact MIX (only when we cover ≥half the arsenal).
 export const blastVsHandOf = (b) => {
@@ -186,9 +202,12 @@ function makeGroup(legs, size, strat, idSuffix = '') {
   }
 }
 
-export function buildGroups(batters, { maxPerBat = 3 } = {}) {
+export function buildGroups(batters, { maxPerBat = 3, favorConsistency = false } = {}) {
   // Each strategy's ranked pool is size-independent — compute once, slice per size.
-  const pools = STRATEGIES.map((strat) => ({ strat, pool: topPerGame(batters, strat.rank, strat.require) }))
+  // favorConsistency wraps each rank with a K%-based factor so high-strikeout
+  // boom-or-bust bats are demoted (don't anchor every strategy).
+  const rankOf = (strat) => (favorConsistency ? (b) => strat.rank(b) * consistencyFactor(b) : strat.rank)
+  const pools = STRATEGIES.map((strat) => ({ strat, pool: topPerGame(batters, rankOf(strat), strat.require) }))
   const out = {}
   for (const size of SIZES) {
     const groups = []

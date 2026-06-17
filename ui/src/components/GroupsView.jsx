@@ -248,7 +248,7 @@ function spreadPick(groups, n = 4) {
   return picked
 }
 
-export default function GroupsView({ batters, onSelect, selectedId, scorecard, generatedAt, windowMode = false, comboConf = 'off' }) {
+export default function GroupsView({ batters, onSelect, selectedId, scorecard, generatedAt, windowMode = false, comboConf = 'off', favorConsistency = false }) {
   const [size, setSize] = useState(2)
   const [games, setGames] = useState(() => new Set()) // empty = all games
   // Hide started defaults ON: HR props can't be bet pregame once the game is
@@ -299,7 +299,7 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard, g
   )
   const conf = useMemo(() => confirmSummary(batters), [batters])
   const asOf = fmtTime(generatedAt)
-  const bySize = useMemo(() => buildGroups(pool), [pool])
+  const bySize = useMemo(() => buildGroups(pool, { favorConsistency }), [pool, favorConsistency])
   const available = SIZE_TABS.filter((t) => bySize[t.k]?.length)
   const activeSize = bySize[size]?.length ? size : available[0]?.k
   const groups = activeSize ? bySize[activeSize] : []
