@@ -49,6 +49,15 @@ function statfaxData() {
       } catch (e) {
         this.warn(`could not copy data into build: ${e.message}`)
       }
+      // Stamp the build's commit SHA so the UpdateBanner can compare a STABLE id
+      // (immune to non-deterministic bundle hashes / CDN edge skew) instead of
+      // parsing the cached index.html. version.json is tiny + always cache-busted.
+      try {
+        const sha = process.env.GITHUB_SHA || 'dev'
+        fs.writeFileSync(path.resolve(__dirname, 'dist', 'version.json'), JSON.stringify({ sha, builtAt: new Date().toISOString() }))
+      } catch (e) {
+        this.warn(`could not write version.json: ${e.message}`)
+      }
     },
   }
 }
@@ -57,6 +66,8 @@ export default defineConfig(({ command }) => ({
   // Relative base on build → works at any URL (root host OR a GitHub Pages
   // project subpath). Root '/' in dev keeps the dev server simple.
   base: command === 'build' ? './' : '/',
+  // Bake the commit SHA into the app so it can compare against version.json.
+  define: { __BUILD_SHA__: JSON.stringify(process.env.GITHUB_SHA || 'dev') },
   plugins: [react(), statfaxData()],
   server: {
     port: 5180,

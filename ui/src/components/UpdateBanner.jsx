@@ -1,40 +1,33 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import Icon from './Icon.jsx'
 
 const BASE_URL = import.meta.env?.BASE_URL ?? '/'
+// Commit SHA baked in at build (vite define). 'dev' locally → banner disabled.
+const BUILD_SHA = typeof __BUILD_SHA__ !== 'undefined' ? __BUILD_SHA__ : 'dev'
 
-// The hashed main bundle this running app loaded (e.g. "index-CHt53zHU.js").
-// Null in dev (the module script is /src/main.jsx, not a built asset).
-function currentAsset() {
-  if (typeof document === 'undefined') return null
-  const tags = [...document.querySelectorAll('script[src*="/assets/index-"]')]
-  const src = tags.map((t) => t.src).find(Boolean)
-  return src ? src.split('/assets/')[1] : null
-}
-
-// Fetch the deployed index.html (no cache) and read its hashed main bundle.
-async function latestAsset() {
-  const res = await fetch(`${BASE_URL}?_v=${Date.now()}`, { cache: 'no-store' })
+// Fetch the deployed build's commit SHA from version.json. Comparing the SHA
+// (not the bundle hash) is immune to non-deterministic builds + CDN edge skew —
+// it flips only on an actual new commit. Always cache-busted.
+async function latestSha() {
+  const res = await fetch(`${BASE_URL}version.json?_v=${Date.now()}`, { cache: 'no-store' })
   if (!res.ok) return null
-  const html = await res.text()
-  const m = html.match(/\/assets\/(index-[\w-]+\.js)/)
-  return m ? m[1] : null
+  const j = await res.json().catch(() => null)
+  return j?.sha || null
 }
 
-// Polls the deployed build and flips true once it differs from what's running —
-// so a home-screen PWA (no pull-to-refresh) can surface a one-tap update.
+// Polls the deployed SHA and flips true once it differs from the running build —
+// so a home-screen PWA (no pull-to-refresh) gets a one-tap update.
 function useUpdateAvailable() {
   const [stale, setStale] = useState(false)
-  const current = useRef(currentAsset())
   useEffect(() => {
-    if (!current.current || stale) return // dev build, or already flagged
+    if (BUILD_SHA === 'dev' || stale) return // dev build, or already flagged
     let alive = true
     const check = async () => {
       try {
-        const latest = await latestAsset()
-        if (alive && latest && latest !== current.current) setStale(true)
+        const sha = await latestSha()
+        if (alive && sha && sha !== BUILD_SHA) setStale(true)
       } catch {
-        /* offline / transient — try again next tick */
+        /* offline / transient — retry next tick */
       }
     }
     check()
