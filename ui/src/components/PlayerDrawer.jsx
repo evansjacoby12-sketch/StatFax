@@ -9,6 +9,7 @@ import { compass, skyLabel } from '../lib/weather.js'
 import { interpretWind } from '../lib/wind.js'
 import { playerHeadshot, teamColor } from '../lib/teams.js'
 import { toolGrades, heatBreakdown, scoutVerdict, gradeLabel, hrSetup } from '../lib/scout.js'
+import { blastOf, blastVsHandOf } from '../lib/groups.js'
 import { useLiveMode } from '../lib/liveMode.js'
 
 // Focus-trap + restore-focus for the slide-over (accessibility).
@@ -123,6 +124,7 @@ export default function PlayerDrawer({ batter: b, onClose, watched, inSlip, onTo
         />
         <div className="drawer-body">
           <HeroNumbers b={b} color={color} />
+          <PlateMatchup b={b} onOpenZone={onOpenZone} />
           <ScoutReport b={b} />
           <HrSetupSection b={b} />
           <ZoneTeaser b={b} onOpen={onOpenZone} />
@@ -232,6 +234,114 @@ const SCOUT_TOOLS = [
   { key: 'matchup', label: 'Matchup', color: 'var(--strong)' },
   { key: 'environment', label: 'Park / Air', color: 'var(--accent)' },
 ]
+
+// Plate Matchup HR Signal — the headline "who's favored" verdict. The model's
+// matchupScore IS the batter-vs-pitcher favorability (50 = neutral), so the lean
+// is just (matchupScore − 50). The pillar bars below it are the real sub-scores
+// that drive the composite, and the detail chips are the live contact-quality
+// numbers (blast / barrel / opposing HR-9) behind the call — no invented stats.
+const LG_BLAST = 15 // league-average blast per squared-up contact (%)
+const LG_BARREL = 8 // league-average barrel rate per BBE (%)
+const LG_HR9 = 1.25 // league-average HR allowed per 9
+function plateMatchup(b) {
+  const ms = b.matchupScore
+  if (!Number.isFinite(ms)) return null
+  const lean = Math.round((ms - 50) * 10) / 10
+  const verdict =
+    lean >= 12 ? 'Batter Favored' :
+    lean >= 4 ? 'Lean Batter' :
+    lean > -4 ? 'Even Matchup' :
+    lean > -12 ? 'Lean Pitcher' : 'Pitcher Favored'
+  const tone = lean >= 4 ? 'good' : lean <= -4 ? 'bad' : 'even'
+  return { lean, verdict, tone }
+}
+
+function PillarBar({ label, value, hint }) {
+  const v = Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : null
+  const tone = v == null ? '' : v >= 67 ? 'good' : v >= 45 ? 'mid' : 'bad'
+  return (
+    <div className="pm-pillar" title={hint}>
+      <div className="pm-pillar-top">
+        <span className="pm-pillar-label">{label}</span>
+        <span className="pm-pillar-val mono">{v == null ? '—' : Math.round(v)}</span>
+      </div>
+      <span className="pm-pillar-track">
+        <span className={`pm-pillar-fill ${tone}`} style={{ width: `${v ?? 0}%` }} />
+      </span>
+    </div>
+  )
+}
+
+function PlateMatchup({ b, onOpenZone }) {
+  const pm = plateMatchup(b)
+  if (!pm) return null
+  const blast = blastOf(b)
+  const vsHandBlast = blastVsHandOf(b)
+  const barrel = Number.isFinite(b.barrelPctBBE) ? b.barrelPctBBE : b.barrelPct
+  const hr9 = Number.isFinite(b.effectiveHR9) ? b.effectiveHR9 : b.pitcher?.season?.hrPer9
+  const slot = b.battingOrder
+  const pas = b.expectedPAs
+  // Quick-jump actions to the sections that already exist in the drawer.
+  const jump = (id) => () => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  const acts = [
+    { label: 'Zone', icon: 'Crosshair', go: () => (b?.zoneMatchup ? onOpenZone?.(b) : jump('sec-zone')()) },
+    { label: 'Pitcher', icon: 'Shield', go: jump('sec-pitcher') },
+    { label: 'Statcast', icon: 'Gauge', go: jump('sec-statcast') },
+    { label: 'Air', icon: 'Wind', go: jump('sec-env') },
+  ]
+  return (
+    <section className="drawer-section pm-card">
+      <div className="pm-head">
+        <span className="pm-title"><Icon name="Target" size={14} /> Plate Matchup</span>
+        <span className={`pm-hr-pill ${pm.tone}`}><Icon name="Zap" size={11} /> HR Signal</span>
+      </div>
+      <div className={`pm-verdict tone-${pm.tone}`}>
+        <div className="pm-verdict-txt">
+          <span className="pm-verdict-label">{pm.verdict}</span>
+          <span className="pm-verdict-sub dim">batter vs {b.pitcher?.name || 'TBD'}</span>
+        </div>
+        <span className="pm-verdict-num mono">{pm.lean > 0 ? '+' : ''}{pm.lean.toFixed(1)}</span>
+      </div>
+      <div className="pm-pillars">
+        <PillarBar label="Bat threat" value={b.batterScore} hint="The hitter's own HR threat — power, contact quality, recent form." />
+        <PillarBar label="Matchup" value={b.matchupScore} hint="This batter vs this starter — handedness, HR-9, zone fit." />
+        <PillarBar label="Park / Air" value={b.envScore} hint="Venue HR factor + weather pushing the ball out (or holding it in)." />
+      </div>
+      <div className="pm-chips">
+        {Number.isFinite(blast) && (
+          <span className={`pm-chip ${blast >= LG_BLAST ? 'good' : ''}`} title={`League avg ${LG_BLAST}% per squared-up contact`}>
+            <Icon name="Zap" size={10} /> Blast {num(blast, 0)}%
+            {Number.isFinite(vsHandBlast) && <span className="pm-chip-sub"> · vs {b.batTracking?.vsHand}HP {num(vsHandBlast, 0)}%</span>}
+          </span>
+        )}
+        {Number.isFinite(barrel) && (
+          <span className={`pm-chip ${barrel >= LG_BARREL ? 'good' : ''}`} title={`League avg ${LG_BARREL}% of batted balls`}>
+            <Icon name="Crosshair" size={10} /> Barrel {num(barrel, 0)}%
+          </span>
+        )}
+        {Number.isFinite(hr9) && (
+          <span className={`pm-chip ${hr9 >= 1.3 ? 'good' : hr9 < LG_HR9 ? 'bad' : ''}`} title={`Opposing starter's HR allowed per 9 (league avg ${LG_HR9})`}>
+            <Icon name="Flame" size={10} /> Arm {num(hr9, 2)} HR/9
+          </span>
+        )}
+      </div>
+      <div className="pm-foot">
+        <span className="pm-lineup">
+          <Icon name="List" size={11} />
+          {slot ? <> Batting <b>{ordinal(slot)}</b></> : <> Lineup <b>{b.lineupConfirmed ? 'set' : 'projected'}</b></>}
+          {Number.isFinite(pas) && <span className="dim"> · ~{num(pas, 1)} PA{slot && slot <= 5 ? ' (premium slot)' : ''}</span>}
+        </span>
+        <div className="pm-acts">
+          {acts.map((a) => (
+            <button key={a.label} className="pm-act" onClick={a.go}>
+              <Icon name={a.icon} size={13} /> {a.label}
+            </button>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
 
 function ScoutReport({ b }) {
   if (b.batterScore == null && b.matchupScore == null) return null
@@ -358,7 +468,7 @@ function StatcastSection({ b }) {
   const has = [b.barrelPct, b.exitVelo, b.launchAngle, x.xSLG].some((v) => v != null)
   if (!has) return null
   return (
-    <Section title="Statcast" icon="Gauge">
+    <Section title="Statcast" icon="Gauge" id="sec-statcast">
       <div className="stat-grid">
         <Cell k="Barrel%" v={b.barrelPct != null ? `${num(b.barrelPct, 1)}%` : '—'} />
         <Cell k="Barrel/BBE" v={b.barrelPctBBE != null ? `${num(b.barrelPctBBE, 1)}%` : '—'} />
@@ -467,7 +577,7 @@ function EnvSection({ b }) {
   const sky = skyLabel(w)
   const wind = interpretWind(w, b.game?.homeTeam?.abbr, { roofClosed: w?.roofClosed })
   return (
-    <Section title="Park & weather" icon="Wind">
+    <Section title="Park & weather" icon="Wind" id="sec-env">
       {wind && (
         <div className="wind-verdict-line" style={{ color: wind.tint }}>
           <Icon name="Wind" size={13} />
@@ -551,7 +661,7 @@ function PitcherSection({ b, onOpenPitcher }) {
     </div>
   )
   return (
-    <Section title="Opposing pitcher" icon="Shield">
+    <Section title="Opposing pitcher" icon="Shield" id="sec-pitcher">
       <div className="pitcher-head">
         {canOpen ? (
           <button className="pitcher-link" onClick={() => onOpenPitcher(p.id, b.gamePk)} title={`Open ${p.name}'s pitcher card`}>
@@ -763,7 +873,7 @@ function ZoneTeaser({ b, onOpen }) {
   if (!z || !z.batter?.grid || !z.pitcher?.grid) return null
   const matched = z.matchedZones?.length || 0
   return (
-    <Section title="Zone matchup" icon="Crosshair">
+    <Section title="Zone matchup" icon="Crosshair" id="sec-zone">
       <button className="zone-teaser" onClick={() => onOpen?.(b)} aria-label="Open full zone matchup">
         <div className="zteaser-grids">
           <div className="zteaser-one">
@@ -912,9 +1022,9 @@ function SplitChips({ b }) {
 }
 
 /* ---- small shared bits ---- */
-function Section({ title, icon, children }) {
+function Section({ title, icon, children, id }) {
   return (
-    <section className="drawer-section">
+    <section className="drawer-section" id={id}>
       <h3 className="section-title">
         <Icon name={icon} size={14} /> {title}
       </h3>
