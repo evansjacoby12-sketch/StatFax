@@ -575,7 +575,13 @@ export default function App() {
               <h2>Same-Game Parlays</h2>
             </div>
             <div className="groups-modal-body">
-              <SameGameView batters={all} onSelect={(b) => setSelectedId(b.id)} />
+              <SameGameView
+                batters={all}
+                onSelect={(b) => setSelectedId(b.id)}
+                favorConsistency={favorConsistency}
+                favorRecent={favorRecent}
+                comboConf={comboConf}
+              />
             </div>
           </div>
         </>

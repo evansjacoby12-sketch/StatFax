@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect, useRef } from 'react'
 import Icon from './Icon.jsx'
 import { GradeChip } from './atoms.jsx'
 import { pct, num, rate, american, signedPct } from '../lib/format.js'
-import { buildGroups, lastFirst, isoOf, blastOf, blastMixOf, blastVsHandOf } from '../lib/groups.js'
+import { buildGroups, lastFirst, isoOf, blastOf, blastMixOf, blastVsHandOf, legFlags, legIsBad } from '../lib/groups.js'
 import { useLiveMode } from '../lib/liveMode.js'
 
 const GROUP_GRADE_COLOR = { S: '#f5a623', A: '#32d74b', B: '#3b82f6', C: '#9aa6b6', D: '#6b7787' }
@@ -11,34 +11,8 @@ const SIZE_TABS = [2, 3, 4].map((k) => ({ k, label: `${k}-leg` }))
 // (show all); 4-leg is lottery (trim hard).
 const DISPLAY_CAP = { 2: Infinity, 3: 5, 4: 3 }
 
-// Per-leg weakness — the same checks as the manual combo audits, but scored on
-// ONE leg so the card can point at *which* leg is the risk, not just glow.
-const STINGY_HR9 = 0.85
-const LOW_BARREL = 13
-const PITCHER_PARK = 0.92
-const LONGSHOT_PROB = 0.18
-function legFlags(b) {
-  const f = []
-  const grade = b.grade?.label || b.grade
-  const sb = Number.isFinite(b.barrelPctBBE) ? b.barrelPctBBE : b.barrelPct
-  const hr9 = b.pitcher?.season?.hrPer9
-  const park = b.gameParkHRFactor
-  if (grade !== 'PRIME') f.push(`${grade || 'SKIP'} (not PRIME)`)
-  if (Number.isFinite(sb) && sb < LOW_BARREL) f.push(`low barrel ${sb.toFixed(0)}%`)
-  if (Number.isFinite(hr9) && hr9 < STINGY_HR9) f.push(`HR-stingy arm ${hr9.toFixed(2)}`)
-  if (Number.isFinite(park) && park <= PITCHER_PARK) f.push(`pitcher's park ${park.toFixed(2)}`)
-  return f
-}
-// "Really bad" = a leg likely to sink the whole parlay: a long-shot HR prob, a
-// tiny barrel under a sub-PRIME grade, or 2+ flags stacking. These turn the card
-// red and earn the leg a WEAK badge.
-function legIsBad(b, flags = legFlags(b)) {
-  const grade = b.grade?.label || b.grade
-  const sb = Number.isFinite(b.barrelPctBBE) ? b.barrelPctBBE : b.barrelPct
-  if (Number.isFinite(b.hrProbability) && b.hrProbability < LONGSHOT_PROB) return true
-  if (grade !== 'PRIME' && Number.isFinite(sb) && sb < 8) return true
-  return flags.length >= 2
-}
+// Per-leg weakness checks (legFlags / legIsBad) are shared with the SGP tab —
+// see ui/lib/groups.js.
 // Score each leg + find the single weakest (lowest HR prob). Card tone: green
 // when every leg is clean, red when a leg is really bad (the weakest one gets
 // flagged), yellow for minor flags in between.

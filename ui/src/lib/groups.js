@@ -11,6 +11,34 @@ const SIZES = [2, 3, 4, 5, 6, 7, 8]
 
 const barrelOf = (b) => (Number.isFinite(b.barrelPctBBE) ? b.barrelPctBBE : b.barrelPct)
 
+// Per-leg weakness checks (shared by Parlay Combos + SGP). A leg trips a flag on
+// a sub-PRIME grade, low barrel, an HR-stingy arm, or a pitcher's park; it's a
+// "really bad" (red) leg on a long-shot HR%, a tiny barrel under a weak grade,
+// or 2+ flags stacking.
+const STINGY_HR9 = 0.85
+const LOW_BARREL = 13
+const PITCHER_PARK = 0.92
+const LONGSHOT_PROB = 0.18
+export function legFlags(b) {
+  const f = []
+  const grade = b.grade?.label || b.grade
+  const sb = Number.isFinite(b.barrelPctBBE) ? b.barrelPctBBE : b.barrelPct
+  const hr9 = b.pitcher?.season?.hrPer9
+  const park = b.gameParkHRFactor
+  if (grade !== 'PRIME') f.push(`${grade || 'SKIP'} (not PRIME)`)
+  if (Number.isFinite(sb) && sb < LOW_BARREL) f.push(`low barrel ${sb.toFixed(0)}%`)
+  if (Number.isFinite(hr9) && hr9 < STINGY_HR9) f.push(`HR-stingy arm ${hr9.toFixed(2)}`)
+  if (Number.isFinite(park) && park <= PITCHER_PARK) f.push(`pitcher's park ${park.toFixed(2)}`)
+  return f
+}
+export function legIsBad(b, flags = legFlags(b)) {
+  const grade = b.grade?.label || b.grade
+  const sb = Number.isFinite(b.barrelPctBBE) ? b.barrelPctBBE : b.barrelPct
+  if (Number.isFinite(b.hrProbability) && b.hrProbability < LONGSHOT_PROB) return true
+  if (grade !== 'PRIME' && Number.isFinite(sb) && sb < 8) return true
+  return flags.length >= 2
+}
+
 // Blast rate (Statcast bat tracking) — recent ~2wk blasts-per-squared-up-contact
 // preferred (needs a real swing sample), season as fallback. Mirrors
 // server/parlay-combos.mjs blastRate(). 0-100 %. BLAST_ELITE flags a top blaster.
@@ -33,7 +61,7 @@ const kRateOf = (b) => {
   return pa > 0 ? (s.k || 0) / pa : null
 }
 // 1.0 = no penalty at/below ~20% K; ramps to 0.75 for very high-K (~40%+) bats.
-const consistencyFactor = (b) => {
+export const consistencyFactor = (b) => {
   const k = kRateOf(b)
   if (k == null) return 1
   return 1 - Math.min(1, Math.max(0, (k - 0.20) / 0.20)) * 0.25
@@ -43,7 +71,7 @@ const consistencyFactor = (b) => {
 // barreling the ball lately (recent L14 barrel above their season rate, + the
 // hot flag) and dabs down cold ones, so the board leans toward who's hot NOW
 // rather than season-long quality. Range ~0.85–1.20.
-const recencyFactor = (b) => {
+export const recencyFactor = (b) => {
   const rb = b.recentBarrel?.recentBarrelPct
   const bbe = b.recentBarrel?.recentBBE ?? 0
   if (!Number.isFinite(rb) || bbe < 6) return b.hot ? 1.06 : b.cold ? 0.92 : 1
