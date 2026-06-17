@@ -4834,6 +4834,19 @@ button.th:hover {
   border-color: color-mix(in srgb, var(--good) 50%, transparent);
   background: color-mix(in srgb, var(--good) 12%, transparent);
 }
+.grp-state-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  border-radius: 5px;
+  padding: 1px 5px;
+  border: 1px solid;
+}
+.grp-state-tag.live { color: var(--good); border-color: color-mix(in srgb, var(--good) 50%, transparent); background: color-mix(in srgb, var(--good) 12%, transparent); }
+.grp-state-tag.final { color: var(--text-faint); border-color: var(--border); }
 .grp-chip.unconf {
   color: var(--warn, #ffb02e);
   border-color: color-mix(in srgb, var(--warn, #ffb02e) 50%, transparent);

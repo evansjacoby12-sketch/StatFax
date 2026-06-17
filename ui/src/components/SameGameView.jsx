@@ -24,7 +24,7 @@ function buildSGP(batters, size, { favorConsistency, favorRecent } = {}) {
     (b.hrProbability ?? 0) * (favorConsistency ? consistencyFactor(b) : 1) * (favorRecent ? recencyFactor(b) : 1)
   const byGame = new Map()
   for (const b of batters || []) {
-    if (b.game?.isFinal) continue
+    // Show every game regardless of state (pregame / live / final).
     if ((b.grade?.label || 'SKIP') === 'SKIP') continue
     if (!Number.isFinite(b.hrProbability)) continue
     if (!byGame.has(b.gamePk)) byGame.set(b.gamePk, { gamePk: b.gamePk, game: b.game, parkHR: b.gameParkHRFactor, bats: [] })
@@ -81,7 +81,11 @@ export default function SameGameView({ batters, onSelect, favorConsistency = fal
                     {matchup}
                     {g.parkHR != null && <span className="dim"> · park {g.parkHR.toFixed(2)}×</span>}
                   </span>
-                  {g.provisional ? (
+                  {g.game?.isFinal ? (
+                    <span className="grp-state-tag final">FINAL</span>
+                  ) : g.game?.isLive ? (
+                    <span className="grp-state-tag live"><Icon name="Activity" size={10} /> LIVE</span>
+                  ) : g.provisional ? (
                     <span className="grp-prov-tag"><Icon name="Clock" size={10} /> PROVISIONAL</span>
                   ) : (
                     <span className="grp-locked-tag"><Icon name="Lock" size={10} /> LOCKED</span>
