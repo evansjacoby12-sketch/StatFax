@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, useCallback, useRef, useLayoutEffect } fr
 import { loadSlate, normName } from './lib/data.js'
 import { GRADE_ORDER, BADGES } from './lib/badges.js'
 import { HOT_HEAT, DESC_BY_DEFAULT, DEFAULT_FILTERS, SORTS } from './lib/constants.js'
+import { risingForm } from './lib/groups.js'
 import * as store from './lib/storage.js'
 import { LiveModeContext } from './lib/liveMode.js'
 import Header from './components/Header.jsx'
@@ -236,7 +237,13 @@ export default function App() {
   const removeSlip = useCallback((id) => setSlipIds((prev) => prev.filter((x) => x !== id)), [])
   const clearSlip = useCallback(() => setSlipIds([]), [])
 
-  const all = state.data?.batters || []
+  // Attach the RISING signal (recent L14 barrel surging above season) as a real
+  // boolean flag so every consumer — board badges, filters, counts, backtest —
+  // reads it the same way as the engine's server-side flags.
+  const all = useMemo(
+    () => (state.data?.batters || []).map((b) => (risingForm(b) ? { ...b, rising: true } : b)),
+    [state.data],
+  )
   const slipSet = useMemo(() => new Set(slipIds), [slipIds])
 
   // Resolve slip ids → batter objects in slip order; drop any not in this slate.

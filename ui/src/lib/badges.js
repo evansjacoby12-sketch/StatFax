@@ -17,6 +17,7 @@ export function gradeColor(label) {
 // `lucide` field is the lucide-react icon name; tone drives color.
 export const BADGES = [
   { key: 'hot', label: 'Hot', lucide: 'Flame', color: 'var(--b-hot)', tone: 'good', desc: 'On a hot streak — recent power surge' },
+  { key: 'rising', label: 'Rising', lucide: 'TrendingUp', color: 'var(--good)', tone: 'good', desc: 'Recent ~14-day barrel rate surging above the season rate — heating up right now (the recency edge sharps ride)' },
   { key: 'due', label: 'Due', lucide: 'Hourglass', color: 'var(--b-due)', tone: 'good', desc: 'HR drought vs. expected — regression candidate' },
   { key: 'cold', label: 'Cold', lucide: 'Snowflake', color: 'var(--b-cold)', tone: 'bad', desc: 'Cold stretch at the plate' },
   { key: 'bullpenLegend', label: 'Pen Edge', lucide: 'Shield', color: 'var(--b-bullpen)', tone: 'good', desc: 'Opposing bullpen is HR-prone late' },
