@@ -4707,6 +4707,12 @@ button.th:hover {
   border-color: color-mix(in srgb, var(--b-hot) 50%, transparent);
   background: color-mix(in srgb, var(--b-hot) 14%, transparent);
 }
+/* "Rising" — recent barrel surging above the season rate (recency signal). */
+.grp-chip.rising {
+  color: var(--good);
+  border-color: color-mix(in srgb, var(--good) 50%, transparent);
+  background: color-mix(in srgb, var(--good) 12%, transparent);
+}
 .grp-blast-hot {
   color: var(--b-hot);
   font-weight: 700;

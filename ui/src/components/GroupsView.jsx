@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect, useRef } from 'react'
 import Icon from './Icon.jsx'
 import { GradeChip } from './atoms.jsx'
 import { pct, num, rate, american, signedPct } from '../lib/format.js'
-import { buildGroups, lastFirst, isoOf, blastOf, blastMixOf, blastVsHandOf, legFlags, legIsBad } from '../lib/groups.js'
+import { buildGroups, lastFirst, isoOf, blastOf, blastMixOf, blastVsHandOf, legFlags, legIsBad, risingForm } from '../lib/groups.js'
 import { useLiveMode } from '../lib/liveMode.js'
 
 const GROUP_GRADE_COLOR = { S: '#f5a623', A: '#32d74b', B: '#3b82f6', C: '#9aa6b6', D: '#6b7787' }
@@ -222,7 +222,7 @@ function spreadPick(groups, n = 4) {
   return picked
 }
 
-export default function GroupsView({ batters, onSelect, selectedId, scorecard, generatedAt, windowMode = false, comboConf = 'off', favorConsistency = false, favorRecent = false }) {
+export default function GroupsView({ batters, onSelect, selectedId, scorecard, generatedAt, windowMode = false, comboConf = 'off', favorConsistency = false }) {
   const [size, setSize] = useState(2)
   const [games, setGames] = useState(() => new Set()) // empty = all games
   // Hide started defaults ON: HR props can't be bet pregame once the game is
@@ -273,7 +273,7 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard, g
   )
   const conf = useMemo(() => confirmSummary(batters), [batters])
   const asOf = fmtTime(generatedAt)
-  const bySize = useMemo(() => buildGroups(pool, { favorConsistency, favorRecent }), [pool, favorConsistency, favorRecent])
+  const bySize = useMemo(() => buildGroups(pool, { favorConsistency }), [pool, favorConsistency])
   const available = SIZE_TABS.filter((t) => bySize[t.k]?.length)
   const activeSize = bySize[size]?.length ? size : available[0]?.k
   const groups = activeSize ? bySize[activeSize] : []
@@ -523,6 +523,7 @@ function GroupLeg({ b, idx, onSelect, selected, bad, weakest, reasons, unconfirm
   const era = b.pitcher?.season?.era
   const barrel = b.barrelPctBBE ?? b.barrelPct
   const iso = isoOf(b)
+  const rising = risingForm(b)
   const hrToday = liveMode && b.liveContext?.isHRThisGame
   return (
     <li
@@ -553,6 +554,14 @@ function GroupLeg({ b, idx, onSelect, selected, bad, weakest, reasons, unconfirm
             </span>
           )}
           {b.hot && <Icon name="Flame" size={12} className="grp-fire" />}
+          {rising && (
+            <span
+              className="grp-chip rising"
+              title={`Rising — L14 barrel ${rising.recent.toFixed(0)}% vs ${rising.season.toFixed(0)}% season (+${rising.delta.toFixed(0)} pts). Heating up right now.`}
+            >
+              <Icon name="TrendingUp" size={10} /> RISING
+            </span>
+          )}
           {b.blast && (
             <span
               className="grp-chip blast"

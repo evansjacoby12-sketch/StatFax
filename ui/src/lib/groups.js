@@ -67,19 +67,20 @@ export const consistencyFactor = (b) => {
   return 1 - Math.min(1, Math.max(0, (k - 0.20) / 0.20)) * 0.25
 }
 
-// Optional "favor recent form" lean — the Outlaw-style recency tilt. Boosts bats
-// barreling the ball lately (recent L14 barrel above their season rate, + the
-// hot flag) and dabs down cold ones, so the board leans toward who's hot NOW
-// rather than season-long quality. Range ~0.85–1.20.
-export const recencyFactor = (b) => {
+// "Rising" signal — the Outlaw-style recency edge surfaced as a visible badge
+// instead of a hidden ranking lean. A bat is RISING when its recent L14 barrel
+// (real sample) is meaningfully above its season rate — it's heating up NOW.
+// Returns { recent, season, delta } or null. RISING_DELTA is the bar in barrel
+// points; ~+4 separates a genuine surge from sample noise.
+export const RISING_DELTA = 4
+export function risingForm(b) {
   const rb = b.recentBarrel?.recentBarrelPct
   const bbe = b.recentBarrel?.recentBBE ?? 0
-  if (!Number.isFinite(rb) || bbe < 6) return b.hot ? 1.06 : b.cold ? 0.92 : 1
-  const season = (Number.isFinite(b.barrelPctBBE) ? b.barrelPctBBE : b.barrelPct) ?? rb
-  let f = 1 + Math.min(0.18, Math.max(-0.15, (rb - season) * 0.015)) // heating up vs cooling
-  if (b.hot) f *= 1.05
-  if (b.cold) f *= 0.93
-  return Math.min(1.20, Math.max(0.85, f))
+  if (!Number.isFinite(rb) || bbe < 6) return null
+  const season = Number.isFinite(b.barrelPctBBE) ? b.barrelPctBBE : b.barrelPct
+  if (!Number.isFinite(season)) return null
+  const delta = rb - season
+  return delta >= RISING_DELTA ? { recent: rb, season, delta } : null
 }
 
 // Matchup-relevant blast cuts (display): vs today's starter's HAND, and the
@@ -245,13 +246,13 @@ function makeGroup(legs, size, strat, idSuffix = '') {
   }
 }
 
-export function buildGroups(batters, { maxPerBat = 3, favorConsistency = false, favorRecent = false } = {}) {
+export function buildGroups(batters, { maxPerBat = 3, favorConsistency = false } = {}) {
   // Each strategy's ranked pool is size-independent — compute once, slice per size.
-  // Optional leans wrap each rank with a factor: favorConsistency demotes high-K
-  // boom-or-bust bats; favorRecent boosts bats hot lately (Outlaw-style recency).
+  // The favorConsistency lean wraps each rank with a factor that demotes high-K
+  // boom-or-bust bats. (Recent form is now a visible RISING signal, not a lean.)
   const rankOf = (strat) => {
-    if (!favorConsistency && !favorRecent) return strat.rank
-    return (b) => strat.rank(b) * (favorConsistency ? consistencyFactor(b) : 1) * (favorRecent ? recencyFactor(b) : 1)
+    if (!favorConsistency) return strat.rank
+    return (b) => strat.rank(b) * consistencyFactor(b)
   }
   const pools = STRATEGIES.map((strat) => ({ strat, pool: topPerGame(batters, rankOf(strat), strat.require) }))
   const out = {}

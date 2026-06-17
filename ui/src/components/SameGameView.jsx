@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import Icon from './Icon.jsx'
 import { GradeChip } from './atoms.jsx'
 import { pct } from '../lib/format.js'
-import { lastFirst, consistencyFactor, recencyFactor, legFlags, legIsBad } from '../lib/groups.js'
+import { lastFirst, consistencyFactor, legFlags, legIsBad, risingForm } from '../lib/groups.js'
 
 const SIZES = [2, 3, 4]
 const GRADE_COLOR = { S: '#f5a623', A: '#32d74b', B: '#3b82f6', C: '#9aa6b6', D: '#6b7787' }
@@ -18,10 +18,9 @@ function sgpStars(legs, tone) {
 }
 
 // Same-Game Parlays: the best `size` bats from ONE game stacked together.
-// Honors the same leans as the combos page (consistency / recent form).
-function buildSGP(batters, size, { favorConsistency, favorRecent } = {}) {
-  const rankVal = (b) =>
-    (b.hrProbability ?? 0) * (favorConsistency ? consistencyFactor(b) : 1) * (favorRecent ? recencyFactor(b) : 1)
+// Honors the same consistency lean as the combos page.
+function buildSGP(batters, size, { favorConsistency } = {}) {
+  const rankVal = (b) => (b.hrProbability ?? 0) * (favorConsistency ? consistencyFactor(b) : 1)
   const byGame = new Map()
   for (const b of batters || []) {
     // Show every game regardless of state (pregame / live / final).
@@ -40,7 +39,7 @@ function buildSGP(batters, size, { favorConsistency, favorRecent } = {}) {
     const combo = legs.reduce((p, b) => p * (b.hrProbability ?? 0), 1) // independent baseline
     const avg = legs.reduce((s, b) => s + (b.score ?? 0), 0) / legs.length
     // Weakness + lineup-confirmation (same guards as the combos page).
-    const legInfo = legs.map((b) => { const flags = legFlags(b); return { flags, bad: legIsBad(b, flags), unconfirmed: b.lineupConfirmed !== true } })
+    const legInfo = legs.map((b) => { const flags = legFlags(b); return { flags, bad: legIsBad(b, flags), unconfirmed: b.lineupConfirmed !== true, rising: risingForm(b) } })
     const tone = legInfo.some((l) => l.bad) ? 'risk' : legInfo.some((l) => l.flags.length) ? 'caution' : 'tail'
     const provisional = legInfo.some((l) => l.unconfirmed)
     out.push({ ...g, legs, legInfo, combo, grade: gradeFor(avg), avg, tone, provisional, stars: sgpStars(legs, tone) })
@@ -48,9 +47,9 @@ function buildSGP(batters, size, { favorConsistency, favorRecent } = {}) {
   return out.sort((a, b) => b.combo - a.combo)
 }
 
-export default function SameGameView({ batters, onSelect, favorConsistency = false, favorRecent = false, comboConf = 'off' }) {
+export default function SameGameView({ batters, onSelect, favorConsistency = false, comboConf = 'off' }) {
   const [size, setSize] = useState(2)
-  const sgps = useMemo(() => buildSGP(batters, size, { favorConsistency, favorRecent }), [batters, size, favorConsistency, favorRecent])
+  const sgps = useMemo(() => buildSGP(batters, size, { favorConsistency }), [batters, size, favorConsistency])
   return (
     <>
       <p className="sgp-intro dim">
@@ -106,6 +105,7 @@ export default function SameGameView({ batters, onSelect, favorConsistency = fal
                         <div className="sgp-leg-body">
                           <span className="sgp-leg-name">{lastFirst(b.name)}</span>
                           {info.unconfirmed && <span className="grp-chip unconf"><Icon name="Clock" size={10} /> NO LINEUP</span>}
+                          {info.rising && <span className="grp-chip rising" title={`Rising — L14 barrel ${info.rising.recent.toFixed(0)}% vs ${info.rising.season.toFixed(0)}% season (+${info.rising.delta.toFixed(0)} pts)`}><Icon name="TrendingUp" size={10} /> RISING</span>}
                           {info.bad && <span className="grp-chip weak" title={info.flags.join(' · ') || 'long-shot HR%'}><Icon name="TriangleAlert" size={10} /> WEAK</span>}
                         </div>
                         <GradeChip grade={b.grade} score={b.score} size="sm" />
