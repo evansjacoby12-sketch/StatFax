@@ -39,6 +39,21 @@ const consistencyFactor = (b) => {
   return 1 - Math.min(1, Math.max(0, (k - 0.20) / 0.20)) * 0.25
 }
 
+// Optional "favor recent form" lean — the Outlaw-style recency tilt. Boosts bats
+// barreling the ball lately (recent L14 barrel above their season rate, + the
+// hot flag) and dabs down cold ones, so the board leans toward who's hot NOW
+// rather than season-long quality. Range ~0.85–1.20.
+const recencyFactor = (b) => {
+  const rb = b.recentBarrel?.recentBarrelPct
+  const bbe = b.recentBarrel?.recentBBE ?? 0
+  if (!Number.isFinite(rb) || bbe < 6) return b.hot ? 1.06 : b.cold ? 0.92 : 1
+  const season = (Number.isFinite(b.barrelPctBBE) ? b.barrelPctBBE : b.barrelPct) ?? rb
+  let f = 1 + Math.min(0.18, Math.max(-0.15, (rb - season) * 0.015)) // heating up vs cooling
+  if (b.hot) f *= 1.05
+  if (b.cold) f *= 0.93
+  return Math.min(1.20, Math.max(0.85, f))
+}
+
 // Matchup-relevant blast cuts (display): vs today's starter's HAND, and the
 // usage-weighted blast vs his exact MIX (only when we cover ≥half the arsenal).
 export const blastVsHandOf = (b) => {
@@ -202,11 +217,14 @@ function makeGroup(legs, size, strat, idSuffix = '') {
   }
 }
 
-export function buildGroups(batters, { maxPerBat = 3, favorConsistency = false } = {}) {
+export function buildGroups(batters, { maxPerBat = 3, favorConsistency = false, favorRecent = false } = {}) {
   // Each strategy's ranked pool is size-independent — compute once, slice per size.
-  // favorConsistency wraps each rank with a K%-based factor so high-strikeout
-  // boom-or-bust bats are demoted (don't anchor every strategy).
-  const rankOf = (strat) => (favorConsistency ? (b) => strat.rank(b) * consistencyFactor(b) : strat.rank)
+  // Optional leans wrap each rank with a factor: favorConsistency demotes high-K
+  // boom-or-bust bats; favorRecent boosts bats hot lately (Outlaw-style recency).
+  const rankOf = (strat) => {
+    if (!favorConsistency && !favorRecent) return strat.rank
+    return (b) => strat.rank(b) * (favorConsistency ? consistencyFactor(b) : 1) * (favorRecent ? recencyFactor(b) : 1)
+  }
   const pools = STRATEGIES.map((strat) => ({ strat, pool: topPerGame(batters, rankOf(strat), strat.require) }))
   const out = {}
   for (const size of SIZES) {

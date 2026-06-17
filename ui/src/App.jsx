@@ -80,6 +80,7 @@ export default function App() {
   const [showDayRating, setShowDayRating] = useState(() => store.load('showDayRating', true))
   const [comboConf, setComboConf] = useState(() => store.load('comboConf', 'off')) // 'off' | 'stars' | 'percent'
   const [favorConsistency, setFavorConsistency] = useState(() => store.load('favorConsistency', false))
+  const [favorRecent, setFavorRecent] = useState(() => store.load('favorRecent', false))
   const [watchlist, setWatchlist] = useState(() => new Set(store.load('watchlist', [])))
   const [slipIds, setSlipIds] = useState(() => store.load('slip', []))
   const [autoRefresh, setAutoRefresh] = useState(() => store.load('autoRefresh', false))
@@ -110,6 +111,7 @@ export default function App() {
   useEffect(() => store.save('showDayRating', showDayRating), [showDayRating])
   useEffect(() => store.save('comboConf', comboConf), [comboConf])
   useEffect(() => store.save('favorConsistency', favorConsistency), [favorConsistency])
+  useEffect(() => store.save('favorRecent', favorRecent), [favorRecent])
   useEffect(() => store.save('podDismissed', podDismissedId), [podDismissedId])
   useEffect(() => {
     store.save('view', view)
@@ -555,6 +557,7 @@ export default function App() {
                 windowMode={windowMode}
                 comboConf={comboConf}
                 favorConsistency={favorConsistency}
+                favorRecent={favorRecent}
               />
             </div>
           </div>
@@ -633,6 +636,8 @@ export default function App() {
           onSetComboConf={setComboConf}
           favorConsistency={favorConsistency}
           onToggleConsistency={() => setFavorConsistency((v) => !v)}
+          favorRecent={favorRecent}
+          onToggleRecent={() => setFavorRecent((v) => !v)}
           onClose={() => setShowSettings(false)}
         />
       )}

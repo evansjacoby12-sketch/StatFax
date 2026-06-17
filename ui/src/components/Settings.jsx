@@ -9,6 +9,7 @@ export default function Settings({
   showDayRating, onToggleDayRating,
   comboConf, onSetComboConf,
   favorConsistency, onToggleConsistency,
+  favorRecent, onToggleRecent,
   onClose,
 }) {
   const groups = [
@@ -67,6 +68,13 @@ export default function Settings({
           desc: 'Down-weight high-strikeout, boom-or-bust sluggers in the combos, so a streaky masher doesn’t anchor every combo. Trades some ceiling for steadier bats.',
           on: favorConsistency,
           toggle: onToggleConsistency,
+        },
+        {
+          icon: 'Flame',
+          label: 'Favor recent form',
+          desc: 'Lean the combos toward bats barreling the ball lately (hot recent form), the way sharps ride “who’s going off this week” — over season-long numbers.',
+          on: favorRecent,
+          toggle: onToggleRecent,
         },
       ],
     },
