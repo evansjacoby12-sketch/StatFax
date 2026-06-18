@@ -440,6 +440,18 @@
   color: var(--blue);
   border-color: color-mix(in srgb, var(--blue) 60%, transparent);
 }
+/* Icon-only toggles at every width — the label is dropped (font-size:0) and the
+   button keeps its title + aria-label for accessibility. */
+.live-btn,
+.eli-btn {
+  gap: 0;
+  padding: 0 11px;
+  font-size: 0;
+}
+.live-btn svg,
+.eli-btn svg {
+  font-size: 14px;
+}
 
 .badges-row-label {
   display: flex;
@@ -2917,21 +2929,6 @@ button.th:hover {
     height: 30px;
   }
 }
-/* On phones the Live/Pregame button is icon-only — the icon (+ tooltip) carries
-   it, and dropping the label declutters the header row. */
-@media (max-width: 768px) {
-  .live-btn,
-  .eli-btn {
-    gap: 0;
-    padding: 0 11px;
-    font-size: 0;
-  }
-  .live-btn svg,
-  .eli-btn svg {
-    font-size: 14px;
-  }
-}
-
 /* ============ Filters disclosure ============ */
 /* Compact chevron toggle for the expandable filter panel. Fixed-size square so
    activating a filter never changes its width (no row reflow); the active count
