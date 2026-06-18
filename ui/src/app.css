@@ -490,7 +490,10 @@
   border-radius: 16px;
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.02) 0%, rgba(255, 255, 255, 0.01) 100%);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  overflow: hidden;
+  /* `clip` (not `hidden`) clips the rounded corners WITHOUT creating a scroll
+     container — `overflow: hidden` here breaks the sticky .board-head, dropping
+     the column header mid-list on top of rows. Same fix as .main's overflow-x. */
+  overflow: clip;
 }
 .board-head,
 .board-row {
