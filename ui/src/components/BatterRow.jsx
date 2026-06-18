@@ -1,6 +1,6 @@
 import Icon from './Icon.jsx'
 import { GradeChip, ProbRing, BadgeRow } from './atoms.jsx'
-import { pct, num, signedPct, american } from '../lib/format.js'
+import { pct, num, signedPct, american, ordinal } from '../lib/format.js'
 import { gradeColor } from '../lib/badges.js'
 import { teamLogo } from '../lib/teams.js'
 import { useLiveMode } from '../lib/liveMode.js'
@@ -29,6 +29,15 @@ export default function BatterRow({
   const hrToday = liveMode && b.liveContext?.isHRThisGame
   const topReason = b.reasons?.[0]
   const edge = b.edge
+  // Mobile-only consolidated card bits (hidden on desktop via CSS, which keeps
+  // its richer multi-column layout). The matchup lean is the Plate Matchup
+  // signal: matchupScore − 50 (50 = neutral).
+  const lean = Number.isFinite(b.matchupScore) ? Math.round(b.matchupScore - 50) : null
+  const mom = b.hot
+    ? { label: 'HOT', cls: 'hot', icon: 'Flame' }
+    : b.rising
+      ? { label: 'RISING', cls: 'rising', icon: 'TrendingUp' }
+      : null
 
   return (
     <div
@@ -83,6 +92,11 @@ export default function BatterRow({
               <Icon name="Flame" size={10} /> HR
             </span>
           )}
+          {mom && (
+            <span className={`mom-chip ${mom.cls}`}>
+              <Icon name={mom.icon} size={10} /> {mom.label}
+            </span>
+          )}
         </div>
         <div className="batter-line2">
           <span className="team-tag">{b.team}</span>
@@ -114,14 +128,29 @@ export default function BatterRow({
             {topReason}
           </div>
         )}
+        <div className="batter-meta mono">
+          {Number.isFinite(b.expectedPAs) && <span className="bm-pa">~{num(b.expectedPAs, 1)} PA</span>}
+          {b.battingOrder ? <span className="bm-slot">Batting {ordinal(b.battingOrder)}</span> : null}
+          {lean != null && (
+            <span className={`bm-lean ${lean >= 0 ? 'pos' : 'neg'}`}>
+              {lean > 0 ? '+' : ''}
+              {lean}
+            </span>
+          )}
+        </div>
       </div>
 
-      <div className="col-grade">
-        <GradeChip grade={b.grade} score={b.score} />
-      </div>
+      <div className="col-right">
+        <div className="col-grade">
+          <GradeChip grade={b.grade} score={b.score} />
+        </div>
 
-      <div className="col-prob">
-        <ProbRing value={b.hrProbability} color={color} />
+        <div className="col-prob">
+          <ProbRing value={b.hrProbability} color={color} />
+          <span className="prob-num-mobile mono" style={{ color }}>
+            {pct(b.hrProbability, 1)}
+          </span>
+        </div>
       </div>
 
       <div className="col-xhr mono" title="Expected HRs this game">

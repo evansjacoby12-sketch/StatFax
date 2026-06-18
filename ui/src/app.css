@@ -541,6 +541,18 @@ button.th:hover {
   display: flex;
   justify-content: center;
 }
+/* Desktop defaults for the mobile-only card bits: .col-right is transparent to
+   the 8-column grid (display:contents), and the consolidated meta line + inline
+   momentum chip stay hidden (desktop shows them as dedicated columns / badges).
+   The ≤560px pass below flips these on and stacks them into the v0 card. */
+.col-right {
+  display: contents;
+}
+.batter-meta,
+.mom-chip,
+.prob-num-mobile {
+  display: none;
+}
 /* Center the LABEL of numeric headers over their data by floating the sort icon
    to the right edge (out of flow) so it doesn't shift the label off-center. */
 .th.col-grade,
@@ -3076,25 +3088,112 @@ button.th:hover {
   .col-actions {
     display: none;
   }
-  /* Declutter the batter cell: drop the reason + opposing pitcher (in drawer) */
-  .batter-reason,
-  .matchup-pitch,
-  .batter-line2 .dot-sep {
+  /* Drop the model-reason line (lives in the drawer); the opposing-pitcher line
+     and the consolidated PA/slot/lean meta now stay — they're the heart of the
+     clean v0 card. */
+  .batter-reason {
     display: none;
   }
-  /* Probability: show just the % (drop the inline bar to save width) */
-  .col-prob .probbar-track {
-    display: none;
+
+  /* --- v0-style clean card: name + momentum, matchup line, PA · slot · lean,
+         with the big % stacked over the grade chip on the right. --- */
+  .board-row {
+    align-items: flex-start;
+    padding: 13px 14px;
+    min-height: 0;
   }
-  .col-prob .probbar {
-    max-width: none;
+  .col-rank {
+    align-self: center;
   }
-  .col-prob .probbar-label {
-    font-size: 15px;
-    min-width: 0;
+  .col-batter {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .batter-line1 {
+    gap: 6px;
   }
   .batter-name {
-    font-size: 12px;
+    font-size: 14px;
+    font-weight: 700;
+  }
+  /* Inline momentum pill (HOT / RISING) next to the name */
+  .mom-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 9.5px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    padding: 2px 6px;
+    border-radius: 999px;
+    border: 1px solid currentColor;
+    line-height: 1;
+  }
+  .mom-chip.hot {
+    color: var(--b-hot);
+    background: color-mix(in srgb, var(--b-hot) 14%, transparent);
+  }
+  .mom-chip.rising {
+    color: var(--good);
+    background: color-mix(in srgb, var(--good) 14%, transparent);
+  }
+  /* Matchup line: team → opp · pitcher, dimmed */
+  .batter-line2 {
+    font-size: 11.5px;
+    color: var(--text-dim);
+  }
+  .matchup-pitch {
+    display: inline;
+  }
+  /* Consolidated meta line: ~PA · Batting Nth · lean */
+  .batter-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 7px;
+    font-size: 11px;
+    color: var(--text-faint);
+    margin-top: 1px;
+  }
+  .batter-meta > span:not(:first-child)::before {
+    content: '·';
+    margin-right: 7px;
+    color: var(--text-faint);
+    opacity: 0.6;
+  }
+  .bm-lean.pos {
+    color: var(--good);
+    font-weight: 700;
+  }
+  .bm-lean.neg {
+    color: var(--bad);
+    font-weight: 700;
+  }
+  /* Right side: big % on top, grade chip beneath, right-aligned. DOM order is
+     grade → prob, so column-reverse puts the % up top. */
+  .col-right {
+    display: flex;
+    flex-direction: column-reverse;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 5px;
+    align-self: center;
+    flex: none;
+  }
+  .col-prob {
+    justify-content: flex-end;
+  }
+  /* Swap the ring for a flat big % (the v0 look) on phones */
+  .col-prob .prob-ring {
+    display: none;
+  }
+  .prob-num-mobile {
+    display: inline;
+    font-size: 21px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    line-height: 1;
   }
 }
 
