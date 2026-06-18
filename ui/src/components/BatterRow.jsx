@@ -4,6 +4,7 @@ import { pct, num, signedPct, american, ordinal } from '../lib/format.js'
 import { gradeColor } from '../lib/badges.js'
 import { teamLogo } from '../lib/teams.js'
 import { useLiveMode } from '../lib/liveMode.js'
+import { useEliLevel, topReasonForLevel } from '../lib/eliLevel.js'
 
 export default function BatterRow({
   batter: b,
@@ -24,10 +25,11 @@ export default function BatterRow({
   const g = b.grade?.label || 'SKIP'
   const color = gradeColor(g)
   const liveMode = useLiveMode()
+  const eliLevel = useEliLevel()
   const live = liveMode && b.game?.isLive
   const isFinal = b.game?.isFinal
   const hrToday = liveMode && b.liveContext?.isHRThisGame
-  const topReason = b.reasons?.[0]
+  const topReason = topReasonForLevel(b, eliLevel)
   const edge = b.edge
   // Mobile-only consolidated card bits (hidden on desktop via CSS, which keeps
   // its richer multi-column layout). The matchup lean is the Plate Matchup
@@ -123,7 +125,7 @@ export default function BatterRow({
           </span>
         </div>
         {topReason && (
-          <div className="batter-reason" title={b.reasons.join(' · ')}>
+          <div className="batter-reason" title={(b.reasons || []).join(' · ')}>
             <Icon name="Zap" size={11} />
             {topReason}
           </div>

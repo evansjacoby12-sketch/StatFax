@@ -9,6 +9,7 @@ export default function Settings({
   showDayRating, onToggleDayRating,
   comboConf, onSetComboConf,
   favorConsistency, onToggleConsistency,
+  eliLevel, onSetEli,
   onClose,
 }) {
   const groups = [
@@ -28,6 +29,14 @@ export default function Settings({
           desc: 'Show the 1-5★ "should I bet HR props today?" gauge at the top of the board.',
           on: showDayRating,
           toggle: onToggleDayRating,
+        },
+        {
+          icon: 'Sparkles',
+          label: 'Explanation level',
+          desc: 'How the "Why" picks are worded across the site. ELI5 = plain English, no jargon. ELI15 = the stats behind each call.',
+          segments: [['eli5', 'ELI5'], ['eli15', 'ELI15']],
+          value: eliLevel,
+          onSet: onSetEli,
         },
       ],
     },

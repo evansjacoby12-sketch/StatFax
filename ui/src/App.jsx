@@ -5,6 +5,7 @@ import { HOT_HEAT, DESC_BY_DEFAULT, DEFAULT_FILTERS, SORTS } from './lib/constan
 import { risingForm } from './lib/groups.js'
 import * as store from './lib/storage.js'
 import { LiveModeContext } from './lib/liveMode.js'
+import { EliLevelContext, nextEliLevel } from './lib/eliLevel.js'
 import Header from './components/Header.jsx'
 import Filters from './components/Filters.jsx'
 import BatterTable from './components/BatterTable.jsx'
@@ -86,6 +87,7 @@ export default function App() {
   const [autoRefresh, setAutoRefresh] = useState(() => store.load('autoRefresh', false))
   const [view, setView] = useState(() => viewFromHash() || store.load('view', 'board'))
   const [liveScores, setLiveScores] = useState(() => store.load('liveScores', true))
+  const [eliLevel, setEliLevel] = useState(() => store.load('eliLevel', 'eli5')) // 'eli5' | 'eli15'
   const [lineupNoticeOff, setLineupNoticeOff] = useState(false)
   // Dismissed Pick of the Day, keyed by batter id (which embeds the gamePk, so
   // it's inherently scoped to that day). Persisted, so a dismiss survives reloads
@@ -111,6 +113,7 @@ export default function App() {
   useEffect(() => store.save('showDayRating', showDayRating), [showDayRating])
   useEffect(() => store.save('comboConf', comboConf), [comboConf])
   useEffect(() => store.save('favorConsistency', favorConsistency), [favorConsistency])
+  useEffect(() => store.save('eliLevel', eliLevel), [eliLevel])
   useEffect(() => store.save('podDismissed', podDismissedId), [podDismissedId])
   useEffect(() => {
     store.save('view', view)
@@ -372,6 +375,7 @@ export default function App() {
 
   return (
     <LiveModeContext.Provider value={liveScores}>
+    <EliLevelContext.Provider value={eliLevel}>
     <div className="app">
       <div className="topbar" ref={topbarRef}>
         <Header
@@ -388,6 +392,8 @@ export default function App() {
           onToggleAuto={() => setAutoRefresh((v) => !v)}
           liveScores={liveScores}
           onToggleLive={() => setLiveScores((v) => !v)}
+          eliLevel={eliLevel}
+          onCycleEli={() => setEliLevel((v) => nextEliLevel(v))}
           refreshing={refreshing}
           gradeCounts={gradeCounts}
           total={all.length}
@@ -643,6 +649,8 @@ export default function App() {
           onToggleDayRating={() => setShowDayRating((v) => !v)}
           comboConf={comboConf}
           onSetComboConf={setComboConf}
+          eliLevel={eliLevel}
+          onSetEli={setEliLevel}
           favorConsistency={favorConsistency}
           onToggleConsistency={() => setFavorConsistency((v) => !v)}
           onClose={() => setShowSettings(false)}
@@ -652,6 +660,7 @@ export default function App() {
       <PullToRefresh onRefresh={load} />
       <UpdateBanner />
     </div>
+    </EliLevelContext.Provider>
     </LiveModeContext.Provider>
   )
 }

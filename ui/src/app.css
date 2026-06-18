@@ -429,6 +429,17 @@
   border-color: color-mix(in srgb, var(--prime) 45%, transparent);
   background: rgba(245, 158, 11, 0.1);
 }
+/* Explanation-level toggle (ELI5 ↔ ELI15) — always-active blue chrome, since
+   it's never "off", it just switches wording depth across the whole site. */
+.eli-btn {
+  color: var(--blue);
+  border-color: color-mix(in srgb, var(--blue) 38%, transparent);
+  background: rgba(59, 130, 246, 0.09);
+}
+.eli-btn:hover {
+  color: var(--blue);
+  border-color: color-mix(in srgb, var(--blue) 60%, transparent);
+}
 
 .badges-row-label {
   display: flex;
@@ -2906,12 +2917,14 @@ button.th:hover {
 /* On phones the Live/Pregame button is icon-only — the icon (+ tooltip) carries
    it, and dropping the label declutters the header row. */
 @media (max-width: 768px) {
-  .live-btn {
+  .live-btn,
+  .eli-btn {
     gap: 0;
     padding: 0 11px;
     font-size: 0;
   }
-  .live-btn svg {
+  .live-btn svg,
+  .eli-btn svg {
     font-size: 14px;
   }
 }

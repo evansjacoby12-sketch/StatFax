@@ -11,6 +11,7 @@ import { playerHeadshot, teamColor } from '../lib/teams.js'
 import { toolGrades, heatBreakdown, scoutVerdict, gradeLabel, hrSetup } from '../lib/scout.js'
 import { blastOf, blastVsHandOf } from '../lib/groups.js'
 import { useLiveMode } from '../lib/liveMode.js'
+import { useEliLevel, reasonsForLevel } from '../lib/eliLevel.js'
 
 // Focus-trap + restore-focus for the slide-over (accessibility).
 function useFocusTrap() {
@@ -413,10 +414,12 @@ function PaCurve({ b, color }) {
 }
 
 function Why({ b }) {
-  const items = b.eli5Reasons || []
+  const level = useEliLevel()
+  const items = reasonsForLevel(b, level)
   if (!items.length) return null
+  const title = level === 'eli15' ? 'Why — the stats' : 'Why — plain English'
   return (
-    <Section title="Why" icon="Info">
+    <Section title={title} icon="Info">
       <ul className="eli5">
         {items.map((r, i) => (
           <li key={i} className={`eli5-item tone-${r.tone}`}>

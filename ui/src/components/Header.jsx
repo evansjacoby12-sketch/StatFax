@@ -77,6 +77,8 @@ export default function Header({
   onToggleAuto,
   liveScores = true,
   onToggleLive,
+  eliLevel = 'eli5',
+  onCycleEli,
   refreshing,
   gradeCounts = {},
   total = 0,
@@ -175,6 +177,20 @@ export default function Header({
         >
           <Icon name={liveScores ? 'Activity' : 'Clock'} size={14} className={liveScores ? 'spin-pulse' : ''} />
           {liveScores ? 'Live' : 'Pregame'}
+        </button>
+
+        <button
+          className="toggle-btn eli-btn"
+          onClick={onCycleEli}
+          title={
+            eliLevel === 'eli5'
+              ? 'Explanations in plain English (ELI5) — tap for the stats behind each call (ELI15)'
+              : 'Explanations as the stats behind each call (ELI15) — tap for plain English (ELI5)'
+          }
+          aria-label={`Explanation level: ${eliLevel === 'eli5' ? 'plain English' : 'stats'} — tap to switch`}
+        >
+          <Icon name={eliLevel === 'eli5' ? 'Sparkles' : 'BarChart3'} size={14} />
+          {eliLevel === 'eli5' ? 'ELI5' : 'ELI15'}
         </button>
 
         <HelpMenu onOpenGroups={onOpenGroups} onOpenSGP={onOpenSGP} onOpenSplits={onOpenSplits} onOpenBacktest={onOpenBacktest} onOpenGuide={onOpenGuide} onOpenHowTo={onOpenHowTo} onOpenLegend={onOpenLegend} onOpenSettings={onOpenSettings} />
