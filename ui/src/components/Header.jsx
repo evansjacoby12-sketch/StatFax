@@ -174,9 +174,9 @@ export default function Header({
               : 'Pregame look (scores hidden, no live polling) — tap to show & auto-update live scores'
           }
           aria-pressed={liveScores}
+          aria-label={liveScores ? 'Live scores on — tap for pregame look' : 'Pregame look — tap to show live scores'}
         >
           <Icon name={liveScores ? 'Activity' : 'Clock'} size={14} className={liveScores ? 'spin-pulse' : ''} />
-          {liveScores ? 'Live' : 'Pregame'}
         </button>
 
         <button
@@ -190,7 +190,6 @@ export default function Header({
           aria-label={`Explanation level: ${eliLevel === 'eli5' ? 'plain English' : 'stats'} — tap to switch`}
         >
           <Icon name={eliLevel === 'eli5' ? 'Sparkles' : 'BarChart3'} size={14} />
-          {eliLevel === 'eli5' ? 'ELI5' : 'ELI15'}
         </button>
 
         <HelpMenu onOpenGroups={onOpenGroups} onOpenSGP={onOpenSGP} onOpenSplits={onOpenSplits} onOpenBacktest={onOpenBacktest} onOpenGuide={onOpenGuide} onOpenHowTo={onOpenHowTo} onOpenLegend={onOpenLegend} onOpenSettings={onOpenSettings} />
