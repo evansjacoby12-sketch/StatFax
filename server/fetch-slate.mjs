@@ -3295,6 +3295,42 @@ async function main() {
   }
   console.log(`[math] post-process: hotness=${hotnessApplied} reverseSplit=${reverseSplitFlipped} parkXweather=${parkWeatherApplied} blast=${blastApplied} logOdds=${logOddsApplied} ml=${mlScoresApplied}/${mlModelHandle ? 'loaded' : 'no-weights'} featRank=${featRanked}@${featRankWeight.toFixed(2)} tiers=PRIME:${tierCounts.PRIME}/STRONG:${tierCounts.STRONG}/LEAN:${tierCounts.LEAN}/SKIP:${tierCounts.SKIP} (${((Date.now() - postProcessStart) / 1000).toFixed(2)}s)`);
 
+  // ─── PRIME relative cap ─────────────────────────────────────────────────────
+  // PRIME is the ELITE tier. An absolute score bar (≥72) lets a big/soft slate
+  // flood it (observed 66+ PRIMEs on a 14-game slate). Cap PRIME to the top
+  // PRIME_PCT of PLAYABLE (non-SKIP) bats by score and demote the overflow to
+  // STRONG, so "PRIME" always means the cream regardless of slate size/softness.
+  // GRADE LABEL ONLY — score + probability are untouched (a demoted bat keeps its
+  // 78; it's simply not in today's top tier). Operates per unique batter-game and
+  // demotes across BOTH snapshot keys (bare playerId + playerId-gamePk).
+  const PRIME_PCT = 0.12;
+  {
+    const seen = new Set();
+    const uniq = [];
+    for (const k of Object.keys(scoredBatters)) {
+      const r = scoredBatters[k];
+      if (!r || r.playerId == null) continue;
+      const id = `${r.playerId}-${r.gamePk}`;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      uniq.push(r);
+    }
+    const playable = uniq.filter((r) => (r.grade?.label || r.grade) !== 'SKIP');
+    const cap = Math.max(8, Math.round(playable.length * PRIME_PCT));
+    const primes = uniq
+      .filter((r) => (r.grade?.label || r.grade) === 'PRIME')
+      .sort((a, b) => (b.score ?? 0) - (a.score ?? 0) || (a.playerId ?? 0) - (b.playerId ?? 0));
+    if (primes.length > cap) {
+      const demote = new Set(primes.slice(cap).map((r) => `${r.playerId}-${r.gamePk}`));
+      const STRONG = gradeFromScore(60); // 60 is solidly inside the STRONG band
+      for (const k of Object.keys(scoredBatters)) {
+        const r = scoredBatters[k];
+        if (r && demote.has(`${r.playerId}-${r.gamePk}`) && (r.grade?.label || r.grade) === 'PRIME') r.grade = STRONG;
+      }
+      console.log(`[slate] PRIME relative cap: ${primes.length} → ${cap} (top ${(PRIME_PCT * 100).toFixed(0)}% of ${playable.length} playable; demoted ${primes.length - cap} to STRONG)`);
+    }
+  }
+
   // 8.6) Zone matchup enrichment — for the top N batters per game, fetch
   // batter ISO-by-zone + opposing pitcher's location-frequency-by-zone,
   // compute matched zones + Zone Rating, and attach as `zoneMatchup` on
