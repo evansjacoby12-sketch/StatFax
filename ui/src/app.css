@@ -6155,8 +6155,43 @@ button.th:hover {
 .combo-sc-ba-txt b { color: var(--good); }
 .combo-sc-ba-days { margin-left: auto; white-space: nowrap; }
 .combo-sc-k { font-size: 11px; font-weight: 700; color: var(--text-dim); }
-.combo-sc-bar { height: 7px; border-radius: 99px; background: var(--card-2); overflow: hidden; }
+.combo-sc-bar { position: relative; height: 7px; border-radius: 99px; background: var(--card-2); overflow: hidden; }
 .combo-sc-fill { display: block; height: 100%; border-radius: 99px; background: var(--good); }
+/* Predicted-cash marker on the bar: where the model EXPECTED to land. Fill past
+   the tick = beating the model; short of it = under-hitting. */
+.combo-sc-pred-tick {
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--text);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
+  border-radius: 1px;
+}
+/* Overall calibration line: actual vs predicted + a verdict chip */
+.combo-sc-calib {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--text-dim);
+  margin: 6px 0 2px;
+}
+.combo-sc-calib b { color: var(--text); }
+.combo-sc-calib-tag {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+}
+.combo-sc-calib-tag.pos { color: var(--good); border-color: color-mix(in srgb, var(--good) 45%, transparent); background: color-mix(in srgb, var(--good) 12%, transparent); }
+.combo-sc-calib-tag.neg { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 45%, transparent); background: color-mix(in srgb, var(--bad) 12%, transparent); }
 .combo-sc-v { font-size: 12px; font-weight: 700; text-align: right; }
 .combo-sc-n { font-size: 11px; text-align: right; }
 .combo-sc-best b { color: var(--text); }

@@ -128,6 +128,10 @@ export function comboRowFromSnapshot(row) {
     team:     row.team,
     score,
     grade,
+    // Frozen PREGAME HR probability (simHRProb is pinned before live decay) —
+    // the model's stated chance this leg homers, used to compute each combo's
+    // predicted all-hit prob so the scorecard can grade predicted vs actual.
+    hrProb:   Number.isFinite(row.simHRProb) ? row.simHRProb : (Number.isFinite(row.hrProbability) ? row.hrProbability : null),
     barrel,
     // Recent (L14) barrel%, when a real sample — blended into the power rank so
     // it isn't always the same season-barrel leaders. null => fall back to season.
@@ -205,7 +209,10 @@ export function buildComboRecords(rows, { maxPerBat = 3 } = {}) {
       if (seen.has(sig)) continue; // identical leg set from another strategy
       seen.add(sig);
       for (const l of legs) used[l.playerId] = (used[l.playerId] || 0) + 1;
-      out.push({ strategy: s.key, size, legs: legs.map((l) => l.playerId) });
+      // Predicted all-hit prob = product of leg HR probs (null if any leg lacks
+      // one), logged so the scorecard can compare predicted vs actual cash rate.
+      const pred = legs.every((l) => Number.isFinite(l.hrProb)) ? legs.reduce((p, l) => p * l.hrProb, 1) : null;
+      out.push({ strategy: s.key, size, legs: legs.map((l) => l.playerId), pred });
     }
   }
   return out;
@@ -243,7 +250,7 @@ export function bestAvailableCombo(rows, homerers, tiers = ['PRIME', 'STRONG']) 
 export function gradeCombos(combos, homerers) {
   return combos.map((c) => {
     const nHit = c.legs.filter((pid) => homerers.has(Number(pid))).length;
-    return { strategy: c.strategy, size: c.size, legs: c.legs, nHit, allHit: nHit === c.legs.length };
+    return { strategy: c.strategy, size: c.size, legs: c.legs, nHit, allHit: nHit === c.legs.length, pred: Number.isFinite(c.pred) ? c.pred : null };
   });
 }
 
@@ -277,11 +284,14 @@ export function comboScorecard(log) {
   // read, not a rolling multi-day blend. byDate holds only settled days
   // (appendComboDay appends graded outcomes), so the last key is yesterday.
   const dates = Object.keys(byDate).sort().slice(-1);
-  const cell = () => ({ combos: 0, allHit: 0, legs: 0, legHits: 0 });
+  const cell = () => ({ combos: 0, allHit: 0, legs: 0, legHits: 0, predSum: 0, predN: 0 });
   const byStrategy = {};
   const bySize = {};
   const overall = cell();
-  const add = (x, c) => { x.combos += 1; x.allHit += c.allHit ? 1 : 0; x.legs += c.size; x.legHits += c.nHit; };
+  const add = (x, c) => {
+    x.combos += 1; x.allHit += c.allHit ? 1 : 0; x.legs += c.size; x.legHits += c.nHit;
+    if (Number.isFinite(c.pred)) { x.predSum += c.pred; x.predN += 1; }
+  };
   for (const d of dates) {
     for (const c of byDate[d] || []) {
       add(overall, c);
@@ -294,6 +304,10 @@ export function comboScorecard(log) {
     allHit: x.allHit,
     hitRate: x.combos ? x.allHit / x.combos : null,
     legHitRate: x.legs ? x.legHits / x.legs : null,
+    // Mean predicted all-hit prob across combos that carried one — the rate the
+    // model EXPECTED to cash. Compare to hitRate for calibration. null until
+    // newly-graded days (with pred logged) accrue.
+    predHitRate: x.predN ? x.predSum / x.predN : null,
   });
   // Best-available diagnostic: the perfect parlay that WAS sittable each day,
   // and how often a winning combo (2+ legs) existed at all — a read on grading

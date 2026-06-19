@@ -70,6 +70,18 @@ function ScoreCard({ sc }) {
         <div className="combo-sc-cap dim">
           Canonical pregame combos (one per strategy &amp; size), graded against actual home runs.
         </div>
+        {Number.isFinite(ov.predHitRate) && (() => {
+          const d = ov.hitRate - ov.predHitRate
+          const tone = d >= 0.02 ? 'pos' : d <= -0.02 ? 'neg' : ''
+          const label = d >= 0.02 ? 'beating the model' : d <= -0.02 ? 'under the model' : 'on the model'
+          return (
+            <div className="combo-sc-calib">
+              <Icon name="Target" size={12} />
+              <span>Actual <b className="mono">{pct(ov.hitRate, 0)}</b> vs predicted <b className="mono">{pct(ov.predHitRate, 0)}</b></span>
+              <span className={`combo-sc-calib-tag ${tone}`}>{label}</span>
+            </div>
+          )
+        })()}
         {ba?.latest && (
           <div className="combo-sc-ba" title="The best perfect parlay that was sittable from the PRIME/STRONG pool — one bat per game that homered, capped at the max combo size. Gauges grading quality apart from which combos the strategies built.">
             <Icon name="Sparkles" size={12} />
@@ -95,9 +107,12 @@ function ScoreCard({ sc }) {
               <span className="combo-sc-k">{k}-leg</span>
               <span className="combo-sc-bar">
                 <span className="combo-sc-fill" style={{ width: `${Math.round((v.hitRate ?? 0) * 100)}%` }} />
+                {Number.isFinite(v.predHitRate) && (
+                  <span className="combo-sc-pred-tick" style={{ left: `${Math.min(100, Math.round(v.predHitRate * 100))}%` }} title={`predicted ${pct(v.predHitRate, 0)}`} />
+                )}
               </span>
               <span className="combo-sc-v mono">{pct(v.hitRate, 0)}</span>
-              <span className="combo-sc-n dim">{v.allHit}/{v.combos}</span>
+              <span className="combo-sc-n dim">{v.allHit}/{v.combos}{Number.isFinite(v.predHitRate) ? ` · exp ${pct(v.predHitRate, 0)}` : ''}</span>
             </div>
           ))}
         </div>
@@ -110,6 +125,9 @@ function ScoreCard({ sc }) {
                   <span className="combo-sc-k" title={`per-leg hit ${pct(v.legHitRate, 0)}`}>{STRAT_LABEL[k] || k}</span>
                   <span className="combo-sc-bar">
                     <span className="combo-sc-fill" style={{ width: `${Math.round((v.hitRate ?? 0) * 100)}%` }} />
+                    {Number.isFinite(v.predHitRate) && (
+                      <span className="combo-sc-pred-tick" style={{ left: `${Math.min(100, Math.round(v.predHitRate * 100))}%` }} title={`predicted ${pct(v.predHitRate, 0)}`} />
+                    )}
                   </span>
                   <span className="combo-sc-v mono">{pct(v.hitRate, 0)}</span>
                   <span className="combo-sc-n dim">{v.allHit}/{v.combos}</span>
