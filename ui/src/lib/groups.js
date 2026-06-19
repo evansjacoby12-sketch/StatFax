@@ -7,7 +7,9 @@
 import { decimalToAmerican } from './format.js'
 import { HOT_HEAT } from './constants.js'
 
-const SIZES = [2, 3, 4, 5, 6, 7, 8]
+// Only 2/3/4-leg combos are displayed and graded (server SIZES === [2,3,4]).
+// Larger pools were built every rebuild but never shown, so we trim to match.
+const SIZES = [2, 3, 4]
 
 const barrelOf = (b) => (Number.isFinite(b.barrelPctBBE) ? b.barrelPctBBE : b.barrelPct)
 
@@ -163,7 +165,10 @@ const STRATEGIES = [
       const recent = Number.isFinite(rb) && (b.recentBarrel?.recentBBE ?? 0) >= 6 ? norm01(rb, 25) : barrel
       return 0.45 * barrel + 0.30 * recent + 0.25 * norm01(blastOf(b), 30)
     },
-    require: (b) => Number.isFinite(barrelOf(b)) && barrelOf(b) >= 9,
+    // Gate at an above-average barrel (11), not league-average (9): a league-avg
+    // bar lets this strategy re-pick the same elite bats as `top`/`mix` instead of
+    // surfacing distinct power arms. Kept identical to server powerRank gate.
+    require: (b) => Number.isFinite(barrelOf(b)) && barrelOf(b) >= 11,
   },
   {
     key: 'matchup',
@@ -186,39 +191,87 @@ const STRATEGIES = [
     // Anchor on batter quality (model HR prob) × the park/air tilt, same reason
     // as matchup — a launch pad should lift a good bat, not rank a weak one.
     rank: (b) => (b.score ?? 0) * (b.parkWeatherHandFactor ?? 0),
-    require: (b) => (b.parkWeatherHandFactor ?? 1) >= 1.05,
+    // Gate at a genuine launch-pad tilt (1.08), not a barely-above-neutral 1.05:
+    // a near-neutral bar lets this strategy re-pick `top`'s legs instead of
+    // surfacing bats in real HR-friendly air. Kept identical to the server gate.
+    require: (b) => (b.parkWeatherHandFactor ?? 1) >= 1.08,
   },
 ]
 
-// Quantize to 3 significant figures so sub-~0.5% rank noise can't reorder
-// near-tied bats run-to-run — the main source of combo-leg flicker. Paired with
-// the stable playerId tiebreak below, leg selection becomes deterministic and a
-// hair-thin score wobble no longer swaps a leg.
-function q3(x) {
+// Noise-filter tolerance, as a FRACTION of a pool's rank spread (max−min). Two
+// bats whose ranks differ by less than this share of the spread are treated as
+// tied, so sub-threshold wobble can't reorder near-tied legs run-to-run — the
+// main source of combo-leg flicker. Expressing it relative to the spread makes
+// the filter comparable across strategies whose raw ranks live on wildly
+// different scales (integer 'stack' weights vs 0–1 'mix' vs ~60–130 score×factor):
+// a flat 3-sig-fig quantize was too coarse on big ranks and too fine on 0–1 ones.
+// The server (parlay-combos.mjs) uses the same fraction so client and server
+// quantize in the same normalized space.
+const RANK_TOL = 0.002
+// Quantize `x` to a grid of step = tol, then re-scale to its original units.
+// With tol derived from the pool spread, equal buckets => treated as tied.
+function quantize(x, tol) {
   if (!Number.isFinite(x)) return -Infinity
-  if (x === 0) return 0
-  return Number(x.toPrecision(3))
+  if (!(tol > 0)) return x
+  return Math.round(x / tol) * tol
 }
-// Total-order comparator, descending by strength: quantized rank → quantized
-// score → STABLE playerId. Returns <0 when `a` outranks `b`. The playerId
+// Build a total-order comparator for ONE pool: ranks are quantized to a grid
+// sized to this pool's own rank spread, then exact ties break by quantized score
+// and finally a STABLE playerId. Returns <0 when `a` outranks `b`. The playerId
 // tiebreak guarantees two genuinely equal-strength legs always resolve the same
 // way, so they never trade places between rebuilds.
-function legCmp(a, b, rank) {
-  return (q3(rank(b)) - q3(rank(a))) || (q3(b.score ?? 0) - q3(a.score ?? 0)) || ((a.playerId ?? 0) - (b.playerId ?? 0))
+function makeLegCmp(rank, items) {
+  let lo = Infinity, hi = -Infinity
+  let sLo = Infinity, sHi = -Infinity
+  for (const b of items) {
+    const r = rank(b)
+    if (Number.isFinite(r)) { if (r < lo) lo = r; if (r > hi) hi = r }
+    const s = b.score ?? 0
+    if (s < sLo) sLo = s; if (s > sHi) sHi = s
+  }
+  const rTol = hi > lo ? (hi - lo) * RANK_TOL : 0
+  const sTol = sHi > sLo ? (sHi - sLo) * RANK_TOL : 0
+  return (a, b) =>
+    (quantize(rank(b), rTol) - quantize(rank(a), rTol)) ||
+    (quantize(b.score ?? 0, sTol) - quantize(a.score ?? 0, sTol)) ||
+    ((a.playerId ?? 0) - (b.playerId ?? 0))
 }
 
-// Best eligible batter per game by a given metric (skip finals + SKIP bats).
-function topPerGame(batters, rank, require) {
-  const byGame = new Map()
+// Eligible bats for a strategy: skip finals, SKIP grades, prob-less rows, and
+// anything the strategy's require-gate rejects.
+function eligibleFor(batters, require) {
+  const eligible = []
   for (const b of batters || []) {
     if (b.game?.isFinal) continue
     if ((b.grade?.label || 'SKIP') === 'SKIP') continue
     if (!Number.isFinite(b.hrProbability)) continue
     if (require && !require(b)) continue
-    const cur = byGame.get(b.gamePk)
-    if (!cur || legCmp(b, cur, rank) < 0) byGame.set(b.gamePk, b)
+    eligible.push(b)
   }
-  return [...byGame.values()].sort((a, b) => legCmp(a, b, rank))
+  return eligible
+}
+
+// Span of a rank function over a pool (max−min of finite ranks), used to size
+// the additive incumbency bonus relative to the strategy's own scale.
+function rankSpan(rank, items) {
+  let lo = Infinity, hi = -Infinity
+  for (const b of items) {
+    const r = rank(b)
+    if (Number.isFinite(r)) { if (r < lo) lo = r; if (r > hi) hi = r }
+  }
+  return hi > lo ? hi - lo : 0
+}
+
+// Best eligible batter per game by a given metric. `eligible` is pre-filtered by
+// eligibleFor so the caller can also derive the rank span from the same pool.
+function topPerGame(eligible, rank) {
+  const cmp = makeLegCmp(rank, eligible)
+  const byGame = new Map()
+  for (const b of eligible) {
+    const cur = byGame.get(b.gamePk)
+    if (!cur || cmp(b, cur) < 0) byGame.set(b.gamePk, b)
+  }
+  return [...byGame.values()].sort(cmp)
 }
 
 // Group letter grade from the legs' average model score.
@@ -232,8 +285,13 @@ function gradeFor(avgScore) {
 
 function makeGroup(legs, size, strat, idSuffix = '') {
   const avgScore = legs.reduce((s, b) => s + (b.score ?? 0), 0) / legs.length
-  // Parlay "all hit" probability = product of independent leg HR probs.
-  const allHit = legs.reduce((p, b) => p * (b.hrProbability ?? 0), 1)
+  // Parlay "all hit" probability = product of independent leg HR probs. Null when
+  // ANY leg lacks a finite prob — mirrors the server's `every(finite) ? product :
+  // null` so a missing leg reads as "unknown" instead of silently collapsing the
+  // whole combo to 0 while it's still displayed.
+  const allHit = legs.every((b) => Number.isFinite(b.hrProbability))
+    ? legs.reduce((p, b) => p * b.hrProbability, 1)
+    : null
   // Combined market price (only meaningful when every leg has a priced book).
   let decimal = 1
   let priced = 0
@@ -257,28 +315,43 @@ function makeGroup(legs, size, strat, idSuffix = '') {
     allHit,
     legs,
     american: allPriced ? decimalToAmerican(decimal) : null,
-    edge: allPriced ? allHit * decimal - 1 : null,
+    edge: allPriced && allHit != null ? allHit * decimal - 1 : null,
   }
 }
 
-export function buildGroups(batters, { maxPerBat = 3, favorConsistency = false, incumbents = null, stickMargin = 0.05 } = {}) {
+export function buildGroups(batters, { maxPerBat = 2, globalMaxPerBat = 4, favorConsistency = false, incumbents = null, stickMargin = 0.05 } = {}) {
   // Each strategy's ranked pool is size-independent — compute once, slice per size.
   // The favorConsistency lean wraps each rank with a factor that demotes high-K
   // boom-or-bust bats. (Recent form is now a visible RISING signal, not a lean.)
   //
   // INCUMBENCY (anti-flicker): a bat that was a leg of THIS strategy on the last
-  // build gets a (1 + stickMargin) rank bonus, so it's only displaced when a
-  // challenger is clearly (>stickMargin) better — not by a marginal wobble. Folds
-  // hysteresis into the ranking, so it stabilizes both the per-game pick and the
-  // cross-game leg order in one shot. Empty/absent incumbents → normal behavior.
-  const rankOf = (strat) => {
+  // build gets an ADDITIVE rank bonus of stickMargin × the strategy pool's rank
+  // span (max−min). Sizing the bonus to each strategy's own scale makes the
+  // stickiness comparable across all 7 strategies — the old (1+stickMargin)
+  // RELATIVE multiplier swung wildly (huge on ~60–130 score×factor ranks, a
+  // near-no-op on small integer 'stack' weights). With an additive span-fraction
+  // bonus, an incumbent holds unless a challenger beats it by more than
+  // stickMargin of the spread — a consistent "meaningfully better" bar everywhere.
+  // Empty/absent incumbents → normal behavior.
+  const pools = STRATEGIES.map((strat) => {
     const base = favorConsistency ? (b) => strat.rank(b) * consistencyFactor(b) : strat.rank
+    const eligible = eligibleFor(batters, strat.require)
     const inc = incumbents?.[strat.key]
-    if (!inc || !inc.size) return base
-    return (b) => base(b) * (inc.has(b.playerId) ? 1 + stickMargin : 1)
-  }
-  const pools = STRATEGIES.map((strat) => ({ strat, pool: topPerGame(batters, rankOf(strat), strat.require) }))
+    let rank = base
+    if (inc && inc.size) {
+      const bonus = stickMargin * rankSpan(base, eligible)
+      rank = (b) => base(b) + (inc.has(b.playerId) ? bonus : 0)
+    }
+    return { strat, pool: topPerGame(eligible, rank) }
+  })
   const out = {}
+  // GLOBAL exposure cap (Fix #1): track each bat's usage across the WHOLE build,
+  // not per-size. The old per-size cap let one stud land in up to maxPerBat combos
+  // PER SIZE — so with sizes [2,3,4] a single bat (e.g. Soto) could anchor most of
+  // the board, and one cold night wiped out nearly every combo (correlated
+  // failure). usedGlobal caps a bat at ~globalMaxPerBat combos TOTAL across all
+  // sizes; the per-size `used` keeps it from stacking within a single size.
+  const usedGlobal = {}
   for (const size of SIZES) {
     const groups = []
     const seen = new Set() // dedupe identical leg sets across strategies
@@ -290,17 +363,30 @@ export function buildGroups(batters, { maxPerBat = 3, favorConsistency = false, 
         .join('|')
       if (seen.has(sig)) return
       seen.add(sig)
-      for (const b of g.legs) used[b.id] = (used[b.id] || 0) + 1
+      for (const b of g.legs) {
+        used[b.id] = (used[b.id] || 0) + 1
+        usedGlobal[b.id] = (usedGlobal[b.id] || 0) + 1
+      }
       groups.push(g)
     }
-    // Pick `size` legs from `pool` starting at `start`, preferring under-cap bats
-    // so the same studs don't anchor every strategy; fall back to the pure slice.
+    // Pick `size` legs from `pool` starting at `start`, preferring bats under BOTH
+    // the per-size and global caps so the same studs don't anchor every strategy
+    // and every size. Two-pass: first take bats under the global cap; if that
+    // leaves us short, relax to per-size only; finally fall back to the pure slice
+    // rather than drop the strategy (the audited safety we must keep).
     const pick = (pool, start) => {
-      const legs = []
-      for (let i = start; i < pool.length && legs.length < size; i++) {
-        if ((used[pool[i].id] || 0) >= maxPerBat) continue
-        legs.push(pool[i])
+      const take = (globalCapped) => {
+        const legs = []
+        for (let i = start; i < pool.length && legs.length < size; i++) {
+          const b = pool[i]
+          if ((used[b.id] || 0) >= maxPerBat) continue
+          if (globalCapped && (usedGlobal[b.id] || 0) >= globalMaxPerBat) continue
+          legs.push(b)
+        }
+        return legs
       }
+      let legs = take(true) // prefer under-global-cap bats
+      if (legs.length < size) legs = take(false) // relax global cap before dropping
       return legs.length === size ? legs : pool.slice(start, start + size)
     }
     for (const { strat, pool } of pools) {

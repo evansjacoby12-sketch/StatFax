@@ -97,13 +97,17 @@ const STRATEGIES = [
   // — all normalized 0-1 — so it rewards true thump and current form, not just
   // career barrel kings. Blast (fast + squared-up contact) is the bat-speed leg
   // of power. Eligibility still gates on the stable season barrel.
-  { key: 'power',   rank: (b) => powerRank(b), require: (b) => Number.isFinite(b.barrel) && b.barrel >= 9 },
+  // Gate at an above-average barrel (11), not league-average (9): a league-avg
+  // bar let power re-pick the same elite bats as top/mix. Kept identical to client.
+  { key: 'power',   rank: (b) => powerRank(b), require: (b) => Number.isFinite(b.barrel) && b.barrel >= 11 },
   // matchup & park anchor on batter quality (score) × the environmental tilt, so
   // a homer-prone matchup / launch pad lifts a GOOD bat instead of ranking a
   // weak bat purely on the ~1.0–1.3× environmental signal. (Badge audit: grade
   // is 2.29× HR lift; park/matchup-alone are far weaker and were discarding it.)
   { key: 'matchup', rank: (b) => (b.score ?? 0) * (b.pitcherHr9 ?? 0), require: (b) => Number.isFinite(b.pitcherHr9) && b.pitcherHr9 >= 1.3 },
-  { key: 'park',    rank: (b) => (b.score ?? 0) * (b.air ?? 0),         require: (b) => Number.isFinite(b.air) && b.air >= 1.05 },
+  // Gate at a real launch-pad tilt (1.08), not barely-above-neutral 1.05, so park
+  // surfaces HR-friendly-air bats rather than re-picking top. Identical to client.
+  { key: 'park',    rank: (b) => (b.score ?? 0) * (b.air ?? 0),         require: (b) => Number.isFinite(b.air) && b.air >= 1.08 },
 ];
 
 /**
@@ -165,20 +169,51 @@ export function comboRowFromSnapshot(row) {
   };
 }
 
+// Anti-flicker quantization, mirroring ui/src/lib/groups.js so this canonical
+// record is DETERMINISTIC from a given snapshot (Fix #4). Ranks are quantized to
+// a grid sized to the pool's own rank spread (RANK_TOL fraction of max−min), so
+// sub-threshold wobble can't reorder near-tied legs and exact ties break by a
+// STABLE playerId. Quantizing relative to the spread keeps the tolerance
+// comparable across strategies whose raw ranks live on very different scales.
+const RANK_TOL = 0.002;
+function quantize(x, tol) {
+  if (!Number.isFinite(x)) return -Infinity;
+  if (!(tol > 0)) return x;
+  return Math.round(x / tol) * tol;
+}
+function makeLegCmp(rank, items) {
+  let lo = Infinity, hi = -Infinity, sLo = Infinity, sHi = -Infinity;
+  for (const b of items) {
+    const r = rank(b);
+    if (Number.isFinite(r)) { if (r < lo) lo = r; if (r > hi) hi = r; }
+    const s = b.score ?? 0;
+    if (s < sLo) sLo = s; if (s > sHi) sHi = s;
+  }
+  const rTol = hi > lo ? (hi - lo) * RANK_TOL : 0;
+  const sTol = sHi > sLo ? (sHi - sLo) * RANK_TOL : 0;
+  return (a, b) =>
+    (quantize(rank(b), rTol) - quantize(rank(a), rTol)) ||
+    (quantize(b.score ?? 0, sTol) - quantize(a.score ?? 0, sTol)) ||
+    ((a.playerId ?? 0) - (b.playerId ?? 0));
+}
+
 // Best eligible bat per game by a metric (skip SKIP-grade + scoreless rows).
 function topPerGame(rows, rank, require) {
-  const byGame = new Map();
+  const eligible = [];
   for (const b of rows) {
     if (!b || b.gamePk == null) continue;
     if ((b.grade || 'SKIP') === 'SKIP') continue;
     if (!Number.isFinite(b.score)) continue;
     if (require && !require(b)) continue;
-    const cur = byGame.get(b.gamePk);
-    if (!cur || rank(b) > rank(cur) || (rank(b) === rank(cur) && (b.score ?? 0) > (cur.score ?? 0))) {
-      byGame.set(b.gamePk, b);
-    }
+    eligible.push(b);
   }
-  return [...byGame.values()].sort((a, b) => rank(b) - rank(a) || (b.score ?? 0) - (a.score ?? 0));
+  const cmp = makeLegCmp(rank, eligible);
+  const byGame = new Map();
+  for (const b of eligible) {
+    const cur = byGame.get(b.gamePk);
+    if (!cur || cmp(b, cur) < 0) byGame.set(b.gamePk, b);
+  }
+  return [...byGame.values()].sort(cmp);
 }
 
 /**
@@ -186,10 +221,17 @@ function topPerGame(rows, rank, require) {
  * comboRowFromSnapshot rows. Returns compact records: { strategy, size, legs:
  * [playerId, …] } — just enough to grade and report.
  */
-export function buildComboRecords(rows, { maxPerBat = 3 } = {}) {
+export function buildComboRecords(rows, { maxPerBat = 2, globalMaxPerBat = 4 } = {}) {
   const pools = STRATEGIES.map((s) => ({ s, pool: topPerGame(rows, s.rank, s.require) }));
   const out = [];
   const seen = new Set();
+  // GLOBAL exposure cap (Fix #1): track each bat's usage across the WHOLE build,
+  // not per-size. The old per-size-only cap let one stud anchor up to maxPerBat
+  // combos PER size — so across sizes [2,3,4] a single bat could land in most of
+  // the board, and one cold night wiped out nearly every combo (correlated
+  // failure). usedGlobal caps a bat at ~globalMaxPerBat combos TOTAL across all
+  // sizes; per-size `used` keeps it from stacking within one size.
+  const usedGlobal = {};
   for (const size of SIZES) {
     // Diversity cap: a bat can anchor at most `maxPerBat` combos at this size,
     // so the same studs don't pile into all 7 strategies (correlated wipeout —
@@ -198,17 +240,29 @@ export function buildComboRecords(rows, { maxPerBat = 3 } = {}) {
     const used = {};
     for (const { s, pool } of pools) {
       if (pool.length < size) continue;
-      let legs = [];
-      for (const b of pool) {
-        if (legs.length >= size) break;
-        if ((used[b.playerId] || 0) >= maxPerBat) continue;
-        legs.push(b);
-      }
+      // Two-pass: prefer bats under the GLOBAL cap, then relax to per-size only,
+      // then fall back to the pure slice rather than drop the strategy (the
+      // audited safety we keep).
+      const take = (globalCapped) => {
+        const picked = [];
+        for (const b of pool) {
+          if (picked.length >= size) break;
+          if ((used[b.playerId] || 0) >= maxPerBat) continue;
+          if (globalCapped && (usedGlobal[b.playerId] || 0) >= globalMaxPerBat) continue;
+          picked.push(b);
+        }
+        return picked;
+      };
+      let legs = take(true);
+      if (legs.length < size) legs = take(false);
       if (legs.length < size) legs = pool.slice(0, size); // not enough under-cap bats — keep the strategy pure rather than drop it
       const sig = `${size}:` + legs.map((l) => l.playerId).slice().sort().join('-');
       if (seen.has(sig)) continue; // identical leg set from another strategy
       seen.add(sig);
-      for (const l of legs) used[l.playerId] = (used[l.playerId] || 0) + 1;
+      for (const l of legs) {
+        used[l.playerId] = (used[l.playerId] || 0) + 1;
+        usedGlobal[l.playerId] = (usedGlobal[l.playerId] || 0) + 1;
+      }
       // Predicted all-hit prob = product of leg HR probs (null if any leg lacks
       // one), logged so the scorecard can compare predicted vs actual cash rate.
       const pred = legs.every((l) => Number.isFinite(l.hrProb)) ? legs.reduce((p, l) => p * l.hrProb, 1) : null;
