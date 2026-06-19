@@ -16,6 +16,7 @@ const PSORT = [
 // already-filtered batter list so the board's filters narrow the pool.
 export default function PitchersView({ batters, onSelect, selectedId, watchlist, slip, focusKey, onFocusDone }) {
   const [sort, setSort] = useState('vuln')
+  const [view, setView] = useState('preview') // 'preview' = tiered vulnerability board · 'detail' = full cards
   const grouped = useMemo(() => groupPitchers(batters), [batters])
   // 'vuln' = groupPitchers' default (most hittable first). 'time' = by game
   // start, which also puts both starters of a game next to each other; ties
@@ -51,27 +52,122 @@ export default function PitchersView({ batters, onSelect, selectedId, watchlist,
   }
   return (
     <>
-      <div className="pitchers-controls" role="group" aria-label="Sort pitchers">
-        <span className="pitchers-controls-k dim">Sort</span>
-        {PSORT.map((t) => (
-          <button key={t.k} className={`badge-toggle ${sort === t.k ? 'on' : ''}`} onClick={() => setSort(t.k)}>
-            {t.label}
+      <div className="pitchers-controls" role="group" aria-label="Pitcher view">
+        <span className="pitchers-controls-k dim">View</span>
+        <button className={`badge-toggle ${view === 'preview' ? 'on' : ''}`} onClick={() => setView('preview')}>Vulnerability</button>
+        <button className={`badge-toggle ${view === 'detail' ? 'on' : ''}`} onClick={() => setView('detail')}>Detail</button>
+        {view === 'detail' && (
+          <>
+            <span className="pitchers-controls-k dim" style={{ marginLeft: 8 }}>Sort</span>
+            {PSORT.map((t) => (
+              <button key={t.k} className={`badge-toggle ${sort === t.k ? 'on' : ''}`} onClick={() => setSort(t.k)}>
+                {t.label}
+              </button>
+            ))}
+          </>
+        )}
+      </div>
+      {view === 'preview' ? (
+        <PitcherPreview pitchers={grouped} onSelect={onSelect} />
+      ) : (
+        <div className="pitchers">
+          {pitchers.map((e) => (
+            <PitcherCard
+              key={e.key}
+              entry={e}
+              onSelect={onSelect}
+              selectedId={selectedId}
+              watchlist={watchlist}
+              slip={slip}
+            />
+          ))}
+        </div>
+      )}
+    </>
+  )
+}
+
+// Tiered "Pitcher Vulnerability preview" — starters grouped by how hittable they
+// are, one tight row each: stat cell (HR/9 · Barrel% · EV · GB-AO) + the bats
+// that match up best. Reuses the vuln score + targets the cards already compute.
+const PVP_TIERS = [
+  { key: 'vuln', label: 'Tier 1 — most hittable', sub: 'attack this side', color: '#FF453A', test: (s) => s >= 80 },
+  { key: 'shaky', label: 'Tier 2 — shaky', sub: 'solid targets', color: '#FF9F0A', test: (s) => s >= 60 && s < 80 },
+  { key: 'mild', label: 'Mild', sub: 'situational', color: '#FFD60A', test: (s) => s >= 40 && s < 60 },
+  { key: 'tough', label: 'Tough — don’t target', sub: 'talent plays only', color: '#32D74B', test: (s) => s < 40 },
+]
+function lastName(name) {
+  const p = (name || '').trim().split(/\s+/)
+  return p.length > 1 ? p.slice(1).join(' ') : name || ''
+}
+function PitcherPreview({ pitchers, onSelect }) {
+  const tbd = pitchers.filter((e) => !Number.isFinite(e.pitcher?.season?.hrPer9))
+  const scored = pitchers.filter((e) => Number.isFinite(e.pitcher?.season?.hrPer9))
+  return (
+    <div className="pvp">
+      <div className="pvp-cap dim">
+        Starters by HR-vulnerability · stat cell: HR/9 · Barrel% allowed · EV against · GB-AO. Matching bats = best HR targets (PRIME in bold).
+      </div>
+      {PVP_TIERS.map((t) => {
+        const rows = scored.filter((e) => t.test(e.vuln?.score ?? 50))
+        if (!rows.length) return null
+        return (
+          <div className="pvp-tier" key={t.key}>
+            <div className="pvp-tier-head">
+              <span className="pvp-dot" style={{ background: t.color }} />
+              <b>{t.label}</b> <span className="dim">· {t.sub}</span>
+              <span className="pvp-tier-n dim">{rows.length}</span>
+            </div>
+            {rows.map((e) => <PvpRow key={e.key} e={e} onSelect={onSelect} />)}
+          </div>
+        )
+      })}
+      {tbd.length > 0 && (
+        <div className="pvp-tier">
+          <div className="pvp-tier-head">
+            <span className="pvp-dot" style={{ background: '#6b7787' }} />
+            <b>TBD / low sample</b> <span className="dim">· treat league-avg, don’t target</span>
+          </div>
+          <div className="pvp-tbd dim">{tbd.map((e) => `${e.pitcher.name} (${e.targets[0]?.team || '?'})`).join(' · ')}</div>
+        </div>
+      )}
+    </div>
+  )
+}
+function PvpRow({ e, onSelect }) {
+  const p = e.pitcher
+  const s = p.season || {}
+  const sav = p.savant || {}
+  const atk = e.attackSide === 'L' ? 'LHB' : e.attackSide === 'R' ? 'RHB' : '—'
+  const seen = new Set()
+  const tg = e.targets.filter((b) => b.playerId != null && !seen.has(b.playerId) && seen.add(b.playerId)).slice(0, 4)
+  const oppTeam = tg[0]?.team || '?'
+  return (
+    <div className="pvp-row">
+      <div className="pvp-p">
+        <span className="pvp-name">{p.name}</span>
+        <span className="pvp-hand dim"> ({p.hand})</span>
+        <span className="pvp-vs dim"> vs {oppTeam} · <b style={{ color: 'var(--text-dim)' }}>{atk}</b></span>
+      </div>
+      <div className="pvp-stats mono">
+        <span><b className={tone(s.hrPer9, { hi: 1.4, lo: 0.9 }) === HITTABLE ? 'pvp-hi' : ''}>{num(s.hrPer9, 2)}</b> HR/9</span>
+        <span><b>{sav.barrelPctAllowed != null ? num(sav.barrelPctAllowed, 1) : '—'}</b> brl</span>
+        <span><b>{sav.exitVeloAgainst != null ? num(sav.exitVeloAgainst, 1) : '—'}</b> EV</span>
+        <span><b>{Number.isFinite(s.goAo) ? num(s.goAo, 2) : '—'}</b> GB/AO</span>
+      </div>
+      <div className="pvp-bats">
+        {tg.map((b) => (
+          <button
+            key={b.playerId}
+            className={`pvp-bat ${(b.grade?.label || b.grade) === 'PRIME' ? 'prime' : ''}`}
+            onClick={() => onSelect?.(b)}
+            title={`${b.name} · ${pct(b.hrProbability, 1)} HR`}
+          >
+            {lastName(b.name)}
           </button>
         ))}
       </div>
-      <div className="pitchers">
-        {pitchers.map((e) => (
-          <PitcherCard
-            key={e.key}
-            entry={e}
-            onSelect={onSelect}
-            selectedId={selectedId}
-            watchlist={watchlist}
-            slip={slip}
-          />
-        ))}
-      </div>
-    </>
+    </div>
   )
 }
 

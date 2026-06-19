@@ -3526,6 +3526,58 @@ button.th:hover {
   height: 18px;
 }
 
+/* ============ Pitcher Vulnerability preview (tiered) ============ */
+.pvp { margin-top: 12px; }
+.pvp-cap { font-size: 11.5px; line-height: 1.4; margin-bottom: 12px; }
+.pvp-tier { margin-bottom: 16px; }
+.pvp-tier-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  padding: 4px 2px 8px;
+  border-bottom: 1px solid var(--border-soft);
+  margin-bottom: 6px;
+}
+.pvp-dot { width: 9px; height: 9px; border-radius: 99px; flex: none; }
+.pvp-tier-n { margin-left: auto; font-weight: 700; }
+.pvp-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.1fr) minmax(190px, 0.9fr) minmax(160px, 1.3fr);
+  align-items: center;
+  gap: 12px;
+  padding: 9px 10px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+}
+.pvp-row:hover { background: var(--card-2); border-color: var(--border-soft); }
+.pvp-name { font-weight: 700; font-size: 13.5px; }
+.pvp-vs { font-size: 12px; }
+.pvp-stats { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 11.5px; color: var(--text-faint); }
+.pvp-stats b { color: var(--text); font-weight: 700; }
+.pvp-stats b.pvp-hi { color: var(--bad); }
+.pvp-bats { display: flex; flex-wrap: wrap; gap: 5px; }
+.pvp-bat {
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.pvp-bat:hover { background: var(--hover); color: var(--text); }
+.pvp-bat.prime { color: var(--prime); font-weight: 800; border-color: color-mix(in srgb, var(--prime) 40%, transparent); background: rgba(245, 158, 11, 0.08); }
+.pvp-tbd { font-size: 12px; line-height: 1.5; padding: 2px; }
+@media (max-width: 680px) {
+  .pvp-row { grid-template-columns: 1fr; gap: 6px; }
+  .pvp-stats { gap: 4px 10px; }
+}
+
 /* ============ Pitcher Plan view ============ */
 .empty-note {
   margin-top: 24px;
