@@ -481,6 +481,14 @@ function StatcastSection({ b }) {
         <Cell k="xSLG" v={rate(x.xSLG)} />
         <Cell k="xISO" v={rate(x.xISO)} />
         <Cell k="xwOBA" v={rate(x.xwOBA)} />
+        {b.pullPct != null && (
+          <Cell
+            k="Pull%"
+            v={`${num(b.pullPct, 0)}%`}
+            tone={b.pullPct >= 45 ? 'good' : null}
+            title="Share of batted balls pulled — pull-side contact clears fences more often."
+          />
+        )}
       </div>
       {b.primaryPitchEdge?.passes && (
         <div className="note good">
@@ -705,6 +713,9 @@ function PitcherSection({ b, onOpenPitcher }) {
           <span className="split-label">vs {b.batSide}HB</span>
           <Mini k="HR/9" v={num(split.hrPer9, 2)} />
           <Mini k="AVG" v={rate(split.avg)} />
+          {split.slg != null && split.slg > 0 && <Mini k="SLG" v={rate(split.slg)} />}
+          {split.iso != null && <Mini k="ISO" v={rate(split.iso)} />}
+          {split.kPct != null && <Mini k="K%" v={`${num(split.kPct, 0)}%`} />}
           <Mini k="IP" v={num(split.ip, 1)} />
         </div>
       )}

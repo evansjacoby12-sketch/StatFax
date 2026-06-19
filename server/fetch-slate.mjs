@@ -768,11 +768,25 @@ async function fetchPitcherStatsBatch(playerIds) {
               if (!code) continue;
               const ip = parseIP(s.inningsPitched);
               const hr = +s.homeRuns || 0;
+              const bf = +s.battersFaced || 0;
+              const kk = +s.strikeOuts || 0;
+              const bbb = +s.baseOnBalls || 0;
+              const slg = +s.slg || 0;
+              const avg = +s.avg || 0;
               sp[code] = {
                 ip,
                 hr,
                 era: +s.era || 0,
-                avg: +s.avg || 0,
+                avg,
+                // Full slash so the matchup view can show how each side hits this
+                // arm (the stat object already carries these — just extracting).
+                obp: +s.obp || 0,
+                slg,
+                ops: +s.ops || 0,
+                iso: slg && avg ? +(slg - avg).toFixed(3) : null,
+                bf,
+                kPct: bf > 0 ? +((kk / bf) * 100).toFixed(1) : null,
+                bbPct: bf > 0 ? +((bbb / bf) * 100).toFixed(1) : null,
                 // Same fix on the split — the model blends split.hrPer9 with
                 // season.hrPer9 weighted by IP. Without this the blend got an
                 // undefined split-side value and defaulted to the season rate
@@ -2921,6 +2935,11 @@ async function main() {
           // though scoreBatter uses it. Heat Index "LA in HR window" check
           // needs it; without it that check could never pass.
           launchAngle: savantStats?.launchAngle ?? null,
+          // Pull rate (% of batted balls pulled) — a HR-relevant batted-ball
+          // tendency (pull-side power clears fences more often). Fetched in the
+          // savant blob but wasn't surfaced on the row; now exposed for the
+          // matchup view. Null when the savant sample is missing.
+          pullPct: savantStats?.pullPct ?? null,
           // Primary-pitch edge (derived above) — compact "does this batter
           // mash the pitcher's bread-and-butter?" signal for Heat Index.
           // Null when we don't have both arsenals to compute it.
