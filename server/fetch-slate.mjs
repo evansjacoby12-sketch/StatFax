@@ -1094,14 +1094,16 @@ async function fetchSavantBatterStatsAll(year = SEASON) {
         };
       }
       if (Object.keys(out).length) {
-        // Backfill launch angle from the statcast custom leaderboard CSV.
-        // The percentile endpoint never carries it, so without this every
-        // batter had launchAngle=null → the Heat Index "LA in HR window"
-        // check could never pass (capped everyone at 5/6). NOTE the column
-        // is `avg_hit_angle`, NOT `avg_launch_angle` — the latter (used
-        // here and in pass 2 historically) doesn't exist on this endpoint,
-        // which is why the earlier row-level fix still read null. One extra
-        // cached call per cron; merges only launchAngle.
+        // Backfill launch angle AND hard-hit% from the statcast custom
+        // leaderboard CSV. The percentile-rankings endpoint carries
+        // `avg_hit_speed` (exitVelo) but NOT `avg_hit_angle` (launchAngle) and
+        // NOT `hard_hit_percent` (hardHitPct) — those two were always null
+        // here, which is why the calibration log showed `ev` ~45% covered but
+        // `hh` 100% null in every row (the savant fields all reach the row
+        // identically, so the gap had to be upstream in THIS fetch). The
+        // statcast leaderboard CSV carries both columns (`avg_hit_angle`,
+        // `hard_hit_percent`), so one cached call backfills both. Merges only
+        // launchAngle + hardHitPct; leaves the percentile values otherwise intact.
         try {
           const laRows = await savantCSV(
             `https://baseballsavant.mlb.com/leaderboard/statcast?type=batter&year=${year}&position=&team=&min=q&csv=true`
@@ -1110,6 +1112,10 @@ async function fetchSavantBatterStatsAll(year = SEASON) {
             const id = Number(p.player_id);
             if (!id || !out[id]) continue;
             if (out[id].launchAngle == null) out[id].launchAngle = pf(p.avg_hit_angle);
+            // hard_hit_percent is the BATTER's hard-hit% (not the pitcher's
+            // hardHitPctAllowed) — this is the field `hh` in the calibration
+            // feature vector. Backfill only when the percentile pass left it null.
+            if (out[id].hardHitPct == null) out[id].hardHitPct = pf(p.hard_hit_percent);
           }
         } catch { /* leaderboard backfill is best-effort */ }
         return out;
@@ -1981,7 +1987,10 @@ async function main() {
   // HR landed in a late west-coast game after this date was first reconciled
   // would otherwise stay logged as a miss forever, deflating measured accuracy.
   // Monotonic false→true correction; days with all games Final are skipped.
-  backtestLog = await repairRecentDays(backtestLog, 3);
+  // Scans ALL still-unsettled dates in the window (capped ~7) so a suspended
+  // game that keeps a date open past the old 3-day tail still gets its late HR
+  // upgraded instead of frozen as a permanent miss.
+  backtestLog = await repairRecentDays(backtestLog, 7);
 
   // Combo scorecard — grade yesterday's canonical PREGAME combos (one per
   // strategy per size, off the same frozen snapshot the per-batter reconcile
@@ -2946,6 +2955,16 @@ async function main() {
             row.grade       = gradeFromScore(row.score);
           }
         }
+        // Capture the RAW pregame engine sim as simHRProb HERE — straight off
+        // scoreBatter's Bayesian output, BEFORE any live PA-decay (8.68) or
+        // Final settlement (which zero score/grade) and BEFORE the isotonic
+        // calibration block overwrites row.hrProbability. The old lazy seed
+        // (`if simHRProb === undefined → row.hrProbability`) ran AFTER those
+        // mutations, so a played batter's logged simHRProb was a post-settlement
+        // value polluting calibration. Pinning it at the source freezes the true
+        // pre-first-pitch sim; the freeze block below carries it forward for
+        // started/Final games (same treatment preGameScore/preGameGrade get).
+        row.simHRProb = Number.isFinite(row.hrProbability) ? row.hrProbability : null;
         // Write under composite key (canonical) + legacy id key (BC).
         scoredBatters[`${id}-${game.gamePk}`] = row;
         scoredBatters[id] = row;
@@ -3646,6 +3665,14 @@ async function main() {
         // keep their settled score (0) on the board; only the logged fields move.
         row.preGameScore = snap.score;
         row.preGameGrade = snap.grade;
+        // Same freeze treatment for the raw pregame sim: carry the frozen
+        // pre-first-pitch simHRProb forward for FINAL games too. The LIVE branch
+        // above already restored it via Object.assign(row, snap), but FINAL rows
+        // were left with the post-game re-scored sim (the row is re-scored each
+        // cron off stats that now include the game's results), polluting the
+        // sim-resolution training signal. Only restore when the snapshot actually
+        // carried one, so never-live (e.g. postponed) rows keep their own value.
+        if (Number.isFinite(snap.simHRProb)) row.simHRProb = snap.simHRProb;
         nextByKey[key] = snap; // carry forward through final too, so it survives to the post-Final snapshot reconcile reads
         frozen++;
       }

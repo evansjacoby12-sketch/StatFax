@@ -43,16 +43,30 @@ const MIN_SAMPLES_TO_CALIBRATE = 1500;
 const Z_FLOOR  = 2.0;   // |z| at/below this → treat as noise, tightest band
 const Z_FULL   = 5.0;   // |z| at/above this → fully trusted, widest band
 const DELTA_NOISE = 0.03;  // near-noise signals barely move scores (was a flat 0.08)
-const DELTA_MAX   = 0.12;  // proven signals get more room than the old flat cap
+const DELTA_MAX   = 0.12;  // proven BADGE gets more room than the old flat cap
+
+// ── Per-GRADE band is much wider than the per-BADGE band ─────────────────────
+// The badge band (±12% max) is right for badges: each badge is a small
+// additive nudge layered ON TOP of the raw score, and they stack, so a tight
+// cap stops pile-on inflation. But the GRADE multiplier is the score's primary
+// empirical correction and it must preserve the grade GRADIENT. With the badge
+// cap, both PRIME (lift 2.09 → sqrt 1.45) and STRONG saturated to ~1.12, and
+// LEAN/SKIP both floored at ~0.88 — collapsing four distinct grades into two
+// values and throwing away exactly the signal grades exist to express. Giving
+// the per-grade loop its own wider ceiling (±45%) lets the sqrt-dampened lift
+// breathe so PRIME > STRONG and LEAN > SKIP instead of all hitting the cap.
+// Sqrt-dampening + the 80-sample floor still guard against small-sample noise.
+const GRADE_DELTA_MAX = 0.45;
 
 // z-score of a sub-group's HR rate vs the overall rate (binomial SE under the
 // null that the group rate equals overall), and the clamp band that strength
-// earns. Returns { z, delta }.
-function significanceBand(rate, n, overallRate) {
+// earns. `deltaMax` is the widest band a fully-trusted signal can earn —
+// DELTA_MAX for badges, GRADE_DELTA_MAX for grades. Returns { z, delta }.
+function significanceBand(rate, n, overallRate, deltaMax = DELTA_MAX) {
   const se = n > 0 ? Math.sqrt((overallRate * (1 - overallRate)) / n) : 0;
   const z = se > 0 ? Math.abs(rate - overallRate) / se : 0;
   const w = Math.max(0, Math.min(1, (z - Z_FLOOR) / (Z_FULL - Z_FLOOR)));
-  return { z, delta: DELTA_NOISE + w * (DELTA_MAX - DELTA_NOISE) };
+  return { z, delta: DELTA_NOISE + w * (deltaMax - DELTA_NOISE) };
 }
 
 // Badges tracked for the StatRecap lift report. Direct boolean fields
@@ -297,9 +311,15 @@ export function computeMultipliers(log) {
     const lift = gRate / overallRate;
     if (!isFinite(lift) || lift <= 0) continue;
     const dampened = Math.sqrt(lift);
-    const { delta } = significanceBand(gRate, withGrade.length, overallRate);
+    // Use the WIDE per-grade band (GRADE_DELTA_MAX) so the grade gradient
+    // survives — with the badge cap, PRIME and STRONG both saturated to ~1.12
+    // and LEAN/SKIP both to ~0.88, erasing the gradient. Sqrt-dampening still
+    // applies, so e.g. a PRIME lift of 2.09 lands near 1.45 (well inside ±45%)
+    // while STRONG's smaller lift lands lower → PRIME > STRONG, LEAN > SKIP.
+    const { z, delta } = significanceBand(gRate, withGrade.length, overallRate, GRADE_DELTA_MAX);
     const clamped  = Math.min(1 + delta, Math.max(1 - delta, dampened));
     base.grades[grade] = +clamped.toFixed(3);
+    console.log(`[calib] grade ${grade}: n=${withGrade.length} rate=${(gRate * 100).toFixed(1)}% lift=${lift.toFixed(2)} z=${z.toFixed(1)} band=±${(delta * 100).toFixed(1)}% → ${base.grades[grade]}`);
   }
 
   base.ready = samples >= MIN_SAMPLES_TO_CALIBRATE;
@@ -373,12 +393,24 @@ export async function reconcileDate(date, yesterdayPredictions, priorLog, prefet
  * so steady-state cost is roughly one in-progress day's box scores per run.
  *
  * Returns the (mutated) log; safe to call every run.
+ *
+ * `maxScan` caps how far back we'll re-fetch in a single run. Rather than only
+ * the last `n` calendar dates (which let a SUSPENDED game keep a date un-settled
+ * past the 3-day tail and freeze a late HR as a permanent miss), we now revisit
+ * EVERY still-unsettled date in the rolling window — capped at `maxScan` (~7) so
+ * a long backlog can't blow up one cron's box-score fetch count. Settled dates
+ * are skipped outright, so steady-state cost stays ~one in-progress day's boxes.
  */
-export async function repairRecentDays(log, n = 3) {
+export async function repairRecentDays(log, maxScan = 7) {
   if (!log?.dates?.length) return log;
   const settled = new Set(log.settledDates || []);
   let totalFixed = 0;
-  for (const date of log.dates.slice(-n)) {
+  // All non-settled dates in the window (newest-first so the most recent,
+  // most-likely-to-still-be-live dates get repaired first), capped at maxScan.
+  const candidates = log.dates
+    .filter(d => !settled.has(d))
+    .slice(-maxScan);
+  for (const date of candidates) {
     if (settled.has(date)) continue;                 // already complete — skip the fetch
     const records = log.records?.[date];
     if (!Array.isArray(records) || !records.length) continue;
@@ -404,6 +436,6 @@ export async function repairRecentDays(log, n = 3) {
     if (allFinal) settled.add(date);
   }
   log.settledDates = [...settled].filter(d => log.dates.includes(d));   // prune to rolling window
-  if (totalFixed) console.log(`[calib] repair: upgraded ${totalFixed} false-miss record(s) across last ${n} day(s)`);
+  if (totalFixed) console.log(`[calib] repair: upgraded ${totalFixed} false-miss record(s) across ${candidates.length} unsettled day(s)`);
   return log;
 }
