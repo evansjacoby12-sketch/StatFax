@@ -9,3 +9,6 @@ dist/*
 *.out.json
 .env
 .omc/
+
+# Background-agent isolated worktrees (harness state)
+.claude/worktrees/
