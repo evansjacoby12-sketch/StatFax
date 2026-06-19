@@ -43,7 +43,7 @@ export default function ParlaySlip({ legs, onRemove, onClear, onSelect }) {
   // Only flagged once there are 2+ legs.
   const weak =
     legs.length >= 2
-      ? legs.slice().sort((a, b) => (a.hrProbability ?? 1) - (b.hrProbability ?? 1) || (a.score ?? 0) - (b.score ?? 0))[0]
+      ? legs.slice().sort((a, b) => (a.hrProbability ?? 1) - (b.hrProbability ?? 1) || (a.score ?? 0) - (b.score ?? 0) || String(a.id).localeCompare(String(b.id)))[0]
       : null
   const weakId = weak?.id
 

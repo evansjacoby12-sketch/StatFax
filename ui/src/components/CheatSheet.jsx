@@ -53,7 +53,7 @@ function LbCard({ title, sub, icon, items }) {
 function batterBoard(batters, { get, fmt, filter, ab, minAb = 0, onSelect }) {
   return (batters || [])
     .filter((b) => live(b) && Number.isFinite(get(b)) && (!filter || filter(b)) && (!minAb || (ab?.(b) ?? 0) >= minAb))
-    .sort((a, b) => get(b) - get(a))
+    .sort((a, b) => get(b) - get(a) || String(a.id).localeCompare(String(b.id)))
     .slice(0, 10)
     .map((b) => ({
       key: b.id,
@@ -107,7 +107,7 @@ export default function CheatSheet({ batters, onSelect, onOpenPitcher }) {
   // HR Matchups — bat × opposing-pitcher HR/9 cross-check, sorted by model HR%.
   const hrMatchups = lb(batters)
     .filter((b) => Number.isFinite(b.hrProbability))
-    .sort((a, b) => b.hrProbability - a.hrProbability)
+    .sort((a, b) => b.hrProbability - a.hrProbability || String(a.id).localeCompare(String(b.id)))
     .slice(0, 12)
     .map((b) => ({
       key: b.id,
@@ -131,7 +131,7 @@ export default function CheatSheet({ batters, onSelect, onOpenPitcher }) {
   const blast = lb(batters)
     .map((b) => ({ b, n: hrSetup(b).n }))
     .filter((x) => x.n >= 4)
-    .sort((a, b) => b.n - a.n || (b.b.hrProbability ?? 0) - (a.b.hrProbability ?? 0))
+    .sort((a, b) => b.n - a.n || (b.b.hrProbability ?? 0) - (a.b.hrProbability ?? 0) || String(a.b.id).localeCompare(String(b.b.id)))
     .slice(0, 12)
     .map(({ b, n }) => ({ key: b.id, name: b.name, meta: b.team, badge: gradeBadge(b), val: `${n}/6`, onClick: () => onSelect(b) }))
   // Exit-Velo Surge — recent (14d) EV jump over season (bat-speed proxy; we don't get bat speed).
@@ -139,13 +139,13 @@ export default function CheatSheet({ batters, onSelect, onOpenPitcher }) {
     .filter((b) => Number.isFinite(b.recentBarrel?.recentEV) && Number.isFinite(b.exitVelo) && (b.recentBarrel?.recentBBE ?? 0) >= 10)
     .map((b) => ({ b, delta: b.recentBarrel.recentEV - b.exitVelo }))
     .filter((x) => x.delta > 0)
-    .sort((a, b) => b.delta - a.delta)
+    .sort((a, b) => b.delta - a.delta || String(a.b.id).localeCompare(String(b.b.id)))
     .slice(0, 12)
     .map(({ b, delta }) => ({ key: b.id, name: b.name, meta: `${num(b.recentBarrel.recentEV, 1)} mph`, badge: gradeBadge(b), val: `+${num(delta, 1)}`, onClick: () => onSelect(b) }))
   // 1st-Inning HR Leaders — top-of-order bats (they hit the starter in the 1st).
   const firstInning = lb(batters)
     .filter((b) => b.battingOrder >= 1 && b.battingOrder <= 3 && Number.isFinite(b.hrProbability))
-    .sort((a, b) => b.hrProbability - a.hrProbability)
+    .sort((a, b) => b.hrProbability - a.hrProbability || String(a.id).localeCompare(String(b.id)))
     .slice(0, 12)
     .map((b) => ({ key: b.id, name: b.name, meta: `#${b.battingOrder} vs ${lastName(b.pitcher?.name)}`, badge: gradeBadge(b), val: pct(b.hrProbability, 2), onClick: () => onSelect(b) }))
 
@@ -158,7 +158,7 @@ export default function CheatSheet({ batters, onSelect, onOpenPitcher }) {
   // ── Matchups ── batters ranked by their SLG on the pitcher's most-used pitch
   const pitchEdgeRows = (batters || [])
     .filter((b) => live(b) && Number.isFinite(b.primaryPitchEdge?.batterSlg) && (b.primaryPitchEdge?.pitcherFreq ?? 0) >= 0.18)
-    .sort((a, b) => b.primaryPitchEdge.batterSlg - a.primaryPitchEdge.batterSlg)
+    .sort((a, b) => b.primaryPitchEdge.batterSlg - a.primaryPitchEdge.batterSlg || String(a.id).localeCompare(String(b.id)))
     .slice(0, 10)
     .map((b) => ({
       key: b.id,
@@ -172,22 +172,22 @@ export default function CheatSheet({ batters, onSelect, onOpenPitcher }) {
   // ── Pitchers & parks ──
   const weakArms = data.pitchers
     .filter((p) => Number.isFinite(p.hr9))
-    .sort((a, b) => b.hr9 - a.hr9)
+    .sort((a, b) => b.hr9 - a.hr9 || String(a.id).localeCompare(String(b.id)))
     .slice(0, 10)
     .map((p) => ({ key: `${p.id}-${p.gamePk}`, name: lastName(p.name), meta: p.matchup, val: `${num(p.hr9, 2)}`, onClick: () => onOpenPitcher?.(p.id, p.gamePk) }))
   const highK = data.pitchers
     .filter((p) => Number.isFinite(p.k9))
-    .sort((a, b) => b.k9 - a.k9)
+    .sort((a, b) => b.k9 - a.k9 || String(a.id).localeCompare(String(b.id)))
     .slice(0, 10)
     .map((p) => ({ key: `${p.id}-${p.gamePk}`, name: lastName(p.name), meta: p.matchup, val: `${num(p.k9, 1)}`, onClick: () => onOpenPitcher?.(p.id, p.gamePk) }))
   const bullpenTargets = data.bullpens
     .filter((t) => Number.isFinite(t.hr9))
-    .sort((a, b) => b.hr9 - a.hr9)
+    .sort((a, b) => b.hr9 - a.hr9 || String(a.id).localeCompare(String(b.id)))
     .slice(0, 10)
     .map((t) => ({ key: t.id, name: `${t.abbr} bullpen`, meta: '', val: `${num(t.hr9, 2)}` }))
   const bestParks = data.games
     .filter((g) => Number.isFinite(g.park))
-    .sort((a, b) => b.park - a.park)
+    .sort((a, b) => b.park - a.park || (a.gamePk ?? 0) - (b.gamePk ?? 0))
     .slice(0, 8)
     .map((g) => ({ key: g.gamePk, name: g.label, meta: g.venue, val: signedPct(g.park - 1, 0) }))
 

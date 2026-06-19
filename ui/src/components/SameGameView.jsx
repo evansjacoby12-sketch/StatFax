@@ -33,7 +33,7 @@ function buildSGP(batters, size, { favorConsistency } = {}) {
   for (const g of byGame.values()) {
     const legs = g.bats
       .slice()
-      .sort((a, b) => rankVal(b) - rankVal(a) || (b.score ?? 0) - (a.score ?? 0))
+      .sort((a, b) => rankVal(b) - rankVal(a) || (b.score ?? 0) - (a.score ?? 0) || String(a.id).localeCompare(String(b.id)))
       .slice(0, size)
     if (legs.length < size) continue
     const combo = legs.reduce((p, b) => p * (b.hrProbability ?? 0), 1) // independent baseline
@@ -44,7 +44,7 @@ function buildSGP(batters, size, { favorConsistency } = {}) {
     const provisional = legInfo.some((l) => l.unconfirmed)
     out.push({ ...g, legs, legInfo, combo, grade: gradeFor(avg), avg, tone, provisional, stars: sgpStars(legs, tone) })
   }
-  return out.sort((a, b) => b.combo - a.combo)
+  return out.sort((a, b) => b.combo - a.combo || (a.gamePk ?? 0) - (b.gamePk ?? 0))
 }
 
 export default function SameGameView({ batters, onSelect, favorConsistency = false, comboConf = 'off' }) {

@@ -138,7 +138,7 @@ export default function ZoneView({ batter: b, onClose }) {
     }))
     .filter((p) => (p.usage ?? 0) > 0)
     .filter((p) => pitchFilter === 'all' || p.bucket === pitchFilter)
-    .sort((a, c) => (c.usage ?? 0) - (a.usage ?? 0))
+    .sort((a, c) => (c.usage ?? 0) - (a.usage ?? 0) || String(a.code).localeCompare(String(c.code)))
   const maxUsage = Math.max(1, ...pitchRows.map((p) => p.usage ?? 0))
 
   return (

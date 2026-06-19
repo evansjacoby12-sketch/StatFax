@@ -18,7 +18,7 @@ const WX_SORTS = [
 ]
 
 function sortGames(games, sort) {
-  const byAir = (a, b) => (b.envFactor ?? 0) - (a.envFactor ?? 0)
+  const byAir = (a, b) => (b.envFactor ?? 0) - (a.envFactor ?? 0) || (a.gamePk ?? 0) - (b.gamePk ?? 0) // stable final key
   const arr = games.slice()
   if (sort === 'park') arr.sort((a, b) => (b.parkHR ?? 0) - (a.parkHR ?? 0) || byAir(a, b))
   else if (sort === 'wind') arr.sort((a, b) => (b.windOutMph ?? -99) - (a.windOutMph ?? -99) || byAir(a, b))
