@@ -497,6 +497,28 @@ function StatcastSection({ b }) {
           {pct(b.primaryPitchEdge.pitcherFreq, 0)} of the time
         </div>
       )}
+      {b.pitchTypeSplits?.length > 0 && (
+        <div className="pitch-splits">
+          <div className="pitch-splits-cap dim">SLG vs the arsenal (by usage)</div>
+          <div className="pitch-splits-row">
+            {b.pitchTypeSplits.map((p) => (
+              <span
+                key={p.key}
+                className="pitch-split"
+                title={`${p.name} — thrown ${p.usage}%${p.whiff != null ? ` · ${num(p.whiff, 0)}% whiff` : ''}`}
+              >
+                <span className="ps-name">{p.name}</span>
+                {p.slg != null ? (
+                  <b className={`ps-slg ${p.slg >= 0.5 ? 'pos' : p.slg <= 0.35 ? 'neg' : ''}`}>{rate(p.slg)}</b>
+                ) : (
+                  <b className="ps-slg dim">—</b>
+                )}
+                <span className="ps-usage dim">{p.usage}%</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
     </Section>
   )
 }

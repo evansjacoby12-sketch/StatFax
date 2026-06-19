@@ -6456,6 +6456,26 @@ button.th:hover {
   }
 }
 
+/* ============ Pitch-type splits (Statcast section) ============ */
+.pitch-splits { margin-top: 10px; }
+.pitch-splits-cap { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px; }
+.pitch-splits-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.pitch-split {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  padding: 4px 9px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--card-2);
+}
+.pitch-split .ps-name { color: var(--text-dim); }
+.pitch-split .ps-slg { font-family: var(--mono); font-weight: 700; color: var(--text); }
+.pitch-split .ps-slg.pos { color: var(--good); }
+.pitch-split .ps-slg.neg { color: var(--bad); }
+.pitch-split .ps-usage { font-size: 10.5px; }
+
 /* ============ Plate Matchup HR Signal (player drawer) ============ */
 .pm-card {
   border: 1px solid rgba(255, 255, 255, 0.08);

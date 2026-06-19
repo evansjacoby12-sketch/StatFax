@@ -2835,6 +2835,27 @@ async function main() {
             }
           }
         }
+        // Compact pitch-type splits: for each pitch the starter throws ≥10%, the
+        // batter's SLG (and whiff%) vs that exact pitch type. Powers the
+        // pitch-type matchup row. Only pitches actually thrown → tiny payload.
+        let pitchTypeSplits = null;
+        if (pitchMix && bArsenal) {
+          const rows = [];
+          for (const k of Object.keys(PITCH_NAMES)) {
+            const usage = Number(pitchMix[`${k}Pct`]);
+            if (!Number.isFinite(usage) || usage < 10) continue;
+            const slg = Number(bArsenal[`${k}Slg`]);
+            const whiff = Number(bArsenal[`${k}Whiff`]);
+            rows.push({
+              key: k,
+              name: PITCH_NAMES[k],
+              usage: +usage.toFixed(0),
+              slg: Number.isFinite(slg) ? +slg.toFixed(3) : null,
+              whiff: Number.isFinite(whiff) ? +whiff.toFixed(1) : null,
+            });
+          }
+          if (rows.length) { rows.sort((a, b) => b.usage - a.usage); pitchTypeSplits = rows; }
+        }
 
         // Pre-compose season helpers (iso, hrRate) the way the app does so
         // the mobile renderer can drop them straight into the row.
@@ -2944,6 +2965,8 @@ async function main() {
           // mash the pitcher's bread-and-butter?" signal for Heat Index.
           // Null when we don't have both arsenals to compute it.
           primaryPitchEdge,
+          // Batter SLG/whiff vs each pitch the starter throws (≥10% usage).
+          pitchTypeSplits,
           // Today's-venue hand-resolved park HR factor (1.0 = neutral).
           // Always present (unlike parkWeatherHandFactor) so the Heat Index
           // "HR Park" check works for every game.
