@@ -8,7 +8,7 @@
  * dist/ensemble-weights.json. loadMLModel() reads that file; scoreWithML()
  * applies sigmoid(intercept + Σwᵢxᵢ) to the same feature vector the trainer
  * used and converts the probability back to the 0-100 HRSauce scale via the
- * same `prob / 0.18 * 100` mapping the rule path uses.
+ * same `prob / 0.28 * 100` mapping the rule path uses.
  *
  * If the weights file is missing or malformed, loadMLModel() returns null and
  * combineModels() falls back to pure-rule scoring unchanged. Zero-impact
@@ -212,9 +212,11 @@ export async function scoreWithML(
   for (let i = 0; i < weights.length; i++) z += weights[i] * features[i];
   const prob = _sigmoid(z);
 
-  // Same prob-to-score mapping the rule path uses: 18% prob = score of 100.
-  // See src/sports/mlb/logic/vegasBlend.js → probToScore().
-  return _clamp(Math.round((prob / 0.18) * 100), 0, 100);
+  // Same prob-to-score mapping the rule path uses: 28% prob = score of 100.
+  // KEEP IN SYNC with PROB_AT_MAX_SCORE in src/sports/mlb/logic/vegasBlend.js and
+  // the mlScore/100*0.28 read in server/fetch-slate.mjs — this is one closed
+  // ml-prob↔mlScore round-trip; both ends must use the same constant.
+  return _clamp(Math.round((prob / 0.28) * 100), 0, 100);
 }
 
 // ---------------------------------------------------------------------------

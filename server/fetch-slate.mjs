@@ -2068,7 +2068,7 @@ async function main() {
   try {
     // Use the just-fit isotonic table for the metric prob conversion. Falls
     // back to the rough linear scoreToProb when the table is sparse/missing.
-    const probFn = (s) => lookupProb(s, scoreToProbTable?.table, (sc) => Math.max(0.005, Math.min(0.30, sc / 100 * 0.18)));
+    const probFn = (s) => lookupProb(s, scoreToProbTable?.table, (sc) => Math.max(0.005, Math.min(0.30, sc / 100 * 0.28)));
     modelMetrics = computeMetricsFromBacktest(backtestLog, { lookbackDays: 30, scoreToProbFn: probFn });
     if (modelMetrics) {
       // Empirical base HR rate over the reconciled window (played records only).
@@ -2126,7 +2126,7 @@ async function main() {
       if (trainDates.length >= MIN_TRAIN_DAYS) {
         const holdoutModel = trainEnsembleWeights({ dates: trainDates, records: backtestLog.records }, { lookbackDays: trainDates.length });
         const sig = (z) => (z >= 0 ? 1 / (1 + Math.exp(-z)) : Math.exp(z) / (1 + Math.exp(z)));
-        const ruleProbOf = (s) => lookupProb(s, scoreToProbTable?.table, (sc) => Math.max(0.005, Math.min(0.30, sc / 100 * 0.18)));
+        const ruleProbOf = (s) => lookupProb(s, scoreToProbTable?.table, (sc) => Math.max(0.005, Math.min(0.30, sc / 100 * 0.28)));
         let ruleBrierSum = 0, mlBrierSum = 0, n = 0;
         for (const d of testDates) {
           for (const rec of (backtestLog.records[d] || [])) {
@@ -3581,12 +3581,12 @@ async function main() {
         () => (Number.isFinite(row.simHRProb) ? row.simHRProb : linFallback(row.score)));
       // Ensemble (probability-level): blend in the ML stacker's prob to the
       // extent the holdout gate earned it. row.mlScore maps back to prob via the
-      // same /0.18 convention scoreWithML used. ensembleMeta.mlWeight is 0
+      // same /0.28 convention scoreWithML used. ensembleMeta.mlWeight is 0
       // unless the ML beat the rule model out-of-sample — so this is a no-op
       // until proven, and never touches the score/grade distribution.
       let calProb = ruleProb;
       if (ensembleMeta.mlWeight > 0 && Number.isFinite(row.mlScore)) {
-        const mlProb = Math.max(0.005, Math.min(0.30, row.mlScore / 100 * 0.18));
+        const mlProb = Math.max(0.005, Math.min(0.30, row.mlScore / 100 * 0.28)); // 0.28 = PROB_AT_MAX_SCORE; matches ensemble.mjs prob/0.28 round-trip
         calProb = (1 - ensembleMeta.mlWeight) * ruleProb + ensembleMeta.mlWeight * mlProb;
       }
       // Store the calibrated LEVEL as the anchor, then let sim-resolution refine
