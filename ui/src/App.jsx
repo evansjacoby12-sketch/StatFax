@@ -78,12 +78,12 @@ export default function App() {
   const [showSplits, setShowSplits] = useState(false)
   const [showBacktest, setShowBacktest] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
-  // Default OFF: the full board (one best bat per game across the slate) is the
-  // default combos view, matching what the scorecard grades. CROSS-WINDOW tags +
-  // per-leg lock times now make staggered legs explicit, so grouping is opt-in.
-  // Key bumped (windowMode → windowModeV2) so the old auto-saved `true` default
-  // doesn't pin existing devices on; users can still toggle it in Settings.
-  const [windowMode, setWindowMode] = useState(() => store.load('windowModeV2', false))
+  // Default ON: same-window grouping is the default combos view — those are the
+  // combos you can actually bet as one ticket (every leg's lineup confirms before
+  // the earliest locks). The full board is an idealized benchmark (it grades each
+  // leg at its own confirmed pregame state, a ticket that never existed at one
+  // bettable moment), so it's opt-in. Toggle in Settings.
+  const [windowMode, setWindowMode] = useState(() => store.load('windowMode', true))
   const [showDayRating, setShowDayRating] = useState(() => store.load('showDayRating', true))
   const [comboConf, setComboConf] = useState(() => store.load('comboConf', 'off')) // 'off' | 'stars' | 'percent'
   const [favorConsistency, setFavorConsistency] = useState(() => store.load('favorConsistency', false))
@@ -114,7 +114,7 @@ export default function App() {
   useEffect(() => store.save('watchlist', [...watchlist]), [watchlist])
   useEffect(() => store.save('slip', slipIds), [slipIds])
   useEffect(() => store.save('autoRefresh', autoRefresh), [autoRefresh])
-  useEffect(() => store.save('windowModeV2', windowMode), [windowMode])
+  useEffect(() => store.save('windowMode', windowMode), [windowMode])
   useEffect(() => store.save('showDayRating', showDayRating), [showDayRating])
   useEffect(() => store.save('comboConf', comboConf), [comboConf])
   useEffect(() => store.save('favorConsistency', favorConsistency), [favorConsistency])
