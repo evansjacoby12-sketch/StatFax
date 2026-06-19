@@ -25,8 +25,27 @@
  */
 export const DEFAULT_HOLD = 0.15;
 
-/** Score calibration constant: 18% implied probability = score of 100. */
-export const PROB_AT_MAX_SCORE = 0.18;
+/**
+ * Score calibration constant: this implied probability maps to a score of 100.
+ *
+ * Was 0.18, which capped the ML/feat probability paths under-confident: a
+ * top-of-scale score implied only an 18% HR chance, but the rolling backtest
+ * shows PRIME bats actually homer ~27% (the fetch-slate isotonic note observes
+ * ~37% at the very top). 0.18 therefore pinned probToScore at 100 for anyone
+ * priced above ~18% and squashed the gradient at the top end. Raised to a
+ * conservative 0.28 — close to the empirical PRIME rate without chasing the
+ * ~37% tail, so the upper buckets spread out again.
+ *
+ * Round-trip note: probToScore() and scoreToProb() are exact inverses through
+ * THIS constant, and every consumer that round-trips a rule-path score
+ * (livePADecay, ProbabilityEngine, logOddsScore) imports this same symbol — so
+ * changing it here keeps write+read consistent everywhere it's imported. The
+ * separate hardcoded `0.18` in server/models/ensemble.mjs and the matching
+ * `mlScore/100*0.18` in server/fetch-slate.mjs form their OWN ml-prob↔mlScore
+ * round-trip and are intentionally left in lockstep with each other (both ends
+ * must move together), so they are NOT touched here.
+ */
+export const PROB_AT_MAX_SCORE = 0.28;
 
 /** Probability floor — never return 0 from scoreToProb. */
 export const PROB_FLOOR = 0.005;
@@ -171,9 +190,9 @@ export function bestPriceFromBooks(oddsObject) {
 /**
  * Convert a probability to a score on the 0-100 HRSauce scale.
  *
- * Calibration constant: 0.18 (18% implied probability maps to a score of 100).
- * This reflects the upper end of realistic HR prop markets; a batter priced
- * at +456 (≈18%) would be the highest-confidence play in the model.
+ * Calibration constant: PROB_AT_MAX_SCORE (0.28 — 28% implied probability maps
+ * to a score of 100). This reflects the empirical PRIME HR rate; a batter
+ * priced around +260 (≈28%) would be the highest-confidence play in the model.
  *
  * When isotonic regression calibration data is available, the caller should
  * substitute their own calibrated curve. This function is the deterministic

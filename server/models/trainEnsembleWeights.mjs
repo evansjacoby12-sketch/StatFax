@@ -12,7 +12,7 @@
  * Why this beats "no ML at all":
  *   - The rule model assigns equal narrative weight to every badge, but we
  *     can already see in the backtest that (e.g.) `hot` is a stronger signal
- *     than `dayEdge`. A learned weight vector encodes that automatically.
+ *     than `awayEdge`. A learned weight vector encodes that automatically.
  *   - PRIME vs STRONG vs LEAN vs SKIP captures non-linear bucketing the
  *     raw score alone can't express on its own; the one-hot lets the
  *     stacker treat the grade boundaries as discrete features.
@@ -47,15 +47,22 @@ export const FEATURE_NAMES = Object.freeze([
   'badge_due',       // 2
   'badge_cold',      // 3
   'badge_bullpenLegend',
-  'badge_dayEdge',
-  'badge_nightEdge',
+  // Swapped dayEdge→homeEdge, nightEdge→awayEdge: the day/night badges are
+  // dead/near-empty noise in the log, while homeEdge/awayEdge are the populated,
+  // predictive split signals (the same keys reconcile.mjs + calibration track).
+  // Training on the real columns means the stacker actually learns from them.
+  'badge_homeEdge',
+  'badge_awayEdge',
   'grade_PRIME',     // 7
   'grade_STRONG',
   'grade_LEAN',
   'grade_SKIP',
 ]);
 
-const BADGE_FEATURE_KEYS = ['hot', 'due', 'cold', 'bullpenLegend', 'dayEdge', 'nightEdge'];
+// homeEdge/awayEdge replace the dead dayEdge/nightEdge columns — these match
+// the badge keys the backtest log + calibration actually populate, so the
+// extractFeatures hasBadge() lookup hits real data instead of always-false.
+const BADGE_FEATURE_KEYS = ['hot', 'due', 'cold', 'bullpenLegend', 'homeEdge', 'awayEdge'];
 const GRADE_FEATURE_KEYS = ['PRIME', 'STRONG', 'LEAN', 'SKIP'];
 
 /**
