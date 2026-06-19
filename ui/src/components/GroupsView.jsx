@@ -2,8 +2,9 @@ import { useMemo, useState, useEffect, useRef } from 'react'
 import Icon from './Icon.jsx'
 import { GradeChip } from './atoms.jsx'
 import { pct, num, rate, american, signedPct } from '../lib/format.js'
-import { buildGroups, lastFirst, isoOf, blastOf, blastMixOf, blastVsHandOf, legFlags, legIsBad, risingForm } from '../lib/groups.js'
+import { buildGroups, legsByStrategy, lastFirst, isoOf, blastOf, blastMixOf, blastVsHandOf, legFlags, legIsBad, risingForm } from '../lib/groups.js'
 import { useLiveMode } from '../lib/liveMode.js'
+import * as store from '../lib/storage.js'
 
 const GROUP_GRADE_COLOR = { S: '#f5a623', A: '#32d74b', B: '#3b82f6', C: '#9aa6b6', D: '#6b7787' }
 const SIZE_TABS = [2, 3, 4].map((k) => ({ k, label: `${k}-leg` }))
@@ -273,7 +274,35 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard, g
   )
   const conf = useMemo(() => confirmSummary(batters), [batters])
   const asOf = fmtTime(generatedAt)
-  const bySize = useMemo(() => buildGroups(pool, { favorConsistency }), [pool, favorConsistency])
+
+  // Anti-flicker incumbency: remember the prior build's legs per strategy and
+  // feed them back so a leg only changes when a challenger is clearly better
+  // (see buildGroups' stickMargin). Keyed by slate day so it resets each morning;
+  // stored as plain arrays (Sets don't serialize). Read from a ref so it doesn't
+  // retrigger the build — we use last build's legs, then persist this build's.
+  const slateDay = (generatedAt ? new Date(generatedAt) : new Date()).toISOString().slice(0, 10)
+  const incKey = `combo-incumbents-${slateDay}`
+  const incRef = useRef(null)
+  if (incRef.current == null) {
+    const raw = store.load(incKey, null) || {}
+    incRef.current = Object.fromEntries(Object.entries(raw).map(([k, v]) => [k, new Set(v)]))
+  }
+  useEffect(() => {
+    const raw = store.load(incKey, null) || {}
+    incRef.current = Object.fromEntries(Object.entries(raw).map(([k, v]) => [k, new Set(v)]))
+  }, [incKey])
+
+  const bySize = useMemo(
+    () => buildGroups(pool, { favorConsistency, incumbents: incRef.current }),
+    [pool, favorConsistency],
+  )
+
+  // Persist this build's legs as next build's incumbents.
+  useEffect(() => {
+    const legs = legsByStrategy(bySize)
+    incRef.current = legs
+    store.save(incKey, Object.fromEntries(Object.entries(legs).map(([k, v]) => [k, [...v]])))
+  }, [bySize, incKey])
   const available = SIZE_TABS.filter((t) => bySize[t.k]?.length)
   const activeSize = bySize[size]?.length ? size : available[0]?.k
   const groups = activeSize ? bySize[activeSize] : []

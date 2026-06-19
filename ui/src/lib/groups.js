@@ -190,6 +190,23 @@ const STRATEGIES = [
   },
 ]
 
+// Quantize to 3 significant figures so sub-~0.5% rank noise can't reorder
+// near-tied bats run-to-run — the main source of combo-leg flicker. Paired with
+// the stable playerId tiebreak below, leg selection becomes deterministic and a
+// hair-thin score wobble no longer swaps a leg.
+function q3(x) {
+  if (!Number.isFinite(x)) return -Infinity
+  if (x === 0) return 0
+  return Number(x.toPrecision(3))
+}
+// Total-order comparator, descending by strength: quantized rank → quantized
+// score → STABLE playerId. Returns <0 when `a` outranks `b`. The playerId
+// tiebreak guarantees two genuinely equal-strength legs always resolve the same
+// way, so they never trade places between rebuilds.
+function legCmp(a, b, rank) {
+  return (q3(rank(b)) - q3(rank(a))) || (q3(b.score ?? 0) - q3(a.score ?? 0)) || ((a.playerId ?? 0) - (b.playerId ?? 0))
+}
+
 // Best eligible batter per game by a given metric (skip finals + SKIP bats).
 function topPerGame(batters, rank, require) {
   const byGame = new Map()
@@ -199,11 +216,9 @@ function topPerGame(batters, rank, require) {
     if (!Number.isFinite(b.hrProbability)) continue
     if (require && !require(b)) continue
     const cur = byGame.get(b.gamePk)
-    if (!cur || rank(b) > rank(cur) || (rank(b) === rank(cur) && (b.score ?? 0) > (cur.score ?? 0))) {
-      byGame.set(b.gamePk, b)
-    }
+    if (!cur || legCmp(b, cur, rank) < 0) byGame.set(b.gamePk, b)
   }
-  return [...byGame.values()].sort((a, b) => rank(b) - rank(a) || (b.score ?? 0) - (a.score ?? 0))
+  return [...byGame.values()].sort((a, b) => legCmp(a, b, rank))
 }
 
 // Group letter grade from the legs' average model score.
@@ -246,13 +261,21 @@ function makeGroup(legs, size, strat, idSuffix = '') {
   }
 }
 
-export function buildGroups(batters, { maxPerBat = 3, favorConsistency = false } = {}) {
+export function buildGroups(batters, { maxPerBat = 3, favorConsistency = false, incumbents = null, stickMargin = 0.05 } = {}) {
   // Each strategy's ranked pool is size-independent — compute once, slice per size.
   // The favorConsistency lean wraps each rank with a factor that demotes high-K
   // boom-or-bust bats. (Recent form is now a visible RISING signal, not a lean.)
+  //
+  // INCUMBENCY (anti-flicker): a bat that was a leg of THIS strategy on the last
+  // build gets a (1 + stickMargin) rank bonus, so it's only displaced when a
+  // challenger is clearly (>stickMargin) better — not by a marginal wobble. Folds
+  // hysteresis into the ranking, so it stabilizes both the per-game pick and the
+  // cross-game leg order in one shot. Empty/absent incumbents → normal behavior.
   const rankOf = (strat) => {
-    if (!favorConsistency) return strat.rank
-    return (b) => strat.rank(b) * consistencyFactor(b)
+    const base = favorConsistency ? (b) => strat.rank(b) * consistencyFactor(b) : strat.rank
+    const inc = incumbents?.[strat.key]
+    if (!inc || !inc.size) return base
+    return (b) => base(b) * (inc.has(b.playerId) ? 1 + stickMargin : 1)
   }
   const pools = STRATEGIES.map((strat) => ({ strat, pool: topPerGame(batters, rankOf(strat), strat.require) }))
   const out = {}
@@ -289,6 +312,20 @@ export function buildGroups(batters, { maxPerBat = 3, favorConsistency = false }
     if (groups.length) out[size] = groups
   }
   return out
+}
+
+// Collect each strategy's current leg playerIds (across all sizes) so the caller
+// can persist them and feed them back as next build's `incumbents` for sticky,
+// flicker-free legs.
+export function legsByStrategy(groupsOut) {
+  const m = {}
+  for (const size of Object.keys(groupsOut || {})) {
+    for (const g of groupsOut[size] || []) {
+      const set = (m[g.strategy] = m[g.strategy] || new Set())
+      for (const b of g.legs) if (b.playerId != null) set.add(b.playerId)
+    }
+  }
+  return m
 }
 
 // "Dillon Dingler" → "Dingler, Dillon" (matches the group-card convention).
