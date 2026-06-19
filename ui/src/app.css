@@ -647,6 +647,59 @@ button.th:hover {
   border-bottom: none;
 }
 
+/* ---- Swipe-to-action (right → watchlist, left → parlay) ---- */
+/* Wrapper is NOT overflow-clipped (that would clip the row's hover shadow); the
+   .board's overflow:clip handles any translate overshoot past the board edge.
+   Edge pills sit behind the row at opacity 0 and fade in as you swipe. */
+.board-swipe {
+  position: relative;
+}
+.board-swipe-actions {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 26px;
+  pointer-events: none;
+}
+.bsa {
+  opacity: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  transition: transform 0.16s cubic-bezier(0.2, 0.9, 0.2, 1);
+}
+.bsa-watch {
+  color: var(--prime);
+  background: color-mix(in srgb, var(--prime) 20%, transparent);
+}
+.bsa-slip {
+  color: var(--good);
+  background: color-mix(in srgb, var(--good) 20%, transparent);
+}
+.bsa.committed {
+  transform: scale(1.2);
+}
+/* Row sits above the pills; pan-y lets the board scroll vertically while we own
+   horizontal drags (the axis lock). */
+.board-swipe > .board-row {
+  position: relative;
+  z-index: 1;
+  touch-action: pan-y;
+}
+.board-swipe:last-child > .board-row {
+  border-bottom: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bsa {
+    transition: none;
+  }
+}
+
 .col-rank {
   color: var(--text-faint);
   font-size: 13px;

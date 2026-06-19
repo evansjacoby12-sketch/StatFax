@@ -6,6 +6,7 @@ import { teamLogo } from '../lib/teams.js'
 import { useLiveMode } from '../lib/liveMode.js'
 import { useEliLevel, topReasonForLevel } from '../lib/eliLevel.js'
 import { risingForm } from '../lib/groups.js'
+import { useSwipeActions } from '../lib/useSwipeActions.js'
 
 export default function BatterRow({
   batter: b,
@@ -45,36 +46,59 @@ export default function BatterRow({
       ? { label: 'RISING', cls: 'rising', icon: 'TrendingUp' }
       : null
 
+  // Swipe-to-action: right → watchlist, left → parlay. Axis-locked so it never
+  // fights the board's vertical scroll; the star/＋ buttons stay for tap/click.
+  const { innerRef, leftRef, rightRef, swipedRef, onPointerDown } = useSwipeActions({
+    onRight: () => onToggleWatch?.(b),
+    onLeft: () => onToggleSlip?.(b),
+  })
+
   return (
-    <div
-      className={`board-row ${selected ? 'selected' : ''} ${isFinal ? 'final' : ''}`}
-      role="button"
-      tabIndex={0}
-      onClick={() => onSelect(b)}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault()
+    <div className="board-swipe">
+      <div className="board-swipe-actions" aria-hidden="true">
+        <span ref={leftRef} className={`bsa bsa-watch ${watched ? 'on' : ''}`}>
+          <Icon name="Star" size={16} />
+        </span>
+        <span ref={rightRef} className={`bsa bsa-slip ${inSlip ? 'on' : ''}`}>
+          <Icon name={inSlip ? 'Check' : 'Plus'} size={16} />
+        </span>
+      </div>
+      <div
+        ref={innerRef}
+        className={`board-row ${selected ? 'selected' : ''} ${isFinal ? 'final' : ''}`}
+        role="button"
+        tabIndex={0}
+        onPointerDown={onPointerDown}
+        onClick={() => {
+          if (swipedRef.current) return // a swipe just happened — don't open the drawer
           onSelect(b)
-        } else if (e.key === 'ArrowDown') {
-          e.preventDefault()
-          e.currentTarget.nextElementSibling?.focus()
-        } else if (e.key === 'ArrowUp') {
-          e.preventDefault()
-          e.currentTarget.previousElementSibling?.focus()
-        } else if (e.key === 'Home') {
-          e.preventDefault()
-          e.currentTarget.parentElement?.firstElementChild?.focus()
-        } else if (e.key === 'End') {
-          e.preventDefault()
-          e.currentTarget.parentElement?.lastElementChild?.focus()
-        }
-      }}
-      style={{
-        '--row-accent': color,
-        '--team-logo': teamLogo(b.teamId) ? `url(${teamLogo(b.teamId)})` : 'none',
-        '--i': Math.min(rank, 24),
-      }}
-    >
+        }}
+        onKeyDown={(e) => {
+          const rowAt = (wrap) => wrap?.querySelector('.board-row')
+          const wrap = e.currentTarget.closest('.board-swipe')
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            onSelect(b)
+          } else if (e.key === 'ArrowDown') {
+            e.preventDefault()
+            rowAt(wrap?.nextElementSibling)?.focus()
+          } else if (e.key === 'ArrowUp') {
+            e.preventDefault()
+            rowAt(wrap?.previousElementSibling)?.focus()
+          } else if (e.key === 'Home') {
+            e.preventDefault()
+            rowAt(wrap?.parentElement?.firstElementChild)?.focus()
+          } else if (e.key === 'End') {
+            e.preventDefault()
+            rowAt(wrap?.parentElement?.lastElementChild)?.focus()
+          }
+        }}
+        style={{
+          '--row-accent': color,
+          '--team-logo': teamLogo(b.teamId) ? `url(${teamLogo(b.teamId)})` : 'none',
+          '--i': Math.min(rank, 24),
+        }}
+      >
       <div className="col-rank mono">{rank}</div>
 
       <div className="col-batter">
@@ -193,6 +217,7 @@ export default function BatterRow({
           <Icon name={inSlip ? 'Check' : 'Plus'} size={15} />
         </button>
         <Icon name="ChevronRight" size={16} className="row-chev" />
+      </div>
       </div>
     </div>
   )
