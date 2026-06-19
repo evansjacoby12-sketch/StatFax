@@ -6537,7 +6537,6 @@ button.th:hover {
 .grp-leg-lock { color: var(--text-faint); white-space: nowrap; }
 .grp-leg-lock.locked { color: var(--good); }
 .grp-leg-lock.pending { color: var(--warn, #ffb02e); }
-.grp-leg-lock-warn { color: var(--warn, #ffb02e); font-weight: 600; }
 .grp-foot-lock { color: var(--text-faint); white-space: nowrap; }
 
 /* ============ Same-Game Parlays ============ */

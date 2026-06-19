@@ -693,7 +693,6 @@ function GroupLeg({ b, idx, onSelect, selected, bad, weakest, reasons, unconfirm
             >
               {' · '}
               <Icon name="Lock" size={9} /> {legLocked ? 'locked' : `locks ${lockTime}`}
-              {!legLocked && unconfirmed && <span className="grp-leg-lock-warn"> · can still change</span>}
             </span>
           )}
         </div>
