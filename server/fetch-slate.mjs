@@ -1982,6 +1982,12 @@ async function main() {
   if (reconcilePredictions?.length) {
     yesterdayOutcomes = await fetchHomerersForDate(yesterdayCT);
   }
+  // Anti-regression guard: remember how many reconciled dates we STARTED with
+  // (after restoring R2 + the Actions-cache local file). reconcile/repair/append
+  // only ever add or hold (the 30-day trim swaps oldest-for-newest), so the final
+  // log must have >= this many dates. Fewer ⇒ data was lost this run; we refuse to
+  // overwrite below this at write time so a bad run can't shrink the cached log.
+  const restoredLogDates = backtestLog?.dates?.length || 0;
   backtestLog = await reconcileDate(yesterdayCT, reconcilePredictions, backtestLog, yesterdayOutcomes);
   // Self-heal late-game / transient misses on recent days — a PRIME pick whose
   // HR landed in a late west-coast game after this date was first reconciled
@@ -3915,8 +3921,13 @@ async function main() {
   // backtest-log.json is the rolling 30-day reconciliation history.
   // Both are uploaded by the same workflow step that uploads daily.json.
   writeFileSync(CALIBRATION_OUT_PATH, JSON.stringify(calibration));
-  writeFileSync(BACKTEST_OUT_PATH,    JSON.stringify(backtestLog));
-  console.log(`[calib] wrote calibration.json (${(JSON.stringify(calibration).length / 1024).toFixed(1)} KB) + backtest-log.json (${(JSON.stringify(backtestLog).length / 1024).toFixed(1)} KB)`);
+  const finalLogDates = backtestLog?.dates?.length || 0;
+  if (finalLogDates < restoredLogDates) {
+    console.error(`[slate-qa] backtest-log REGRESSION: final ${finalLogDates} dates < restored ${restoredLogDates} — REFUSING to overwrite (preserving the richer on-disk log so the cache isn't poisoned).`);
+  } else {
+    writeFileSync(BACKTEST_OUT_PATH, JSON.stringify(backtestLog));
+    console.log(`[calib] wrote calibration.json (${(JSON.stringify(calibration).length / 1024).toFixed(1)} KB) + backtest-log.json (${(JSON.stringify(backtestLog).length / 1024).toFixed(1)} KB)`);
+  }
 
   // Persist the zone cache so the next cron run can warm-start instead
   // of re-fetching every batter/pitcher zone heatmap. The cache contains
