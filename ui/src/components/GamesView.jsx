@@ -1,8 +1,9 @@
+import { useState } from 'react'
 import Icon from './Icon.jsx'
 import { GradeChip, BadgeRow, ProbBar, ProbRing } from './atoms.jsx'
 import { teamColor, teamLogo, hexToRgba, readableOn, playerHeadshot } from '../lib/teams.js'
 import { pct, num, gameTime, signedPct } from '../lib/format.js'
-import { gradeColor } from '../lib/badges.js'
+import { gradeColor, eli5IconName, toneColor } from '../lib/badges.js'
 import { HOT_HEAT } from '../lib/constants.js'
 import { compass } from '../lib/weather.js'
 import { interpretWind } from '../lib/wind.js'
@@ -139,15 +140,111 @@ export default function GamesView({ games, batters, onSelect, selectedId, watchl
 
   const ctx = { onSelect, selectedId, watchlist, slip, onToggleWatch, onToggleSlip, onOpenPitcher }
   const god = computeGameOfDay(batters)
+  const [view, setView] = useState('extractor') // 'extractor' = HR King/Target cards · 'detail' = full silos
   return (
     <>
+      <div className="games-controls" role="group" aria-label="Games view">
+        <span className="games-controls-k dim">View</span>
+        <button className={`badge-toggle ${view === 'extractor' ? 'on' : ''}`} onClick={() => setView('extractor')}>HR Extractor</button>
+        <button className={`badge-toggle ${view === 'detail' ? 'on' : ''}`} onClick={() => setView('detail')}>Detail</button>
+      </div>
       <GameOfDay god={god} onSelect={onSelect} onOpenPitcher={onOpenPitcher} />
       <div className="games-grid">
-        {ordered.map((g, i) => (
-          <GameCard key={g.gamePk} game={g} groups={byGame.get(g.gamePk)} idx={i} {...ctx} />
-        ))}
+        {ordered.map((g, i) =>
+          view === 'extractor' ? (
+            <ExtractorCard key={g.gamePk} game={g} groups={byGame.get(g.gamePk)} idx={i} {...ctx} />
+          ) : (
+            <GameCard key={g.gamePk} game={g} groups={byGame.get(g.gamePk)} idx={i} {...ctx} />
+          ),
+        )}
       </div>
     </>
+  )
+}
+
+// Per-game environment-alert line composed from the real env signals.
+function envAlert(bat, game) {
+  if (!bat) return null
+  const w = bat.weather
+  const park = bat.gameParkHRFactor
+  const env = bat.envScore
+  const wind = w ? interpretWind(w, game?.homeTeam?.abbr, { roofClosed: w?.roofClosed }) : null
+  const parts = []
+  if (Number.isFinite(w?.tempF) && w.tempF >= 80) parts.push('warm air adds carry')
+  if (wind?.verdict === 'OUT') parts.push(`wind out (${wind.caption})`)
+  else if (wind?.verdict === 'IN') parts.push('wind holding it in')
+  if (Number.isFinite(park) && park >= 1.08) parts.push("hitter's park")
+  else if (Number.isFinite(park) && park <= 0.92) parts.push("pitcher's park")
+  const tone = Number.isFinite(env) ? (env >= 78 ? 'good' : env <= 45 ? 'bad' : '') : ''
+  const lead = !Number.isFinite(env) ? 'Environment' : env >= 78 ? 'Strong HR environment' : env >= 62 ? 'Above-average HR environment' : env <= 45 ? 'Suppressed HR environment' : 'Neutral environment'
+  return { tone, text: parts.length ? `${lead} — ${parts.join(', ')}.` : `${lead}.`, env }
+}
+
+// "Lineup HR Extractor" card — per game, crowns the top bat (HR King) and the
+// second (Elite Target) with their full eli5 reasons + an environment alert.
+function ExtractorCard({ game: g, groups, idx = 0, ...ctx }) {
+  const awayC = teamColor(g.awayTeam?.id)
+  const homeC = teamColor(g.homeTeam?.id)
+  // Combined lineup, best HR threats first (batters arrive pre-sorted by score).
+  const all = [...(groups.away || []), ...(groups.home || [])]
+    .filter((b) => (b.grade?.label || b.grade) !== 'SKIP')
+    .sort((a, b) => (b.score ?? 0) - (a.score ?? 0) || (b.hrProbability ?? 0) - (a.hrProbability ?? 0))
+  const king = all[0]
+  const target = all[1]
+  const alert = envAlert(groups.away?.[0] || groups.home?.[0], g)
+  if (!king) return null
+  return (
+    <section className="xcard" style={{ '--i': Math.min(idx, 12) }}>
+      <header
+        className="xc-head"
+        style={{ background: `linear-gradient(100deg, ${hexToRgba(awayC, 0.22)}, transparent 42%, transparent 58%, ${hexToRgba(homeC, 0.22)})` }}
+      >
+        <div className="xc-matchup">
+          <span className="xc-teams">{g.awayTeam?.abbr} @ {g.homeTeam?.abbr}</span>
+          <span className="xc-arms dim">{g.awayPitcher?.name || 'TBD'} vs {g.homePitcher?.name || 'TBD'}</span>
+        </div>
+        <GameStatus g={g} />
+      </header>
+      <GameChips sample={groups.away?.[0] || groups.home?.[0]} />
+      {alert && (
+        <div className={`xc-alert ${alert.tone}`}>
+          <Icon name="TriangleAlert" size={12} /> {alert.text}
+        </div>
+      )}
+      <ExtractorBat b={king} rank="king" onSelect={ctx.onSelect} />
+      {target && <ExtractorBat b={target} rank="target" onSelect={ctx.onSelect} />}
+    </section>
+  )
+}
+
+function ExtractorBat({ b, rank, onSelect }) {
+  const reasons = (b.eli5Reasons || []).slice(0, 5)
+  const isKing = rank === 'king'
+  return (
+    <div className={`xc-bat ${rank}`} role="button" tabIndex={0} onClick={() => onSelect?.(b)}>
+      <div className="xc-bat-head">
+        <span className="xc-crown">{isKing ? '👑' : '🔥'}</span>
+        <span className="xc-label">{isKing ? 'HR King' : 'Elite Target'}</span>
+        <span className="xc-bat-name">{b.name}</span>
+        <span className="xc-bat-team dim">{b.team}{b.battingOrder ? ` · #${b.battingOrder}` : ''}</span>
+        <span className="xc-bat-right">
+          <span className="xc-bat-prob mono">{pct(b.hrProbability, 1)}</span>
+          <GradeChip grade={b.grade} size="sm" score={b.score} />
+        </span>
+      </div>
+      {reasons.length > 0 && (
+        <ul className="xc-reasons">
+          {reasons.map((r, i) => (
+            <li key={i} className={`xc-reason tone-${r.tone}`}>
+              <span className="xc-reason-ico" style={{ color: toneColor(r.tone) }}>
+                <Icon name={eli5IconName(r.icon)} size={12} />
+              </span>
+              {r.text}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   )
 }
 

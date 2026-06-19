@@ -2252,6 +2252,65 @@ button.th:hover {
   background: linear-gradient(135deg, var(--prime), #f7b955);
 }
 
+/* ============ HR Extractor (Games view) ============ */
+.games-controls { display: flex; align-items: center; gap: 7px; margin-bottom: 12px; }
+.games-controls-k { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
+.xcard {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--card);
+  overflow: hidden;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+.xc-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 11px 14px;
+}
+.xc-matchup { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.xc-teams { font-size: 15px; font-weight: 800; letter-spacing: 0.01em; }
+.xc-arms { font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.xc-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--text-dim);
+  padding: 8px 14px;
+  border-top: 1px solid var(--border-soft);
+  border-bottom: 1px solid var(--border-soft);
+}
+.xc-alert.good { color: var(--good); background: color-mix(in srgb, var(--good) 7%, transparent); }
+.xc-alert.bad { color: var(--bad); background: color-mix(in srgb, var(--bad) 7%, transparent); }
+.xc-bat { padding: 11px 14px; border-top: 1px solid var(--border-soft); cursor: pointer; transition: background 0.12s; }
+.xc-bat:first-of-type { border-top: none; }
+.xc-bat:hover { background: var(--card-2); }
+.xc-bat.king { background: linear-gradient(180deg, rgba(245, 158, 11, 0.06), transparent); }
+.xc-bat-head { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.xc-crown { font-size: 14px; flex: none; }
+.xc-label {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--prime);
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--prime) 40%, transparent);
+  background: rgba(245, 158, 11, 0.08);
+}
+.xc-bat.target .xc-label { color: var(--b-hot); border-color: color-mix(in srgb, var(--b-hot) 40%, transparent); background: color-mix(in srgb, var(--b-hot) 10%, transparent); }
+.xc-bat-name { font-size: 14px; font-weight: 700; }
+.xc-bat-team { font-size: 11.5px; }
+.xc-bat-right { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; }
+.xc-bat-prob { font-size: 15px; font-weight: 800; }
+.xc-reasons { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 5px; }
+.xc-reason { display: flex; align-items: flex-start; gap: 7px; font-size: 12px; line-height: 1.4; color: var(--text-dim); }
+.xc-reason-ico { flex: none; margin-top: 1px; }
+
 /* ============ Games view ============ */
 .games-grid {
   display: grid;
