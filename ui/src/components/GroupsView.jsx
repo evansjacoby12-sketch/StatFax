@@ -490,6 +490,8 @@ function GroupCard({ g, onSelect, selectedId, comboConf = 'off' }) {
   const spreadHrs = times.length >= 2 ? (Math.max(...times) - Math.min(...times)) / 3600e3 : 0
   const spreadWarn = spreadHrs > 2.5
   const earliestTime = times.length ? fmtTime(new Date(Math.min(...times)).toISOString()) : null
+  const latestTime = times.length ? fmtTime(new Date(Math.max(...times)).toISOString()) : null
+  const staggered = times.length >= 2 && Math.max(...times) > Math.min(...times)
   const title =
     tone === 'risk'
       ? `🔴 Weak leg — ${g.legs
@@ -568,6 +570,11 @@ function GroupCard({ g, onSelect, selectedId, comboConf = 'off' }) {
       </ul>
       <footer className="grp-foot dim">
         {g.size}-leg {g.label} · {names}
+        {staggered && (
+          <span className="grp-foot-lock" title="Each leg locks at its own game's first pitch. Until then an unconfirmed later leg can still change.">
+            {' · '}<Icon name="Lock" size={9} /> legs lock {earliestTime} → {latestTime}
+          </span>
+        )}
       </footer>
     </section>
   )
@@ -586,6 +593,11 @@ function GroupLeg({ b, idx, onSelect, selected, bad, weakest, reasons, unconfirm
   const iso = isoOf(b)
   const rising = risingForm(b)
   const hrToday = liveMode && b.liveContext?.isHRThisGame
+  // Per-leg lock: a leg is locked once ITS game starts (first pitch) — on a full
+  // board the legs are in different games, so they lock at different times.
+  const lockIso = b.game?.gameDate
+  const lockTime = lockIso ? fmtTime(lockIso) : null
+  const legLocked = !!(b.game?.isFinal || b.game?.isLive)
   return (
     <li
       className={`grp-leg ${selected ? 'selected' : ''} ${bad ? 'weak-leg' : ''}`}
@@ -668,6 +680,22 @@ function GroupLeg({ b, idx, onSelect, selected, bad, weakest, reasons, unconfirm
             </span>
           )}
           {iso != null && <> · ISO {rate(iso)}</>}
+          {lockTime && (
+            <span
+              className={`grp-leg-lock ${legLocked ? 'locked' : unconfirmed ? 'pending' : ''}`}
+              title={
+                legLocked
+                  ? 'Game underway — this leg is locked'
+                  : unconfirmed
+                    ? `Lineup not posted — this leg can still change until first pitch (${lockTime})`
+                    : `This leg locks at its first pitch (${lockTime})`
+              }
+            >
+              {' · '}
+              <Icon name="Lock" size={9} /> {legLocked ? 'locked' : `locks ${lockTime}`}
+              {!legLocked && unconfirmed && <span className="grp-leg-lock-warn"> · can still change</span>}
+            </span>
+          )}
         </div>
       </div>
       <div className="grp-leg-right">

@@ -6473,6 +6473,14 @@ button.th:hover {
   transform: translateY(-1px);
 }
 
+/* Per-leg lock time on combo legs — when each leg's game starts (full-board
+   legs lock at staggered times). */
+.grp-leg-lock { color: var(--text-faint); white-space: nowrap; }
+.grp-leg-lock.locked { color: var(--good); }
+.grp-leg-lock.pending { color: var(--warn, #ffb02e); }
+.grp-leg-lock-warn { color: var(--warn, #ffb02e); font-weight: 600; }
+.grp-foot-lock { color: var(--text-faint); white-space: nowrap; }
+
 /* ============ Same-Game Parlays ============ */
 .sgp-intro {
   font-size: 12px;
