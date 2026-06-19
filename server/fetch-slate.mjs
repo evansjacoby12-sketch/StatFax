@@ -2395,14 +2395,18 @@ async function main() {
     if (g.homePitcher?.id) for (const bid of awayIds) h2hPairs.push([bid, g.homePitcher.id]);
     if (g.awayPitcher?.id) for (const bid of homeIds) h2hPairs.push([bid, g.awayPitcher.id]);
   }
-  // Cap and shuffle so on heavy days we still get a representative slice
-  // rather than the first N alphabetically.
+  // Cap the H2H fetch DETERMINISTICALLY: sort by a stable key (batterId, then
+  // pitcherId) and take the first N. This was a Math.random shuffle for a
+  // "representative slice" — but H2H feeds the h2hFactor in the score, so a
+  // random sample meant a batter got an H2H score nudge on one run and not the
+  // next, silently reshuffling the whole board every 10-min rebuild. A fixed
+  // sample → stable scores → no shuffling. H2H is a minor career factor; which
+  // 200 pairs we sample matters far less than sampling the SAME ones each run.
   const h2hSampleSize = Math.min(h2hPairs.length, 200);
-  for (let i = h2hPairs.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [h2hPairs[i], h2hPairs[j]] = [h2hPairs[j], h2hPairs[i]];
-  }
-  const h2hSample = h2hPairs.slice(0, h2hSampleSize);
+  const h2hSample = h2hPairs
+    .slice()
+    .sort((a, b) => a[0] - b[0] || a[1] - b[1])
+    .slice(0, h2hSampleSize);
   const h2h = {};
   const h2hResults = await pMap(h2hSample, async ([bid, pid]) => {
     try {

@@ -188,7 +188,12 @@ function ExtractorCard({ game: g, groups, idx = 0, ...ctx }) {
   // Combined lineup, best HR threats first (batters arrive pre-sorted by score).
   const all = [...(groups.away || []), ...(groups.home || [])]
     .filter((b) => (b.grade?.label || b.grade) !== 'SKIP')
-    .sort((a, b) => (b.score ?? 0) - (a.score ?? 0) || (b.hrProbability ?? 0) - (a.hrProbability ?? 0))
+    .sort(
+      (a, b) =>
+        (b.score ?? 0) - (a.score ?? 0) ||
+        (b.hrProbability ?? 0) - (a.hrProbability ?? 0) ||
+        String(a.id).localeCompare(String(b.id)),
+    )
   const king = all[0]
   const target = all[1]
   const alert = envAlert(groups.away?.[0] || groups.home?.[0], g)

@@ -58,7 +58,8 @@ export function groupPitchers(batters) {
       (a, b) =>
         (b.hrProbability ?? 0) + boost(b) - ((a.hrProbability ?? 0) + boost(a)) ||
         (b.score ?? 0) - (a.score ?? 0) ||
-        (a.battingOrder ?? 99) - (b.battingOrder ?? 99),
+        (a.battingOrder ?? 99) - (b.battingOrder ?? 99) ||
+        (a.playerId ?? 0) - (b.playerId ?? 0), // stable final key — no shuffle on full ties
     )
     e.topProb = e.targets[0]?.hrProbability ?? 0
     return e
