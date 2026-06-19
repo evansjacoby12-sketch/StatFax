@@ -5,6 +5,7 @@ import { gradeColor } from '../lib/badges.js'
 import { teamLogo } from '../lib/teams.js'
 import { useLiveMode } from '../lib/liveMode.js'
 import { useEliLevel, topReasonForLevel } from '../lib/eliLevel.js'
+import { risingForm } from '../lib/groups.js'
 
 export default function BatterRow({
   batter: b,
@@ -35,9 +36,12 @@ export default function BatterRow({
   // its richer multi-column layout). The matchup lean is the Plate Matchup
   // signal: matchupScore − 50 (50 = neutral).
   const lean = Number.isFinite(b.matchupScore) ? Math.round(b.matchupScore - 50) : null
+  // RISING is a UI-derived signal (recent barrel% surging over season) — the
+  // backend never emits a `rising` field, so compute it the same way the combos
+  // board does. Without this the RISING pill could never render.
   const mom = b.hot
     ? { label: 'HOT', cls: 'hot', icon: 'Flame' }
-    : b.rising
+    : risingForm(b)
       ? { label: 'RISING', cls: 'rising', icon: 'TrendingUp' }
       : null
 

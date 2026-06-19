@@ -298,7 +298,9 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard, g
   // (see buildGroups' stickMargin). Keyed by slate day so it resets each morning;
   // stored as plain arrays (Sets don't serialize). Read from a ref so it doesn't
   // retrigger the build — we use last build's legs, then persist this build's.
-  const slateDay = (generatedAt ? new Date(generatedAt) : new Date()).toISOString().slice(0, 10)
+  // Key incumbency by the ET slate day (not UTC) so night games crossing
+  // midnight UTC don't roll the key mid-slate and reset the anti-flicker state.
+  const slateDay = (generatedAt ? new Date(generatedAt) : new Date()).toLocaleDateString('en-CA', { timeZone: 'America/New_York' })
   const incKey = `combo-incumbents-${slateDay}`
   const incRef = useRef(null)
   if (incRef.current == null) {
@@ -544,7 +546,7 @@ function GroupCard({ g, onSelect, selectedId, comboConf = 'off' }) {
           <span className={`grp-edge ${g.edge >= 0 ? 'pos' : 'neg'}`}> · {signedPct(g.edge, 0)} edge</span>
         )}
       </div>
-      {spreadWarn && (
+      {spreadWarn && !provisional && (
         <div className="grp-spread-warn" title="A parlay locks at the earliest leg's first pitch. The later game's lineup won't be posted by then, so you'd bet that leg before its lineup is confirmed.">
           <Icon name="Clock" size={11} /> Legs {spreadHrs.toFixed(1)}h apart — ticket locks at {earliestTime}, but the late leg's lineup won't be set yet
         </div>

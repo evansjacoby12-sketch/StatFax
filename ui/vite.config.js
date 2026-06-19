@@ -42,7 +42,7 @@ function statfaxData() {
         fs.mkdirSync(outData, { recursive: true })
         // Bundle the data into the static build so a plain static host (GitHub
         // Pages, Cloudflare Pages, …) serves a fully self-contained snapshot.
-        for (const f of ['daily.json', 'backtest-log.json', 'calibration.json', 'context.json']) {
+        for (const f of ['daily.json', 'backtest-log.json', 'calibration.json', 'context.json', 'board-history.json']) {
           const src = path.join(DIST_DIR, f)
           if (fs.existsSync(src)) fs.copyFileSync(src, path.join(outData, f))
         }

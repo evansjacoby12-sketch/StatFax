@@ -247,7 +247,7 @@ const LG_HR9 = 1.25 // league-average HR allowed per 9
 function plateMatchup(b) {
   const ms = b.matchupScore
   if (!Number.isFinite(ms)) return null
-  const lean = Math.round((ms - 50) * 10) / 10
+  const lean = Math.round(ms - 50) // integer — matchupScore is integer-grained; matches the board row
   const verdict =
     lean >= 12 ? 'Batter Favored' :
     lean >= 4 ? 'Lean Batter' :
@@ -301,7 +301,7 @@ function PlateMatchup({ b, onOpenZone }) {
           <span className="pm-verdict-label">{pm.verdict}</span>
           <span className="pm-verdict-sub dim">batter vs {b.pitcher?.name || 'TBD'}</span>
         </div>
-        <span className="pm-verdict-num mono">{pm.lean > 0 ? '+' : ''}{pm.lean.toFixed(1)}</span>
+        <span className="pm-verdict-num mono">{pm.lean > 0 ? '+' : ''}{pm.lean}</span>
       </div>
       <div className="pm-pillars">
         <PillarBar label="Bat threat" value={b.batterScore} hint="The hitter's own HR threat — power, contact quality, recent form." />
@@ -321,7 +321,7 @@ function PlateMatchup({ b, onOpenZone }) {
           </span>
         )}
         {Number.isFinite(hr9) && (
-          <span className={`pm-chip ${hr9 >= 1.3 ? 'good' : hr9 < LG_HR9 ? 'bad' : ''}`} title={`Opposing starter's HR allowed per 9 (league avg ${LG_HR9})`}>
+          <span className={`pm-chip ${hr9 >= LG_HR9 ? 'good' : 'bad'}`} title={`Opposing starter's HR allowed per 9 (league avg ${LG_HR9}). From the hitter's POV a HIGH arm HR/9 is favorable (green).`}>
             <Icon name="Flame" size={10} /> Arm {num(hr9, 2)} HR/9
           </span>
         )}
