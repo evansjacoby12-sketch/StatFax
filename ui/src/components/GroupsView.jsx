@@ -317,6 +317,14 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard, g
           {asOf && <span className="grp-stamp-time dim">as of {asOf}</span>}
         </div>
       )}
+      <div className={`grp-mode ${windowMode ? 'window' : 'full'}`}>
+        <Icon name={windowMode ? 'Lock' : 'Layers'} size={12} />
+        {windowMode ? (
+          <span><b>Same-window combos</b> — every leg starts together, so each combo locks as one bettable ticket.</span>
+        ) : (
+          <span><b>Full board (benchmark)</b> — best bat per game across all games. Measures the model; legs may span start windows you can’t parlay as one ticket (those show <b>CROSS-WINDOW</b>, not LOCKED).</span>
+        )}
+      </div>
       {overConc && !spread && (
         <div className="grp-overlap">
           <Icon name="TriangleAlert" size={13} />
@@ -458,8 +466,12 @@ function GroupCard({ g, onSelect, selectedId, comboConf = 'off' }) {
         </span>
         {provisional ? (
           <span className="grp-prov-tag"><Icon name="Clock" size={10} /> PROVISIONAL</span>
+        ) : spreadWarn ? (
+          <span className="grp-split-tag" title="Benchmark combo — its legs start in different windows (>2.5h apart), so it can't be locked as one clean ticket. Shown to measure the model, not to bet as a single parlay.">
+            <Icon name="Layers" size={10} /> CROSS-WINDOW
+          </span>
         ) : (
-          <span className="grp-locked-tag" title="All lineups confirmed — this combo is locked in & bettable, and it's the version that gets graded for the record.">
+          <span className="grp-locked-tag" title="All lineups confirmed and every leg starts together — this combo locks in as one bettable ticket, and it's the version graded for the record.">
             <Icon name="Lock" size={10} /> LOCKED
           </span>
         )}

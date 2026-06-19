@@ -5050,7 +5050,8 @@ button.th:hover {
   border-style: dashed;
 }
 .grp-prov-tag,
-.grp-locked-tag {
+.grp-locked-tag,
+.grp-split-tag {
   display: inline-flex;
   align-items: center;
   gap: 3px;
@@ -5070,6 +5071,42 @@ button.th:hover {
   color: var(--good);
   border-color: color-mix(in srgb, var(--good) 50%, transparent);
   background: color-mix(in srgb, var(--good) 12%, transparent);
+}
+/* Benchmark combo whose legs span start windows — neutral blue, distinct from
+   the green "lockable" LOCKED tag so the two never read as the same thing. */
+.grp-split-tag {
+  color: var(--blue);
+  border-color: color-mix(in srgb, var(--blue) 50%, transparent);
+  background: color-mix(in srgb, var(--blue) 12%, transparent);
+}
+/* Mode banner — tells the user which board they're on (bettable same-window vs
+   full-board model benchmark), so a CROSS-WINDOW combo never reads as a slip. */
+.grp-mode {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  line-height: 1.35;
+  padding: 8px 11px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  margin-bottom: 10px;
+}
+.grp-mode svg {
+  flex: none;
+}
+.grp-mode.window {
+  color: var(--good);
+  border-color: color-mix(in srgb, var(--good) 35%, transparent);
+  background: color-mix(in srgb, var(--good) 8%, transparent);
+}
+.grp-mode.full {
+  color: var(--text-dim);
+  border-color: color-mix(in srgb, var(--blue) 30%, transparent);
+  background: color-mix(in srgb, var(--blue) 7%, transparent);
+}
+.grp-mode b {
+  color: var(--text);
 }
 .grp-state-tag {
   display: inline-flex;
