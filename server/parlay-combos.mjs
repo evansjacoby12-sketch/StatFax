@@ -273,7 +273,10 @@ export function appendComboDay(log, date, gradedCombos, bestAvailable) {
  */
 export function comboScorecard(log) {
   const byDate = log?.combos?.byDate || {};
-  const dates = Object.keys(byDate).sort();
+  // Only the most recent graded day — a clean "how did last night's combos do?"
+  // read, not a rolling multi-day blend. byDate holds only settled days
+  // (appendComboDay appends graded outcomes), so the last key is yesterday.
+  const dates = Object.keys(byDate).sort().slice(-1);
   const cell = () => ({ combos: 0, allHit: 0, legs: 0, legHits: 0 });
   const byStrategy = {};
   const bySize = {};
