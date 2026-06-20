@@ -156,7 +156,7 @@ export default function BatterRow({
             </span>
           </div>
           {topReason && (
-            <div className="batter-reason" title={(b.reasons || []).join(' · ')} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'var(--text-dim)', marginTop: '4px' }}>
+            <div className="batter-reason" title={(b.reasons || []).join(' · ')}>
               <Icon name="Zap" size={10} style={{ color: 'var(--accent)' }} />
               <span>{topReason}</span>
             </div>

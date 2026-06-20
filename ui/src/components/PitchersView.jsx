@@ -184,41 +184,24 @@ function PvpRow({ e, onSelect }) {
   const tg = e.targets.filter((b) => b.playerId != null && !seen.has(b.playerId) && seen.add(b.playerId)).slice(0, 4)
   const oppTeam = tg[0]?.team || '?'
   return (
-    <div className="pvp-row" style={{
-      display: 'grid',
-      gridTemplateColumns: '1.2fr 1.5fr 1.3fr',
-      alignItems: 'center',
-      padding: '8px 0',
-      borderBottom: '1px solid rgba(255,255,255,0.02)',
-      fontSize: '12px',
-      gap: '12px'
-    }}>
+    <div className="pvp-row">
       <div className="pvp-p" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
         <span className="pvp-name" style={{ color: '#fff', fontWeight: '600' }}>{p.name}</span>
         <span className="pvp-hand dim"> ({p.hand})</span>
         <span className="pvp-vs dim"> vs {oppTeam}</span>
       </div>
-      <div className="pvp-stats mono" style={{ display: 'flex', gap: '8px', color: 'var(--text-dim)', fontSize: '11px' }}>
+      <div className="pvp-stats mono">
         <span><b style={{ color: '#fff' }}>{num(s.hrPer9, 2)}</b> HR/9</span>
         <span><b style={{ color: '#fff' }}>{sav.barrelPctAllowed != null ? num(sav.barrelPctAllowed, 1) : '—'}%</b> brl</span>
         <span><b style={{ color: '#fff' }}>{sav.exitVeloAgainst != null ? num(sav.exitVeloAgainst, 0) : '—'}</b> EV</span>
       </div>
-      <div className="pvp-bats" style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+      <div className="pvp-bats" style={{ justifyContent: 'flex-end' }}>
         {tg.map((b) => (
           <button
             key={b.playerId}
             className={`pvp-bat ${(b.grade?.label || b.grade) === 'PRIME' ? 'prime' : ''}`}
             onClick={() => onSelect?.(b)}
             title={`${b.name} · ${pct(b.hrProbability, 1)} HR`}
-            style={{
-              fontSize: '10px',
-              fontWeight: (b.grade?.label || b.grade) === 'PRIME' ? '800' : '600',
-              color: (b.grade?.label || b.grade) === 'PRIME' ? 'var(--prime)' : '#fff',
-              background: 'rgba(255,255,255,0.03)',
-              border: `1px solid ${hexA(gradeColor(b.grade?.label), 0.25)}`,
-              borderRadius: '4px',
-              padding: '2px 6px'
-            }}
           >
             {lastName(b.name)}
           </button>

@@ -3327,7 +3327,7 @@ button.th:hover {
   }
   .prob-num-mobile {
     display: inline;
-    font-size: 21px;
+    font-size: 16px;
     font-weight: 800;
     letter-spacing: -0.01em;
     line-height: 1;
@@ -5002,6 +5002,7 @@ button.th:hover {
   font-size: 15px;
   font-weight: 700;
   color: var(--text);
+  white-space: nowrap;
 }
 .grp-strategy svg { color: var(--gc); flex: none; }
 .grp-pays { color: var(--text); font-weight: 700; }
@@ -7198,6 +7199,10 @@ button.th:hover {
     border-radius: 8px !important;
     font-size: 12px !important;
     padding: 6px 12px !important;
+  }
+
+  .grp-strategy {
+    font-size: 13.5px !important;
   }
 }
 
