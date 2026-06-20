@@ -7059,11 +7059,14 @@ button.th:hover {
     font-size: 11px !important;
   }
 
-  /* Header Spacing and Stacking */
+  /* Header Spacing and Stacking. Keep the safe-area inset in the top padding so
+     the header clears the iOS status bar / notch when added to the home screen
+     (standalone PWA, black-translucent status bar) — a flat top pad would tuck
+     the controls under the status bar where they're hidden and untappable. */
   .header {
     flex-wrap: nowrap !important;
     justify-content: space-between !important;
-    padding: 10px 14px !important;
+    padding: calc(10px + env(safe-area-inset-top, 0px)) 14px 10px !important;
   }
   
   .header-left {
