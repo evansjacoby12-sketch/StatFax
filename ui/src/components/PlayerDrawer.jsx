@@ -810,7 +810,7 @@ function EnvSection({ b }) {
               icon="Wind"
               k="Wind"
               v={w.windSpeedMph != null ? `${Math.round(w.windSpeedMph)} ${compass(w.windDirDeg) || ''}` : '—'}
-              sub={w.windGustMph ? `G${Math.round(w.windGustMph)}` : null}
+              sub={Number.isFinite(w.windGustMph) && w.windGustMph <= 90 && w.windGustMph >= (w.windSpeedMph || 0) ? `G${Math.round(w.windGustMph)}` : null}
             />
             <Wx icon="Droplet" k="Humidity" v={w.humidity != null ? `${w.humidity}%` : '—'} />
             <Wx icon="Cloud" k="Precip" v={w.precipProbPct != null ? `${w.precipProbPct}%` : '—'} />

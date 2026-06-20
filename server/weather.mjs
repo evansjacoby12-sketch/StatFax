@@ -165,6 +165,14 @@ function kmhToMph(v) {
   return v == null ? null : v * 0.621371192;
 }
 
+// NWS gridpoint values are occasionally garbled (e.g. a windGust of ~994 km/h →
+// 618 mph). No wind relevant to a playable ballgame approaches triple digits,
+// so treat anything beyond a physical ceiling — or negative — as missing data.
+const MAX_SANE_MPH = 90;
+function saneMph(v) {
+  return Number.isFinite(v) && v >= 0 && v <= MAX_SANE_MPH ? v : null;
+}
+
 /**
  * NWS gridpoint properties carry per-hour values keyed by an ISO interval
  * like "2026-05-28T16:00:00+00:00/PT1H" (start + duration). Some intervals
@@ -248,9 +256,9 @@ function buildHours(periods, gridProps, firstPitchIdx) {
       ? gridDirDeg
       : windDirTextToDeg(p.windDirection);
 
-    // Gust comes from grid in km/h; convert to mph.
+    // Gust comes from grid in km/h; convert to mph, dropping garbled values.
     const gustKmh    = getGridValueAt(gridProps?.windGust, ts);
-    const gustMph    = gustKmh == null ? null : Math.round(kmhToMph(gustKmh) * 10) / 10;
+    const gustMph    = gustKmh == null ? null : saneMph(Math.round(kmhToMph(gustKmh) * 10) / 10);
 
     // Cloud cover lives in grid as skyCover (%).
     const cloudPct   = getGridValueAt(gridProps?.skyCover, ts);
@@ -263,7 +271,7 @@ function buildHours(periods, gridProps, firstPitchIdx) {
       hourOffset:    i,
       tIso:          p.startTime,            // ISO with TZ offset
       tempF:         Number.isFinite(p.temperature) ? p.temperature : null,
-      windSpeedMph:  parseWindSpeed(p.windSpeed),
+      windSpeedMph:  saneMph(parseWindSpeed(p.windSpeed)),
       windDirDeg:    Number.isFinite(windDirDeg) ? windDirDeg : null,
       windGustMph:   gustMph,
       humidity:      p?.relativeHumidity?.value ?? null,

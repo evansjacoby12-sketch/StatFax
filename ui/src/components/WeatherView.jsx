@@ -253,7 +253,7 @@ function WeatherCard({ g, onSelect, selectedId }) {
 
         <div className="wxcard-stats" style={{ flex: '1', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
           <Wx icon="Thermometer" k="Temp" v={w?.tempF != null ? `${Math.round(w.tempF)}°F` : '—'} />
-          <Wx icon="Wind" k="Wind" v={w?.windSpeedMph != null ? `${Math.round(w.windSpeedMph)} ${compass(w.windDirDeg) || ''}`.trim() : '—'} sub={w?.windGustMph ? `G${Math.round(w.windGustMph)}` : null} />
+          <Wx icon="Wind" k="Wind" v={w?.windSpeedMph != null ? `${Math.round(w.windSpeedMph)} ${compass(w.windDirDeg) || ''}`.trim() : '—'} sub={Number.isFinite(w?.windGustMph) && w.windGustMph <= 90 && w.windGustMph >= (w?.windSpeedMph || 0) ? `G${Math.round(w.windGustMph)}` : null} />
           <Wx icon="Droplet" k="Humidity" v={w?.humidity != null ? `${w.humidity}%` : '—'} />
           <Wx icon="Cloud" k="Precip" v={w?.precipProbPct != null ? `${w.precipProbPct}%` : '—'} sub={sky} />
           <Wx icon="Gauge" k="Park HR" v={parkHR != null ? `${num(parkHR, 2)}×` : '—'} />
