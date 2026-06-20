@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect, useRef } from 'react'
 import Icon from './Icon.jsx'
 import { GradeChip } from './atoms.jsx'
+import Select from './Select.jsx'
 import { pct, num, rate, american, signedPct } from '../lib/format.js'
 import { buildGroups, legsByStrategy, lastFirst, isoOf, blastOf, blastMixOf, blastVsHandOf, legFlags, legIsBad, risingForm } from '../lib/groups.js'
 import { useLiveMode } from '../lib/liveMode.js'
@@ -385,35 +386,26 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard, g
       )}
       {windowMode && windows.length > 1 ? (
         <div className="grp-games" role="group" aria-label="Filter by start window">
-          <button className={`badge-toggle ${games.size === 0 ? 'on' : ''}`} onClick={() => setGames(new Set())}>
-            All windows
-          </button>
-          {windows.map((w, i) => (
-            <button
-              key={i}
-              className={`badge-toggle ${activeWindowIdx === i ? 'on' : ''}`}
-              onClick={() => setGames(new Set(w.pks))}
-              title={`${w.pks.size} game${w.pks.size > 1 ? 's' : ''} in this start window — same-window combos lock together, no spread trap`}
-            >
-              <Icon name="Clock" size={11} /> {w.label} <span className="dim">·{w.pks.size}</span>
-            </button>
-          ))}
+          <Select
+            icon="Clock"
+            ariaLabel="Filter by start window"
+            title="Same-window combos lock together — no spread trap"
+            value={activeWindowIdx >= 0 ? String(activeWindowIdx) : ''}
+            onChange={(v) => setGames(v === '' ? new Set() : new Set(windows[Number(v)].pks))}
+            options={[{ value: '', label: 'All windows' }, ...windows.map((w, i) => ({ value: i, label: `${w.label} · ${w.pks.size}g` }))]}
+          />
         </div>
       ) : (
         gameList.length > 1 && (
           <div className="grp-games" role="group" aria-label="Filter by game">
-            <button className={`badge-toggle ${games.size === 0 ? 'on' : ''}`} onClick={() => setGames(new Set())}>
-              All games
-            </button>
-            {gameList.map((g) => (
-              <button
-                key={g.gamePk}
-                className={`badge-toggle ${games.has(g.gamePk) ? 'on' : ''}`}
-                onClick={() => toggleGame(g.gamePk)}
-              >
-                {g.label}
-              </button>
-            ))}
+            <Select
+              multi
+              icon="List"
+              ariaLabel="Filter by game"
+              value={new Set([...games].map(String))}
+              onChange={(set) => setGames(new Set([...set].map(Number)))}
+              options={[{ value: '', label: 'All games' }, ...gameList.map((g) => ({ value: g.gamePk, label: g.label }))]}
+            />
           </div>
         )
       )}
