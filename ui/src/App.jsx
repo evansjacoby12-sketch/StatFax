@@ -510,6 +510,25 @@ export default function App() {
         <span className="dim">StatFax</span>
       </footer>
 
+      <nav className="bottom-nav">
+        {[
+          { id: 'board', label: 'Board', icon: 'List' },
+          { id: 'games', label: 'Games', icon: 'LayoutGrid' },
+          { id: 'pitchers', label: 'Pitchers', icon: 'Crosshair' },
+          { id: 'weather', label: 'Weather', icon: 'Wind' },
+          { id: 'results', label: 'Results', icon: 'Activity' }
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            className={`bottom-nav-btn ${view === tab.id ? 'active' : ''}`}
+            onClick={() => setView(tab.id)}
+          >
+            <Icon name={tab.icon} size={20} />
+            <span className="bottom-nav-label">{tab.label}</span>
+          </button>
+        ))}
+      </nav>
+
       <ParlaySlip
         legs={slipLegs}
         onRemove={removeSlip}

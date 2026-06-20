@@ -1,12 +1,13 @@
 import { useMemo, useState } from 'react'
 import Icon from './Icon.jsx'
 import { GradeChip } from './atoms.jsx'
-import { pct } from '../lib/format.js'
+import { pct, num } from '../lib/format.js'
 import { lastFirst, consistencyFactor, legFlags, legIsBad, risingForm } from '../lib/groups.js'
+import { correlatedJoint, gameCorrelation } from '../lib/parlay.js'
+import { gradeFor } from '../lib/combo-engine.js'
 
 const SIZES = [2, 3, 4]
 const GRADE_COLOR = { S: '#f5a623', A: '#32d74b', B: '#3b82f6', C: '#9aa6b6', D: '#6b7787' }
-const gradeFor = (avg) => (avg >= 76 ? 'S' : avg >= 70 ? 'A' : avg >= 62 ? 'B' : avg >= 54 ? 'C' : 'D')
 
 // Stars from leg strength minus caution/weak penalty (mirrors the combos page).
 function sgpStars(legs, tone) {
@@ -36,13 +37,20 @@ function buildSGP(batters, size, { favorConsistency } = {}) {
       .sort((a, b) => rankVal(b) - rankVal(a) || (b.score ?? 0) - (a.score ?? 0) || String(a.id).localeCompare(String(b.id)))
       .slice(0, size)
     if (legs.length < size) continue
-    const combo = legs.reduce((p, b) => p * (b.hrProbability ?? 0), 1) // independent baseline
+    const probs = legs.map((b) => b.hrProbability ?? 0)
+    const comboIndep = probs.reduce((p, x) => p * x, 1) // independent baseline
+    // Same-game legs are positively correlated; scale up by the game's HR-env
+    // tilt (avg park×weather of the legs, else the game park factor). See parlay.js.
+    const facs = legs.map((b) => b.parkWeatherHandFactor).filter(Number.isFinite)
+    const envTilt = facs.length ? facs.reduce((s, x) => s + x, 0) / facs.length : (Number.isFinite(g.parkHR) ? g.parkHR : 1)
+    const rho = gameCorrelation(envTilt)
+    const combo = correlatedJoint(probs, rho) // correlation-adjusted all-hit (headline)
     const avg = legs.reduce((s, b) => s + (b.score ?? 0), 0) / legs.length
     // Weakness + lineup-confirmation (same guards as the combos page).
     const legInfo = legs.map((b) => { const flags = legFlags(b); return { flags, bad: legIsBad(b, flags), unconfirmed: b.lineupConfirmed !== true, rising: risingForm(b) } })
     const tone = legInfo.some((l) => l.bad) ? 'risk' : legInfo.some((l) => l.flags.length) ? 'caution' : 'tail'
     const provisional = legInfo.some((l) => l.unconfirmed)
-    out.push({ ...g, legs, legInfo, combo, grade: gradeFor(avg), avg, tone, provisional, stars: sgpStars(legs, tone) })
+    out.push({ ...g, legs, legInfo, combo, comboIndep, rho, envTilt, grade: gradeFor(avg), avg, tone, provisional, stars: sgpStars(legs, tone) })
   }
   return out.sort((a, b) => b.combo - a.combo || (a.gamePk ?? 0) - (b.gamePk ?? 0))
 }
@@ -94,7 +102,14 @@ export default function SameGameView({ batters, onSelect, favorConsistency = fal
                   <span className="grp-grade" style={{ color: c, borderColor: c }}>{g.grade}</span>
                 </header>
                 <div className="grp-sub dim">
-                  all‑hit ≈ <b className="mono">{pct(g.combo, g.combo < 0.01 ? 2 : 1)}</b> (independent) · correlated, so true odds are better
+                  all‑hit ≈ <b className="mono">{pct(g.combo, g.combo < 0.01 ? 2 : 1)}</b>
+                  {g.rho > 0 ? (
+                    <span title={`Correlation-adjusted for this game's HR environment (park × weather ${num(g.envTilt, 2)}×). Independent product is ${pct(g.comboIndep, g.comboIndep < 0.01 ? 2 : 1)}; books still apply a correlation discount to the payout.`}>
+                      {' '}· corr-adj (indep {pct(g.comboIndep, g.comboIndep < 0.01 ? 2 : 1)})
+                    </span>
+                  ) : (
+                    <span> · independent (neutral park)</span>
+                  )}
                 </div>
                 <ul className="grp-legs">
                   {g.legs.map((b, i) => {

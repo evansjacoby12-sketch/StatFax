@@ -250,6 +250,7 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard, g
   const [hideStarted, setHideStarted] = useState(true)
   const [confirmedOnly, setConfirmedOnly] = useState(false)
   const [spread, setSpread] = useState(false) // de-correlated subset (min bat overlap)
+  const [valueSort, setValueSort] = useState(false) // sort by EV when books are posted
   // windowMode (start-window grouping) is an app-level setting — see Settings.
 
   // Distinct, still-playable games in the pool — for the game selector.
@@ -337,11 +338,21 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard, g
     return { total: all.length, top }
   }, [bySize])
   const overConc = exposure.top[0] && exposure.top[0][1] >= Math.max(4, Math.ceil(exposure.total * 0.35))
+  // Whether any shown combo is fully priced — only then is a Value/EV sort useful.
+  const anyPriced = groups.some((g) => g.ev != null)
+  // EV-desc: priced combos first (best EV on top); unpriced fall back to all-hit.
+  const byValue = (a, b) => {
+    if (a.ev != null && b.ev != null) return b.ev - a.ev
+    if (a.ev != null) return -1
+    if (b.ev != null) return 1
+    return (b.allHit ?? 0) - (a.allHit ?? 0)
+  }
+  const byProb = (a, b) => (b.allHit ?? 0) - (a.allHit ?? 0)
   // Spread mode: show a de-correlated subset instead of the full (overlapping) list.
   const shownGroups = spread
     ? spreadPick(groups, 4)
     : [...groups]
-        .sort((a, b) => (b.allHit ?? 0) - (a.allHit ?? 0))
+        .sort(valueSort && anyPriced ? byValue : byProb)
         .slice(0, DISPLAY_CAP[activeSize] ?? Infinity)
 
   const toggleGame = (pk) =>
@@ -440,6 +451,16 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard, g
         >
           <Icon name="Layers" size={12} /> Spread
         </button>
+        {anyPriced && (
+          <button
+            className={`badge-toggle ${valueSort ? 'on' : ''}`}
+            onClick={() => setValueSort((v) => !v)}
+            aria-pressed={valueSort}
+            title="Sort by betting EV — model all-hit % against the posted parlay price (de-juiced). Needs books posted."
+          >
+            <Icon name="Percent" size={12} /> Value
+          </button>
+        )}
       </div>
       {available.length ? (
         <div className="grp-list">
@@ -536,8 +557,15 @@ function GroupCard({ g, onSelect, selectedId, comboConf = 'off' }) {
             <b className="grp-pays">{american(g.american)}</b>
           </>
         )}
-        {g.edge != null && (
-          <span className={`grp-edge ${g.edge >= 0 ? 'pos' : 'neg'}`}> · {signedPct(g.edge, 0)} edge</span>
+        {g.ev != null && (
+          <span className={`grp-edge ${g.ev >= 0 ? 'pos' : 'neg'}`} title="Betting EV per $1 staked — model all-hit % × the posted parlay payout − 1">
+            {' · '}{signedPct(g.ev, 0)} EV
+          </span>
+        )}
+        {g.deJuicedEdge != null && (
+          <span className={`grp-edge ${g.deJuicedEdge >= 0 ? 'pos' : 'neg'}`} title="Model all-hit % vs the de-vigged 'fair' market line — the book's hold removed">
+            {' · '}{signedPct(g.deJuicedEdge, 1)} vs fair
+          </span>
         )}
       </div>
       {spreadWarn && !provisional && (

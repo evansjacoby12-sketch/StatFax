@@ -1,6 +1,6 @@
 import Icon from './Icon.jsx'
 import { BADGES, gradeColor, GRADE_ORDER } from '../lib/badges.js'
-import { hexA } from './atoms.jsx'
+import { hexA, Badge } from './atoms.jsx'
 
 const VIEWS = [
   ['List', 'Board', 'Every hitter ranked by the model’s HR probability. Sort and filter to find tonight’s best power spots.'],
@@ -153,10 +153,7 @@ export default function Guide({ onClose }) {
         <div className="guide-badges">
           {BADGES.map((b) => (
             <div className="guide-badge" key={b.key}>
-              <span className="badge" style={{ color: b.color, borderColor: 'color-mix(in srgb,' + b.color + ' 40%, transparent)' }}>
-                <Icon name={b.lucide} size={11} />
-                {b.label}
-              </span>
+              <Badge badge={b} />
               <span className="dim">{b.desc}</span>
             </div>
           ))}

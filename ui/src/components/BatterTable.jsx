@@ -23,12 +23,17 @@ export default function BatterTable({
         type="button"
         title={title ? `${title} — click to sort` : 'Click to sort'}
         aria-sort={active ? (dir === 'asc' ? 'ascending' : 'descending') : 'none'}
+        style={{
+          color: active ? 'var(--accent)' : 'var(--text-faint)',
+          fontWeight: active ? '800' : '600',
+          position: 'relative'
+        }}
       >
-        {children}
+        <span style={{ marginRight: '4px' }}>{children}</span>
         {active ? (
-          <Icon name={dir === 'asc' ? 'ChevronUp' : 'ChevronDown'} size={12} />
+          <Icon name={dir === 'asc' ? 'ChevronUp' : 'ChevronDown'} size={12} style={{ color: 'var(--accent)' }} />
         ) : (
-          <Icon name="ArrowUpDown" size={11} className="sort-hint" />
+          <Icon name="ArrowUpDown" size={10} className="sort-hint" style={{ opacity: 0.5 }} />
         )}
       </button>
     )
@@ -37,23 +42,23 @@ export default function BatterTable({
   return (
     <div className="board">
       <div className="board-head">
-        <div className="th col-rank" title="Rank by current sort">#</div>
+        <div className="th col-rank" title="Rank by current sort" style={{ fontWeight: '800' }}>#</div>
         <HeadCol k="name" className="col-batter" title="Batter, team vs opponent, and starting pitcher">
           Batter
         </HeadCol>
         <HeadCol k="score" className="col-grade" title="Model grade: PRIME / STRONG / LEAN / SKIP">
           Grade
         </HeadCol>
-        <HeadCol k="hrProbability" className="col-prob" title="Calibrated chance of ≥1 HR today">
-          HR Probability
+        <HeadCol k="hrProbability" className="col-prob" title="Calibrated chance of >=1 HR today">
+          Prob
         </HeadCol>
-        <HeadCol k="expectedHRs" className="col-xhr" title="Expected HRs this game (sum of per-PA odds)">
+        <HeadCol k="expectedHRs" className="col-xhr" title="Expected HRs this game">
           xHR
         </HeadCol>
-        <HeadCol k="heat" className="col-rating" title="Heat index — current form (0–100); tap a batter for the why">
+        <HeadCol k="heat" className="col-rating" title="Heat index — current form (0-100)">
           Heat
         </HeadCol>
-        <div className="th col-signals" title="Active model signals (hot, due, edges…)">
+        <div className="th col-signals" title="Active model signals (hot, due, edges...)">
           Signals
         </div>
         <div className="th col-actions" title="Watchlist & parlay" />
@@ -61,9 +66,17 @@ export default function BatterTable({
 
       <div className="board-body">
         {batters.length === 0 ? (
-          <div className="empty">
-            <Icon name="Search" size={28} />
-            <p>No batters match these filters.</p>
+          <div className="empty" style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '48px 24px',
+            color: 'var(--text-faint)',
+            gap: '12px'
+          }}>
+            <Icon name="Search" size={32} />
+            <p style={{ fontSize: '14px', fontWeight: '500' }}>No batters match these filters.</p>
           </div>
         ) : (
           batters.map((b, i) => (

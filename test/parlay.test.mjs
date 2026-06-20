@@ -1,6 +1,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { computeParlay } from '../ui/src/lib/parlay.js'
+import { computeParlay, correlatedJoint, gameCorrelation } from '../ui/src/lib/parlay.js'
+
+const approx = (a, b, eps = 1e-9) => Math.abs(a - b) < eps
 
 const leg = (p, dec) => ({ hrProbability: p, odds: dec ? { best: { decimal: dec, american: dec >= 2 ? Math.round((dec - 1) * 100) : Math.round(-100 / (dec - 1)) } } : null })
 
@@ -36,4 +38,36 @@ test('mixed pricing → not all priced, fair odds from model', () => {
   assert.equal(r.decimal, null)
   assert.equal(r.american, null)
   assert.ok(Number.isFinite(r.fairAmerican), 'fair american still computed from model prob')
+})
+
+// ─── same-game correlation (SGP) ──────────────────────────────────────────────
+
+test('gameCorrelation: neutral/pitcher park → 0, launch pad → capped max, monotone', () => {
+  assert.equal(gameCorrelation(1.0), 0) // neutral
+  assert.equal(gameCorrelation(0.9), 0) // pitcher's park → no negative correlation
+  assert.ok(gameCorrelation(1.15) > 0)
+  assert.ok(gameCorrelation(1.3) > gameCorrelation(1.15))
+  assert.ok(approx(gameCorrelation(1.3), 0.3)) // (1.3-1)/0.3 = 1 → × MAX (0.30)
+  assert.ok(approx(gameCorrelation(1.6), 0.3)) // clamped at the max
+  assert.equal(gameCorrelation(NaN), 0)
+})
+
+test('correlatedJoint: rho=0 is the independent product', () => {
+  assert.ok(approx(correlatedJoint([0.2, 0.25], 0), 0.05))
+})
+
+test('correlatedJoint: positive rho lifts the joint above independent', () => {
+  const indep = 0.2 * 0.25
+  const corr = correlatedJoint([0.2, 0.25], 0.3)
+  assert.ok(corr > indep, 'correlation raises the joint')
+  assert.ok(corr <= 0.2, 'but never above the weakest leg')
+})
+
+test('correlatedJoint: caps at the weakest leg (P(all) ≤ P(any))', () => {
+  // 0.81 × 1.3 = 1.053 would exceed 1; the min-leg cap pulls it to 0.9
+  assert.ok(approx(correlatedJoint([0.9, 0.9], 0.3), 0.9))
+})
+
+test('correlatedJoint: single leg is unaffected by rho', () => {
+  assert.ok(approx(correlatedJoint([0.2], 0.3), 0.2))
 })
