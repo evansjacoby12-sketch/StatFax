@@ -76,7 +76,9 @@ export default function ResultsView({ meta }) {
   const maxGradeRate = Math.max(0.3, ...byGrade.map((x) => x.rate))
 
   const dates = Object.keys(log.records || {}).sort().reverse()
-  const daily = dates.map((d) => {
+  // Both the daily table and the combo scoreboard are scoped to a rolling week.
+  const RECENT_DAYS = 7
+  const daily = dates.slice(0, RECENT_DAYS).map((d) => {
     const rs = (log.records[d] || []).filter((r) => typeof r.homered === 'boolean')
     const prime = rs.filter((r) => (r.grade || '') === 'PRIME' || (r.grade || '') === 'STRONG')
     return {
@@ -98,7 +100,7 @@ export default function ResultsView({ meta }) {
   const comboDates = [...new Set([
     ...Object.keys(comboByDate).filter((d) => (comboByDate[d] || []).length),
     ...Object.keys(comboWindowsByDate).filter((d) => (comboWindowsByDate[d] || []).length),
-  ])].sort().reverse()
+  ])].sort().reverse().slice(0, RECENT_DAYS)
   const activeComboDay = comboDay && comboDates.includes(comboDay) ? comboDay : comboDates[0] || null
   
   const windows = (activeComboDay && comboWindowsByDate[activeComboDay]) || []
@@ -137,6 +139,27 @@ export default function ResultsView({ meta }) {
       .sort((a, b) => Number(b.allHit) - Number(a.allHit) || a.size - b.size)
   })()
   const comboCashed = dayCombos.filter((c) => c.allHit).length
+
+  // Rolling 7-day combo scoreboard — all-hit combos across the week, scored on
+  // the full board (falling back to a day's first window / evening board) at
+  // sizes ≤3 so each day contributes on the same basis as the table above.
+  const comboWeek = comboDates.reduce(
+    (acc, d) => {
+      const recs = recByDay(d)
+      const src = comboByDate[d]?.length
+        ? comboByDate[d]
+        : comboWindowsByDate[d]?.[0]?.combos || comboLateByDate[d] || []
+      for (const c of src) {
+        if (c.size > 3) continue
+        const legs = (c.legs || []).map((pid) => recs.get(Number(pid)))
+        if (!legs.length || legs.some((r) => !r)) continue
+        acc.total += 1
+        if (legs.every((r) => r.homered === true)) acc.cashed += 1
+      }
+      return acc
+    },
+    { cashed: 0, total: 0 },
+  )
 
   const m = meta.modelMetrics
   const reliability = m?.reliability || []
@@ -281,7 +304,8 @@ export default function ResultsView({ meta }) {
           <h3 className="section-title" style={{ fontSize: '13px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '16px', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: '8px' }}>
             <Icon name="Layers" size={14} style={{ color: 'var(--accent)' }} /> Combo results
             <span style={{ fontWeight: '400', textTransform: 'none', marginLeft: '6px', fontSize: '12px', color: 'var(--text-faint)' }}>
-              · {comboCashed}/{dayCombos.length} cashed {activeComboDay ? `on ${activeComboDay.slice(5)}` : ''}
+              · last 7d <b style={{ color: 'var(--strong)' }}>{comboWeek.cashed}</b>/{comboWeek.total} cashed
+              {activeComboDay ? ` · ${comboCashed}/${dayCombos.length} on ${activeComboDay.slice(5)}` : ''}
             </span>
           </h3>
           {(windows.length > 0 || hasLate) && (
@@ -332,7 +356,7 @@ export default function ResultsView({ meta }) {
           )}
           {comboDates.length > 1 && (
             <div className="hr-days" style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
-              {comboDates.slice(0, 15).map((d) => (
+              {comboDates.map((d) => (
                 <button key={d} className={`hr-day ${activeComboDay === d ? 'on' : ''}`} onClick={() => setComboDay(d)} style={{
                   background: activeComboDay === d ? 'var(--hover)' : 'rgba(255,255,255,0.03)',
                   border: activeComboDay === d ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)',
@@ -395,6 +419,9 @@ export default function ResultsView({ meta }) {
       }}>
         <h3 className="section-title" style={{ fontSize: '13px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '16px', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: '8px' }}>
           <Icon name="Clock" size={14} style={{ color: 'var(--accent)' }} /> Daily track record
+          <span style={{ fontWeight: '400', textTransform: 'none', marginLeft: '6px', fontSize: '12px', color: 'var(--text-faint)' }}>
+            · last 7 days
+          </span>
         </h3>
         <div className="daily-table" style={{ display: 'flex', flexDirection: 'column', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '8px', overflow: 'hidden' }}>
           <div className="daily-row daily-th" style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', padding: '6px 10px', background: 'rgba(255,255,255,0.03)', fontSize: '10px', fontWeight: '700', color: 'var(--text-faint)', textTransform: 'uppercase' }}>
