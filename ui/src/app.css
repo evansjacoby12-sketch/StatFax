@@ -41,6 +41,16 @@
   position: sticky;
   top: 0;
   z-index: 30;
+  /* Reserve the iOS status-bar / notch height here, on the sticky container,
+     so EVERYTHING inside (header + filters) sits below it in standalone PWA
+     mode (black-translucent status bar). Centralizing the inset on the one
+     pinned ancestor makes it immune to the header's own padding overrides —
+     a flat top pad on .header used to tuck the brand + controls under the
+     status bar where they were hidden and unrecoverable. The topbar's dark
+     blurred background (below) fills this reserved strip so the notch region
+     reads as part of the bar. */
+  padding-top: env(safe-area-inset-top, 0px);
+  background: color-mix(in srgb, var(--bg) 80%, transparent);
 }
 /* When the filters panel is expanded the sticky chrome can grow taller than the
    viewport (especially on phones), and a sticky box taller than the screen
@@ -58,7 +68,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: calc(12px + env(safe-area-inset-top, 0px)) 20px 12px;
+  /* Notch inset lives on .topbar now (the sticky container) — keep this flat. */
+  padding: 12px 20px 12px;
   background: color-mix(in srgb, var(--bg) 78%, transparent);
   backdrop-filter: blur(14px) saturate(140%);
   border-bottom: 1px solid var(--border);
@@ -1863,7 +1874,7 @@ button.th:hover {
     padding: 0 9px;
   }
   .header {
-    padding: calc(10px + env(safe-area-inset-top, 0px)) 12px 10px;
+    padding: 10px 12px 10px;
   }
   .filters {
     padding: 10px 12px;
@@ -7067,14 +7078,12 @@ button.th:hover {
     font-size: 11px !important;
   }
 
-  /* Header Spacing and Stacking. Keep the safe-area inset in the top padding so
-     the header clears the iOS status bar / notch when added to the home screen
-     (standalone PWA, black-translucent status bar) — a flat top pad would tuck
-     the controls under the status bar where they're hidden and untappable. */
+  /* Header Spacing and Stacking. Notch inset is handled by .topbar (the sticky
+     container), so this stays a flat pad — see the .topbar rule. */
   .header {
     flex-wrap: nowrap !important;
     justify-content: space-between !important;
-    padding: calc(10px + env(safe-area-inset-top, 0px)) 14px 10px !important;
+    padding: 10px 14px 10px !important;
   }
   
   .header-left {
