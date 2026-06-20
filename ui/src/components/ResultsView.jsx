@@ -171,8 +171,10 @@ export default function ResultsView({ meta }) {
   const m = meta.modelMetrics
   const reliability = m?.reliability || []
 
+  // Scope the top-tier HR feed to the same rolling week as the tables above.
+  const recentSet = new Set(dates.slice(0, RECENT_DAYS))
   const topHRs = rows
-    .filter((r) => (r.grade === 'PRIME' || r.grade === 'STRONG') && r.homered)
+    .filter((r) => (r.grade === 'PRIME' || r.grade === 'STRONG') && r.homered && recentSet.has(r.date))
     .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : (b.score ?? 0) - (a.score ?? 0)))
   const hrDates = [...new Set(topHRs.map((r) => r.date))]
   const activeDay = hrDay && hrDates.includes(hrDay) ? hrDay : null
