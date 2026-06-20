@@ -19,112 +19,38 @@
  * slate often lacks live book odds, and the scorecard should be measurable on
  * every slate regardless.
  *
- * Pure JS, no imports. Mirrors the strategy math in ui/src/lib/groups.js so the
- * benchmark stays recognizably "the same combos".
+ * SINGLE SOURCE OF TRUTH: the strategy menu, ranking, and selection live in
+ * ui/src/lib/combo-engine.js — imported here AND by the live UI — so the combos
+ * graded are the combos shown (no more hand-mirrored math drifting apart). This
+ * module only supplies the SERVER adapter (frozen-pregame snapshot → the
+ * engine's canonical row) plus the grading/scorecard that's server-only.
  */
 
-const SIZES = [2, 3, 4];
-
-// Proven HR signals, weighted by the badge audit's within-grade lift — the same
-// set + weighting the UI's Signal Stack uses (minus odds-only signals). "due" is
-// excluded (the falsified gambler's-fallacy signal).
-const STACK_SIGNALS = { hot: 3, barrelKing: 2, homeEdge: 2, bullpenLegend: 2, awayEdge: 1.5 };
-const signalScore = (b) => Object.entries(STACK_SIGNALS).reduce((s, [k, w]) => s + (b[k] ? w : 0), 0);
-const signalCount = (b) => Object.keys(STACK_SIGNALS).reduce((n, k) => n + (b[k] ? 1 : 0), 0);
-
-// Blast rate (Statcast bat tracking) — "blast" = a swing that's both fast and
-// squared-up, the most HR-predictive slice. Prefer the recent ~2-week window
-// (blasting lately = live power) when it has a real sample; fall back to season.
-// Returned as blasts-per-squared-up-contact %, matching the number sharps quote.
-const BLAST_ELITE = 25; // ≈ top ~8% of the slate (recent per-contact p90 ≈ 23)
-function blastRate(row) {
-  const t = row.batTracking;
-  if (!t) return null;
-  if (Number.isFinite(t.recentBlastPerContact) && (t.recentSwings ?? 0) >= 25) return t.recentBlastPerContact;
-  return Number.isFinite(t.blastPerContact) ? t.blastPerContact : null;
-}
-
-// Heat index — mirrors ui/src/lib/scout.js heatBreakdown().total (kept in sync
-// by hand, like the strategy math). Used so the `hot` strategy can rank on a
-// blend of BOTH heat signals: heatIndex × the recent-form multiplier.
-const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
-const isoOf = (s) => (s ? Math.max(0, (s.slg ?? 0) - (s.avg ?? 0)) : null);
-function heatIndexOf(row) {
-  const HEAT_BASE = 45;
-  let sum = 0;
-  const sIso = isoOf(row.season), rIso = isoOf(row.recent);
-  if (sIso != null && rIso != null && (row.recent?.ab ?? 0) >= 12) sum += Math.round(clamp((rIso - sIso) * 250, -25, 30));
-  const seasonBarrel = Number.isFinite(row.barrelPctBBE) ? row.barrelPctBBE : row.barrelPct;
-  if (Number.isFinite(row.recentBarrel?.recentBarrelPct) && Number.isFinite(seasonBarrel) && (row.recentBarrel?.recentBBE ?? 0) >= 6) {
-    sum += Math.round(clamp((row.recentBarrel.recentBarrelPct - seasonBarrel) * 1.5, -15, 22));
-  }
-  if (row.hot) sum += 13;
-  if (row.cold) sum += -20;
-  if (row.hrStreak) sum += 10;
-  return Math.round(clamp(HEAT_BASE + sum, 0, 100));
-}
-
-// Strategy menu — the no-odds subset of the UI's strategies. Each ranks the
-// eligible pool by its own metric; `require` gates which bats qualify.
-// Best Mix — a cross-metric blend so a great-overall bat and an elite-barrel
-// bat can land in the SAME combo (the single-metric strategies silo them).
-// Weights: grade/score 0.5, barrel 0.25, heat 0.25 — score leads (grade is the
-// dominant HR signal, PRIME 2.29x in the audit); barrel (1.68x) and heat
-// (1.75x) are ~tied secondary signals, so they split the rest. Mirrors ui/groups.js.
-const mixRank = (b) =>
-  0.5 * ((b.score ?? 0) / 100) +
-  0.25 * clamp((b.barrel ?? 0) / 25, 0, 1) +
-  0.25 * ((b.heat ?? 0) / 100);
-
-// Power rank — barrel (45%) + recent L14 barrel (30%) + blast rate (25%), all
-// normalized 0-1. Blast is the bat-speed/squared-up leg of raw power. Recent
-// barrel falls back to season when there's no L14 sample; blast to 0.
-const norm01 = (v, hi) => clamp((v ?? 0) / hi, 0, 1);
-const powerRank = (b) =>
-  0.45 * norm01(b.barrel, 25) +
-  0.30 * (Number.isFinite(b.recentBarrel) ? norm01(b.recentBarrel, 25) : norm01(b.barrel, 25)) +
-  0.25 * norm01(b.blast, 30);
-
-const STRATEGIES = [
-  { key: 'top',     rank: (b) => b.score,          require: null },
-  { key: 'mix',     rank: mixRank,                 require: null },
-  { key: 'stack',   rank: signalScore,             require: (b) => signalCount(b) >= 2 },
-  // hot ranks on heatIndex × recent-form multiplier (a blend of both heat
-  // signals) rather than the overall score — otherwise it just re-picks `top`'s
-  // legs, since hot bats already score high.
-  { key: 'hot',     rank: (b) => (b.heat ?? 0) * (b.heatMult ?? 1), require: (b) => b.hot },
-  // power: blend season barrel, recent L14 barrel, and BLAST rate (bat tracking)
-  // — all normalized 0-1 — so it rewards true thump and current form, not just
-  // career barrel kings. Blast (fast + squared-up contact) is the bat-speed leg
-  // of power. Eligibility still gates on the stable season barrel.
-  // Gate at an above-average barrel (11), not league-average (9): a league-avg
-  // bar let power re-pick the same elite bats as top/mix. Kept identical to client.
-  { key: 'power',   rank: (b) => powerRank(b), require: (b) => Number.isFinite(b.barrel) && b.barrel >= 11 },
-  // matchup & park anchor on batter quality (score) × the environmental tilt, so
-  // a homer-prone matchup / launch pad lifts a GOOD bat instead of ranking a
-  // weak bat purely on the ~1.0–1.3× environmental signal. (Badge audit: grade
-  // is 2.29× HR lift; park/matchup-alone are far weaker and were discarding it.)
-  { key: 'matchup', rank: (b) => (b.score ?? 0) * (b.pitcherHr9 ?? 0), require: (b) => Number.isFinite(b.pitcherHr9) && b.pitcherHr9 >= 1.3 },
-  // Gate at a real launch-pad tilt (1.08), not barely-above-neutral 1.05, so park
-  // surfaces HR-friendly-air bats rather than re-picking top. Identical to client.
-  { key: 'park',    rank: (b) => (b.score ?? 0) * (b.air ?? 0),         require: (b) => Number.isFinite(b.air) && b.air >= 1.08 },
-];
+import { heatIndex } from '../ui/src/lib/scout.js';
+import {
+  buildCombos,
+  barrelOf,
+  recentBarrelOf,
+  blastRate,
+  allHitProb,
+  SIZES,
+} from '../ui/src/lib/combo-engine.js';
 
 /**
- * Normalize a snapshot scoredBatters row to the compact shape the strategies
- * rank on, reading the FROZEN pregame fields (score/grade decay once a game
- * starts; preGameScore/preGameGrade are pinned to pre-first-pitch — see the
- * freeze block in fetch-slate). Falls back to the live fields for rows that
- * never started (postponed), where they ARE pregame.
+ * Normalize a snapshot scoredBatters row to the engine's canonical combo row,
+ * reading the FROZEN pregame fields (score/grade decay once a game starts;
+ * preGameScore/preGameGrade are pinned to pre-first-pitch — see the freeze block
+ * in fetch-slate). Falls back to the live fields for rows that never started
+ * (postponed), where they ARE pregame. The shared derivation helpers (barrel,
+ * recent barrel, blast) and the Heat Index (scout.heatIndex — the same function
+ * the client precomputes) come from the engine/scout so neither side recomputes
+ * them differently.
  */
 export function comboRowFromSnapshot(row) {
   if (!row || row.playerId == null) return null;
   const score = Number.isFinite(row.preGameScore) ? row.preGameScore : row.score;
   const grade = row.preGameGrade?.label || row.preGameGrade || row.grade?.label || row.grade || null;
-  const barrel = Number.isFinite(row.barrelPctBBE) ? row.barrelPctBBE
-    : Number.isFinite(row.barrelPct) ? row.barrelPct : null;
-  const park = Number.isFinite(row.gameParkHRFactor) ? row.gameParkHRFactor : null;
-  const air  = Number.isFinite(row.parkWeatherHandFactor) ? row.parkWeatherHandFactor : null;
+  const barrel = barrelOf(row);
   return {
     playerId: row.playerId,
     gamePk:   row.gamePk,
@@ -139,24 +65,19 @@ export function comboRowFromSnapshot(row) {
     barrel,
     // Recent (L14) barrel%, when a real sample — blended into the power rank so
     // it isn't always the same season-barrel leaders. null => fall back to season.
-    recentBarrel:
-      Number.isFinite(row.recentBarrel?.recentBarrelPct) && (row.recentBarrel?.recentBBE ?? 0) >= 6
-        ? row.recentBarrel.recentBarrelPct
-        : null,
-    park,
-    air, // park × weather × hand — the Park & Air strategy ranks on this
-    // Blast rate (bat tracking) — recent-preferred blasts-per-squared-up-contact
-    // %, folded into the power rank. blastKing flags an elite blaster.
+    recentBarrel: recentBarrelOf(row),
+    // park × weather × hand — the Park & Air strategy ranks on this.
+    air: Number.isFinite(row.parkWeatherHandFactor) ? row.parkWeatherHandFactor : null,
+    // Blast rate (bat tracking) — recent-preferred, folded into the power rank.
     blast: blastRate(row),
-    blastKing: (() => { const r = blastRate(row); return Number.isFinite(r) && r >= BLAST_ELITE; })(),
     // Opposing-pitcher HR/9. Fall back to a league-average prior (~1.25) for an
-    // arm with no current-season sample (call-up / season debut, e.g. Estes) so
-    // the matchup strategy treats him as neutral rather than blind — it won't
-    // falsely flag him homer-prone (prior < the 1.3 gate), just stops nulling him.
+    // arm with no current-season sample (call-up / season debut) so the matchup
+    // strategy treats him as neutral rather than blind — it won't falsely flag
+    // him homer-prone (prior < the 1.3 gate), just stops nulling him.
     pitcherHr9: Number.isFinite(row.pitcher?.season?.hrPer9) ? row.pitcher.season.hrPer9
       : (row.pitcher?.id != null ? 1.25 : null),
     // Heat signals the `hot` strategy ranks on: heatIndex × recent-form multiplier.
-    heat: heatIndexOf(row),
+    heat: heatIndex(row),
     heatMult: Number.isFinite(row.hotnessMultiplier) ? row.hotnessMultiplier : 1,
     // Boolean signals (static — not decayed) for the Signal Stack strategy.
     hot:           row.hot === true,
@@ -164,112 +85,23 @@ export function comboRowFromSnapshot(row) {
     awayEdge:      row.awayEdge === true,
     bullpenLegend: row.bullpenLegend === true,
     barrelKing:    Number.isFinite(barrel) && barrel >= 13,
-    launchPad:     Number.isFinite(park) && park >= 1.10,
-    wxEdge:        Number.isFinite(air) && air >= 1.05,
   };
 }
 
-// Anti-flicker quantization, mirroring ui/src/lib/groups.js so this canonical
-// record is DETERMINISTIC from a given snapshot (Fix #4). Ranks are quantized to
-// a grid sized to the pool's own rank spread (RANK_TOL fraction of max−min), so
-// sub-threshold wobble can't reorder near-tied legs and exact ties break by a
-// STABLE playerId. Quantizing relative to the spread keeps the tolerance
-// comparable across strategies whose raw ranks live on very different scales.
-const RANK_TOL = 0.002;
-function quantize(x, tol) {
-  if (!Number.isFinite(x)) return -Infinity;
-  if (!(tol > 0)) return x;
-  return Math.round(x / tol) * tol;
-}
-function makeLegCmp(rank, items) {
-  let lo = Infinity, hi = -Infinity, sLo = Infinity, sHi = -Infinity;
-  for (const b of items) {
-    const r = rank(b);
-    if (Number.isFinite(r)) { if (r < lo) lo = r; if (r > hi) hi = r; }
-    const s = b.score ?? 0;
-    if (s < sLo) sLo = s; if (s > sHi) sHi = s;
-  }
-  const rTol = hi > lo ? (hi - lo) * RANK_TOL : 0;
-  const sTol = sHi > sLo ? (sHi - sLo) * RANK_TOL : 0;
-  return (a, b) =>
-    (quantize(rank(b), rTol) - quantize(rank(a), rTol)) ||
-    (quantize(b.score ?? 0, sTol) - quantize(a.score ?? 0, sTol)) ||
-    ((a.playerId ?? 0) - (b.playerId ?? 0));
-}
-
-// Best eligible bat per game by a metric (skip SKIP-grade + scoreless rows).
-function topPerGame(rows, rank, require) {
-  const eligible = [];
-  for (const b of rows) {
-    if (!b || b.gamePk == null) continue;
-    if ((b.grade || 'SKIP') === 'SKIP') continue;
-    if (!Number.isFinite(b.score)) continue;
-    if (require && !require(b)) continue;
-    eligible.push(b);
-  }
-  const cmp = makeLegCmp(rank, eligible);
-  const byGame = new Map();
-  for (const b of eligible) {
-    const cur = byGame.get(b.gamePk);
-    if (!cur || cmp(b, cur) < 0) byGame.set(b.gamePk, b);
-  }
-  return [...byGame.values()].sort(cmp);
-}
-
 /**
- * Build the canonical combos (one per strategy per size, dedup'd) from a list of
- * comboRowFromSnapshot rows. Returns compact records: { strategy, size, legs:
- * [playerId, …] } — just enough to grade and report.
+ * Build the canonical combo records from a list of comboRowFromSnapshot rows.
+ * Delegates construction to the shared engine, then flattens to compact records:
+ * { strategy, size, legs: [playerId, …], pred } — just enough to grade and report.
+ * `pred` = predicted all-hit prob (product of leg HR probs, null if any leg lacks
+ * one) so the scorecard can compare predicted vs actual cash rate.
  */
-export function buildComboRecords(rows, { maxPerBat = 2, globalMaxPerBat = 4 } = {}) {
-  const pools = STRATEGIES.map((s) => ({ s, pool: topPerGame(rows, s.rank, s.require) }));
-  const out = [];
-  const seen = new Set();
-  // GLOBAL exposure cap (Fix #1): track each bat's usage across the WHOLE build,
-  // not per-size. The old per-size-only cap let one stud anchor up to maxPerBat
-  // combos PER size — so across sizes [2,3,4] a single bat could land in most of
-  // the board, and one cold night wiped out nearly every combo (correlated
-  // failure). usedGlobal caps a bat at ~globalMaxPerBat combos TOTAL across all
-  // sizes; per-size `used` keeps it from stacking within one size.
-  const usedGlobal = {};
-  for (const size of SIZES) {
-    // Diversity cap: a bat can anchor at most `maxPerBat` combos at this size,
-    // so the same studs don't pile into all 7 strategies (correlated wipeout —
-    // one cold bat kills the whole board). Strategies run in array order, so the
-    // headline ones (top, mix) keep their purest picks; the tail diversifies.
-    const used = {};
-    for (const { s, pool } of pools) {
-      if (pool.length < size) continue;
-      // Two-pass: prefer bats under the GLOBAL cap, then relax to per-size only,
-      // then fall back to the pure slice rather than drop the strategy (the
-      // audited safety we keep).
-      const take = (globalCapped) => {
-        const picked = [];
-        for (const b of pool) {
-          if (picked.length >= size) break;
-          if ((used[b.playerId] || 0) >= maxPerBat) continue;
-          if (globalCapped && (usedGlobal[b.playerId] || 0) >= globalMaxPerBat) continue;
-          picked.push(b);
-        }
-        return picked;
-      };
-      let legs = take(true);
-      if (legs.length < size) legs = take(false);
-      if (legs.length < size) legs = pool.slice(0, size); // not enough under-cap bats — keep the strategy pure rather than drop it
-      const sig = `${size}:` + legs.map((l) => l.playerId).slice().sort().join('-');
-      if (seen.has(sig)) continue; // identical leg set from another strategy
-      seen.add(sig);
-      for (const l of legs) {
-        used[l.playerId] = (used[l.playerId] || 0) + 1;
-        usedGlobal[l.playerId] = (usedGlobal[l.playerId] || 0) + 1;
-      }
-      // Predicted all-hit prob = product of leg HR probs (null if any leg lacks
-      // one), logged so the scorecard can compare predicted vs actual cash rate.
-      const pred = legs.every((l) => Number.isFinite(l.hrProb)) ? legs.reduce((p, l) => p * l.hrProb, 1) : null;
-      out.push({ strategy: s.key, size, legs: legs.map((l) => l.playerId), pred });
-    }
-  }
-  return out;
+export function buildComboRecords(rows, opts = {}) {
+  return buildCombos(rows, opts).map((c) => ({
+    strategy: c.strategy,
+    size: c.size,
+    legs: c.legs.map((l) => l.playerId),
+    pred: allHitProb(c.legs.map((l) => l.hrProb)),
+  }));
 }
 
 /**
