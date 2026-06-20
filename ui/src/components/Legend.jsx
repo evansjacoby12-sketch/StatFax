@@ -1,6 +1,6 @@
 import Icon from './Icon.jsx'
 import { BADGES, gradeColor } from '../lib/badges.js'
-import { hexA } from './atoms.jsx'
+import { hexA, Badge } from './atoms.jsx'
 
 const GRADES = [
   { label: 'PRIME', min: 72, desc: 'Top-tier play — signals stack strongly' },
@@ -58,10 +58,7 @@ export default function Legend({ onClose }) {
         <div className="legend-badges">
           {BADGES.map((b) => (
             <div className="legend-badge" key={b.key}>
-              <span className="badge" style={{ color: b.color, borderColor: 'color-mix(in srgb,' + b.color + ' 40%, transparent)' }}>
-                <Icon name={b.lucide} size={11} />
-                {b.label}
-              </span>
+              <Badge badge={b} />
               <span className="legend-badge-desc dim">{b.desc}</span>
             </div>
           ))}

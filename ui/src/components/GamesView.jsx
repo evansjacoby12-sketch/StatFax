@@ -8,13 +8,10 @@ import { HOT_HEAT } from '../lib/constants.js'
 import { compass } from '../lib/weather.js'
 import { interpretWind } from '../lib/wind.js'
 import { useLiveMode } from '../lib/liveMode.js'
+import { hexA } from './atoms.jsx'
 
 const lastName = (n) => (n || '').trim().split(/\s+/).slice(-1)[0]
 
-// Game of the Day — the best HR environment on the slate, cross-checking
-// everything at once. Ranks games by total expected HRs (the model's xHR already
-// bakes in the pitcher matchup, park, and weather), then surfaces the WHY: both
-// starters' HR/9, the wind/park, the PRIME/STRONG count, and the top threats.
 function computeGameOfDay(batters) {
   const byGame = new Map()
   for (const b of batters || []) {
@@ -33,8 +30,7 @@ function computeGameOfDay(batters) {
   if (!list.length) return null
   list.sort((a, b) => b.xhr - a.xhr)
   const g = list[0]
-  // A home batter faces the AWAY starter and vice-versa, so pull both starters
-  // (with full season stats) off the batters' pitcher field.
+  if (!g) return null
   g.awayPitcher = g.bats.find((b) => b.isHome)?.pitcher || null
   g.homePitcher = g.bats.find((b) => !b.isHome)?.pitcher || null
   g.park = g.bats[0]?.gameParkHRFactor ?? null
@@ -51,8 +47,13 @@ function GodPitcher({ p, onOpenPitcher, gamePk }) {
   const hr9 = p.season?.hrPer9
   const tone = hr9 >= 1.3 ? 'pos' : hr9 <= 0.9 ? 'neg' : ''
   return (
-    <button className="god-pitcher" onClick={() => onOpenPitcher?.(p.id, gamePk)} title={`${p.name} — open pitcher card`}>
-      {lastName(p.name)} {hr9 != null && <b className={tone}>{num(hr9, 2)}</b>}
+    <button className="god-pitcher" onClick={() => onOpenPitcher?.(p.id, gamePk)} title={`${p.name} — open pitcher card`} style={{
+      color: 'var(--accent)',
+      fontWeight: '600',
+      borderBottom: '1px dashed rgba(0, 216, 246, 0.4)',
+      display: 'inline-block'
+    }}>
+      {lastName(p.name)} {hr9 != null && <b className={tone} style={{ marginLeft: '4px' }}>{num(hr9, 2)}</b>}
     </button>
   )
 }
@@ -64,47 +65,81 @@ function GameOfDay({ god, onSelect, onOpenPitcher }) {
   const home = g?.homeTeam?.abbr || '—'
   const wind = interpretWind(god.weather, g?.homeTeam?.abbr, { roofClosed: god.weather?.roofClosed })
   return (
-    <section className="god-card">
-      <div className="god-head">
-        <span className="god-kicker">
-          <Icon name="Flame" size={14} /> Game of the Day
+    <section className="god-card" style={{
+      background: 'linear-gradient(135deg, rgba(0, 216, 246, 0.12) 0%, rgba(8,12,28,0.85) 100%)',
+      border: '1px solid rgba(0, 216, 246, 0.25)',
+      boxShadow: '0 8px 32px rgba(0,0,0,0.5), 0 0 16px var(--accent-glow)',
+      borderRadius: '16px',
+      padding: '20px',
+      marginBottom: '24px',
+      position: 'relative'
+    }}>
+      <div className="god-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+        <span className="god-kicker" style={{
+          fontSize: '12px',
+          fontWeight: '800',
+          textTransform: 'uppercase',
+          letterSpacing: '0.08em',
+          color: 'var(--accent)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px'
+        }}>
+          <Icon name="Flame" size={14} style={{ filter: 'drop-shadow(0 0 4px var(--accent))' }} /> Game of the Day
         </span>
-        <span className="god-xhr mono">
-          {num(god.xhr, 1)} <em>exp HR</em>
+        <span className="god-xhr mono" style={{ fontSize: '13px', fontWeight: '700', color: '#fff' }}>
+          {num(god.xhr, 1)} <em style={{ fontStyle: 'normal', color: 'var(--text-faint)' }}>exp HR</em>
         </span>
       </div>
-      <div className="god-matchup">
-        <b>
-          {away} @ {home}
-        </b>
-        {g?.venueName ? ` · ${g.venueName}` : ''}
-        {g?.gameDate ? ` · ${gameTime(g.gameDate)}` : ''}
+      <div className="god-matchup" style={{ fontSize: '18px', fontWeight: '800', color: '#fff', marginBottom: '12px' }}>
+        {away} @ {home}
+        <span style={{ fontSize: '13px', color: 'var(--text-dim)', fontWeight: '400', marginLeft: '8px' }}>
+          {g?.venueName ? ` · ${g.venueName}` : ''}
+          {g?.gameDate ? ` · ${gameTime(g.gameDate)}` : ''}
+        </span>
       </div>
-      <div className="god-factors">
-        <span className="god-fac" title="Both starters' HR allowed per 9 — higher = more hittable">
-          <Icon name="Shield" size={12} /> vs <GodPitcher p={god.awayPitcher} onOpenPitcher={onOpenPitcher} gamePk={god.gamePk} />
+      <div className="god-factors" style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginBottom: '14px', fontSize: '13px' }}>
+        <span className="god-fac" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+          <Icon name="Shield" size={12} style={{ color: 'var(--text-faint)' }} /> vs <GodPitcher p={god.awayPitcher} onOpenPitcher={onOpenPitcher} gamePk={god.gamePk} />
           <span className="god-amp">·</span>
           <GodPitcher p={god.homePitcher} onOpenPitcher={onOpenPitcher} gamePk={god.gamePk} /> HR/9
         </span>
         {wind && wind.verdict !== 'CROSS' && (
-          <span className={`god-fac ${wind.verdict === 'OUT' ? 'good' : 'bad'}`}>
+          <span className={`god-fac ${wind.verdict === 'OUT' ? 'good' : 'bad'}`} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
             <Icon name="Wind" size={12} /> {wind.caption}
           </span>
         )}
         {god.park != null && Math.abs(god.park - 1) >= 0.02 && (
-          <span className={`god-fac ${god.park >= 1.05 ? 'good' : god.park <= 0.95 ? 'bad' : ''}`}>
+          <span className={`god-fac ${god.park >= 1.05 ? 'good' : god.park <= 0.95 ? 'bad' : ''}`} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
             <Icon name="Gauge" size={12} /> {signedPct(god.park - 1, 0)} park
           </span>
         )}
-        <span className="god-fac">
-          <Icon name="Award" size={12} /> {god.primeStrong} PRIME/STRONG
+        <span className="god-fac" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+          <Icon name="Award" size={12} style={{ color: 'var(--text-faint)' }} /> {god.primeStrong} PRIME/STRONG
         </span>
       </div>
-      <div className="god-threats">
-        <span className="god-threats-k dim">Top threats</span>
+      <div className="god-threats" style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '14px' }}>
+        <span className="god-threats-k dim" style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Top threats:</span>
         {god.threats.map((b) => (
-          <button key={b.id} className="god-threat" onClick={() => onSelect(b)} style={{ '--row-accent': gradeColor(b.grade?.label) }}>
-            {lastName(b.name)} <span className="mono">{pct(b.hrProbability, 2)}</span>
+          <button 
+            key={b.id} 
+            className="god-threat" 
+            onClick={() => onSelect(b)} 
+            style={{ 
+              '--row-accent': gradeColor(b.grade?.label),
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              background: 'rgba(255,255,255,0.03)',
+              border: `1px solid ${hexA(gradeColor(b.grade?.label), 0.25)}`,
+              borderRadius: '6px',
+              padding: '3px 8px',
+              fontSize: '12px',
+              color: '#fff',
+              fontWeight: '600'
+            }}
+          >
+            {lastName(b.name)} <span className="mono" style={{ color: gradeColor(b.grade?.label) }}>{pct(b.hrProbability, 1)}</span>
           </button>
         ))}
       </div>
@@ -113,14 +148,12 @@ function GameOfDay({ god, onSelect, onOpenPitcher }) {
 }
 
 export default function GamesView({ games, batters, onSelect, selectedId, watchlist, slip, onToggleWatch, onToggleSlip, onOpenPitcher }) {
-  // Group the (already filtered + sorted) batters by game, then by side.
   const byGame = new Map()
   for (const b of batters) {
     if (!byGame.has(b.gamePk)) byGame.set(b.gamePk, { away: [], home: [] })
     byGame.get(b.gamePk)[b.isHome ? 'home' : 'away'].push(b)
   }
 
-  // Order: live first, then scheduled by start time, finals last.
   const phase = (g) => (g.isLive ? 0 : g.isFinal ? 2 : 1)
   const ordered = games
     .filter((g) => {
@@ -131,8 +164,8 @@ export default function GamesView({ games, batters, onSelect, selectedId, watchl
 
   if (!ordered.length) {
     return (
-      <div className="empty">
-        <Icon name="Search" size={28} />
+      <div className="empty" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '64px', color: 'var(--text-faint)', gap: '12px' }}>
+        <Icon name="Search" size={32} />
         <p>No batters match these filters.</p>
       </div>
     )
@@ -140,13 +173,34 @@ export default function GamesView({ games, batters, onSelect, selectedId, watchl
 
   const ctx = { onSelect, selectedId, watchlist, slip, onToggleWatch, onToggleSlip, onOpenPitcher }
   const god = computeGameOfDay(batters)
-  const [view, setView] = useState('extractor') // 'extractor' = HR King/Target cards · 'detail' = full silos
+  const [view, setView] = useState('extractor')
+
   return (
     <>
-      <div className="games-controls" role="group" aria-label="Games view">
-        <span className="games-controls-k dim">View</span>
-        <button className={`badge-toggle ${view === 'extractor' ? 'on' : ''}`} onClick={() => setView('extractor')}>HR Extractor</button>
-        <button className={`badge-toggle ${view === 'detail' ? 'on' : ''}`} onClick={() => setView('detail')}>Detail</button>
+      <div className="games-controls" role="group" aria-label="Games view" style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '16px' }}>
+        <span className="games-controls-k dim" style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>View Mode:</span>
+        <button 
+          className={`badge-toggle ${view === 'extractor' ? 'on' : ''}`} 
+          onClick={() => setView('extractor')}
+          style={{
+            borderColor: view === 'extractor' ? 'var(--accent)' : 'var(--border-soft)',
+            background: view === 'extractor' ? 'var(--hover)' : 'transparent',
+            color: view === 'extractor' ? '#fff' : 'var(--text-faint)'
+          }}
+        >
+          HR Extractor
+        </button>
+        <button 
+          className={`badge-toggle ${view === 'detail' ? 'on' : ''}`} 
+          onClick={() => setView('detail')}
+          style={{
+            borderColor: view === 'detail' ? 'var(--accent)' : 'var(--border-soft)',
+            background: view === 'detail' ? 'var(--hover)' : 'transparent',
+            color: view === 'detail' ? '#fff' : 'var(--text-faint)'
+          }}
+        >
+          Detail Silos
+        </button>
       </div>
       <GameOfDay god={god} onSelect={onSelect} onOpenPitcher={onOpenPitcher} />
       <div className="games-grid">
@@ -162,7 +216,6 @@ export default function GamesView({ games, batters, onSelect, selectedId, watchl
   )
 }
 
-// Per-game environment-alert line composed from the real env signals.
 function envAlert(bat, game) {
   if (!bat) return null
   const w = bat.weather
@@ -177,15 +230,12 @@ function envAlert(bat, game) {
   else if (Number.isFinite(park) && park <= 0.92) parts.push("pitcher's park")
   const tone = Number.isFinite(env) ? (env >= 78 ? 'good' : env <= 45 ? 'bad' : '') : ''
   const lead = !Number.isFinite(env) ? 'Environment' : env >= 78 ? 'Strong HR environment' : env >= 62 ? 'Above-average HR environment' : env <= 45 ? 'Suppressed HR environment' : 'Neutral environment'
-  return { tone, text: parts.length ? `${lead} — ${parts.join(', ')}.` : `${lead}.`, env }
+  return { tone, text: parts.length ? `${parts.join(', ')}` : `${lead}.`, env }
 }
 
-// "Lineup HR Extractor" card — per game, crowns the top bat (HR King) and the
-// second (Elite Target) with their full eli5 reasons + an environment alert.
 function ExtractorCard({ game: g, groups, idx = 0, ...ctx }) {
   const awayC = teamColor(g.awayTeam?.id)
   const homeC = teamColor(g.homeTeam?.id)
-  // Combined lineup, best HR threats first (batters arrive pre-sorted by score).
   const all = [...(groups.away || []), ...(groups.home || [])]
     .filter((b) => (b.grade?.label || b.grade) !== 'SKIP')
     .sort(
@@ -199,21 +249,44 @@ function ExtractorCard({ game: g, groups, idx = 0, ...ctx }) {
   const alert = envAlert(groups.away?.[0] || groups.home?.[0], g)
   if (!king) return null
   return (
-    <section className="xcard" style={{ '--i': Math.min(idx, 12) }}>
+    <section className="xcard" style={{ 
+      '--i': Math.min(idx, 12),
+      background: 'rgba(16, 24, 48, 0.45)',
+      border: '1px solid rgba(255,255,255,0.06)',
+      boxShadow: 'var(--glass-shadow)',
+      borderRadius: '16px',
+      overflow: 'hidden'
+    }}>
       <header
         className="xc-head"
-        style={{ background: `linear-gradient(100deg, ${hexToRgba(awayC, 0.22)}, transparent 42%, transparent 58%, ${hexToRgba(homeC, 0.22)})` }}
+        style={{ 
+          background: `linear-gradient(100deg, ${hexToRgba(awayC, 0.15)}, transparent 45%, transparent 55%, ${hexToRgba(homeC, 0.15)})`,
+          borderBottom: '1px solid rgba(255,255,255,0.06)'
+        }}
       >
         <div className="xc-matchup">
-          <span className="xc-teams">{g.awayTeam?.abbr} @ {g.homeTeam?.abbr}</span>
-          <span className="xc-arms dim">{g.awayPitcher?.name || 'TBD'} vs {g.homePitcher?.name || 'TBD'}</span>
+          <span className="xc-teams" style={{ fontWeight: '800' }}>{g.awayTeam?.abbr} @ {g.homeTeam?.abbr}</span>
+          <span className="xc-arms dim" style={{ fontSize: '11px', display: 'block', marginTop: '2px' }}>{g.awayPitcher?.name || 'TBD'} vs {g.homePitcher?.name || 'TBD'}</span>
         </div>
         <GameStatus g={g} />
       </header>
       <GameChips sample={groups.away?.[0] || groups.home?.[0]} />
       {alert && (
-        <div className={`xc-alert ${alert.tone}`}>
-          <Icon name="TriangleAlert" size={12} /> {alert.text}
+        <div className={`xc-alert ${alert.tone}`} style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          padding: '8px 12px',
+          margin: '0 12px 12px',
+          borderRadius: '8px',
+          fontSize: '11px',
+          fontWeight: '500',
+          background: alert.tone === 'good' ? 'rgba(16, 185, 129, 0.08)' : alert.tone === 'bad' ? 'rgba(239, 68, 68, 0.08)' : 'rgba(255,255,255,0.03)',
+          color: alert.tone === 'good' ? 'var(--strong)' : alert.tone === 'bad' ? 'var(--bad)' : 'var(--text-dim)',
+          border: alert.tone === 'good' ? '1px solid rgba(16, 185, 129, 0.15)' : alert.tone === 'bad' ? '1px solid rgba(239, 68, 68, 0.15)' : '1px solid rgba(255,255,255,0.05)'
+        }}>
+          <Icon name="TriangleAlert" size={11} />
+          <span>{alert.text}</span>
         </div>
       )}
       <ExtractorBat b={king} rank="king" onSelect={ctx.onSelect} />
@@ -225,15 +298,20 @@ function ExtractorCard({ game: g, groups, idx = 0, ...ctx }) {
 function ExtractorBat({ b, rank, onSelect }) {
   const reasons = (b.eli5Reasons || []).slice(0, 5)
   const isKing = rank === 'king'
+  const color = gradeColor(b.grade?.label)
   return (
-    <div className={`xc-bat ${rank}`} role="button" tabIndex={0} onClick={() => onSelect?.(b)}>
+    <div className={`xc-bat ${rank}`} role="button" tabIndex={0} onClick={() => onSelect?.(b)} style={{
+      borderLeft: `3px solid ${color}`,
+      background: 'rgba(255,255,255,0.01)',
+      borderBottom: !isKing ? 'none' : '1px solid rgba(255,255,255,0.03)'
+    }}>
       <div className="xc-bat-head">
-        <span className="xc-crown">{isKing ? '👑' : '🔥'}</span>
-        <span className="xc-label">{isKing ? 'HR King' : 'Elite Target'}</span>
-        <span className="xc-bat-name">{b.name}</span>
+        <span className="xc-crown">{isKing ? '👑' : '🎯'}</span>
+        <span className="xc-label" style={{ color: color, fontWeight: '700' }}>{isKing ? 'HR King' : 'Elite Target'}</span>
+        <span className="xc-bat-name" style={{ fontWeight: '600', color: '#fff' }}>{b.name}</span>
         <span className="xc-bat-team dim">{b.team}{b.battingOrder ? ` · #${b.battingOrder}` : ''}</span>
         <span className="xc-bat-right">
-          <span className="xc-bat-prob mono">{pct(b.hrProbability, 1)}</span>
+          <span className="xc-bat-prob mono" style={{ color: color, fontWeight: '800' }}>{pct(b.hrProbability, 1)}</span>
           <GradeChip grade={b.grade} size="sm" score={b.score} />
         </span>
       </div>
@@ -242,7 +320,7 @@ function ExtractorBat({ b, rank, onSelect }) {
           {reasons.map((r, i) => (
             <li key={i} className={`xc-reason tone-${r.tone}`}>
               <span className="xc-reason-ico" style={{ color: toneColor(r.tone) }}>
-                <Icon name={eli5IconName(r.icon)} size={12} />
+                <Icon name={eli5IconName(r.icon)} size={11} />
               </span>
               {r.text}
             </li>
@@ -257,14 +335,14 @@ function GameStatus({ g }) {
   const liveMode = useLiveMode()
   if (liveMode && g.isLive) {
     return (
-      <div className="gc-status live">
+      <div className="gc-status live" style={{ background: 'rgba(239, 68, 68, 0.15)', color: 'var(--bad)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
         <span className="live-dot" />
         {(g.inningHalf || '').slice(0, 3)} {g.currentInning}
       </div>
     )
   }
-  if (g.isFinal) return <div className="gc-status final">Final</div>
-  return <div className="gc-status">{gameTime(g.gameDate) || 'TBD'}</div>
+  if (g.isFinal) return <div className="gc-status final" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-faint)' }}>Final</div>
+  return <div className="gc-status" style={{ background: 'rgba(0, 216, 246, 0.08)', color: 'var(--accent)' }}>{gameTime(g.gameDate) || 'TBD'}</div>
 }
 
 function TeamHead({ team, pitcher, score, showScore, align, gamePk, onOpenPitcher }) {
@@ -273,22 +351,27 @@ function TeamHead({ team, pitcher, score, showScore, align, gamePk, onOpenPitche
   const canOpen = !!onOpenPitcher && pitcher?.id != null
   return (
     <div className={`gc-team ${align}`} style={{ '--tc': color }}>
-      {logo && <img className="gc-logo" src={logo} alt={team?.name || ''} loading="lazy" />}
+      {logo && <img className="gc-logo" src={logo} alt={team?.name || ''} loading="lazy" style={{ width: '28px', height: '28px' }} />}
       <div className="gc-team-txt">
-        <span className="gc-abbr">{team?.abbr}</span>
+        <span className="gc-abbr" style={{ fontSize: '15px', fontWeight: '800' }}>{team?.abbr}</span>
         {canOpen ? (
           <button
             className="gc-pitcher pitch-link"
             onClick={() => onOpenPitcher(pitcher.id, gamePk)}
             title={`Open ${pitcher.name}'s pitcher card`}
+            style={{
+              color: 'var(--accent)',
+              fontSize: '11px',
+              borderBottom: '1px dashed rgba(0, 216, 246, 0.3)'
+            }}
           >
             {pitcher.name}
           </button>
         ) : (
-          <span className="gc-pitcher">{pitcher?.name || 'TBD'}</span>
+          <span className="gc-pitcher" style={{ fontSize: '11px' }}>{pitcher?.name || 'TBD'}</span>
         )}
       </div>
-      {showScore && <span className="gc-score mono">{score ?? 0}</span>}
+      {showScore && <span className="gc-score mono" style={{ fontSize: '18px', fontWeight: '800', background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: '6px' }}>{score ?? 0}</span>}
     </div>
   )
 }
@@ -299,24 +382,32 @@ function GameCard({ game: g, groups, idx = 0, ...ctx }) {
   const homeC = teamColor(g.homeTeam?.id)
   const showScore = liveMode && (g.isLive || g.isFinal)
   return (
-    <section className={`game-card ${g.isFinal ? 'final' : ''}`} style={{ '--i': Math.min(idx, 12) }}>
+    <section className={`game-card ${g.isFinal ? 'final' : ''}`} style={{ 
+      '--i': Math.min(idx, 12),
+      background: 'rgba(16, 24, 48, 0.45)',
+      border: '1px solid rgba(255,255,255,0.06)',
+      boxShadow: 'var(--glass-shadow)',
+      borderRadius: '16px',
+      overflow: 'hidden'
+    }}>
       <header
         className="gc-head"
         style={{
-          background: `linear-gradient(100deg, ${hexToRgba(awayC, 0.22)}, transparent 42%, transparent 58%, ${hexToRgba(homeC, 0.22)})`,
+          background: `linear-gradient(100deg, ${hexToRgba(awayC, 0.15)}, transparent 45%, transparent 55%, ${hexToRgba(homeC, 0.15)})`,
+          borderBottom: '1px solid rgba(255,255,255,0.06)'
         }}
       >
         <TeamHead team={g.awayTeam} pitcher={g.awayPitcher} score={g.awayScore} showScore={showScore} align="left" gamePk={g.gamePk} onOpenPitcher={ctx.onOpenPitcher} />
         <div className="gc-center">
           <GameStatus g={g} />
-          <span className="gc-venue">{g.venueName || ''}</span>
+          <span className="gc-venue" style={{ fontSize: '10px' }}>{g.venueName || ''}</span>
         </div>
         <TeamHead team={g.homeTeam} pitcher={g.homePitcher} score={g.homeScore} showScore={showScore} align="right" gamePk={g.gamePk} onOpenPitcher={ctx.onOpenPitcher} />
       </header>
 
       <GameChips sample={groups.away[0] || groups.home[0]} />
 
-      <div className="gc-silos">
+      <div className="gc-silos" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
         <Silo team={g.awayTeam} batters={groups.away} {...ctx} />
         <Silo team={g.homeTeam} batters={groups.home} {...ctx} />
       </div>
@@ -338,9 +429,19 @@ function GameChips({ sample }) {
   else if (w?.precipProbPct >= 40) chips.push({ icon: 'Droplet', text: `${w.precipProbPct}% rain` })
   if (!chips.length) return null
   return (
-    <div className="gc-chips">
+    <div className="gc-chips" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', padding: '12px', background: 'rgba(0,0,0,0.1)' }}>
       {chips.map((c, i) => (
-        <span className={`gc-chip ${c.tone || ''}`} key={i}>
+        <span className={`gc-chip ${c.tone || ''}`} key={i} style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '4px',
+          fontSize: '11px',
+          background: c.tone === 'good' ? 'rgba(16, 185, 129, 0.08)' : c.tone === 'bad' ? 'rgba(239, 68, 68, 0.08)' : 'rgba(255,255,255,0.03)',
+          color: c.tone === 'good' ? 'var(--strong)' : c.tone === 'bad' ? 'var(--bad)' : 'var(--text-dim)',
+          border: c.tone === 'good' ? '1px solid rgba(16, 185, 129, 0.15)' : c.tone === 'bad' ? '1px solid rgba(239, 68, 68, 0.15)' : '1px solid rgba(255,255,255,0.05)',
+          padding: '2px 8px',
+          borderRadius: '6px'
+        }}>
           <Icon name={c.icon} size={11} />
           {c.text}
         </span>
@@ -353,17 +454,24 @@ function Silo({ team, batters, ...ctx }) {
   const color = teamColor(team?.id)
   const logo = teamLogo(team?.id)
   return (
-    <div className="silo" style={{ '--tc': color }}>
-      <div className="silo-head" style={{ background: hexToRgba(color, 0.16) }}>
-        {logo && <img className="silo-logo" src={logo} alt={`${team?.name || team?.abbr || ''} logo`} loading="lazy" />}
-        <span className="silo-team" style={{ color: readableOn('#11161f') }}>
+    <div className="silo" style={{ '--tc': color, borderRight: '1px solid rgba(255,255,255,0.04)' }}>
+      <div className="silo-head" style={{ 
+        background: hexToRgba(color, 0.12),
+        display: 'flex',
+        alignItems: 'center',
+        gap: '6px',
+        padding: '8px 12px',
+        borderBottom: '1px solid rgba(255,255,255,0.04)'
+      }}>
+        {logo && <img className="silo-logo" src={logo} alt={team?.abbr} loading="lazy" style={{ width: '18px', height: '18px' }} />}
+        <span className="silo-team" style={{ color: '#fff', fontSize: '13px', fontWeight: '800' }}>
           {team?.abbr}
         </span>
-        <span className="silo-count mono">{batters.length}</span>
+        <span className="silo-count mono" style={{ fontSize: '11px', background: 'rgba(255,255,255,0.08)', padding: '1px 5px', borderRadius: '4px', marginLeft: 'auto' }}>{batters.length}</span>
       </div>
-      <div className="silo-body">
+      <div className="silo-body" style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
         {batters.length === 0 ? (
-          <div className="silo-empty">No matching batters</div>
+          <div className="silo-empty" style={{ padding: '24px 12px', textAlign: 'center', color: 'var(--text-faint)', fontSize: '12px' }}>No matching batters</div>
         ) : (
           batters.map((b) => <SiloBatter key={b.id} b={b} {...ctx} />)
         )}
@@ -393,40 +501,79 @@ function SiloBatter({ b, onSelect, selectedId, watchlist, slip, onToggleWatch, o
           onSelect(b)
         }
       }}
-      style={{ '--row-accent': color }}
+      style={{ 
+        '--row-accent': color,
+        borderLeft: `2px solid ${color}`,
+        display: 'flex',
+        alignItems: 'center',
+        padding: '8px 12px',
+        borderBottom: '1px solid rgba(255,255,255,0.02)',
+        cursor: 'pointer',
+        transition: 'background 0.15s'
+      }}
     >
-      <img className="sb-avatar" src={playerHeadshot(b.playerId, 96)} alt={b.name} loading="lazy" />
-      <div className="sb-content">
-        <div className="sb-line1">
-          {b.battingOrder ? <span className="sb-order mono">{b.battingOrder}</span> : <span className="sb-order mono dim">–</span>}
-          <span className={`sb-name ${hrToday ? 'hr-glow' : ''}`}>{b.name}</span>
-          <span className="bathand">{b.batSide}</span>
+      <img className="sb-avatar" src={playerHeadshot(b.playerId, 96)} alt={b.name} loading="lazy" style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover', background: 'rgba(255,255,255,0.03)', marginRight: '10px' }} />
+      <div className="sb-content" style={{ flex: '1', minWidth: '0' }}>
+        <div className="sb-line1" style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+          {b.battingOrder ? <span className="sb-order mono" style={{ fontSize: '10px', background: 'rgba(255,255,255,0.05)', padding: '1px 4px', borderRadius: '3px' }}>{b.battingOrder}</span> : null}
+          <span className={`sb-name ${hrToday ? 'hr-glow' : ''}`} style={{ fontSize: '12px', fontWeight: '600', color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.name}</span>
+          <span className="bathand" style={{ fontSize: '9px', opacity: 0.6 }}>{b.batSide}</span>
           {hrToday && (
-            <span className="hr-tag sm" title="Already homered">
-              <Icon name="Flame" size={9} />
+            <span className="hr-tag sm" title="Already homered" style={{ background: 'var(--b-hot)', color: '#000', borderRadius: '3px', padding: '1px 3px' }}>
+              <Icon name="Flame" size={8} />
             </span>
           )}
-          <ProbRing value={b.hrProbability} color={color} size={42} />
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center' }}>
+            <ProbRing value={b.hrProbability} color={color} size={36} />
+          </div>
         </div>
-        <div className="sb-line2">
+        <div className="sb-line2" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px' }}>
           <GradeChip grade={b.grade} size="sm" score={b.score} />
           {b.heatIndex >= HOT_HEAT && (
-            <span className="sb-heat" title={`Heat index ${b.heatIndex}/100`}>
+            <span className="sb-heat" title={`Heat index ${b.heatIndex}/100`} style={{ color: 'var(--b-hot)', display: 'inline-flex', alignItems: 'center', gap: '2px', fontWeight: '600' }}>
               <Icon name="Flame" size={10} />
               {b.heatIndex}
             </span>
           )}
-          <ProbBar value={b.hrProbability} color={color} showLabel={false} />
-          <span className="sb-acts">
-            <button className={`act-btn star ${watched ? 'on' : ''}`} onClick={stop(onToggleWatch)} aria-label="Watch" title={watched ? 'Unwatch' : 'Watch'}>
-              <Icon name="Star" size={13} />
+          <span className="sb-acts" style={{ marginLeft: 'auto', display: 'flex', gap: '4px' }}>
+            <button 
+              className={`act-btn star ${watched ? 'on' : ''}`} 
+              onClick={stop(onToggleWatch)} 
+              aria-label="Watch" 
+              title={watched ? 'Unwatch' : 'Watch'}
+              style={{
+                width: '22px',
+                height: '22px',
+                borderRadius: '4px',
+                border: '1px solid var(--border-soft)',
+                background: watched ? 'rgba(245,166,35,0.1)' : 'transparent',
+                color: watched ? 'var(--prime)' : 'var(--text-faint)',
+                display: 'grid',
+                placeItems: 'center'
+              }}
+            >
+              <Icon name="Star" size={11} style={{ fill: watched ? 'currentColor' : 'none' }} />
             </button>
-            <button className={`act-btn add ${inSlip ? 'on' : ''}`} onClick={stop(onToggleSlip)} aria-label="Parlay" title={inSlip ? 'In parlay' : 'Add to parlay'}>
-              <Icon name={inSlip ? 'Check' : 'Plus'} size={13} />
+            <button 
+              className={`act-btn add ${inSlip ? 'on' : ''}`} 
+              onClick={stop(onToggleSlip)} 
+              aria-label="Parlay" 
+              title={inSlip ? 'In parlay' : 'Add to parlay'}
+              style={{
+                width: '22px',
+                height: '22px',
+                borderRadius: '4px',
+                border: '1px solid var(--border-soft)',
+                background: inSlip ? 'rgba(16,185,129,0.1)' : 'transparent',
+                color: inSlip ? 'var(--strong)' : 'var(--text-faint)',
+                display: 'grid',
+                placeItems: 'center'
+              }}
+            >
+              <Icon name={inSlip ? 'Check' : 'Plus'} size={11} />
             </button>
           </span>
         </div>
-        {b.reasons?.[0] && <div className="sb-reason">{b.reasons[0]}</div>}
       </div>
     </div>
   )

@@ -4,8 +4,8 @@ import { pct, num } from '../lib/format.js'
 import { GRADE_ORDER, gradeColor } from '../lib/badges.js'
 import { GradeChip } from './atoms.jsx'
 import { playerHeadshot } from '../lib/teams.js'
+import { hexA } from './atoms.jsx'
 
-// Mann–Whitney AUC (ranking quality), tie-aware.
 function computeAuc(rows) {
   const y = rows.map((r) => (r.homered ? 1 : 0))
   const nPos = y.reduce((s, v) => s + v, 0)
@@ -27,10 +27,11 @@ function computeAuc(rows) {
 export default function ResultsView({ meta }) {
   const [log, setLog] = useState(null)
   const [err, setErr] = useState(null)
-  const [hrDay, setHrDay] = useState(null) // null = all days
-  const [comboDay, setComboDay] = useState(null) // null = latest
-  const [comboBoard, setComboBoard] = useState('full') // 'full' = all-slate · 'late' = evening · 'w<i>' = a start window
-  const [comboSize, setComboSize] = useState(0) // 0 = all sizes, else 2 or 3
+  const [hrDay, setHrDay] = useState(null)
+  const [comboDay, setComboDay] = useState(null)
+  const [comboBoard, setComboBoard] = useState('full')
+  const [comboSize, setComboSize] = useState(0)
+
   useEffect(() => {
     let alive = true
     fetch(`${import.meta.env.BASE_URL}data/backtest-log.json`, { cache: 'no-store' })
@@ -42,14 +43,15 @@ export default function ResultsView({ meta }) {
     }
   }, [])
 
-  if (err)
+  if (err) {
     return (
-      <div className="empty">
-        <Icon name="TriangleAlert" size={26} />
+      <div className="empty" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '64px', color: 'var(--text-faint)', gap: '12px' }}>
+        <Icon name="TriangleAlert" size={32} />
         <p>No backtest log yet — run a few days of `npm run slate` + reconcile to build a track record.</p>
       </div>
     )
-  if (!log) return <div className="results-loading">Loading track record…</div>
+  }
+  if (!log) return <div className="results-loading" style={{ display: 'flex', justifyContent: 'center', padding: '64px', color: 'var(--text-dim)', fontWeight: '600' }}>Loading track record…</div>
 
   const rows = []
   for (const d of Object.keys(log.records || {})) {
@@ -57,7 +59,7 @@ export default function ResultsView({ meta }) {
       if (Number.isFinite(r.score) && typeof r.homered === 'boolean') rows.push({ ...r, date: d })
     }
   }
-  if (!rows.length) return <div className="empty"><Icon name="Search" size={26} /><p>No reconciled records yet.</p></div>
+  if (!rows.length) return <div className="empty" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '64px', color: 'var(--text-faint)' }}><Icon name="Search" size={32} /><p>No reconciled records yet.</p></div>
 
   const N = rows.length
   const hits = rows.filter((r) => r.homered).length
@@ -86,31 +88,23 @@ export default function ResultsView({ meta }) {
     }
   })
 
-  // Exact graded combos per day — the canonical pregame parlays + which legs
-  // homered. log.combos.byDate stores { strategy, size, legs:[playerId], allHit };
-  // resolve each leg's name + HR from that day's records.
   const STRAT_LABEL = { top: 'Top Picks', mix: 'Best Mix', stack: 'Signal Stack', hot: 'Hot Hand', power: 'Power Bats', matchup: 'Soft Matchup', park: 'Park & Air' }
   const comboByDateGraded = log.combos?.byDate || {}
   const comboFullByDate = log.combos?.fullByDate || {}
-  // Full board: prefer the graded byDate; fall back to the live-captured full
-  // board (fullByDate) so a day shows even if next-day grading lagged.
   const comboByDate = { ...comboFullByDate, ...comboByDateGraded }
   const comboLateByDate = log.combos?.lateByDate || {}
   const comboWindowsByDate = log.combos?.windowsByDate || {}
-  // Day selection — any day that has a Full board OR window boards (a day can
-  // have windows but no full board if grading missed the one-shot).
+  
   const comboDates = [...new Set([
     ...Object.keys(comboByDate).filter((d) => (comboByDate[d] || []).length),
     ...Object.keys(comboWindowsByDate).filter((d) => (comboWindowsByDate[d] || []).length),
   ])].sort().reverse()
   const activeComboDay = comboDay && comboDates.includes(comboDay) ? comboDay : comboDates[0] || null
-  // Per-start-window boards (early / late / …) when the day split; else the
-  // single "Evening board" (latest bettable). Drives the board-cut toggle.
+  
   const windows = (activeComboDay && comboWindowsByDate[activeComboDay]) || []
   const hasFull = activeComboDay && (comboByDate[activeComboDay] || []).length > 0
   const hasLate = activeComboDay && (comboLateByDate[activeComboDay] || []).length > 0
-  // board: 'full' · 'late' · or 'w0','w1',… (a start window). When there's no
-  // full board for the day, fall back to the first window.
+  
   const wIdx = /^w(\d+)$/.test(comboBoard) ? Number(comboBoard.slice(1)) : -1
   const board = windows[wIdx] ? comboBoard
     : comboBoard === 'late' && hasLate ? 'late'
@@ -118,6 +112,7 @@ export default function ResultsView({ meta }) {
     : windows.length ? 'w0'
     : 'full'
   const effWIdx = board === 'full' || board === 'late' ? -1 : (wIdx >= 0 ? wIdx : 0)
+  
   const recByDay = (d) => {
     const map = new Map()
     for (const r of log.records?.[d] || []) map.set(Number(r.playerId), r)
@@ -130,7 +125,7 @@ export default function ResultsView({ meta }) {
       : board === 'late' ? comboLateByDate[activeComboDay]
       : comboByDate[activeComboDay]
     return (src || [])
-      .filter((c) => c.size <= 3 && (!comboSize || c.size === comboSize)) // 4-leg lottos excluded; size filter
+      .filter((c) => c.size <= 3 && (!comboSize || c.size === comboSize))
       .map((c) => {
         const legs = (c.legs || []).map((pid) => {
           const r = recs.get(Number(pid))
@@ -146,98 +141,161 @@ export default function ResultsView({ meta }) {
   const m = meta.modelMetrics
   const reliability = m?.reliability || []
 
-  // Every PRIME/STRONG graded pick that actually homered, newest first.
   const topHRs = rows
     .filter((r) => (r.grade === 'PRIME' || r.grade === 'STRONG') && r.homered)
     .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : (b.score ?? 0) - (a.score ?? 0)))
-  const hrDates = [...new Set(topHRs.map((r) => r.date))] // already newest-first
+  const hrDates = [...new Set(topHRs.map((r) => r.date))]
   const activeDay = hrDay && hrDates.includes(hrDay) ? hrDay : null
   const shownHRs = activeDay ? topHRs.filter((r) => r.date === activeDay) : topHRs
 
   return (
     <div className="results">
-      <div className="results-kpis">
-        <Kpi label="Discrimination (AUC)" value={Number.isFinite(auc) ? auc.toFixed(3) : '—'} sub="ranking quality · 0.5 = coin flip" accent="var(--prime)" />
-        <Kpi label="Top-decile hit rate" value={pct(topRate, 0)} sub={`${(topRate / base).toFixed(1)}× vs base ${pct(base, 0)}`} accent="var(--strong)" />
+      <div className="results-kpis" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px', marginBottom: '24px' }}>
+        <Kpi label="Discrimination (AUC)" value={Number.isFinite(auc) ? auc.toFixed(3) : '—'} sub="ranking quality · 0.5 = random" accent="var(--prime)" />
+        <Kpi label="Top-decile hit rate" value={pct(topRate, 0)} sub={`${(topRate / base).toFixed(1)}x vs base ${pct(base, 0)}`} accent="var(--strong)" />
         <Kpi label="Graded picks" value={num(N)} sub={`${hits} HR · ${dates.length} days`} />
         {m && <Kpi label="Brier vs baseline" value={m.brier.toFixed(4)} sub={`${pct((m.baselineBrier - m.brier) / m.baselineBrier, 0)} better`} accent="var(--accent)" />}
       </div>
 
-      <div className="results-cols">
-        <section className="results-card">
-          <h3 className="section-title"><Icon name="Trophy" size={14} /> Hit rate by grade</h3>
-          <div className="grade-hits">
+      <div className="results-cols" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px', flexWrap: 'wrap' }}>
+        <section className="results-card" style={{
+          background: 'rgba(16, 24, 48, 0.45)',
+          border: '1px solid rgba(255,255,255,0.06)',
+          borderRadius: '12px',
+          padding: '20px'
+        }}>
+          <h3 className="section-title" style={{ fontSize: '13px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '16px', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: '8px' }}>
+            <Icon name="Trophy" size={14} style={{ color: 'var(--accent)' }} /> Hit rate by grade
+          </h3>
+          <div className="grade-hits" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             {byGrade.map((x) => (
               <div className="grade-hit" key={x.g}>
-                <div className="grade-hit-head">
-                  <span style={{ color: gradeColor(x.g), fontWeight: 700 }}>{x.g}</span>
-                  <span className="mono">{pct(x.rate, 1)} <span className="dim">· n={x.n}</span></span>
+                <div className="grade-hit-head" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '4px' }}>
+                  <span style={{ color: gradeColor(x.g), fontWeight: '700' }}>{x.g}</span>
+                  <span className="mono" style={{ color: '#fff' }}>{pct(x.rate, 1)} <span style={{ color: 'var(--text-faint)', fontSize: '11px', fontWeight: '400' }}>· n={x.n}</span></span>
                 </div>
-                <div className="grade-hit-track">
-                  <div className="grade-hit-fill" style={{ width: `${Math.min(100, (x.rate / maxGradeRate) * 100)}%`, background: gradeColor(x.g) }} />
+                <div className="grade-hit-track" style={{ height: '6px', background: 'rgba(255,255,255,0.03)', borderRadius: '99px', overflow: 'hidden' }}>
+                  <div className="grade-hit-fill" style={{ 
+                    width: `${Math.min(100, (x.rate / maxGradeRate) * 100)}%`, 
+                    background: gradeColor(x.g),
+                    height: '100%',
+                    borderRadius: '99px',
+                    boxShadow: `0 0 8px ${hexA(gradeColor(x.g), 0.4)}`
+                  }} />
                 </div>
               </div>
             ))}
           </div>
-          <p className="chart-cap dim">Share of each grade that actually homered, over the reconciled window. A working model shows a clean PRIME &gt; STRONG &gt; LEAN &gt; SKIP staircase.</p>
+          <p className="chart-cap dim" style={{ fontSize: '11px', marginTop: '16px' }}>Share of each grade that homered. A well-calibrated model shows a staircase slope.</p>
         </section>
 
-        <section className="results-card">
-          <h3 className="section-title"><Icon name="Activity" size={14} /> Reliability</h3>
-          <Reliability bins={reliability} />
-          <p className="chart-cap dim">Predicted vs actual HR rate. On the dashed line = perfectly calibrated.</p>
+        <section className="results-card" style={{
+          background: 'rgba(16, 24, 48, 0.45)',
+          border: '1px solid rgba(255,255,255,0.06)',
+          borderRadius: '12px',
+          padding: '20px',
+          display: 'flex',
+          flexDirection: 'column'
+        }}>
+          <h3 className="section-title" style={{ fontSize: '13px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '16px', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: '8px' }}>
+            <Icon name="Activity" size={14} style={{ color: 'var(--accent)' }} /> Reliability Diagram
+          </h3>
+          <div style={{ flex: '1', display: 'grid', placeItems: 'center' }}>
+            <Reliability bins={reliability} />
+          </div>
+          <p className="chart-cap dim" style={{ fontSize: '11px', marginTop: '16px' }}>Predicted vs observed HR rates. Dashed diagonal = ideal calibration.</p>
         </section>
       </div>
 
-      <section className="results-card">
-        <h3 className="section-title">
-          <Icon name="Flame" size={14} /> Top-tier home runs
-          <span className="dim" style={{ fontWeight: 400, marginLeft: 6 }}>
+      <section className="results-card" style={{
+        background: 'rgba(16, 24, 48, 0.45)',
+        border: '1px solid rgba(255,255,255,0.06)',
+        borderRadius: '12px',
+        padding: '20px',
+        marginBottom: '24px'
+      }}>
+        <h3 className="section-title" style={{ fontSize: '13px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '16px', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: '8px' }}>
+          <Icon name="Flame" size={14} style={{ color: 'var(--accent)' }} /> Top-tier home runs
+          <span style={{ fontWeight: '400', textTransform: 'none', marginLeft: '6px', fontSize: '12px', color: 'var(--text-faint)' }}>
             · {shownHRs.length} PRIME/STRONG {activeDay ? `on ${activeDay.slice(5)}` : 'cashed'}
           </span>
         </h3>
         {hrDates.length > 1 && (
-          <div className="hr-days">
-            <button className={`hr-day ${!activeDay ? 'on' : ''}`} onClick={() => setHrDay(null)}>
+          <div className="hr-days" style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '14px' }}>
+            <button className={`hr-day ${!activeDay ? 'on' : ''}`} onClick={() => setHrDay(null)} style={{
+              background: !activeDay ? 'var(--hover)' : 'rgba(255,255,255,0.03)',
+              border: !activeDay ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)',
+              color: !activeDay ? '#fff' : 'var(--text-dim)',
+              fontSize: '11px',
+              padding: '3px 8px',
+              borderRadius: '4px'
+            }}>
               All
             </button>
-            {hrDates.map((d) => (
-              <button key={d} className={`hr-day ${activeDay === d ? 'on' : ''}`} onClick={() => setHrDay(d)}>
+            {hrDates.slice(0, 15).map((d) => (
+              <button key={d} className={`hr-day ${activeDay === d ? 'on' : ''}`} onClick={() => setHrDay(d)} style={{
+                background: activeDay === d ? 'var(--hover)' : 'rgba(255,255,255,0.03)',
+                border: activeDay === d ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)',
+                color: activeDay === d ? '#fff' : 'var(--text-dim)',
+                fontSize: '11px',
+                padding: '3px 8px',
+                borderRadius: '4px'
+              }}>
                 {d.slice(5)}
               </button>
             ))}
           </div>
         )}
         {shownHRs.length ? (
-          <ul className="hr-feed">
+          <ul className="hr-feed" style={{ listStyle: 'none', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '10px' }}>
             {shownHRs.map((r, i) => (
-              <li className="hr-feed-row" key={`${r.playerId}-${r.date}-${i}`}>
-                <span className="hr-feed-date mono dim">{r.date.slice(5)}</span>
-                <img className="hr-feed-photo" src={playerHeadshot(r.playerId, 64)} alt="" loading="lazy" />
-                <span className="hr-feed-name">{r.name || `#${r.playerId}`}</span>
+              <li className="hr-feed-row" key={`${r.playerId}-${r.date}-${i}`} style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                background: 'rgba(255,255,255,0.02)',
+                border: '1px solid rgba(255,255,255,0.04)',
+                borderRadius: '8px',
+                padding: '8px 12px'
+              }}>
+                <span className="hr-feed-date mono dim" style={{ fontSize: '10px', color: 'var(--text-faint)' }}>{r.date.slice(5)}</span>
+                <img className="hr-feed-photo" src={playerHeadshot(r.playerId, 64)} alt="" loading="lazy" style={{ width: '24px', height: '24px', borderRadius: '50%', objectFit: 'cover' }} />
+                <span className="hr-feed-name" style={{ fontSize: '12px', fontWeight: '600', color: '#fff', flex: '1', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.name || `#${r.playerId}`}</span>
                 <GradeChip grade={{ label: r.grade, color: gradeColor(r.grade) }} size="sm" score={r.score} />
               </li>
             ))}
           </ul>
         ) : (
-          <p className="chart-cap dim">No PRIME or STRONG picks have homered in the reconciled window yet.</p>
+          <p className="chart-cap dim">No PRIME/STRONG picks homered yet.</p>
         )}
-        <p className="chart-cap dim">Every PRIME &amp; STRONG graded pick that homered, newest first. LEAN and SKIP are hidden.</p>
       </section>
 
       {comboDates.length > 0 && (
-        <section className="results-card">
-          <h3 className="section-title">
-            <Icon name="Layers" size={14} /> Combo results
-            <span className="dim" style={{ fontWeight: 400, marginLeft: 6 }}>
-              · {comboCashed}/{dayCombos.length} cashed{activeComboDay ? ` on ${activeComboDay.slice(5)}` : ''}
+        <section className="results-card" style={{
+          background: 'rgba(16, 24, 48, 0.45)',
+          border: '1px solid rgba(255,255,255,0.06)',
+          borderRadius: '12px',
+          padding: '20px',
+          marginBottom: '24px'
+        }}>
+          <h3 className="section-title" style={{ fontSize: '13px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '16px', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: '8px' }}>
+            <Icon name="Layers" size={14} style={{ color: 'var(--accent)' }} /> Combo results
+            <span style={{ fontWeight: '400', textTransform: 'none', marginLeft: '6px', fontSize: '12px', color: 'var(--text-faint)' }}>
+              · {comboCashed}/{dayCombos.length} cashed {activeComboDay ? `on ${activeComboDay.slice(5)}` : ''}
             </span>
           </h3>
           {(windows.length > 0 || hasLate) && (
-            <div className="hr-days" role="group" aria-label="Board view">
+            <div className="hr-days" style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
               {hasFull && (
-                <button className={`hr-day ${board === 'full' ? 'on' : ''}`} onClick={() => setComboBoard('full')} title="The full-slate board — all games, each bat frozen at its first pitch (model benchmark; not all bettable as one ticket)">
-                  Full board
+                <button className={`hr-day ${board === 'full' ? 'on' : ''}`} onClick={() => setComboBoard('full')} style={{
+                  background: board === 'full' ? 'var(--hover)' : 'rgba(255,255,255,0.03)',
+                  border: board === 'full' ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)',
+                  color: board === 'full' ? '#fff' : 'var(--text-dim)',
+                  fontSize: '11px',
+                  padding: '3px 8px',
+                  borderRadius: '4px'
+                }}>
+                  Full Board
                 </button>
               )}
               {windows.length > 0
@@ -246,79 +304,113 @@ export default function ResultsView({ meta }) {
                       key={i}
                       className={`hr-day ${effWIdx === i ? 'on' : ''}`}
                       onClick={() => setComboBoard(`w${i}`)}
-                      title={`Start window ${w.label} · ${w.games} games — the board you could bet as one confirmed ticket in this window`}
+                      style={{
+                        background: effWIdx === i ? 'var(--hover)' : 'rgba(255,255,255,0.03)',
+                        border: effWIdx === i ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)',
+                        color: effWIdx === i ? '#fff' : 'var(--text-dim)',
+                        fontSize: '11px',
+                        padding: '3px 8px',
+                        borderRadius: '4px'
+                      }}
                     >
-                      {w.label} <span className="dim">·{w.games}g</span>
+                      {w.label} <span style={{ opacity: 0.5 }}>({w.games}g)</span>
                     </button>
                   ))
                 : hasLate && (
-                    <button className={`hr-day ${board === 'late' ? 'on' : ''}`} onClick={() => setComboBoard('late')} title="The latest bettable board — only games that hadn't started (what you could realistically bet late)">
-                      Evening board
+                    <button className={`hr-day ${board === 'late' ? 'on' : ''}`} onClick={() => setComboBoard('late')} style={{
+                      background: board === 'late' ? 'var(--hover)' : 'rgba(255,255,255,0.03)',
+                      border: board === 'late' ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)',
+                      color: board === 'late' ? '#fff' : 'var(--text-dim)',
+                      fontSize: '11px',
+                      padding: '3px 8px',
+                      borderRadius: '4px'
+                    }}>
+                      Evening Board
                     </button>
                   )}
             </div>
           )}
           {comboDates.length > 1 && (
-            <div className="hr-days">
-              {comboDates.map((d) => (
-                <button key={d} className={`hr-day ${activeComboDay === d ? 'on' : ''}`} onClick={() => setComboDay(d)}>
+            <div className="hr-days" style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
+              {comboDates.slice(0, 15).map((d) => (
+                <button key={d} className={`hr-day ${activeComboDay === d ? 'on' : ''}`} onClick={() => setComboDay(d)} style={{
+                  background: activeComboDay === d ? 'var(--hover)' : 'rgba(255,255,255,0.03)',
+                  border: activeComboDay === d ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)',
+                  color: activeComboDay === d ? '#fff' : 'var(--text-dim)',
+                  fontSize: '11px',
+                  padding: '3px 8px',
+                  borderRadius: '4px'
+                }}>
                   {d.slice(5)}
                 </button>
               ))}
             </div>
           )}
-          <div className="hr-days" role="group" aria-label="Combo size">
-            {[[0, 'All'], [2, '2-leg'], [3, '3-leg']].map(([k, label]) => (
-              <button key={k} className={`hr-day ${comboSize === k ? 'on' : ''}`} onClick={() => setComboSize(k)}>
+          <div className="hr-days" style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '14px' }}>
+            {[[0, 'All Sizes'], [2, '2-leg'], [3, '3-leg']].map(([k, label]) => (
+              <button key={k} className={`hr-day ${comboSize === k ? 'on' : ''}`} onClick={() => setComboSize(k)} style={{
+                background: comboSize === k ? 'var(--hover)' : 'rgba(255,255,255,0.03)',
+                border: comboSize === k ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)',
+                color: comboSize === k ? '#fff' : 'var(--text-dim)',
+                fontSize: '11px',
+                padding: '3px 8px',
+                borderRadius: '4px'
+              }}>
                 {label}
               </button>
             ))}
           </div>
-          <p className="chart-cap dim" style={{ marginTop: 2 }}>
-            {windows[effWIdx]
-              ? `Start window ${windows[effWIdx].label} (${windows[effWIdx].games} games) — the combos you could bet as one confirmed ticket in this window.`
-              : board === 'late'
-                ? 'Evening board — the latest combos built only from games that hadn’t started, i.e. what you could realistically still bet late.'
-                : 'Full board — all games, each bat frozen at its first pitch (model benchmark; legs may span windows you couldn’t parlay together).'}
-          </p>
-          <ul className="combo-res">
+          <ul className="combo-res" style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {dayCombos.map((c, i) => (
-              <li className={`combo-res-row ${c.allHit ? 'hit' : 'miss'}`} key={`${c.strategy}-${c.size}-${i}`}>
-                <span className="combo-res-badge">{c.allHit ? '🎯' : `${c.nHit}/${c.size}`}</span>
-                <span className="combo-res-strat">{STRAT_LABEL[c.strategy] || c.strategy}</span>
-                <span className="combo-res-size dim">{c.size}-leg</span>
-                <span className="combo-res-legs">
+              <li className={`combo-res-row ${c.allHit ? 'hit' : 'miss'}`} key={`${c.strategy}-${c.size}-${i}`} style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                background: c.allHit ? 'rgba(16, 185, 129, 0.08)' : 'rgba(255,255,255,0.02)',
+                border: `1px solid ${c.allHit ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255,255,255,0.04)'}`,
+                padding: '10px 14px',
+                borderRadius: '8px'
+              }}>
+                <span className="combo-res-badge" style={{ fontSize: '16px' }}>{c.allHit ? '🎯' : `${c.nHit}/${c.size}`}</span>
+                <span className="combo-res-strat" style={{ fontWeight: '700', fontSize: '13px', color: '#fff', width: '100px' }}>{STRAT_LABEL[c.strategy] || c.strategy}</span>
+                <span className="combo-res-size dim" style={{ fontSize: '11px', width: '50px' }}>{c.size}-leg</span>
+                <span className="combo-res-legs" style={{ fontSize: '12px', flex: '1' }}>
                   {c.legs.map((l, j) => (
-                    <span key={j} className={`combo-res-leg ${l.homered ? 'hr' : 'no'}`}>
-                      {l.name}{l.homered ? ' ✅' : ' ❌'}{j < c.legs.length - 1 ? ' · ' : ''}
+                    <span key={j} style={{ color: l.homered ? 'var(--strong)' : 'var(--text-dim)', fontWeight: l.homered ? '700' : '400' }}>
+                      {l.name} {l.homered ? '✅' : '❌'}{j < c.legs.length - 1 ? ' · ' : ''}
                     </span>
                   ))}
                 </span>
               </li>
             ))}
           </ul>
-          <p className="chart-cap dim">The canonical pregame combos (one per strategy &amp; size) graded against actual HRs. 🎯 = every leg homered.</p>
         </section>
       )}
 
-      <section className="results-card">
-        <h3 className="section-title"><Icon name="Clock" size={14} /> Daily track record</h3>
-        <div className="daily-table">
-          <div className="daily-row daily-th">
+      <section className="results-card" style={{
+        background: 'rgba(16, 24, 48, 0.45)',
+        border: '1px solid rgba(255,255,255,0.06)',
+        borderRadius: '12px',
+        padding: '20px'
+      }}>
+        <h3 className="section-title" style={{ fontSize: '13px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '16px', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: '8px' }}>
+          <Icon name="Clock" size={14} style={{ color: 'var(--accent)' }} /> Daily track record
+        </h3>
+        <div className="daily-table" style={{ display: 'flex', flexDirection: 'column', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '8px', overflow: 'hidden' }}>
+          <div className="daily-row daily-th" style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', padding: '6px 10px', background: 'rgba(255,255,255,0.03)', fontSize: '10px', fontWeight: '700', color: 'var(--text-faint)', textTransform: 'uppercase' }}>
             <span>Date</span><span>Picks</span><span>HR</span><span>Hit%</span><span>Top tier</span><span>Top hit%</span>
           </div>
           {daily.map((d) => (
-            <div className="daily-row" key={d.date}>
-              <span className="mono">{d.date.slice(5)}</span>
+            <div className="daily-row" key={d.date} style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', padding: '8px 10px', borderBottom: '1px solid rgba(255,255,255,0.02)', fontSize: '12px' }}>
+              <span className="mono" style={{ color: '#fff' }}>{d.date.slice(5)}</span>
               <span className="mono">{d.n}</span>
               <span className="mono">{d.hits}</span>
               <span className="mono">{d.n ? pct(d.hits / d.n, 0) : '—'}</span>
               <span className="mono dim">{d.topN}</span>
-              <span className={`mono ${d.topN && d.topHits / d.topN > base ? 'pos' : ''}`}>{d.topN ? pct(d.topHits / d.topN, 0) : '—'}</span>
+              <span className={`mono ${d.topN && d.topHits / d.topN > base ? 'pos' : ''}`} style={d.topN && d.topHits / d.topN > base ? { color: 'var(--strong)', fontWeight: '700' } : {}}>{d.topN ? pct(d.topHits / d.topN, 0) : '—'}</span>
             </div>
           ))}
         </div>
-        <p className="chart-cap dim">"Top tier" = PRIME + STRONG picks. Green = beat the base rate that day.</p>
       </section>
     </div>
   )
@@ -326,10 +418,17 @@ export default function ResultsView({ meta }) {
 
 function Kpi({ label, value, sub, accent }) {
   return (
-    <div className="results-kpi">
-      <div className="results-kpi-label">{label}</div>
-      <div className="results-kpi-value mono" style={accent ? { color: accent } : undefined}>{value}</div>
-      {sub && <div className="results-kpi-sub dim">{sub}</div>}
+    <div className="results-kpi" style={{
+      background: 'rgba(16, 24, 48, 0.45)',
+      border: '1px solid rgba(255, 255, 255, 0.06)',
+      boxShadow: accent ? `0 0 16px ${hexA(accent, 0.05)}` : 'none',
+      borderRadius: '12px',
+      padding: '16px',
+      textAlign: 'center'
+    }}>
+      <div className="results-kpi-label" style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-dim)', marginBottom: '4px' }}>{label}</div>
+      <div className="results-kpi-value mono" style={{ fontSize: '26px', fontWeight: '800', color: accent || '#fff' }}>{value}</div>
+      {sub && <div className="results-kpi-sub dim" style={{ fontSize: '11px', marginTop: '2px', color: 'var(--text-faint)' }}>{sub}</div>}
     </div>
   )
 }
@@ -343,22 +442,42 @@ function Reliability({ bins }) {
   const y = (v) => pad.t + ih - (v / max) * ih
   const maxN = Math.max(1, ...bins.map((b) => b.n || 0))
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="reliability" role="img" aria-label="Reliability diagram">
+    <svg viewBox={`0 0 ${W} ${H}`} className="reliability" role="img" aria-label="Reliability diagram" style={{ overflow: 'visible', maxWidth: '400px', width: '100%' }}>
+      <defs>
+        <radialGradient id="dotGlow" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.4" />
+          <stop offset="100%" stopColor="var(--accent)" stopOpacity="0" />
+        </radialGradient>
+      </defs>
       {[0, 0.1, 0.2, 0.3].filter((t) => t <= max).map((t) => (
         <g key={t}>
-          <line x1={x(t)} y1={pad.t} x2={x(t)} y2={pad.t + ih} className="grid" />
-          <line x1={pad.l} y1={y(t)} x2={pad.l + iw} y2={y(t)} className="grid" />
-          <text x={x(t)} y={H - 10} className="axis-lbl" textAnchor="middle">{Math.round(t * 100)}%</text>
-          <text x={pad.l - 5} y={y(t) + 3} className="axis-lbl" textAnchor="end">{Math.round(t * 100)}%</text>
+          <line x1={x(t)} y1={pad.t} x2={x(t)} y2={pad.t + ih} stroke="rgba(255,255,255,0.03)" strokeWidth="1" />
+          <line x1={pad.l} y1={y(t)} x2={pad.l + iw} y2={y(t)} stroke="rgba(255,255,255,0.03)" strokeWidth="1" />
+          <text x={x(t)} y={H - 10} fill="var(--text-faint)" fontSize="8" fontFamily="var(--mono)" textAnchor="middle">{Math.round(t * 100)}%</text>
+          <text x={pad.l - 5} y={y(t) + 3} fill="var(--text-faint)" fontSize="8" fontFamily="var(--mono)" textAnchor="end">{Math.round(t * 100)}%</text>
         </g>
       ))}
-      <line x1={x(0)} y1={y(0)} x2={x(max)} y2={y(max)} className="diag" />
-      <polyline className="rel-line" points={bins.map((b) => `${x(b.avgPredicted)},${y(b.observedRate)}`).join(' ')} />
-      {bins.map((b, i) => (
-        <circle key={i} cx={x(b.avgPredicted)} cy={y(b.observedRate)} r={3 + 6 * Math.sqrt((b.n || 0) / maxN)} className="rel-pt">
-          <title>predicted {pct(b.avgPredicted, 1)} → observed {pct(b.observedRate, 1)} (n={b.n})</title>
-        </circle>
-      ))}
+      <line x1={x(0)} y1={y(0)} x2={x(max)} y2={y(max)} stroke="rgba(255,255,255,0.15)" strokeWidth="1" strokeDasharray="3 3" />
+      <polyline 
+        fill="none" 
+        stroke="var(--accent)" 
+        strokeWidth="2.5" 
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        points={bins.map((b) => `${x(b.avgPredicted)},${y(b.observedRate)}`).join(' ')} 
+        style={{ filter: 'drop-shadow(0 0 3px var(--accent-glow))' }}
+      />
+      {bins.map((b, i) => {
+        const radius = 3 + 6 * Math.sqrt((b.n || 0) / maxN)
+        return (
+          <g key={i}>
+            <circle cx={x(b.avgPredicted)} cy={y(b.observedRate)} r={radius * 2} fill="url(#dotGlow)" />
+            <circle cx={x(b.avgPredicted)} cy={y(b.observedRate)} r={radius} fill="var(--accent)" stroke="#030508" strokeWidth="1.5">
+              <title>predicted {pct(b.avgPredicted, 1)} → observed {pct(b.observedRate, 1)} (n={b.n})</title>
+            </circle>
+          </g>
+        )
+      })}
     </svg>
   )
 }

@@ -2,11 +2,13 @@ import { useState, useRef, useEffect } from 'react'
 import Icon from './Icon.jsx'
 import { timeAgo, pct } from '../lib/format.js'
 import { GRADE_ORDER, gradeColor } from '../lib/badges.js'
+import { hexA } from './atoms.jsx'
 
-// Help dropdown anchored to the header info button: Groups, Guide, How to Pick, Legend.
+// Help dropdown anchored to the header info button
 function HelpMenu({ onOpenGroups, onOpenSGP, onOpenSplits, onOpenBacktest, onOpenGuide, onOpenHowTo, onOpenLegend, onOpenSettings }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
+  
   useEffect(() => {
     if (!open) return
     const onDoc = (e) => {
@@ -20,27 +22,33 @@ function HelpMenu({ onOpenGroups, onOpenSGP, onOpenSplits, onOpenBacktest, onOpe
       document.removeEventListener('keydown', onKey)
     }
   }, [open])
+
   const items = [
-    { label: 'Parlay Combos', desc: 'Auto-built combos — chalk, value, heat, power, lottery', icon: 'Layers', fn: onOpenGroups },
-    { label: 'Same-Game Parlays', desc: 'Best 2–4 leg SGP per game (correlated)', icon: 'Zap', fn: onOpenSGP },
-    { label: 'Cheat Sheet', desc: 'HR plays, barrels, splits, weak arms & parks', icon: 'LayoutGrid', fn: onOpenSplits },
-    { label: 'Signal Backtest', desc: 'Hit rates by grade + signals', icon: 'Activity', fn: onOpenBacktest },
-    { label: 'How to Pick', desc: 'HR-selection playbook', icon: 'Target', fn: onOpenHowTo },
-    { label: 'Guide', desc: 'How the board works', icon: 'Info', fn: onOpenGuide },
-    { label: 'Legend', desc: 'Grades, signals & stats', icon: 'Trophy', fn: onOpenLegend },
-    { label: 'Settings', desc: 'Live, auto-refresh, combo windows', icon: 'SlidersHorizontal', fn: onOpenSettings },
+    { label: 'Parlay Combos', desc: 'Auto-built chalk, value, lottery combos', icon: 'Layers', fn: onOpenGroups },
+    { label: 'Same-Game Parlays', desc: 'Best correlated 2–4 leg SGPs', icon: 'Zap', fn: onOpenSGP },
+    { label: 'Cheat Sheet', desc: 'HR plays, barrels, weak arms & parks', icon: 'LayoutGrid', fn: onOpenSplits },
+    { label: 'Signal Backtest', desc: 'Hit rates by grade and signals', icon: 'Activity', fn: onOpenBacktest },
+    { label: 'How to Pick', desc: 'HR-selection playbook strategies', icon: 'Target', fn: onOpenHowTo },
+    { label: 'Guide', desc: 'Learn how the board is structured', icon: 'Info', fn: onOpenGuide },
+    { label: 'Legend', desc: 'Definitions of grades, signals & stats', icon: 'Trophy', fn: onOpenLegend },
+    { label: 'Settings', desc: 'Live updates, refresh rate, combo window', icon: 'SlidersHorizontal', fn: onOpenSettings },
   ]
+
   return (
-    <div className="help-menu" ref={ref}>
+    <div className="help-menu" ref={ref} style={{ position: 'relative' }}>
       <button
         className={`icon-btn ${open ? 'on' : ''}`}
         onClick={() => setOpen((o) => !o)}
         aria-haspopup="menu"
         aria-expanded={open}
-        title="Help — Guide, How to Pick, Legend"
+        title="Help & Tools Menu"
         aria-label="Help"
+        style={{
+          background: open ? 'var(--hover)' : 'var(--card)',
+          borderColor: open ? 'var(--accent)' : 'var(--border)'
+        }}
       >
-        <Icon name="ChevronDown" size={16} />
+        <Icon name="ChevronDown" size={16} style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
       </button>
       {open && (
         <div className="view-menu-pop" role="menu">
@@ -54,7 +62,9 @@ function HelpMenu({ onOpenGroups, onOpenSGP, onOpenSplits, onOpenBacktest, onOpe
                 setOpen(false)
               }}
             >
-              <Icon name={it.icon} size={16} />
+              <div className="vm-icon-box">
+                <Icon name={it.icon} size={15} />
+              </div>
               <span className="vm-txt">
                 <b>{it.label}</b>
                 <span className="dim">{it.desc}</span>
@@ -92,20 +102,28 @@ export default function Header({
 }) {
   const m = meta.modelMetrics
   const brierEdge = m ? (m.baselineBrier - m.brier) / m.baselineBrier : null
-  // Flag a stale slate: rebuilds target ~10 min during games, so anything older
-  // than ~14 min means the scores/innings on screen are lagging behind reality.
   const genMs = meta.generatedAt ? Date.parse(meta.generatedAt) : NaN
   const slateStale = Number.isFinite(genMs) && Date.now() - genMs > 14 * 60_000
+
   return (
     <header className="header">
       <div className="header-left">
         <div className="brand">
-          <span className="brand-mark">
-            <Icon name="Trophy" size={18} />
+          <span className="brand-mark" style={{
+            background: 'linear-gradient(135deg, var(--accent) 0%, #0052d4 100%)',
+            boxShadow: '0 0 16px rgba(0, 216, 246, 0.4)',
+            borderRadius: '10px',
+            width: '34px',
+            height: '34px',
+            display: 'grid',
+            placeItems: 'center',
+            color: '#fff'
+          }}>
+            <Icon name="Trophy" size={16} />
           </span>
           <div className="brand-txt">
             <span className="brand-name">
-              Stat<span className="brand-accent">Fax</span>
+              Stat<span style={{ color: 'var(--accent)', textShadow: '0 0 8px var(--accent-glow)' }}>Fax</span>
             </span>
             <span className="brand-sub">Model Board</span>
           </div>
@@ -117,11 +135,11 @@ export default function Header({
             <span>{counts.games} games</span>
             <span className="dot-sep slate-batters">·</span>
             <span className="slate-batters">
-              <b className="mono">{counts.shown}</b> / {counts.total} batters
+              <b className="mono" style={{ color: 'var(--accent)' }}>{counts.shown}</b> / {counts.total} batters
             </span>
           </div>
           {total > 0 && (
-            <div className="grade-bar" title="Grade distribution">
+            <div className="grade-bar" title="Grade distribution" style={{ height: '4px', background: 'rgba(255,255,255,0.05)', borderRadius: '2px', overflow: 'hidden', marginTop: '6px' }}>
               {GRADE_ORDER.map((g) => {
                 const n = gradeCounts[g] || 0
                 if (!n) return null
@@ -129,7 +147,7 @@ export default function Header({
                   <span
                     key={g}
                     className="grade-bar-seg"
-                    style={{ flexGrow: n, background: gradeColor(g) }}
+                    style={{ flexGrow: n, background: gradeColor(g), height: '100%', display: 'inline-block' }}
                     title={`${g}: ${n}`}
                   />
                 )
@@ -140,15 +158,15 @@ export default function Header({
       </div>
 
       <div className="header-right">
-        <button className="metric-pill" onClick={onOpenModel} title="Model track record, accuracy & calibration">
-          <Icon name="Gauge" size={14} />
+        <button className="metric-pill" onClick={onOpenModel} title="Model accuracy & calibration tracker">
+          <Icon name="Gauge" size={14} style={{ color: 'var(--accent)' }} />
           <span className="metric-pill-stack">
             <span className="metric-pill-k">Brier</span>
-            <span className="metric-pill-v mono">{m ? m.brier.toFixed(4) : '—'}</span>
+            <span className="metric-pill-v mono" style={{ color: 'var(--accent)' }}>{m ? m.brier.toFixed(4) : '—'}</span>
           </span>
           {brierEdge != null && (
             <span className={`metric-delta ${brierEdge >= 0 ? 'up' : 'down'} mono`}>
-              {brierEdge >= 0 ? '▲' : '▼'} {pct(Math.abs(brierEdge), 0)} vs base
+              {brierEdge >= 0 ? '▲' : '▼'} {pct(Math.abs(brierEdge), 0)}
             </span>
           )}
         </button>
@@ -157,12 +175,12 @@ export default function Header({
           className={`gen-meta ${slateStale ? 'stale' : ''}`}
           title={
             slateStale
-              ? `Slate generated ${meta.generatedAt} — scores/innings are from then, not live-now. Rebuilds run on a schedule.`
+              ? `Slate generated ${meta.generatedAt} — scores/innings are from then, not live-now.`
               : `Generated ${meta.generatedAt}`
           }
         >
-          <Icon name={slateStale ? 'TriangleAlert' : 'Clock'} size={13} />
-          <span>{timeAgo(meta.generatedAt)}</span>
+          <Icon name={slateStale ? 'TriangleAlert' : 'Clock'} size={13} style={{ color: slateStale ? 'var(--warn)' : 'var(--text-faint)' }} />
+          <span style={{ color: slateStale ? 'var(--warn)' : 'var(--text-dim)' }}>{timeAgo(meta.generatedAt)}</span>
         </div>
 
         <button
@@ -170,11 +188,16 @@ export default function Header({
           onClick={onToggleLive}
           title={
             liveScores
-              ? 'Live scores & innings shown and auto-updated while games are in progress — tap for a clean pregame look'
-              : 'Pregame look (scores hidden, no live polling) — tap to show & auto-update live scores'
+              ? 'Live scores & innings auto-updating — tap to view pregame only'
+              : 'Pregame only — tap to enable live updates'
           }
           aria-pressed={liveScores}
-          aria-label={liveScores ? 'Live scores on — tap for pregame look' : 'Pregame look — tap to show live scores'}
+          aria-label={liveScores ? 'Live scores on' : 'Pregame look'}
+          style={{
+            background: liveScores ? 'rgba(16, 185, 129, 0.1)' : 'var(--card)',
+            borderColor: liveScores ? 'var(--strong)' : 'var(--border)',
+            color: liveScores ? 'var(--strong)' : 'var(--text-dim)'
+          }}
         >
           <Icon name={liveScores ? 'Activity' : 'Clock'} size={14} className={liveScores ? 'spin-pulse' : ''} />
         </button>
@@ -184,12 +207,12 @@ export default function Header({
           onClick={onCycleEli}
           title={
             eliLevel === 'eli5'
-              ? 'Explanations in plain English (ELI5) — tap for the stats behind each call (ELI15)'
-              : 'Explanations as the stats behind each call (ELI15) — tap for plain English (ELI5)'
+              ? 'Explanations: Plain English (ELI5). Tap for stats depth (ELI15).'
+              : 'Explanations: Stats depth (ELI15). Tap for plain English (ELI5).'
           }
-          aria-label={`Explanation level: ${eliLevel === 'eli5' ? 'plain English' : 'stats'} — tap to switch`}
+          aria-label={`Explanation depth: ${eliLevel}`}
         >
-          <Icon name={eliLevel === 'eli5' ? 'Sparkles' : 'BarChart3'} size={14} />
+          <Icon name={eliLevel === 'eli5' ? 'Sparkles' : 'BarChart3'} size={14} style={{ color: 'var(--accent)' }} />
         </button>
 
         <HelpMenu onOpenGroups={onOpenGroups} onOpenSGP={onOpenSGP} onOpenSplits={onOpenSplits} onOpenBacktest={onOpenBacktest} onOpenGuide={onOpenGuide} onOpenHowTo={onOpenHowTo} onOpenLegend={onOpenLegend} onOpenSettings={onOpenSettings} />
@@ -199,8 +222,12 @@ export default function Header({
           onClick={onRefresh}
           title="Reload slate now"
           aria-label="Reload slate"
+          style={{
+            position: 'relative',
+            overflow: 'hidden'
+          }}
         >
-          <Icon name="RefreshCw" size={15} />
+          <Icon name="RefreshCw" size={14} className={refreshing ? 'animate-spin' : ''} />
         </button>
       </div>
     </header>
