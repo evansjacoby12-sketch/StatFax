@@ -56,7 +56,6 @@ const DELTA_MAX   = 0.12;  // proven BADGE gets more room than the old flat cap
 // the per-grade loop its own wider ceiling (±45%) lets the sqrt-dampened lift
 // breathe so PRIME > STRONG and LEAN > SKIP instead of all hitting the cap.
 // Sqrt-dampening + the 80-sample floor still guard against small-sample noise.
-const GRADE_DELTA_MAX = 0.45;
 
 // z-score of a sub-group's HR rate vs the overall rate (binomial SE under the
 // null that the group rate equals overall), and the clamp band that strength
@@ -311,12 +310,15 @@ export function computeMultipliers(log) {
     const lift = gRate / overallRate;
     if (!isFinite(lift) || lift <= 0) continue;
     const dampened = Math.sqrt(lift);
-    // Use the WIDE per-grade band (GRADE_DELTA_MAX) so the grade gradient
-    // survives — with the badge cap, PRIME and STRONG both saturated to ~1.12
-    // and LEAN/SKIP both to ~0.88, erasing the gradient. Sqrt-dampening still
-    // applies, so e.g. a PRIME lift of 2.09 lands near 1.45 (well inside ±45%)
-    // while STRONG's smaller lift lands lower → PRIME > STRONG, LEAN > SKIP.
-    const { z, delta } = significanceBand(gRate, withGrade.length, overallRate, GRADE_DELTA_MAX);
+    // Grades use the SAME modest band as badges (±12%). A wider band looked good
+    // for calibration in isolation, but the multiplier is applied to the 0-100
+    // SCORE and the displayed GRADE is re-derived from that score — so a big
+    // PRIME multiplier (e.g. 1.45) inflates scores across the PRIME boundary and
+    // floods the PRIME tier (observed: ~90 PRIMEs vs the usual ~25). Probability
+    // is already calibrated empirically by the score→prob isotonic table, so the
+    // grade multiplier only needs to nudge the score modestly, not carry the
+    // gradient. Keep it tight to preserve the grade distribution.
+    const { z, delta } = significanceBand(gRate, withGrade.length, overallRate);
     const clamped  = Math.min(1 + delta, Math.max(1 - delta, dampened));
     base.grades[grade] = +clamped.toFixed(3);
     console.log(`[calib] grade ${grade}: n=${withGrade.length} rate=${(gRate * 100).toFixed(1)}% lift=${lift.toFixed(2)} z=${z.toFixed(1)} band=±${(delta * 100).toFixed(1)}% → ${base.grades[grade]}`);

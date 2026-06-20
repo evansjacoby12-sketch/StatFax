@@ -238,27 +238,16 @@ export async function recomputeCalibration() {
 export function applyCalibration(score, gradeKey, activeBadgeKeys = []) {
   if (!activeCalibration.ready) return { score, gradeKey };
 
-  // Grade multiplier is the PRIMARY empirical correction and must NOT be
-  // diluted by the geometric mean. Folding it into pow(·, 1/(badges+1)) — as
-  // the old code did — shrank a PRIME grade nudge toward 1.0 the moment a batter
-  // had any badges (e.g. a 1.45 grade mult with 3 badges became its cube-root
-  // ~1.13), so the wide per-grade band computed server-side (GRADE_DELTA_MAX)
-  // was thrown away here. Apply the grade multiplier DIRECTLY, and geometric-
-  // mean-dampen ONLY the badge product to prevent multi-badge pile-on inflation.
-  const gradeMult = gradeMultiplier(gradeKey);
-
-  let badgeProduct = 1;
-  for (const k of activeBadgeKeys) {
-    badgeProduct *= badgeMultiplier(k);
-  }
-  // Geometric-mean dampening over the BADGES only: if a player has 5 active
-  // badges each nudged 1.1, the raw product is 1.61; the dampened version is
-  // 1.1. Empty badge list → 1.0 (no-op). Grade is excluded from this mean.
-  const dampedBadges = activeBadgeKeys.length
-    ? Math.pow(badgeProduct, 1 / activeBadgeKeys.length)
-    : 1;
-
-  const damped = gradeMult * dampedBadges;
+  // Geometric-mean dampening over GRADE + badges (n = badges + 1). Combining the
+  // grade multiplier with each active badge and taking the nth root keeps total
+  // movement bounded AND keeps the grade nudge from inflating the grade
+  // distribution — the multiplier is applied to the 0-100 score and the displayed
+  // grade is re-derived from it, so an undiluted/wide grade multiplier floods the
+  // PRIME tier (we saw ~90 PRIMEs). Probability is already calibrated by the
+  // score→prob isotonic table, so the grade multiplier only nudges gently here.
+  let product = gradeMultiplier(gradeKey);
+  for (const k of activeBadgeKeys) product *= badgeMultiplier(k);
+  const damped = Math.pow(product, 1 / (activeBadgeKeys.length + 1));
 
   let adjusted = Math.min(100, Math.max(0, Math.round(score * damped)));
 

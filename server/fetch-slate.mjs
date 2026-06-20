@@ -3445,6 +3445,43 @@ async function main() {
   }
   console.log(`[slate] zone bonus applied to ${zoneScoreApplied} rows in ${((Date.now() - zoneScoreStart) / 1000).toFixed(2)}s`);
 
+  // ─── PRIME relative cap ─────────────────────────────────────────────────────
+  // Runs AFTER all pregame score/grade passes (incl. the zone-bonus re-grade
+  // above) so it's the final word on the pregame grade, and BEFORE the live-decay
+  // freeze so it flows into preGameGrade. PRIME is the ELITE tier; an absolute
+  // bar (score ≥72) lets a big/soft slate flood it (66+ on a 14-gamer). Cap PRIME
+  // to the top PRIME_PCT of PLAYABLE (non-SKIP) bats by score, demoting the
+  // overflow to STRONG so "PRIME" always means the cream regardless of slate
+  // size. GRADE LABEL ONLY — score + probability untouched (a demoted bat keeps
+  // its 78). Demotes across BOTH snapshot keys (bare playerId + playerId-gamePk).
+  const PRIME_PCT = 0.12;
+  {
+    const seen = new Set();
+    const uniq = [];
+    for (const k of Object.keys(scoredBatters)) {
+      const r = scoredBatters[k];
+      if (!r || r.playerId == null) continue;
+      const id = `${r.playerId}-${r.gamePk}`;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      uniq.push(r);
+    }
+    const playable = uniq.filter((r) => (r.grade?.label || r.grade) !== 'SKIP');
+    const cap = Math.max(8, Math.round(playable.length * PRIME_PCT));
+    const primes = uniq
+      .filter((r) => (r.grade?.label || r.grade) === 'PRIME')
+      .sort((a, b) => (b.score ?? 0) - (a.score ?? 0) || (a.playerId ?? 0) - (b.playerId ?? 0));
+    if (primes.length > cap) {
+      const demote = new Set(primes.slice(cap).map((r) => `${r.playerId}-${r.gamePk}`));
+      const STRONG = gradeFromScore(60); // 60 is solidly inside the STRONG band
+      for (const k of Object.keys(scoredBatters)) {
+        const r = scoredBatters[k];
+        if (r && demote.has(`${r.playerId}-${r.gamePk}`) && (r.grade?.label || r.grade) === 'PRIME') r.grade = STRONG;
+      }
+      console.log(`[slate] PRIME relative cap: ${primes.length} → ${cap} (top ${(PRIME_PCT * 100).toFixed(0)}% of ${playable.length} playable; demoted ${primes.length - cap} to STRONG)`);
+    }
+  }
+
   // 8.68) Live in-game context (Tier-1 live signals — display only)
   //
   // For games currently IN PROGRESS, pull the per-play live feed and
