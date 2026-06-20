@@ -7010,6 +7010,14 @@ button.th:hover {
     bottom: calc(74px + env(safe-area-inset-bottom, 0px)) !important;
   }
 
+  /* Lift the "new version available" banner above the fixed bottom nav (58px,
+     z-index 100) — at its default bottom:18px it renders behind the nav and
+     looks like the update prompt vanished. */
+  .update-banner {
+    bottom: calc(74px + env(safe-area-inset-bottom, 0px)) !important;
+    z-index: 105 !important;
+  }
+
   /* Compact Board Header & Row Actions */
   .col-actions {
     display: flex !important;
