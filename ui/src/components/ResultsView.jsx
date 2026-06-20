@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import Icon from './Icon.jsx'
+import Select from './Select.jsx'
 import { pct, num } from '../lib/format.js'
 import { GRADE_ORDER, gradeColor } from '../lib/badges.js'
 import { GradeChip } from './atoms.jsx'
@@ -114,6 +115,12 @@ export default function ResultsView({ meta }) {
     : windows.length ? 'w0'
     : 'full'
   const effWIdx = board === 'full' || board === 'late' ? -1 : (wIdx >= 0 ? wIdx : 0)
+  // Board dropdown options: full board, each time window, or the evening board.
+  const boardOptions = [
+    ...(hasFull ? [{ value: 'full', label: 'Full Board' }] : []),
+    ...windows.map((w, i) => ({ value: `w${i}`, label: `${w.label} (${w.games}g)` })),
+    ...(!windows.length && hasLate ? [{ value: 'late', label: 'Evening Board' }] : []),
+  ]
   
   const recByDay = (d) => {
     const map = new Map()
@@ -308,81 +315,35 @@ export default function ResultsView({ meta }) {
               {activeComboDay ? ` · ${comboCashed}/${dayCombos.length} on ${activeComboDay.slice(5)}` : ''}
             </span>
           </h3>
-          {(windows.length > 0 || hasLate) && (
-            <div className="hr-days" style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
-              {hasFull && (
-                <button className={`hr-day ${board === 'full' ? 'on' : ''}`} onClick={() => setComboBoard('full')} style={{
-                  background: board === 'full' ? 'var(--hover)' : 'rgba(255,255,255,0.03)',
-                  border: board === 'full' ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)',
-                  color: board === 'full' ? '#fff' : 'var(--text-dim)',
-                  fontSize: '11px',
-                  padding: '3px 8px',
-                  borderRadius: '4px'
-                }}>
-                  Full Board
-                </button>
-              )}
-              {windows.length > 0
-                ? windows.map((w, i) => (
-                    <button
-                      key={i}
-                      className={`hr-day ${effWIdx === i ? 'on' : ''}`}
-                      onClick={() => setComboBoard(`w${i}`)}
-                      style={{
-                        background: effWIdx === i ? 'var(--hover)' : 'rgba(255,255,255,0.03)',
-                        border: effWIdx === i ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)',
-                        color: effWIdx === i ? '#fff' : 'var(--text-dim)',
-                        fontSize: '11px',
-                        padding: '3px 8px',
-                        borderRadius: '4px'
-                      }}
-                    >
-                      {w.label} <span style={{ opacity: 0.5 }}>({w.games}g)</span>
-                    </button>
-                  ))
-                : hasLate && (
-                    <button className={`hr-day ${board === 'late' ? 'on' : ''}`} onClick={() => setComboBoard('late')} style={{
-                      background: board === 'late' ? 'var(--hover)' : 'rgba(255,255,255,0.03)',
-                      border: board === 'late' ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)',
-                      color: board === 'late' ? '#fff' : 'var(--text-dim)',
-                      fontSize: '11px',
-                      padding: '3px 8px',
-                      borderRadius: '4px'
-                    }}>
-                      Evening Board
-                    </button>
-                  )}
-            </div>
-          )}
-          {comboDates.length > 1 && (
-            <div className="hr-days" style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
-              {comboDates.map((d) => (
-                <button key={d} className={`hr-day ${activeComboDay === d ? 'on' : ''}`} onClick={() => setComboDay(d)} style={{
-                  background: activeComboDay === d ? 'var(--hover)' : 'rgba(255,255,255,0.03)',
-                  border: activeComboDay === d ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)',
-                  color: activeComboDay === d ? '#fff' : 'var(--text-dim)',
-                  fontSize: '11px',
-                  padding: '3px 8px',
-                  borderRadius: '4px'
-                }}>
-                  {d.slice(5)}
-                </button>
-              ))}
-            </div>
-          )}
-          <div className="hr-days" style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '14px' }}>
-            {[[0, 'All Sizes'], [2, '2-leg'], [3, '3-leg']].map(([k, label]) => (
-              <button key={k} className={`hr-day ${comboSize === k ? 'on' : ''}`} onClick={() => setComboSize(k)} style={{
-                background: comboSize === k ? 'var(--hover)' : 'rgba(255,255,255,0.03)',
-                border: comboSize === k ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)',
-                color: comboSize === k ? '#fff' : 'var(--text-dim)',
-                fontSize: '11px',
-                padding: '3px 8px',
-                borderRadius: '4px'
-              }}>
-                {label}
-              </button>
-            ))}
+          <div className="combo-res-controls" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '14px' }}>
+            {boardOptions.length > 1 && (
+              <Select
+                icon="LayoutGrid"
+                title="Board"
+                ariaLabel="Board"
+                value={board}
+                onChange={(val) => setComboBoard(val)}
+                options={boardOptions}
+              />
+            )}
+            {comboDates.length > 1 && (
+              <Select
+                icon="Clock"
+                title="Day"
+                ariaLabel="Results day"
+                value={activeComboDay}
+                onChange={(d) => setComboDay(d)}
+                options={comboDates.map((d) => ({ value: d, label: d.slice(5) }))}
+              />
+            )}
+            <Select
+              icon="Layers"
+              title="Legs"
+              ariaLabel="Combo size"
+              value={comboSize}
+              onChange={(k) => setComboSize(k)}
+              options={[{ value: 0, label: 'All sizes' }, { value: 2, label: '2-leg' }, { value: 3, label: '3-leg' }]}
+            />
           </div>
           <ul className="combo-res" style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {dayCombos.map((c, i) => (
