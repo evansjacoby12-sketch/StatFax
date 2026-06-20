@@ -689,34 +689,16 @@ function PercentileSection({ b }) {
   if (!rows.length) return null
   return (
     <Section title="Percentiles" icon="BarChart3">
-      <div className="pctile-cap dim" style={{ fontSize: '11px', marginBottom: '14px' }}>Power profile ranked against today&apos;s slate.</div>
+      <div className="pctile-cap dim" style={{ fontSize: '11px', marginBottom: '14px' }}>Power profile ranked against today&apos;s slate — colored number is the percentile, right column is the raw stat.</div>
       <div className="pctile-list" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
         {rows.map((r) => (
-          <div className="pctile-row" key={r.k} title={`${r.label}: better than ${r.p}% of slate`} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '12px' }}>
-            <span className="pctile-label" style={{ width: '80px', color: 'var(--text-dim)', fontWeight: '600' }}>{r.label}</span>
-            <span className="pctile-bar" style={{ flex: '1', height: '18px', background: 'rgba(255,255,255,0.03)', borderRadius: '99px', position: 'relative', overflow: 'hidden' }}>
-              <span className="pctile-fill" style={{ width: `${r.p}%`, background: pctileColor(r.p), height: '100%', display: 'block', borderRadius: '99px', boxShadow: `0 0 6px ${hexA(pctileColor(r.p), 0.4)}` }} />
-              <span
-                className="pctile-chip mono"
-                style={{ 
-                  position: 'absolute',
-                  top: '0',
-                  left: `clamp(0px, calc(${r.p}% - 11px), calc(100% - 22px))`, 
-                  background: pctileColor(r.p),
-                  color: '#fff',
-                  fontSize: '9px',
-                  fontWeight: '800',
-                  width: '22px',
-                  height: '100%',
-                  display: 'grid',
-                  placeItems: 'center',
-                  borderRadius: '50%'
-                }}
-              >
-                {r.p}
-              </span>
+          <div className="pctile-row" key={r.k} title={`${r.label}: better than ${r.p}% of today's slate`} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '12px' }}>
+            <span className="pctile-label" style={{ width: '72px', color: 'var(--text-dim)', fontWeight: '700', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>{r.label}</span>
+            <span className="pctile-bar" style={{ flex: '1', height: '8px', background: 'var(--card-2)', borderRadius: '99px', position: 'relative', overflow: 'hidden' }}>
+              <span className="pctile-fill" style={{ width: `${r.p}%`, background: pctileColor(r.p), opacity: 1, height: '100%', display: 'block', borderRadius: '99px' }} />
             </span>
-            <span className="pctile-val mono" style={{ width: '60px', textAlign: 'right', fontWeight: '700', color: '#fff' }}>{r.val ?? '—'}</span>
+            <span className="pctile-rank mono" style={{ width: '26px', textAlign: 'right', fontWeight: '800', color: pctileColor(r.p) }} title={`${r.p}th percentile`}>{r.p}</span>
+            <span className="pctile-val mono" style={{ width: '62px', textAlign: 'right', fontWeight: '700', color: '#fff' }}>{r.val ?? '—'}</span>
           </div>
         ))}
       </div>
