@@ -2381,6 +2381,24 @@ async function main() {
     fetchBlastByPitchType(),
   ]);
 
+  // 6b) League-wide Statcast percentile pools. savantBatter holds every
+  // qualified MLB batter, so ranking a player's value within it gives the
+  // honest "vs MLB" percentile (Savant-style) for the player-card power
+  // profile — as opposed to the slate-relative rank the client computes.
+  const mlbPool = Object.values(savantBatter || {});
+  const mlbSorted = {
+    ev:      mlbPool.map((s) => s?.exitVelo).filter(Number.isFinite).sort((a, b) => a - b),
+    barrel:  mlbPool.map((s) => s?.barrelPctBBE).filter(Number.isFinite).sort((a, b) => a - b),
+    hardHit: mlbPool.map((s) => s?.hardHitPct).filter(Number.isFinite).sort((a, b) => a - b),
+  };
+  // Mid-rank percentile (ties share rank); needs a real pool to mean anything.
+  const mlbPctile = (arr, v) => {
+    if (!Number.isFinite(v) || arr.length < 30) return null;
+    let lo = 0; while (lo < arr.length && arr[lo] < v) lo++;
+    let hi = lo; while (hi < arr.length && arr[hi] === v) hi++;
+    return Math.round(((lo + (hi - lo) / 2) / arr.length) * 100);
+  };
+
   // 7) Pitcher recent form (gameLog) — per-pitcher fetch, parallelized
   const pitcherRecentForm = {};
   const recentFormResults = await pMap(pitcherIdArr, async (pid) => ({ pid, form: await fetchPitcherRecentForm(pid) }), 6);
@@ -2930,6 +2948,14 @@ async function main() {
           barrelPctBBE: savantStats?.barrelPctBBE ?? null,
           exitVelo:   savantStats?.exitVelo   ?? null,
           hardHitPct: savantStats?.hardHitPct ?? null,
+          // True vs-MLB Statcast percentiles (ranked across every qualified
+          // batter, not just today's slate) for the power-profile bars. Null
+          // per metric when the Statcast value is missing.
+          pctileMLB: {
+            ev:      mlbPctile(mlbSorted.ev,      savantStats?.exitVelo),
+            barrel:  mlbPctile(mlbSorted.barrel,  savantStats?.barrelPctBBE),
+            hardHit: mlbPctile(mlbSorted.hardHit, savantStats?.hardHitPct),
+          },
           // Bat tracking (Statcast 2024+): bat speed + BLAST rate. "Blast" =
           // a swing that's fast AND squared-up — the most HR-predictive slice.
           // We carry season + a recent ~2-week window (recentBlastPct), since a

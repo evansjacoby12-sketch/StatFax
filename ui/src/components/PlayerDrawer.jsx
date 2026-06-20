@@ -685,20 +685,37 @@ const PCTILE_ROWS = [
 const pctileColor = (p) => `hsl(${220 - 180 * (p / 100)} 75% 50%)`
 
 function PercentileSection({ b }) {
-  const rows = PCTILE_ROWS.map((r) => ({ ...r, p: b.pctile?.[r.k], val: r.v(b) })).filter((r) => r.p != null)
+  // Prefer the true vs-MLB Statcast percentile (server-computed across every
+  // qualified batter) for the metrics it covers; fall back to the slate-
+  // relative rank otherwise. Keep the slate rank as a secondary tag so you can
+  // still see where a bat lands among tonight's options.
+  const rows = PCTILE_ROWS.map((r) => {
+    const mlbP = b.pctileMLB?.[r.k]
+    const slateP = b.pctile?.[r.k]
+    const mlb = Number.isFinite(mlbP)
+    return { ...r, p: mlb ? mlbP : slateP, slateP, basis: mlb ? 'MLB' : 'slate', val: r.v(b) }
+  }).filter((r) => r.p != null)
   if (!rows.length) return null
   return (
     <Section title="Percentiles" icon="BarChart3">
-      <div className="pctile-cap dim" style={{ fontSize: '11px', marginBottom: '14px' }}>Power profile ranked against today&apos;s slate — colored number is the percentile, right column is the raw stat.</div>
+      <div className="pctile-cap dim" style={{ fontSize: '11px', marginBottom: '14px' }}>Statcast power quality ranked vs <b>all MLB</b> (Savant); rate stats vs today&apos;s slate. Small line = rank among today&apos;s bats.</div>
       <div className="pctile-list" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
         {rows.map((r) => (
-          <div className="pctile-row" key={r.k} title={`${r.label}: better than ${r.p}% of today's slate`} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '12px' }}>
-            <span className="pctile-label" style={{ width: '72px', color: 'var(--text-dim)', fontWeight: '700', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>{r.label}</span>
+          <div className="pctile-row" key={r.k} title={`${r.label}: better than ${r.p}% (${r.basis === 'MLB' ? 'vs all MLB' : "vs today's slate"})`} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '12px' }}>
+            <span className="pctile-label" style={{ width: '66px', color: 'var(--text-dim)', fontWeight: '700', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>{r.label}</span>
             <span className="pctile-bar" style={{ flex: '1', height: '8px', background: 'var(--card-2)', borderRadius: '99px', position: 'relative', overflow: 'hidden' }}>
               <span className="pctile-fill" style={{ width: `${r.p}%`, background: pctileColor(r.p), opacity: 1, height: '100%', display: 'block', borderRadius: '99px' }} />
             </span>
-            <span className="pctile-rank mono" style={{ width: '26px', textAlign: 'right', fontWeight: '800', color: pctileColor(r.p) }} title={`${r.p}th percentile`}>{r.p}</span>
-            <span className="pctile-val mono" style={{ width: '62px', textAlign: 'right', fontWeight: '700', color: '#fff' }}>{r.val ?? '—'}</span>
+            <span className="pctile-rank mono" style={{ width: '52px', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', lineHeight: 1.15 }}>
+              <span>
+                <b style={{ fontWeight: '800', color: pctileColor(r.p) }}>{r.p}</b>
+                <span className="dim" style={{ fontSize: '8px', fontWeight: '700', marginLeft: '3px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{r.basis}</span>
+              </span>
+              {r.basis === 'MLB' && Number.isFinite(r.slateP) && (
+                <span className="dim" style={{ fontSize: '9px', color: 'var(--text-faint)' }}>{r.slateP} slate</span>
+              )}
+            </span>
+            <span className="pctile-val mono" style={{ width: '58px', textAlign: 'right', fontWeight: '700', color: '#fff' }}>{r.val ?? '—'}</span>
           </div>
         ))}
       </div>
