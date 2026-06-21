@@ -128,6 +128,13 @@ export default function ResultsView({ meta, batters, onSelect, favorConsistency 
     for (const r of log.records?.[d] || []) map.set(Number(r.playerId), r)
     return map
   }
+  // Live fallback for the current (un-reconciled) day: the backtest log has no
+  // graded records until reconcile runs after games, so without this today's
+  // combos render as #playerId with every leg a miss. When a leg has no record
+  // we read its name + HR status straight from the live slate instead.
+  const liveById = new Map(
+    (batters || []).map((b) => [Number(b.playerId), { name: b.name, homered: b.homeredThisGame === true || b.liveContext?.isHRThisGame === true }]),
+  )
   const dayCombos = (() => {
     if (!activeComboDay) return []
     const recs = recByDay(activeComboDay)
@@ -139,7 +146,12 @@ export default function ResultsView({ meta, batters, onSelect, favorConsistency 
       .map((c) => {
         const legs = (c.legs || []).map((pid) => {
           const r = recs.get(Number(pid))
-          return { name: (r?.name || `#${pid}`).split(' ').slice(-1)[0], homered: r?.homered === true }
+          const lb = liveById.get(Number(pid))
+          // Records (reconciled past days) are authoritative; live status only
+          // fills in when a leg has no record yet (today).
+          const name = r?.name || lb?.name || `#${pid}`
+          const homered = r ? r.homered === true : lb?.homered === true
+          return { name: name.split(' ').slice(-1)[0], homered }
         })
         const nHit = legs.filter((l) => l.homered).length
         return { strategy: c.strategy, size: c.size, nHit, allHit: legs.length > 0 && nHit === legs.length, legs }
