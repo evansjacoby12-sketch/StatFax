@@ -181,9 +181,11 @@ function makeGroup({ strategy, size, legs: rows }) {
 // canonical engine rows (skipping finals — not bettable pregame), delegates the
 // construction to combo-engine.buildCombos, then wraps each combo for display.
 // favorConsistency / incumbents / stickMargin are client-only leans passed
-// straight through to the engine (see buildCombos).
-export function buildGroups(batters, { maxPerBat = 2, globalMaxPerBat = 4, favorConsistency = false, incumbents = null, stickMargin = 0.05 } = {}) {
-  const rows = (batters || []).filter((b) => !b.game?.isFinal).map(toComboRow)
+// straight through to the engine (see buildCombos). `includeFinals` keeps
+// finished games in the pool — used by the Live tracker (not the betting board)
+// so a combo can be followed all day, not dropped the moment a game ends.
+export function buildGroups(batters, { maxPerBat = 2, globalMaxPerBat = 4, favorConsistency = false, incumbents = null, stickMargin = 0.05, includeFinals = false } = {}) {
+  const rows = (batters || []).filter((b) => includeFinals || !b.game?.isFinal).map(toComboRow)
   const combos = buildCombos(rows, { sizes: SIZES, maxPerBat, globalMaxPerBat, favorConsistency, incumbents, stickMargin })
   const out = {}
   for (const c of combos) {

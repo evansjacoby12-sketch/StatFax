@@ -20,6 +20,7 @@ import PlayerDrawer from '../src/components/PlayerDrawer.jsx'
 import ZoneView from '../src/components/ZoneView.jsx'
 import ParlaySlip from '../src/components/ParlaySlip.jsx'
 import ParlayBuilder from '../src/components/ParlayBuilder.jsx'
+import LiveCombosView from '../src/components/LiveCombosView.jsx'
 import Guide from '../src/components/Guide.jsx'
 import HowToPick from '../src/components/HowToPick.jsx'
 import Legend from '../src/components/Legend.jsx'
@@ -174,6 +175,7 @@ add('ResultsView', <ResultsView meta={meta} />)
 add('ParlaySlip', <ParlaySlip legs={batters.slice(0, 2)} onRemove={noop} onClear={noop} onSelect={noop} onOpenBuilder={noop} />)
 add('ParlayBuilder.empty', <ParlayBuilder batters={batters} legs={[]} slipSet={new Set()} onToggle={noop} onRemove={noop} onClear={noop} onReplace={noop} onSelect={noop} onClose={noop} />)
 add('ParlayBuilder.filled', <ParlayBuilder batters={batters} legs={batters.slice(0, 2)} slipSet={new Set(batters.slice(0, 2).map((b) => b.id))} onToggle={noop} onRemove={noop} onClear={noop} onReplace={noop} onSelect={noop} onClose={noop} />)
+add('LiveCombosView', <LiveCombosView batters={batters} onSelect={noop} />)
 add('Guide', <Guide onClose={noop} />)
 add('HowToPick', <HowToPick onClose={noop} />)
 add('Legend', <Legend onClose={noop} />)

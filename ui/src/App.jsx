@@ -22,6 +22,7 @@ import PlayerDrawer from './components/PlayerDrawer.jsx'
 import ZoneView from './components/ZoneView.jsx'
 import ParlaySlip from './components/ParlaySlip.jsx'
 import ParlayBuilder from './components/ParlayBuilder.jsx'
+import LiveCombosView from './components/LiveCombosView.jsx'
 import Legend from './components/Legend.jsx'
 import Guide from './components/Guide.jsx'
 import HowToPick from './components/HowToPick.jsx'
@@ -77,6 +78,7 @@ export default function App() {
   const [showGroups, setShowGroups] = useState(false)
   const [showSGP, setShowSGP] = useState(false)
   const [showBuilder, setShowBuilder] = useState(false)
+  const [showLiveCombos, setShowLiveCombos] = useState(false)
   const [showSplits, setShowSplits] = useState(false)
   const [showBacktest, setShowBacktest] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
@@ -198,6 +200,7 @@ export default function App() {
         else if (selectedId) setSelectedId(null) // drawer stacks above the modals — close it first
         else if (showBacktest) setShowBacktest(false)
         else if (showSplits) setShowSplits(false)
+        else if (showLiveCombos) setShowLiveCombos(false)
         else if (showBuilder) setShowBuilder(false)
         else if (showGroups) setShowGroups(false)
         else if (showSGP) setShowSGP(false)
@@ -208,7 +211,7 @@ export default function App() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [selectedId, showLegend, showGuide, showHowTo, zoneId, showGroups, showSGP, showBuilder, showSplits, showBacktest, pitcherKey])
+  }, [selectedId, showLegend, showGuide, showHowTo, zoneId, showGroups, showSGP, showBuilder, showLiveCombos, showSplits, showBacktest, pitcherKey])
 
   const patch = useCallback((p) => setFilters((f) => ({ ...f, ...p })), [])
 
@@ -410,6 +413,7 @@ export default function App() {
           onOpenGuide={() => setShowGuide(true)}
           onOpenHowTo={() => setShowHowTo(true)}
           onOpenBuilder={() => setShowBuilder(true)}
+          onOpenLiveCombos={() => setShowLiveCombos(true)}
           onOpenGroups={() => setShowGroups(true)}
           onOpenSGP={() => setShowSGP(true)}
           onOpenSplits={() => setShowSplits(true)}
@@ -602,6 +606,27 @@ export default function App() {
                 selectedId={selectedId}
                 watchlist={watchlist}
                 slip={slipSet}
+              />
+            </div>
+          </div>
+        </>
+      )}
+      {showLiveCombos && (
+        <>
+          <div className="drawer-scrim" onClick={() => setShowLiveCombos(false)} />
+          <div className="modal groups-modal" role="dialog" aria-modal="true" aria-label="Live Combos">
+            <button className="drawer-close icon-btn" onClick={() => setShowLiveCombos(false)} aria-label="Close">
+              <Icon name="X" size={18} />
+            </button>
+            <div className="groups-modal-head">
+              <Icon name="Activity" size={18} />
+              <h2>Live Combos</h2>
+            </div>
+            <div className="groups-modal-body">
+              <LiveCombosView
+                batters={all}
+                onSelect={(b) => setSelectedId(b.id)}
+                favorConsistency={favorConsistency}
               />
             </div>
           </div>
