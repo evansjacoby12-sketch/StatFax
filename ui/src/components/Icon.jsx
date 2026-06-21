@@ -48,6 +48,10 @@ import {
   UserCheck,
   Sparkles,
   Lock,
+  GitBranch,
+  Share2,
+  Bookmark,
+  Trash2,
 } from 'lucide-react'
 
 const REGISTRY = {
@@ -100,6 +104,10 @@ const REGISTRY = {
   UserCheck,
   Sparkles,
   Lock,
+  GitBranch,
+  Share2,
+  Bookmark,
+  Trash2,
 }
 
 export default function Icon({ name, size = 16, ...rest }) {

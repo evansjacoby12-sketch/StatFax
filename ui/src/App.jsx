@@ -21,6 +21,7 @@ import ResultsView from './components/ResultsView.jsx'
 import PlayerDrawer from './components/PlayerDrawer.jsx'
 import ZoneView from './components/ZoneView.jsx'
 import ParlaySlip from './components/ParlaySlip.jsx'
+import ParlayBuilder from './components/ParlayBuilder.jsx'
 import Legend from './components/Legend.jsx'
 import Guide from './components/Guide.jsx'
 import HowToPick from './components/HowToPick.jsx'
@@ -75,6 +76,7 @@ export default function App() {
   const [showHowTo, setShowHowTo] = useState(false)
   const [showGroups, setShowGroups] = useState(false)
   const [showSGP, setShowSGP] = useState(false)
+  const [showBuilder, setShowBuilder] = useState(false)
   const [showSplits, setShowSplits] = useState(false)
   const [showBacktest, setShowBacktest] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
@@ -196,6 +198,7 @@ export default function App() {
         else if (selectedId) setSelectedId(null) // drawer stacks above the modals — close it first
         else if (showBacktest) setShowBacktest(false)
         else if (showSplits) setShowSplits(false)
+        else if (showBuilder) setShowBuilder(false)
         else if (showGroups) setShowGroups(false)
         else if (showSGP) setShowSGP(false)
         else if (showHowTo) setShowHowTo(false)
@@ -205,7 +208,7 @@ export default function App() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [selectedId, showLegend, showGuide, showHowTo, zoneId, showGroups, showSGP, showSplits, showBacktest, pitcherKey])
+  }, [selectedId, showLegend, showGuide, showHowTo, zoneId, showGroups, showSGP, showBuilder, showSplits, showBacktest, pitcherKey])
 
   const patch = useCallback((p) => setFilters((f) => ({ ...f, ...p })), [])
 
@@ -244,6 +247,8 @@ export default function App() {
 
   const removeSlip = useCallback((id) => setSlipIds((prev) => prev.filter((x) => x !== id)), [])
   const clearSlip = useCallback(() => setSlipIds([]), [])
+  // Replace the whole slip (auto-build / load a saved slip) — dedupes + ignores blanks.
+  const replaceSlip = useCallback((ids) => setSlipIds([...new Set((ids || []).filter((x) => x != null))]), [])
 
   // Attach the RISING signal (recent L14 barrel surging above season) as a real
   // boolean flag so every consumer — board badges, filters, counts, backtest —
@@ -404,6 +409,7 @@ export default function App() {
           total={all.length}
           onOpenGuide={() => setShowGuide(true)}
           onOpenHowTo={() => setShowHowTo(true)}
+          onOpenBuilder={() => setShowBuilder(true)}
           onOpenGroups={() => setShowGroups(true)}
           onOpenSGP={() => setShowSGP(true)}
           onOpenSplits={() => setShowSplits(true)}
@@ -534,7 +540,37 @@ export default function App() {
         onRemove={removeSlip}
         onClear={clearSlip}
         onSelect={(b) => setSelectedId(b.id)}
+        onOpenBuilder={() => setShowBuilder(true)}
       />
+
+      {showBuilder && (
+        <>
+          <div className="drawer-scrim" onClick={() => setShowBuilder(false)} />
+          <div className="modal groups-modal builder-modal" role="dialog" aria-modal="true" aria-label="Parlay Builder">
+            <button className="drawer-close icon-btn" onClick={() => setShowBuilder(false)} aria-label="Close">
+              <Icon name="X" size={18} />
+            </button>
+            <div className="groups-modal-head">
+              <Icon name="Layers" size={18} />
+              <h2>Parlay Builder</h2>
+            </div>
+            <div className="groups-modal-body">
+              <ParlayBuilder
+                batters={all}
+                legs={slipLegs}
+                slipSet={slipSet}
+                onToggle={toggleSlip}
+                onRemove={removeSlip}
+                onClear={clearSlip}
+                onReplace={replaceSlip}
+                onSelect={(b) => setSelectedId(b.id)}
+                onClose={() => setShowBuilder(false)}
+                favorConsistency={favorConsistency}
+              />
+            </div>
+          </div>
+        </>
+      )}
 
       {selected && (
         <PlayerDrawer

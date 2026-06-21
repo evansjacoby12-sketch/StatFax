@@ -25,7 +25,7 @@ function parlaySummary(p, pg) {
   return s
 }
 
-export default function ParlaySlip({ legs, onRemove, onClear, onSelect }) {
+export default function ParlaySlip({ legs, onRemove, onClear, onSelect, onOpenBuilder }) {
   const [open, setOpen] = useState(false)
   const [wager, setWager] = useState('10')
   if (!legs.length) return null
@@ -78,9 +78,16 @@ export default function ParlaySlip({ legs, onRemove, onClear, onSelect }) {
                 Grade {pg.letter}
               </span>
             )}
-            <button className="slip-clear" onClick={onClear} style={{ fontSize: '11px', color: 'var(--text-faint)', fontWeight: '600' }}>
-              Clear all
-            </button>
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+              {onOpenBuilder && (
+                <button className="slip-build" onClick={onOpenBuilder} title="Open the full parlay builder" style={{ fontSize: '11px', color: 'var(--accent)', fontWeight: '800', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                  <Icon name="Sparkles" size={12} /> Build
+                </button>
+              )}
+              <button className="slip-clear" onClick={onClear} style={{ fontSize: '11px', color: 'var(--text-faint)', fontWeight: '600' }}>
+                Clear all
+              </button>
+            </div>
           </div>
           
           <div className="slip-summary" style={{ fontSize: '12px', color: 'var(--text-dim)', marginBottom: '14px', lineHeight: '1.4' }}>
