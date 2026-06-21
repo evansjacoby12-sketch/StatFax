@@ -3,14 +3,21 @@ import Icon from './Icon.jsx'
 import { GradeChip } from './atoms.jsx'
 import { hexA } from './atoms.jsx'
 import { pct, num } from '../lib/format.js'
+import Select from './Select.jsx'
 import { buildGroups, lastFirst } from '../lib/groups.js'
 import { comboStatus, legStatus, VERDICT_META, LEG_META } from '../lib/live.js'
 
 const GRADE_COLOR = { S: '#f5a623', A: '#32d74b', B: '#3b82f6', C: '#9aa6b6', D: '#6b7787' }
-const FILTERS = [
-  { k: 'all', label: 'All live' },
-  { k: 'cashed', label: 'Cashed' },
-  { k: 'live', label: 'Still alive' },
+const STATUS_OPTS = [
+  { value: 'all', label: 'All live' },
+  { value: 'cashed', label: 'Cashed' },
+  { value: 'live', label: 'Still alive' },
+]
+const SIZE_OPTS = [
+  { value: 0, label: 'All sizes' },
+  { value: 2, label: '2-leg' },
+  { value: 3, label: '3-leg' },
+  { value: 4, label: '4-leg' },
 ]
 
 function Tag({ code, text, meta }) {
@@ -58,6 +65,9 @@ function LiveCombo({ g, onSelect }) {
 
 export default function LiveCombosView({ batters, onSelect, favorConsistency = false }) {
   const [filter, setFilter] = useState('all')
+  const [size, setSize] = useState(0)
+  const [strat, setStrat] = useState('all')
+  const [gamePks, setGamePks] = useState(() => new Set())
 
   // Build combos across the FULL slate (finals included) so a combo is tracked
   // all day, then grade each against live HRs.
@@ -80,8 +90,25 @@ export default function LiveCombosView({ batters, onSelect, favorConsistency = f
   const cashed = started.filter((c) => c.v.code === 'cashed')
   const alive = started.filter((c) => c.v.code === 'live')
 
-  const shown = (filter === 'cashed' ? cashed : filter === 'live' ? alive : [...cashed, ...alive])
-    .slice()
+  // Filter option pools, derived from the combos actually in play.
+  const stratOpts = useMemo(() => {
+    const m = new Map()
+    for (const c of started) if (!m.has(c.g.strategy)) m.set(c.g.strategy, c.g.label)
+    return [{ value: 'all', label: 'All strategies' }, ...[...m].map(([value, label]) => ({ value, label }))]
+  }, [started])
+  const gameOpts = useMemo(() => {
+    const m = new Map()
+    for (const c of started) for (const b of c.g.legs) {
+      if (b.gamePk != null && !m.has(b.gamePk)) m.set(b.gamePk, b.game ? `${b.game.awayTeam?.abbr}@${b.game.homeTeam?.abbr}` : `#${b.gamePk}`)
+    }
+    return [{ value: '', label: 'All games' }, ...[...m].map(([value, label]) => ({ value, label }))]
+  }, [started])
+
+  const shown = started
+    .filter((c) => (filter === 'cashed' ? c.v.code === 'cashed' : filter === 'live' ? c.v.code === 'live' : c.v.code === 'cashed' || c.v.code === 'live'))
+    .filter((c) => !size || c.g.size === size)
+    .filter((c) => strat === 'all' || c.g.strategy === strat)
+    .filter((c) => !gamePks.size || c.g.legs.some((b) => gamePks.has(String(b.gamePk))))
     .sort((a, b) =>
       (b.v.code === 'cashed') - (a.v.code === 'cashed') ||
       (b.v.hits / b.v.n) - (a.v.hits / a.v.n) ||
@@ -100,12 +127,13 @@ export default function LiveCombosView({ batters, onSelect, favorConsistency = f
         <Kpi label="Tracked" value={started.length} color="var(--text-dim)" />
       </div>
 
-      <div className="lc-filters" style={{ display: 'flex', gap: '6px', marginBottom: '14px' }}>
-        {FILTERS.map((f) => (
-          <button key={f.k} className={`badge-toggle ${filter === f.k ? 'on' : ''}`} onClick={() => setFilter(f.k)} aria-pressed={filter === f.k}>
-            {f.label}
-          </button>
-        ))}
+      <div className="lc-filters" style={{ display: 'flex', gap: '8px', marginBottom: '14px', flexWrap: 'wrap' }}>
+        <Select icon="Activity" title="Status" ariaLabel="Filter by status" value={filter} onChange={setFilter} options={STATUS_OPTS} />
+        <Select icon="Layers" title="Legs" ariaLabel="Filter by size" value={size} onChange={setSize} options={SIZE_OPTS} />
+        <Select icon="Sparkles" title="Strategy" ariaLabel="Filter by strategy" value={strat} onChange={setStrat} options={stratOpts} />
+        {gameOpts.length > 1 && (
+          <Select multi icon="List" title="Games" ariaLabel="Filter by game" value={gamePks} onChange={setGamePks} options={gameOpts} />
+        )}
       </div>
 
       {shown.length ? (
