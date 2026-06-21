@@ -6,6 +6,7 @@ import { GRADE_ORDER, gradeColor } from '../lib/badges.js'
 import { GradeChip } from './atoms.jsx'
 import { playerHeadshot } from '../lib/teams.js'
 import { hexA } from './atoms.jsx'
+import LiveCombosView from './LiveCombosView.jsx'
 
 function computeAuc(rows) {
   const y = rows.map((r) => (r.homered ? 1 : 0))
@@ -25,7 +26,7 @@ function computeAuc(rows) {
   return (rankSum - (nPos * (nPos + 1)) / 2) / (nPos * nNeg)
 }
 
-export default function ResultsView({ meta }) {
+export default function ResultsView({ meta, batters, onSelect, favorConsistency = false }) {
   const [log, setLog] = useState(null)
   const [err, setErr] = useState(null)
   const [hrDay, setHrDay] = useState(null)
@@ -182,6 +183,15 @@ export default function ResultsView({ meta }) {
 
   return (
     <div className="results">
+      {batters && (
+        <section className="results-card" style={{ background: 'rgba(16, 24, 48, 0.45)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '12px', padding: '20px', marginBottom: '24px' }}>
+          <h3 className="section-title" style={{ fontSize: '13px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '16px', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: '8px' }}>
+            <Icon name="Activity" size={14} style={{ color: 'var(--accent)' }} /> Live combos
+            <span style={{ fontWeight: '400', textTransform: 'none', marginLeft: '6px', fontSize: '12px', color: 'var(--text-faint)' }}>· today, in progress</span>
+          </h3>
+          <LiveCombosView batters={batters} onSelect={onSelect} favorConsistency={favorConsistency} />
+        </section>
+      )}
       <div className="results-kpis" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px', marginBottom: '24px' }}>
         <Kpi label="Discrimination (AUC)" value={Number.isFinite(auc) ? auc.toFixed(3) : '—'} sub="ranking quality · 0.5 = random" accent="var(--prime)" />
         <Kpi label="Top-decile hit rate" value={pct(topRate, 0)} sub={`${(topRate / base).toFixed(1)}x vs base ${pct(base, 0)}`} accent="var(--strong)" />

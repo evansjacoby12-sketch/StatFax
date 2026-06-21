@@ -5,7 +5,7 @@ import { GRADE_ORDER, gradeColor } from '../lib/badges.js'
 import { hexA } from './atoms.jsx'
 
 // Help dropdown anchored to the header info button
-function HelpMenu({ onOpenBuilder, onOpenLiveCombos, onOpenGroups, onOpenSGP, onOpenSplits, onOpenBacktest, onOpenGuide, onOpenHowTo, onOpenLegend, onOpenSettings }) {
+function HelpMenu({ onOpenBuilder, onOpenGroups, onOpenSGP, onOpenSplits, onOpenBacktest, onOpenGuide, onOpenHowTo, onOpenLegend, onOpenSettings }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
   
@@ -25,7 +25,6 @@ function HelpMenu({ onOpenBuilder, onOpenLiveCombos, onOpenGroups, onOpenSGP, on
 
   const items = [
     { label: 'Parlay Builder', desc: 'Build your own slip — live odds, EV & correlation', icon: 'Sparkles', fn: onOpenBuilder },
-    { label: 'Live Combos', desc: 'Every model combo, graded live as games play', icon: 'Activity', fn: onOpenLiveCombos },
     { label: 'Parlay Combos', desc: 'Auto-built chalk, value, lottery combos', icon: 'Layers', fn: onOpenGroups },
     { label: 'Same-Game Parlays', desc: 'Best correlated 2–4 leg SGPs', icon: 'Zap', fn: onOpenSGP },
     { label: 'Cheat Sheet', desc: 'HR plays, barrels, weak arms & parks', icon: 'LayoutGrid', fn: onOpenSplits },
@@ -97,7 +96,6 @@ export default function Header({
   onOpenGuide,
   onOpenHowTo,
   onOpenBuilder,
-  onOpenLiveCombos,
   onOpenGroups,
   onOpenSGP,
   onOpenSplits,
@@ -219,7 +217,7 @@ export default function Header({
           <Icon name={eliLevel === 'eli5' ? 'Sparkles' : 'BarChart3'} size={14} style={{ color: 'var(--accent)' }} />
         </button>
 
-        <HelpMenu onOpenBuilder={onOpenBuilder} onOpenLiveCombos={onOpenLiveCombos} onOpenGroups={onOpenGroups} onOpenSGP={onOpenSGP} onOpenSplits={onOpenSplits} onOpenBacktest={onOpenBacktest} onOpenGuide={onOpenGuide} onOpenHowTo={onOpenHowTo} onOpenLegend={onOpenLegend} onOpenSettings={onOpenSettings} />
+        <HelpMenu onOpenBuilder={onOpenBuilder} onOpenGroups={onOpenGroups} onOpenSGP={onOpenSGP} onOpenSplits={onOpenSplits} onOpenBacktest={onOpenBacktest} onOpenGuide={onOpenGuide} onOpenHowTo={onOpenHowTo} onOpenLegend={onOpenLegend} onOpenSettings={onOpenSettings} />
 
         <button
           className={`icon-btn ${refreshing ? 'refreshing' : ''}`}

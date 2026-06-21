@@ -171,7 +171,7 @@ for (const mode of [true, false]) {
   add(`PlayerDrawer.normal[${tag}]`, <PlayerDrawer batter={normal} onClose={noop} watched onToggleWatch={noop} onToggleSlip={noop} />)
 }
 add('ZoneView', <ZoneView batter={live} onClose={noop} />)
-add('ResultsView', <ResultsView meta={meta} />)
+add('ResultsView', <ResultsView meta={meta} batters={batters} onSelect={noop} />)
 add('ParlaySlip', <ParlaySlip legs={batters.slice(0, 2)} onRemove={noop} onClear={noop} onSelect={noop} onOpenBuilder={noop} />)
 add('ParlayBuilder.empty', <ParlayBuilder batters={batters} legs={[]} slipSet={new Set()} onToggle={noop} onRemove={noop} onClear={noop} onReplace={noop} onSelect={noop} onClose={noop} />)
 add('ParlayBuilder.filled', <ParlayBuilder batters={batters} legs={batters.slice(0, 2)} slipSet={new Set(batters.slice(0, 2).map((b) => b.id))} onToggle={noop} onRemove={noop} onClear={noop} onReplace={noop} onSelect={noop} onClose={noop} />)
