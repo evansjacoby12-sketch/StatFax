@@ -12,7 +12,7 @@ function parlaySummary(p, pg) {
   if (!p.n) return ''
   const size = p.n === 1 ? 'single-leg parlay' : `${p.n}-leg parlay`
   const hit = pct(p.modelProb, p.modelProb < 0.01 ? 2 : 1)
-  const who = p.n === 1 ? 'it' : `all ${p.n}`
+  const who = p.n === 1 ? 'it' : `all ${p.n} legs`
   const grade = pg ? `Grade ${pg.letter} · ` : ''
   let s = `${grade}${size} — model gives ${who} a ${hit} chance to cash.`
   if (p.allPriced) {
@@ -160,11 +160,13 @@ export default function ParlaySlip({ legs, onRemove, onClear, onSelect, onOpenBu
                   textAlign: 'left',
                   minWidth: '0'
                 }}>
-                  <span className="slip-leg-grade" style={{ background: gradeColor(b.grade?.label), width: '6px', height: '6px', borderRadius: '50%' }} />
-                  <span className="slip-leg-name" style={{ fontSize: '12px', fontWeight: '600', color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.name}</span>
-                  <span className="slip-leg-team" style={{ fontSize: '10px', color: 'var(--text-faint)' }}>{b.team}</span>
+                  <span className="slip-leg-grade" style={{ background: gradeColor(b.grade?.label), width: '6px', height: '6px', borderRadius: '50%', flexShrink: 0 }} />
+                  {/* Name owns the flexible space and ellipsizes; the team + weak
+                      tag are fixed-size so they can't squeeze the name to nothing. */}
+                  <span className="slip-leg-name" style={{ flex: '1 1 auto', minWidth: 0, fontSize: '12px', fontWeight: '600', color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.name}</span>
+                  <span className="slip-leg-team" style={{ flexShrink: 0, fontSize: '10px', color: 'var(--text-faint)' }}>{b.team}</span>
                   {b.id === weakId && (
-                    <span className="slip-weak-tag" title="Weakest leg" style={{ fontSize: '9px', background: 'rgba(249,115,22,0.08)', color: 'var(--b-hot)', borderRadius: '4px', padding: '1px 4px', display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                    <span className="slip-weak-tag" title="Weakest leg" style={{ flexShrink: 0, fontSize: '9px', background: 'rgba(249,115,22,0.08)', color: 'var(--b-hot)', borderRadius: '4px', padding: '1px 4px', display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
                       <Icon name="TriangleAlert" size={8} /> weak
                     </span>
                   )}
