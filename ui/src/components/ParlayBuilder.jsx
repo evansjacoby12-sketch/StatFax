@@ -6,6 +6,7 @@ import { pct, num, american, signedPct } from '../lib/format.js'
 import { gradeColor } from '../lib/badges.js'
 import { buildParlay } from '../lib/parlayMath.js'
 import { buildGroups, lastFirst } from '../lib/groups.js'
+import { comboStatus, legStatus, VERDICT_META, LEG_META } from '../lib/live.js'
 import * as store from '../lib/storage.js'
 
 const GRADE_COLOR = { S: '#f5a623', A: '#10b981', B: '#3b82f6', C: '#94a3b8', D: '#64748b' }
@@ -14,8 +15,19 @@ const SIZES = [2, 3, 4]
 // Compact American odds, "—" when unpriced.
 const od = (a) => (Number.isFinite(a) ? american(a) : '—')
 
+// A small live-status pill for a leg / combo verdict.
+function LiveTag({ code, text, meta, size = 'sm' }) {
+  const m = meta[code]
+  if (!m) return null
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', flexShrink: 0, fontSize: size === 'lg' ? '11px' : '9px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.03em', color: m.color, background: hexA(m.color, 0.1), border: `1px solid ${hexA(m.color, 0.3)}`, borderRadius: '5px', padding: size === 'lg' ? '2px 8px' : '1px 5px' }}>
+      <Icon name={m.icon} size={size === 'lg' ? 11 : 9} className={code === 'live' ? 'spin-pulse' : ''} /> {text ?? m.label}
+    </span>
+  )
+}
+
 // ── Live summary header ───────────────────────────────────────────────────────
-function Summary({ p, correlate, onToggleCorr, wager, onWager }) {
+function Summary({ p, live, correlate, onToggleCorr, wager, onWager }) {
   const gColor = p.grade ? GRADE_COLOR[p.grade.letter] : 'var(--text-faint)'
   const payDecimal = p.allPriced ? p.decimal : p.fairDecimal
   const wagerNum = parseFloat(wager)
@@ -30,6 +42,9 @@ function Summary({ p, correlate, onToggleCorr, wager, onWager }) {
             <span style={{ color: gColor, borderColor: hexA(gColor, 0.4), borderWidth: '1px', borderStyle: 'solid', borderRadius: '6px', padding: '2px 8px', fontSize: '11px', fontWeight: '800', background: hexA(gColor, 0.08) }} title={`Avg leg score ${Math.round(p.grade.avgScore)}`}>
               Grade {p.grade.letter}
             </span>
+          )}
+          {live?.started && (
+            <LiveTag code={live.code} text={`${VERDICT_META[live.code].label} ${live.hits}/${live.n}`} meta={VERDICT_META} size="lg" />
           )}
         </span>
         {p.sameGame && (
@@ -80,15 +95,20 @@ function Metric({ k, v, color, sub }) {
 function LegRow({ b, perLeg, weak, onSelect, onRemove }) {
   const isWeak = weak?.id === b.id
   const edge = perLeg?.edge
+  const st = legStatus(b)
+  const lm = LEG_META[st.code]
+  // A homered leg gets a green wash; a dead one dims.
+  const bg = st.code === 'hit' ? hexA('#10b981', 0.08) : st.code === 'dead' ? 'rgba(255,255,255,0.01)' : 'rgba(255,255,255,0.015)'
   return (
-    <div className={`pb-leg ${isWeak ? 'weak' : ''}`} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px', background: 'rgba(255,255,255,0.015)', border: `1px solid ${isWeak ? 'rgba(249,115,22,0.18)' : 'rgba(255,255,255,0.05)'}`, borderRadius: '9px' }}>
+    <div className={`pb-leg ${isWeak ? 'weak' : ''}`} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px', background: bg, border: `1px solid ${st.code === 'hit' ? 'rgba(16,185,129,0.25)' : isWeak ? 'rgba(249,115,22,0.18)' : 'rgba(255,255,255,0.05)'}`, borderRadius: '9px', opacity: st.code === 'dead' ? 0.6 : 1 }}>
       <button onClick={() => onSelect(b)} title="Open detail" style={{ display: 'flex', alignItems: 'center', gap: '7px', flex: '1', textAlign: 'left', minWidth: 0 }}>
-        <span style={{ background: gradeColor(b.grade?.label), width: '6px', height: '6px', borderRadius: '50%', flex: 'none' }} />
+        <span style={{ background: st.code !== 'pending' ? lm.color : gradeColor(b.grade?.label), width: '6px', height: '6px', borderRadius: '50%', flex: 'none' }} />
         <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
           <span style={{ fontSize: '12.5px', fontWeight: '600', color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.name}</span>
           <span style={{ fontSize: '10px', color: 'var(--text-faint)' }}>{b.team} {b.opponent?.abbr ? `vs ${b.opponent.abbr}` : ''}{isWeak ? ' · weak link' : ''}</span>
         </span>
       </button>
+      {st.code !== 'pending' && <LiveTag code={st.code} text={st.code === 'hit' ? 'HR' : st.label} meta={LEG_META} />}
       <GradeChip grade={b.grade} size="sm" score={b.score} />
       <span className="mono" style={{ fontSize: '11px', color: 'var(--text-dim)', width: '42px', textAlign: 'right' }}>{pct(b.hrProbability, 1)}</span>
       <span className="mono" style={{ fontSize: '11px', color: '#fff', fontWeight: '600', width: '46px', textAlign: 'right' }}>{od(perLeg?.american)}</span>
@@ -110,6 +130,9 @@ export default function ParlayBuilder({ batters, legs, slipSet, onToggle, onRemo
 
   const p = useMemo(() => buildParlay(legs, { correlate }), [legs, correlate])
   const perLegById = useMemo(() => new Map(p.perLeg.map((l) => [l.id, l])), [p])
+  // Live tracking — grade the slip + resolve saved slips against in-progress HRs.
+  const live = useMemo(() => comboStatus(legs), [legs])
+  const byId = useMemo(() => new Map((batters || []).map((b) => [b.id, b])), [batters])
 
   // Same-game groups with ≥2 legs (the correlated subsets) for the badge note.
   const sgGroups = useMemo(() => p.byGame.filter((g) => g.legs.length >= 2), [p])
@@ -174,7 +197,7 @@ export default function ParlayBuilder({ batters, legs, slipSet, onToggle, onRemo
         <div className="pb-toast" style={{ position: 'absolute', top: '12px', left: '50%', transform: 'translateX(-50%)', zIndex: 10, background: 'var(--strong)', color: '#06251a', fontWeight: '800', fontSize: '12px', padding: '6px 14px', borderRadius: '999px', boxShadow: '0 4px 16px rgba(0,0,0,0.4)' }}>{toast}</div>
       )}
 
-      <Summary p={p} correlate={correlate} onToggleCorr={() => setCorrelate((c) => !c)} wager={wager} onWager={setWager} />
+      <Summary p={p} live={live} correlate={correlate} onToggleCorr={() => setCorrelate((c) => !c)} wager={wager} onWager={setWager} />
 
       {sgGroups.length > 0 && correlate && (
         <div className="pb-sg-note" style={{ fontSize: '11px', color: 'var(--b-plat)', background: hexA('#8b5cf6', 0.08), border: `1px solid ${hexA('#8b5cf6', 0.25)}`, borderRadius: '8px', padding: '7px 10px', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -277,16 +300,21 @@ export default function ParlayBuilder({ batters, legs, slipSet, onToggle, onRemo
 
         {tab === 'saved' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            {saved.length ? saved.map((s) => (
-              <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '9px 11px', background: 'rgba(255,255,255,0.015)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '9px' }}>
-                <button onClick={() => { onReplace(s.ids); setTab('legs') }} style={{ flex: 1, textAlign: 'left', minWidth: 0 }}>
-                  <span style={{ display: 'block', fontSize: '12.5px', fontWeight: '600', color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.name}</span>
-                  <span className="dim" style={{ fontSize: '10px' }}>{s.ids.length} legs · saved {new Date(s.savedAt).toLocaleDateString()}</span>
-                </button>
-                <button onClick={() => { onReplace(s.ids); setTab('legs') }} style={{ fontSize: '11px', fontWeight: '700', color: 'var(--accent)', border: '1px solid var(--accent)', borderRadius: '6px', padding: '2px 9px' }}>Load</button>
-                <button onClick={() => deleteSaved(s.id)} aria-label="Delete saved slip" style={{ color: 'var(--text-faint)', display: 'grid', placeItems: 'center' }}><Icon name="Trash2" size={14} /></button>
-              </div>
-            )) : <div className="pb-empty" style={{ textAlign: 'center', color: 'var(--text-faint)', padding: '28px 16px', fontSize: '13px' }}><Icon name="Bookmark" size={24} /><p style={{ marginTop: '8px' }}>No saved slips yet. Build one and tap <b>Save</b>.</p></div>}
+            {saved.length ? saved.map((s) => {
+              const resolved = s.ids.map((id) => byId.get(id)).filter(Boolean)
+              const v = comboStatus(resolved)
+              return (
+                <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '9px 11px', background: v.code === 'cashed' ? hexA('#10b981', 0.07) : 'rgba(255,255,255,0.015)', border: `1px solid ${v.code === 'cashed' ? 'rgba(16,185,129,0.25)' : 'rgba(255,255,255,0.05)'}`, borderRadius: '9px' }}>
+                  <button onClick={() => { onReplace(s.ids); setTab('legs') }} style={{ flex: 1, textAlign: 'left', minWidth: 0 }}>
+                    <span style={{ display: 'block', fontSize: '12.5px', fontWeight: '600', color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.name}</span>
+                    <span className="dim" style={{ fontSize: '10px' }}>{s.ids.length} legs · saved {new Date(s.savedAt).toLocaleDateString()}</span>
+                  </button>
+                  {v.started && resolved.length > 0 && <LiveTag code={v.code} text={`${VERDICT_META[v.code].label} ${v.hits}/${v.n}`} meta={VERDICT_META} />}
+                  <button onClick={() => { onReplace(s.ids); setTab('legs') }} style={{ fontSize: '11px', fontWeight: '700', color: 'var(--accent)', border: '1px solid var(--accent)', borderRadius: '6px', padding: '2px 9px' }}>Load</button>
+                  <button onClick={() => deleteSaved(s.id)} aria-label="Delete saved slip" style={{ color: 'var(--text-faint)', display: 'grid', placeItems: 'center' }}><Icon name="Trash2" size={14} /></button>
+                </div>
+              )
+            }) : <div className="pb-empty" style={{ textAlign: 'center', color: 'var(--text-faint)', padding: '28px 16px', fontSize: '13px' }}><Icon name="Bookmark" size={24} /><p style={{ marginTop: '8px' }}>No saved slips yet. Build one and tap <b>Save</b>.</p></div>}
           </div>
         )}
       </div>

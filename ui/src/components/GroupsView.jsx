@@ -4,7 +4,7 @@ import { GradeChip } from './atoms.jsx'
 import Select from './Select.jsx'
 import { pct, num, rate, american, signedPct } from '../lib/format.js'
 import { buildGroups, legsByStrategy, lastFirst, isoOf, blastOf, blastMixOf, blastVsHandOf, legFlags, legIsBad, risingForm } from '../lib/groups.js'
-import { useLiveMode } from '../lib/liveMode.js'
+import { comboStatus, legStatus, VERDICT_META } from '../lib/live.js'
 import * as store from '../lib/storage.js'
 
 const GROUP_GRADE_COLOR = { S: '#f5a623', A: '#32d74b', B: '#3b82f6', C: '#9aa6b6', D: '#6b7787' }
@@ -505,6 +505,9 @@ function GroupCard({ g, onSelect, selectedId, comboConf = 'off' }) {
   const earliestTime = times.length ? fmtTime(new Date(Math.min(...times)).toISOString()) : null
   const latestTime = times.length ? fmtTime(new Date(Math.max(...times)).toISOString()) : null
   const staggered = times.length >= 2 && Math.max(...times) > Math.min(...times)
+  // Live tracking — once legs' games start, light the card up with a verdict.
+  const live = comboStatus(g.legs)
+  const lv = VERDICT_META[live.code]
   const title =
     tone === 'risk'
       ? `🔴 Weak leg — ${g.legs
@@ -528,7 +531,11 @@ function GroupCard({ g, onSelect, selectedId, comboConf = 'off' }) {
         <span className="grp-strategy">
           <Icon name={g.icon} size={13} /> {g.label}
         </span>
-        {provisional ? (
+        {live.started ? (
+          <span className="grp-live-tag" title={`Live: ${live.hits}/${live.n} legs homered`} style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '10px', fontWeight: '800', color: lv.color, background: `color-mix(in srgb, ${lv.color} 12%, transparent)`, border: `1px solid color-mix(in srgb, ${lv.color} 35%, transparent)`, borderRadius: '5px', padding: '1px 6px' }}>
+            <Icon name={lv.icon} size={10} className={live.code === 'live' ? 'spin-pulse' : ''} /> {lv.label} {live.hits}/{live.n}
+          </span>
+        ) : provisional ? (
           <span className="grp-prov-tag"><Icon name="Clock" size={10} /> PROVISIONAL</span>
         ) : spreadWarn ? (
           <span className="grp-split-tag" title="Benchmark combo — its legs start in different windows (>2.5h apart), so it can't be locked as one clean ticket. Shown to measure the model, not to bet as a single parlay.">
@@ -601,7 +608,6 @@ function GroupCard({ g, onSelect, selectedId, comboConf = 'off' }) {
 }
 
 function GroupLeg({ b, idx, onSelect, selected, bad, weakest, reasons, unconfirmed }) {
-  const liveMode = useLiveMode()
   const hm = b.hotnessMultiplier
   const hotTone = hm > 1.02 ? 'good' : hm < 0.98 ? 'bad' : ''
   const hotLabel = hm > 1.02 ? 'HOT' : hm < 0.98 ? 'COLD' : 'NEU'
@@ -612,7 +618,9 @@ function GroupLeg({ b, idx, onSelect, selected, bad, weakest, reasons, unconfirm
   const barrel = b.barrelPctBBE ?? b.barrelPct
   const iso = isoOf(b)
   const rising = risingForm(b)
-  const hrToday = liveMode && b.liveContext?.isHRThisGame
+  // Live leg status — glow on a HR (live OR already-final game, via homeredThisGame).
+  const st = legStatus(b)
+  const hrToday = st.code === 'hit'
   // Per-leg lock: a leg is locked once ITS game starts (first pitch) — on a full
   // board the legs are in different games, so they lock at different times.
   const lockIso = b.game?.gameDate
@@ -636,6 +644,17 @@ function GroupLeg({ b, idx, onSelect, selected, bad, weakest, reasons, unconfirm
         <div className="grp-leg-l1">
           <span className={`grp-leg-name ${hrToday ? 'hr-glow' : ''}`}>{lastFirst(b.name)}</span>
           <span className="grp-team">{b.team}</span>
+          {hrToday ? (
+            <span className="grp-chip" style={{ color: 'var(--strong)', background: 'color-mix(in srgb, var(--strong) 12%, transparent)', borderColor: 'color-mix(in srgb, var(--strong) 35%, transparent)' }} title="Homered today">
+              <Icon name="Check" size={10} /> HR
+            </span>
+          ) : st.code === 'live' ? (
+            <span className="grp-chip" style={{ color: 'var(--accent)', background: 'color-mix(in srgb, var(--accent) 10%, transparent)', borderColor: 'color-mix(in srgb, var(--accent) 30%, transparent)' }} title="Game in progress">
+              <Icon name="Activity" size={10} /> {st.label}
+            </span>
+          ) : st.code === 'dead' ? (
+            <span className="grp-chip" style={{ color: 'var(--text-faint)' }} title="Game final — no HR">no HR</span>
+          ) : null}
           {unconfirmed && (
             <span className="grp-chip unconf" title="Lineup not posted yet — this bat isn't confirmed in the order. Combo can still change before first pitch.">
               <Icon name="Clock" size={10} /> NO LINEUP
