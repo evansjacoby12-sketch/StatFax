@@ -90,6 +90,20 @@ jobs:
           key: board-history-${{ github.run_id }}
           restore-keys: board-history-
 
+      # Held-out inputs corpus — the frozen scoreBatter() argument bundle per day
+      # (dist/inputs-<date>.json). Accumulated across runs (glob path carries every
+      # dated file forward, same unique-key-saves / restore-by-prefix pattern) so
+      # engine changes can be A/B re-scored against reconciled outcomes offline
+      # (model-lab/ab-rescore.mjs). Previously each run started empty and discarded
+      # its one file, so the corpus could never grow and the up-weight validation
+      # had no held-out set. (Unbounded for now — add a rolling prune once it's deep.)
+      - name: Restore inputs corpus
+        uses: actions/cache@v4
+        with:
+          path: dist/inputs-*.json
+          key: inputs-corpus-${{ github.run_id }}
+          restore-keys: inputs-corpus-
+
       - name: Install brain deps
         run: npm install
 

@@ -136,10 +136,12 @@ export function extractPredictionRecord(row) {
     ord:  num(row.battingOrder),
     hot:  row.hot ? 1 : 0,
     due:  row.due ? 1 : 0,
+    he:   row.homeEdge ? 1 : 0,   // home/park split edge — logged so the homeEdge up-weight is forward-validatable (it wasn't in feat before)
   };
   return {
     feat,
     playerId:       row.playerId,
+    gamePk:         row.gamePk,   // join outcomes per (player, game): a split doubleheader has two prediction rows for one playerId
     name:           row.name,
     // Log the FROZEN pre-game prediction. Once a game starts the server mutates
     // BOTH `score` (live PA-decay, zeroed at Final) AND `grade` (re-derived from
@@ -186,8 +188,10 @@ export async function fetchHomerersForDate(date) {
   const games = sched?.dates?.[0]?.games || [];
   if (!games.length) return { homerers: new Set(), played: new Set() };
 
-  const homerers = new Set();
+  const homerers = new Set();      // playerId — combo scorecard (1 bat/game; a leg is a bare playerId)
   const played   = new Set();
+  const homerersByKey = new Set(); // `${playerId}-${gamePk}` — per-batter reconcile (doubleheader-safe)
+  const playedByKey   = new Set();
   let finalCount = 0;
   for (const g of games) {
     // Only count finalized games — postponed/suspended don't reconcile
@@ -203,9 +207,11 @@ export async function fetchHomerersForDate(date) {
         // Any batter with a stats.batting block had at least one PA.
         if (p?.stats?.batting) {
           played.add(id);
+          playedByKey.add(`${id}-${g.gamePk}`);
           const hr = p.stats.batting.homeRuns;
           if (Number.isFinite(hr) && hr > 0) {
             homerers.add(id);
+            homerersByKey.add(`${id}-${g.gamePk}`);
           }
         }
       }
@@ -213,7 +219,22 @@ export async function fetchHomerersForDate(date) {
   }
   const allFinal = games.length > 0 && finalCount === games.length;
   console.log(`[calib] ${date}: ${finalCount}/${games.length} final games, ${homerers.size} players homered`);
-  return { homerers, played, allFinal };
+  return { homerers, played, homerersByKey, playedByKey, allFinal };
+}
+
+/**
+ * Join predictions to outcomes per (playerId, gamePk). Pure + exported so it's
+ * unit-testable without the network. A split doubleheader has TWO prediction
+ * rows for one playerId (different gamePk); composite keying grades them
+ * independently — a HR in game 1 must NOT mark the game-2 row homered. Legacy
+ * records logged before gamePk existed fall back to bare-playerId matching.
+ */
+export function reconcileOutcomes(predictions, { homerers, played, homerersByKey, playedByKey }) {
+  const didHomer = (p) =>
+    p.gamePk != null && homerersByKey ? homerersByKey.has(`${p.playerId}-${p.gamePk}`) : homerers.has(p.playerId);
+  const didPlay = (p) =>
+    p.gamePk != null && playedByKey ? playedByKey.has(`${p.playerId}-${p.gamePk}`) : played.has(p.playerId);
+  return predictions.map((p) => ({ ...p, homered: didHomer(p), actuallyPlayed: didPlay(p) }));
 }
 
 /**
@@ -353,12 +374,7 @@ export async function reconcileDate(date, yesterdayPredictions, priorLog, prefet
     console.warn(`[calib] failed to fetch box scores for ${date} — skipping`);
     return log;
   }
-  const { homerers, played } = result;
-  const reconciled = yesterdayPredictions.map(p => ({
-    ...p,
-    homered:      homerers.has(p.playerId),
-    actuallyPlayed: played.has(p.playerId),
-  }));
+  const reconciled = reconcileOutcomes(yesterdayPredictions, result);
   const homerCount   = reconciled.filter(r => r.homered).length;
   const scratchCount = reconciled.filter(r => !r.actuallyPlayed).length;
   console.log(`[calib] reconciled ${reconciled.length} predictions for ${date}, ${homerCount} hit (${(homerCount / reconciled.length * 100).toFixed(1)}% rate)`);
@@ -418,15 +434,18 @@ export async function repairRecentDays(log, maxScan = 7) {
     if (!Array.isArray(records) || !records.length) continue;
     const result = await fetchHomerersForDate(date).catch(() => null);
     if (!result) continue;
-    const { homerers, played, allFinal } = result;
+    const { homerers, played, homerersByKey, playedByKey, allFinal } = result;
     let fixed = 0;
     for (const r of records) {
       const pid = Number(r.playerId);
-      if (r.homered !== true && homerers.has(pid)) {
+      // Per-(player,game) join; bare-playerId fallback for legacy records w/o gamePk.
+      const homered  = r.gamePk != null ? homerersByKey.has(`${pid}-${r.gamePk}`) : homerers.has(pid);
+      const playedIt = r.gamePk != null ? playedByKey.has(`${pid}-${r.gamePk}`)  : played.has(pid);
+      if (r.homered !== true && homered) {
         r.homered = true;
         r.actuallyPlayed = true;
         fixed++;
-      } else if (r.actuallyPlayed !== true && played.has(pid)) {
+      } else if (r.actuallyPlayed !== true && playedIt) {
         r.actuallyPlayed = true;                      // batted after all — not a scratch
       }
     }

@@ -16,7 +16,7 @@
  * The backend's job is purely "fetch + cache + serve."
  *
  * Run locally:    node server/fetch-slate.mjs
- * Env required:   none — weather via Open-Meteo, no keys.
+ * Env required:   none — weather via NWS (api.weather.gov), no keys.
  *
  * ─── Snapshot contract ─────────────────────────────────────────────────────
  *
@@ -64,7 +64,7 @@
  *                                    (first-pitch hour is hours[0]; ~4 entries).
  *                                    Unlocks "wind shifts later in the game"
  *                                    surfaces — UI/model can read any hour.
- * @property {'open-meteo'} source    Provider tag (single-source post-rewrite).
+ * @property {'nws'} source    Provider tag (single-source post-rewrite).
  * @property {string} fetchedAt       ISO UTC when the forecast was fetched.
  * @property {string} gameStartIso    ISO UTC of first pitch (echoed back).
  * @property {?string} timezone       Venue local TZ (e.g. 'America/Phoenix').
@@ -407,10 +407,23 @@ import { applySimResolution } from './lib/simResolution.mjs';
 
 // ─── HTTP helpers ────────────────────────────────────────────────────────────
 
-async function getJson(url, opts = {}) {
-  const res = await fetch(url, opts);
-  if (!res.ok) throw new Error(`HTTP ${res.status}: ${url}`);
-  return res.json();
+async function getJson(url, opts = {}, retries = 2) {
+  let lastErr;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch(url, opts);
+      if (res.ok) return res.json();
+      // Fail fast on a real 4xx (bad request / not found); retry only transient
+      // rate-limit (429) and 5xx. A single MLB brown-out otherwise silently
+      // drops that batch of stats (callers swallow the throw → empty data).
+      if (res.status !== 429 && res.status < 500) throw new Error(`HTTP ${res.status}: ${url}`);
+      lastErr = new Error(`HTTP ${res.status}: ${url}`);
+    } catch (e) {
+      lastErr = e; // network error / timeout — retry
+    }
+    if (attempt < retries) await new Promise((r) => setTimeout(r, 300 * (attempt + 1)));
+  }
+  throw lastErr;
 }
 
 async function mlbGet(path) {
@@ -1825,7 +1838,7 @@ async function fetchBullpenSplitsBatch(playerIds) {
 
 // ─── Weather ─────────────────────────────────────────────────────────────────
 //
-// All weather fetching moved into `./weather.mjs` (Open-Meteo client).
+// All weather fetching moved into `./weather.mjs` (NWS client).
 // Snapshot shape published here: see the Weather + WeatherHour typedefs at
 // the top of this file.
 //
@@ -1955,12 +1968,20 @@ async function main() {
   const yesterdayCT = ctDateMinusDays(1);
   let reconcilePredictions = null;
   let calibSnapshot = null;
+  // The latest published snapshot (today's earlier cron, or yesterday's on the
+  // day's first run). Reused by the weather carry-forward below, which needs
+  // today's prior weatherByGame when a fresh fetch returns nothing. Declared at
+  // function scope so that block can read it — it previously referenced an
+  // UNDECLARED `priorSnapshot`, which threw ReferenceError and crashed the whole
+  // slate on the exact weather-outage path the carry-forward exists to rescue.
+  let priorSnapshot = null;
   try {
     const res = await fetch(`${SNAPSHOT_URL}?t=${Date.now()}`);
     if (res.ok) {
       const prior = await res.json();
-      // Accept ONLY yesterday's snapshot — today's would mean an earlier
-      // cron already overwrote yesterday's data on R2 and we lost the
+      priorSnapshot = prior; // keep regardless of date — weather carry-forward wants today's
+      // Accept ONLY yesterday's snapshot for RECONCILE — today's would mean an
+      // earlier cron already overwrote yesterday's data on R2 and we lost the
       // reconciliation window (handled gracefully below: skip without log
       // append, calibration just keeps yesterday's multipliers).
       if (prior?.date === yesterdayCT) calibSnapshot = prior;
@@ -2085,6 +2106,15 @@ async function main() {
     const probFn = (s) => lookupProb(s, scoreToProbTable?.table, (sc) => Math.max(0.005, Math.min(0.30, sc / 100 * 0.28)));
     modelMetrics = computeMetricsFromBacktest(backtestLog, { lookbackDays: 30, scoreToProbFn: probFn });
     if (modelMetrics) {
+      // The Brier/logLoss just computed are IN-SAMPLE — scored on the very rows
+      // the isotonic table was fit on, so they read optimistically. Attach the
+      // honest out-of-sample 5-fold CV Brier (at the chosen bucket) so skill is
+      // judged week-over-week on an OOS number, not the flattering in-sample one.
+      const chosenCv = Array.isArray(scoreToProbTable?.cv)
+        ? scoreToProbTable.cv.find(c => c.bucketSize === scoreToProbTable.bucketSize)
+        : null;
+      modelMetrics.inSample = true;
+      modelMetrics.cvBrier  = Number.isFinite(chosenCv?.brier) ? +chosenCv.brier.toFixed(4) : null;
       // Empirical base HR rate over the reconciled window (played records only).
       // The logged set is the displayed top-N batters, whose base rate (~12%) is
       // far above the league per-PA rate, so the old hardcoded 0.035 made the
@@ -2476,7 +2506,7 @@ async function main() {
     if (r?.key) h2h[r.key] = r;
   }
 
-  // 8) Weather per game — single-source: Open-Meteo hourly forecast.
+  // 8) Weather per game — single-source: NWS hourly forecast.
   //
   // For each game we resolve the stadium (for lat/lon) and ask weather.mjs
   // for the hour-by-hour forecast covering the game window. The result has
@@ -2485,7 +2515,7 @@ async function main() {
   // features. See the Weather typedef at the top of this file for the full
   // shape, or weather.mjs for the why behind the provider choice.
   //
-  // Concurrency capped at 4 (was 8). Open-Meteo's free tier is generous
+  // Concurrency capped at 4 (was 8). The prior provider (Open-Meteo)'s free tier was generous
   // (10k/day) but the per-second burst limit is tighter; with 8 concurrent
   // requests, ~half the second batch was silently 429-ing on the May 25
   // morning cron and returning null weather for those games. 4 is below
@@ -2502,9 +2532,9 @@ async function main() {
     if (r?.gamePk && r.weather) weatherByGame[r.gamePk] = r.weather;
   }
 
-  // ── Open-Meteo outage fallback ────────────────────────────────────────────
-  // When Open-Meteo is throwing 502s (happens — May 26 we saw a multi-hour
-  // outage), every fetchHourlyForecast() above returns null and the
+  // ── Weather outage fallback ───────────────────────────────────────────────
+  // When the weather provider (NWS) is throwing errors (happens — May 26 we saw
+  // a multi-hour outage), every forecast fetch above returns null and the
   // weatherByGame map ends up empty. The slate-qa hard-fail downstream
   // would then block the entire snapshot, leaving every user with stale
   // data. That's worse than shipping with stale weather.
@@ -2530,7 +2560,7 @@ async function main() {
       }
     }
     if (carried > 0) {
-      console.warn(`[slate] weather carry-forward — fresh fetch returned 0, reused ${carried}/${games.length} from prior snapshot (likely Open-Meteo outage)`);
+      console.warn(`[slate] weather carry-forward — fresh fetch returned 0, reused ${carried}/${games.length} from prior snapshot (likely NWS outage)`);
     } else {
       console.warn(`[slate] weather carry-forward unavailable — prior snapshot has no weatherByGame to reuse`);
     }
@@ -3725,6 +3755,7 @@ async function main() {
     const linFallback = (s) => Math.max(0.005, Math.min(0.3, 0.025 + s * 0.0015));
     let patched = 0;
     for (const key of Object.keys(scoredBatters)) {
+      if (!key.includes('-')) continue; // composite keys only — the bare-id alias is the SAME object (matches every sibling loop; avoids the double-counted patched tally and the dual-key NaN trap if this ever becomes non-idempotent)
       const row = scoredBatters[key];
       if (!row || !Number.isFinite(row.score) || Number.isFinite(row.hrProbability)) continue;
       row.hrProbability = scoreToProbTable?.table?.length
@@ -3938,13 +3969,21 @@ async function main() {
       .map(([id, b]) => `${b.name} (${id}, ${(b.season.hrRate * 100).toFixed(1)}% on ${b.season.ab} AB)`)
       .slice(0, 20),
     nanFallbacks: nanDebug.length,
+    // Games whose venue isn't in the park-factor table → silently scored at a
+    // NEUTRAL park (PF 1.0). Park is one of the largest env inputs, so a missed
+    // launch pad (e.g. a venue rename or new park) would under-rate everyone in
+    // that game with no other signal. Surfaced so it reads as a park-table gap,
+    // not a weather problem.
+    gamesMissingStadium: games
+      .filter(g => g.venueName && !findStadium(g.venueName))
+      .map(g => `${g.awayTeam?.abbr}@${g.homeTeam?.abbr} (${g.gamePk}, ${g.venueName})`),
   };
   payload._qaFlags = _qaFlags;
 
   // ─── Cron freshness lint ─────────────────────────────────────────────────
   // Single-line summary line that GitHub Actions logs. Easy to grep across
   // historical runs to spot when something started silently shipping empty.
-  console.log(`[slate-qa] games=${games.length} sb=${composedScoredKeys.length} weather=${Object.keys(weatherByGame).length} dh-empty=${_qaFlags.gamesWithFewScoredBatters.length} no-weather=${_qaFlags.outdoorGamesMissingWeather.length} nan=${nanDebug.length}`);
+  console.log(`[slate-qa] games=${games.length} sb=${composedScoredKeys.length} weather=${Object.keys(weatherByGame).length} dh-empty=${_qaFlags.gamesWithFewScoredBatters.length} no-weather=${_qaFlags.outdoorGamesMissingWeather.length} no-stadium=${_qaFlags.gamesMissingStadium.length} nan=${nanDebug.length}`);
 
   // Hard-fail the cron when the most-critical sections come back empty
   // despite there being games to score. This catches silent regressions
@@ -3955,7 +3994,7 @@ async function main() {
       throw new Error('[slate-qa] FATAL: 0 scored batters despite ' + games.length + ' games. Likely scoring engine failure.');
     }
     if (Object.keys(weatherByGame).length === 0) {
-      throw new Error('[slate-qa] FATAL: 0 weather rows despite ' + games.length + ' games. Open-Meteo unreachable or all stadium lookups failed?');
+      throw new Error('[slate-qa] FATAL: 0 weather rows despite ' + games.length + ' games. NWS unreachable or all stadium lookups failed?');
     }
   }
 
@@ -4049,6 +4088,14 @@ async function main() {
   writeFileSync(ZONE_CACHE_OUT_PATH, JSON.stringify(zoneCacheDump));
   console.log(`[zone] wrote zone-cache.json (${zoneCacheKB} KB, ${Object.keys(zoneCacheDump).length} entries)`);
 }
+
+// Loud top-level net for stray async failures (fire-and-forget writes, escaped
+// pMap rejections) so a rejection exits non-zero for the Actions gate instead
+// of leaving a partial run with an ambiguous exit code.
+process.on('unhandledRejection', (err) => {
+  console.error('[slate] UNHANDLED REJECTION:', err);
+  process.exit(1);
+});
 
 main().catch(err => {
   console.error('[slate] FAILED:', err);
