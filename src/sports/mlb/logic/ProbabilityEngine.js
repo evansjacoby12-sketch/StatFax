@@ -117,10 +117,11 @@ function hotBatScore(season, recent) {
   if (!season || !recent?.ab || recent.ab < 12) return 0;
   const gap = computeISO(recent) - computeISO(season);
   if (gap < 0.020) return 0;
-  // Up-weighted: cap 15→20, slope 200→240. lab:audit shows hot bats beat their
-  // own grademates by +17.6 (STRONG) / +16.2 (SKIP) / +8.6 (LEAN) — the single
-  // strongest positive signal, previously under-credited. Modest bump, not fit
-  // to the sample; confirm the gain with a held-out re-score before shipping.
+  // Up-weighted: cap 15→20, slope 200→240. VALIDATED 2026-06-20 on 27d / 6441
+  // reconciled bats (`npm run lab:audit`): hot is the strongest positive signal
+  // (univariate 2.51x, z=14.6) and beats its OWN grademates in every grade
+  // (within-grade +1.1 PRIME / +9.7 STRONG / +5.9 LEAN / +13.2 SKIP) — it was
+  // under-credited, so the bump holds up well beyond the original 11d sample.
   return Math.min(20, Math.round(gap * 240));
 }
 
@@ -1315,8 +1316,10 @@ export function scoreBatter(
     const hasEnoughSample = homeAB >= 50 && awayAB >= 50;
     if (hasEnoughSample && homeISO != null && awayISO != null) {
       const diff = isHomeGame ? (homeISO - awayISO) : (awayISO - homeISO);
-      // Up-weighted tiers (5→7, 3→5): lab:audit shows homeEdge bats beat their
-      // grademates by +8.4 (PRIME) / +8.0 (STRONG) — consistently under-credited.
+      // Up-weighted tiers (5→7, 3→5). VALIDATED 2026-06-20 on 27d / 6441 bats
+      // (`npm run lab:audit`): homeEdge univariate 1.50x (z=5.3) and beats its
+      // grademates in 3 of 4 grades (+4.1 STRONG / +3.0 LEAN / +5.6 SKIP; PRIME
+      // ~flat at -1.7, n275) — net under-credited, so the up-weight holds.
       if (diff >= 0.045) {
         homeAwayAdj = 7;
         if (isHomeGame) homeEdge = true; else awayEdge = true;
@@ -1410,6 +1413,11 @@ export function scoreBatter(
     // distribution, so openers (recent avg ~1-2 IP) were blended as if they'd
     // pitch 5+ innings, badly understating bullpen exposure on opener days.
     const ipDist = estimateIPDistribution({ ...pitcher, season: pitcherSeason, recentForm: pitcherRecentForm });
+    // paBreakdown=null → a generic per-PA reach curve. The batting SLOT still
+    // drives the starter↔bullpen mix at each PA via batterSpot + ipDist; only the
+    // per-slot PA-count weighting uses the generic curve (a small second-order
+    // approximation, not a disabled feature). A real per-slot curve is a future
+    // tweak to validate offline, not an unverified change to ship into the model.
     const weightedHR9 = expectedHR9ForBatter(battingOrder, null, pitcherHRPer9, opposingBullpenHR9, ipDist);
     if (Number.isFinite(weightedHR9)) {
       effectiveHR9 = 0.5 * pitcherHRPer9 + 0.5 * weightedHR9;
@@ -1565,7 +1573,7 @@ export function scoreBatter(
   if (savantStats?.barrelPct >= 10)          signalCount++;  // elite contact quality
   if (pitcherSavant?.barrelPctAllowed >= 10) signalCount++;  // pitcher giving up barrels
   if (h2h?.hr >= 2)                          signalCount++;  // proven history vs this pitcher
-  if (dueAndHotBonus > 0)                    signalCount++;  // regression candidate + hot — potent combo
+  // (hot+due synergy signal removed — dueAndHotBonus is permanently 0 after the due falsification; the branch could never fire)
   // Require a real batting order — `null <= 4` is true (null coerces to 0)
   // and was crediting projected-lineup players (no order yet) with this
   // signal whenever they had any platoon edge.
