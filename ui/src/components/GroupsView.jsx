@@ -267,8 +267,17 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard, g
   }, [batters, hideStarted])
 
   const windows = useMemo(() => computeWindows(gameList), [gameList])
-  // A window is "active" when the game selection exactly matches its games.
-  const activeWindowIdx = windows.findIndex((w) => w.pks.size === games.size && [...w.pks].every((pk) => games.has(pk)))
+  // Multi-select: every window whose games are all currently picked. Drives the
+  // window dropdown so you can combine two or more start windows into one pool.
+  const selectedWindowIdxs = new Set(
+    games.size ? windows.map((_, i) => i).filter((i) => [...windows[i].pks].every((pk) => games.has(pk))).map(String) : [],
+  )
+  const onWindows = (set) => {
+    if (!set.size) { setGames(new Set()); return } // empty = all windows
+    const next = new Set()
+    for (const s of set) for (const pk of windows[Number(s)].pks) next.add(pk)
+    setGames(next)
+  }
   // With Windows on, land on the EARLY window by default (once) rather than the
   // flickery all-games view — the all-slate board churns as unconfirmed late
   // games wobble, the window board is stable. One-time so it never fights a tap.
@@ -398,11 +407,12 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard, g
       {windowMode && windows.length > 1 ? (
         <div className="grp-games" role="group" aria-label="Filter by start window">
           <Select
+            multi
             icon="Clock"
             ariaLabel="Filter by start window"
-            title="Same-window combos lock together — no spread trap"
-            value={activeWindowIdx >= 0 ? String(activeWindowIdx) : ''}
-            onChange={(v) => setGames(v === '' ? new Set() : new Set(windows[Number(v)].pks))}
+            title="Pick one or more start windows — same-window legs lock together"
+            value={selectedWindowIdxs}
+            onChange={onWindows}
             options={[{ value: '', label: 'All windows' }, ...windows.map((w, i) => ({ value: i, label: `${w.label} · ${w.pks.size}g` }))]}
           />
         </div>
