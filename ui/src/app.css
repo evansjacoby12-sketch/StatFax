@@ -4990,8 +4990,8 @@ button.th:hover {
 .grp-card {
   border: 1px solid var(--border-soft);
   border-radius: var(--radius);
-  background: linear-gradient(180deg, color-mix(in srgb, var(--gc) 6%, transparent), transparent 90px), var(--card);
-  padding: 14px 16px 12px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--gc) 5%, transparent), transparent 64px), var(--card);
+  padding: 16px 18px 14px;
 }
 .grp-head {
   display: flex;
@@ -5029,16 +5029,17 @@ button.th:hover {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
-  border: 2px solid;
-  border-radius: 9px;
-  font-size: 16px;
+  width: 26px;
+  height: 26px;
+  border: 1.5px solid;
+  border-radius: 8px;
+  font-size: 14px;
   font-weight: 800;
 }
 .grp-sub {
-  font-size: 12px;
-  margin: 6px 0 10px;
+  font-size: 11.5px;
+  color: var(--text-faint);
+  margin: 8px 0 6px;
 }
 .grp-legs {
   list-style: none;
@@ -5050,8 +5051,8 @@ button.th:hover {
 .grp-leg {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 6px;
+  gap: 11px;
+  padding: 12px 8px;
   border-top: 1px solid var(--border-soft);
   cursor: pointer;
   border-radius: 8px;
@@ -5101,41 +5102,39 @@ button.th:hover {
 .grp-fire {
   color: var(--b-hot);
 }
+/* Signal chips read as quiet colored tags (no border) so a leg's badges don't
+   compete with its name + HR%. Status chips (weak / unconf) keep a border. */
 .grp-chip {
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  font-size: 10px;
+  font-size: 9.5px;
   font-weight: 700;
+  letter-spacing: 0.02em;
   border-radius: 5px;
   padding: 1px 5px;
-  border: 1px solid;
+  border: 1px solid transparent;
 }
 .grp-chip.good {
   color: var(--good);
-  border-color: color-mix(in srgb, var(--good) 45%, transparent);
-  background: color-mix(in srgb, var(--good) 12%, transparent);
+  background: color-mix(in srgb, var(--good) 10%, transparent);
 }
 .grp-chip.bad {
   color: var(--bad);
-  border-color: color-mix(in srgb, var(--bad) 45%, transparent);
-  background: color-mix(in srgb, var(--bad) 12%, transparent);
+  background: color-mix(in srgb, var(--bad) 10%, transparent);
 }
 .grp-chip.pitch {
   color: var(--b-pitch);
-  border-color: color-mix(in srgb, var(--b-pitch) 45%, transparent);
-  background: color-mix(in srgb, var(--b-pitch) 12%, transparent);
+  background: color-mix(in srgb, var(--b-pitch) 10%, transparent);
 }
 .grp-chip.blast {
   color: var(--b-hot);
-  border-color: color-mix(in srgb, var(--b-hot) 50%, transparent);
-  background: color-mix(in srgb, var(--b-hot) 14%, transparent);
+  background: color-mix(in srgb, var(--b-hot) 11%, transparent);
 }
 /* "Rising" — recent barrel surging above the season rate (recency signal). */
 .grp-chip.rising {
   color: var(--good);
-  border-color: color-mix(in srgb, var(--good) 50%, transparent);
-  background: color-mix(in srgb, var(--good) 12%, transparent);
+  background: color-mix(in srgb, var(--good) 10%, transparent);
 }
 .grp-blast-hot {
   color: var(--b-hot);
@@ -5336,10 +5335,11 @@ button.th:hover {
 .grp-leg-l2 {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
   flex-wrap: wrap;
-  font-size: 12px;
-  margin-top: 3px;
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 4px;
 }
 .grp-era {
   color: var(--warn);
@@ -5353,25 +5353,28 @@ button.th:hover {
   gap: 3px;
 }
 .grp-mult {
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 700;
-  border-radius: 5px;
-  padding: 1px 5px;
+  border-radius: 4px;
+  padding: 0 4px;
+  opacity: 0.85;
 }
 .grp-mult.good {
   color: var(--good);
-  background: color-mix(in srgb, var(--good) 14%, transparent);
+  background: color-mix(in srgb, var(--good) 11%, transparent);
 }
 .grp-mult.bad {
   color: var(--bad);
-  background: color-mix(in srgb, var(--bad) 14%, transparent);
+  background: color-mix(in srgb, var(--bad) 11%, transparent);
 }
 .grp-prob {
-  font-size: 16px;
-  font-weight: 700;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
 }
 .grp-foot {
-  font-size: 11px;
+  font-size: 10.5px;
+  color: var(--text-faint);
   margin-top: 10px;
   padding-top: 8px;
   border-top: 1px solid var(--border-soft);

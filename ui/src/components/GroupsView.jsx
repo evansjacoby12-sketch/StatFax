@@ -500,7 +500,6 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard, g
 
 function GroupCard({ g, onSelect, selectedId, comboConf = 'off' }) {
   const gc = GROUP_GRADE_COLOR[g.grade] || '#6b7787'
-  const names = g.legs.map((b) => lastFirst(b.name).split(',')[0]).join(' + ')
   const { legs: legInfo, weakestIdx, tone } = assessCombo(g)
   // Provisional = a leg's lineup isn't posted yet, so this combo can still
   // reshuffle before first pitch — not safe to bet (the 6 AM-board trap).
@@ -605,14 +604,13 @@ function GroupCard({ g, onSelect, selectedId, comboConf = 'off' }) {
           />
         ))}
       </ul>
-      <footer className="grp-foot dim">
-        {g.size}-leg {g.label} · {names}
-        {staggered && (
+      {staggered && (
+        <footer className="grp-foot dim">
           <span className="grp-foot-lock" title="Each leg locks at its own game's first pitch. Until then an unconfirmed later leg can still change.">
-            {' · '}<Icon name="Lock" size={9} /> legs lock {earliestTime} → {latestTime}
+            <Icon name="Lock" size={9} /> legs lock {earliestTime} → {latestTime}
           </span>
-        )}
-      </footer>
+        </footer>
+      )}
     </section>
   )
 }
@@ -714,19 +712,8 @@ function GroupLeg({ b, idx, onSelect, selected, bad, weakest, reasons, unconfirm
           {barrel != null && (
             <>
               {' · '}
-              <Icon name="Crosshair" size={10} /> {num(barrel, 0)}%
+              <Icon name="Crosshair" size={10} /> {num(barrel, 0)}% barrel
             </>
-          )}
-          {blastOf(b) != null && (
-            <>
-              {' · '}
-              <span className={b.blast ? 'grp-blast-hot' : ''}><Icon name="Zap" size={10} /> {num(blastOf(b), 0)}%</span>
-            </>
-          )}
-          {blastMixOf(b) != null && (
-            <span className="grp-blast-mix" title="Blast rate vs the exact pitch mix today's starter throws (usage-weighted)">
-              {' · '}vs mix {num(blastMixOf(b), 0)}%
-            </span>
           )}
           {iso != null && <> · ISO {rate(iso)}</>}
           {lockTime && (
