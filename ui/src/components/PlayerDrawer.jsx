@@ -75,16 +75,14 @@ export default function PlayerDrawer({ batter: b, onClose, watched, inSlip, onTo
 
   useEffect(() => {
     if (typeof document === 'undefined') return
-    const body = document.body
-    const scrollY = window.scrollY
-    const prev = { position: body.style.position, top: body.style.top, width: body.style.width, overflow: body.style.overflow }
-    body.style.position = 'fixed'
-    body.style.top = `-${scrollY}px`
-    body.style.width = '100%'
-    body.style.overflow = 'hidden'
+    // Lock the scroll container (.app) while the drawer is open — it keeps its
+    // scrollTop, so no save/restore jump. (.app is the scroller, not body.)
+    const scroller = document.querySelector('.app')
+    if (!scroller) return
+    const prev = scroller.style.overflow
+    scroller.style.overflow = 'hidden'
     return () => {
-      Object.assign(body.style, prev)
-      window.scrollTo(0, scrollY)
+      scroller.style.overflow = prev
     }
   }, [])
 

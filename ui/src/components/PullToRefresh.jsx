@@ -12,7 +12,8 @@ export default function PullToRefresh({ onRefresh }) {
   const g = useRef({ startY: null, active: false, pull: 0, busy: false })
 
   useEffect(() => {
-    const scrollTop = () => window.scrollY || document.documentElement.scrollTop || 0
+    // .app is the scroll container (not the document) — read its scrollTop.
+    const scrollTop = () => document.querySelector('.app')?.scrollTop || 0
     // Don't hijack scroll inside an open sheet/dialog (drawer, zone page, modal).
     const blocked = () => !!document.querySelector('[role="dialog"]')
     const setP = (v) => {

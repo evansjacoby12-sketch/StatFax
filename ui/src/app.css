@@ -1,8 +1,13 @@
 /* ============ Layout shell ============ */
 .app {
-  min-height: 100%;
+  height: 100%;
   display: flex;
   flex-direction: column;
+  /* Scroll happens here, not on the body — see index.css note. Keeps the
+     sticky topbar and the fixed bottom nav / slip pinned to the viewport in
+     the iOS home-screen PWA. */
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 .main {
   flex: 1;

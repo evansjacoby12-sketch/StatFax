@@ -3,17 +3,20 @@ import Icon from './Icon.jsx'
 
 export default function BackToTop() {
   const [show, setShow] = useState(false)
+  // .app is the scroll container (not the window) — listen + scroll there.
   useEffect(() => {
-    const onScroll = () => setShow(window.scrollY > 700)
+    const el = document.querySelector('.app')
+    if (!el) return
+    const onScroll = () => setShow(el.scrollTop > 700)
     onScroll()
-    window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
+    el.addEventListener('scroll', onScroll, { passive: true })
+    return () => el.removeEventListener('scroll', onScroll)
   }, [])
   if (!show) return null
   return (
     <button
       className="back-to-top"
-      onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+      onClick={() => document.querySelector('.app')?.scrollTo({ top: 0, behavior: 'smooth' })}
       aria-label="Back to top"
       title="Back to top"
     >

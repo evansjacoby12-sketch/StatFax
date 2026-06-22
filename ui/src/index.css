@@ -84,7 +84,11 @@ body {
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   font-feature-settings: 'cv05', 'ss01';
-  overflow-x: hidden;
+  /* .app is the scroll container, not the body. In an iOS home-screen PWA,
+     scrolling the body mis-anchors position:fixed elements (the bottom nav +
+     parlay slip drift up into the page) — moving scroll into .app keeps fixed
+     and sticky chrome pinned to the viewport. */
+  overflow: hidden;
 }
 
 .mono {
