@@ -51,23 +51,44 @@ function heatColor(t) {
   return `hsl(${h} ${s}% ${l}%)`
 }
 
-const ZONE_POS = [
-  [2, 2], [2, 3], [2, 4],
-  [3, 2], [3, 3], [3, 4],
-  [4, 2], [4, 3], [4, 4],
-  [1, 1], [1, 5], [5, 1], [5, 5],
+// Map the 13 Statcast zones onto a full 5×5 grid (row-major). The center 3×3
+// holds in-zone indices 0–8 (zones 1–9); the outer ring is filled by the 4
+// chase indices 9–12 (zones 11–14: TL, TR, BL, BR). The four edge-midpoints
+// blend the two chase zones they sit between so the fill reads symmetric.
+const MAP25 = [
+  [9], [9], [9, 10], [10], [10],
+  [9], [0], [1], [2], [10],
+  [9, 11], [3], [4], [5], [10, 12],
+  [11], [6], [7], [8], [12],
+  [11], [11], [11, 12], [12], [12],
 ]
+const avg = (arr) => (arr.length ? arr.reduce((s, x) => s + x, 0) / arr.length : null)
 
 function Heatmap({ grid, metric, fmt, matched }) {
   const vals = grid.map((c) => c?.[metric]).filter((v) => Number.isFinite(v))
   const min = vals.length ? Math.min(...vals) : 0
   const max = vals.length ? Math.max(...vals) : 1
   const is13 = grid.length >= 13
+  // 5×5 display cells from the 13-zone source (or the raw grid when it's a
+  // smaller 9-cell in-zone-only grid).
+  const cells = is13
+    ? MAP25.map((src) => {
+        const vs = src.map((j) => grid[j]?.[metric]).filter((v) => Number.isFinite(v))
+        const chase = src.every((j) => j >= 9)
+        return {
+          v: avg(vs),
+          count: chase ? null : (grid[src[0]]?.count ?? null),
+          chase,
+          matched: src.some((j) => matched?.includes(j)),
+        }
+      })
+    : grid.map((c, i) => ({ v: c?.[metric], count: c?.count ?? null, chase: false, matched: matched?.includes(i) }))
+  const cols = is13 ? 5 : Math.max(1, Math.ceil(Math.sqrt(grid.length)))
   return (
     <div className={`zone-grid ${is13 ? 'zone-grid-13' : ''}`} role="img" aria-label="Strike-zone heatmap" style={{
       display: 'grid',
-      gridTemplateColumns: 'repeat(5, 1fr)',
-      gridTemplateRows: 'repeat(5, 1fr)',
+      gridTemplateColumns: `repeat(${cols}, 1fr)`,
+      gridTemplateRows: `repeat(${cols}, 1fr)`,
       gap: '4px',
       background: 'rgba(0,0,0,0.2)',
       border: '1px solid rgba(255,255,255,0.06)',
@@ -78,36 +99,28 @@ function Heatmap({ grid, metric, fmt, matched }) {
       maxWidth: '300px',
       margin: '0 auto'
     }}>
-      {grid.map((c, i) => {
-        const v = c?.[metric]
-        const t = Number.isFinite(v) && max > min ? (v - min) / (max - min) : null
-        const isMatched = matched?.includes(i)
-        const isChase = is13 && i >= 9
-        const style = { background: heatColor(t) }
-        if (is13) {
-          const [r, col] = ZONE_POS[i] || [0, 0]
-          style.gridRow = r
-          style.gridColumn = col
-        }
+      {cells.map((c, i) => {
+        const t = Number.isFinite(c.v) && max > min ? (c.v - min) / (max - min) : null
         return (
           <div
             key={i}
-            className={`zone-cell ${isMatched ? 'matched' : ''} ${isChase ? 'zone-chase' : ''}`}
+            className={`zone-cell ${c.matched ? 'matched' : ''} ${c.chase ? 'zone-chase' : ''}`}
             style={{
-              ...style,
+              background: heatColor(t),
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'center',
               alignItems: 'center',
               borderRadius: '6px',
               position: 'relative',
-              border: isMatched ? '2px solid var(--accent)' : 'none',
-              boxShadow: isMatched ? '0 0 8px var(--accent-glow)' : 'none'
+              border: c.matched ? '2px solid var(--accent)' : c.chase ? '1px dashed rgba(255,255,255,0.22)' : 'none',
+              boxShadow: c.matched ? '0 0 8px var(--accent-glow)' : 'none',
+              opacity: c.chase ? 0.9 : 1
             }}
-            title={isChase ? 'Chase zone' : undefined}
+            title={c.chase ? 'Chase zone (outside the strike zone)' : undefined}
           >
-            <span className="zc-v mono" style={{ fontSize: '11px', fontWeight: '800', color: '#fff' }}>{fmt(v)}</span>
-            {c?.count != null && <span className="zc-n mono" style={{ fontSize: '8px', color: 'var(--text-faint)', position: 'absolute', bottom: '2px', right: '4px' }}>{c.count}</span>}
+            <span className="zc-v mono" style={{ fontSize: '10px', fontWeight: '800', color: '#fff' }}>{fmt(c.v)}</span>
+            {c.count != null && c.count > 0 && <span className="zc-n mono" style={{ fontSize: '8px', color: 'var(--text-faint)', position: 'absolute', bottom: '2px', right: '4px' }}>{c.count}</span>}
           </div>
         )
       })}
