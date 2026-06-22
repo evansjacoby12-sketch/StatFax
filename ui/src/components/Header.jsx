@@ -23,16 +23,38 @@ function HelpMenu({ onOpenBuilder, onOpenGroups, onOpenSGP, onOpenSplits, onOpen
     }
   }, [open])
 
-  const items = [
-    { label: 'Parlay Builder', desc: 'Build your own slip — live odds, EV & correlation', icon: 'Sparkles', fn: onOpenBuilder },
-    { label: 'Parlay Combos', desc: 'Auto-built chalk, value, lottery combos', icon: 'Layers', fn: onOpenGroups },
-    { label: 'Same-Game Parlays', desc: 'Best correlated 2–4 leg SGPs', icon: 'Zap', fn: onOpenSGP },
-    { label: 'Cheat Sheet', desc: 'HR plays, barrels, weak arms & parks', icon: 'LayoutGrid', fn: onOpenSplits },
-    { label: 'Signal Backtest', desc: 'Hit rates by grade and signals', icon: 'Activity', fn: onOpenBacktest },
-    { label: 'How to Pick', desc: 'HR-selection playbook strategies', icon: 'Target', fn: onOpenHowTo },
-    { label: 'Guide', desc: 'Learn how the board is structured', icon: 'Info', fn: onOpenGuide },
-    { label: 'Legend', desc: 'Definitions of grades, signals & stats', icon: 'Trophy', fn: onOpenLegend },
-    { label: 'Settings', desc: 'Live updates, refresh rate, combo window', icon: 'SlidersHorizontal', fn: onOpenSettings },
+  // Grouped so the menu reads as: betting tools → finding plays → learning →
+  // app settings, instead of one flat 9-item wall.
+  const sections = [
+    {
+      title: 'Parlays',
+      items: [
+        { label: 'Parlay Builder', desc: 'Build your own slip — live odds, EV & correlation', icon: 'Sparkles', fn: onOpenBuilder },
+        { label: 'Parlay Combos', desc: 'Auto-built chalk, value, lottery combos', icon: 'Layers', fn: onOpenGroups },
+        { label: 'Same-Game Parlays', desc: 'Best correlated 2–4 leg SGPs', icon: 'Zap', fn: onOpenSGP },
+      ],
+    },
+    {
+      title: 'Find plays',
+      items: [
+        { label: 'Cheat Sheet', desc: 'HR plays, barrels, weak arms & parks', icon: 'LayoutGrid', fn: onOpenSplits },
+        { label: 'Signal Backtest', desc: 'Hit rates by grade and signals', icon: 'Activity', fn: onOpenBacktest },
+      ],
+    },
+    {
+      title: 'Learn',
+      items: [
+        { label: 'How to Pick', desc: 'HR-selection playbook strategies', icon: 'Target', fn: onOpenHowTo },
+        { label: 'Guide', desc: 'Learn how the board is structured', icon: 'Info', fn: onOpenGuide },
+        { label: 'Legend', desc: 'Definitions of grades, signals & stats', icon: 'Trophy', fn: onOpenLegend },
+      ],
+    },
+    {
+      title: 'App',
+      items: [
+        { label: 'Settings', desc: 'Live updates, refresh rate, combo window', icon: 'SlidersHorizontal', fn: onOpenSettings },
+      ],
+    },
   ]
 
   return (
@@ -53,24 +75,43 @@ function HelpMenu({ onOpenBuilder, onOpenGroups, onOpenSGP, onOpenSplits, onOpen
       </button>
       {open && (
         <div className="view-menu-pop" role="menu">
-          {items.map((it) => (
-            <button
-              key={it.label}
-              role="menuitem"
-              className="vm-item"
-              onClick={() => {
-                it.fn()
-                setOpen(false)
-              }}
-            >
-              <div className="vm-icon-box">
-                <Icon name={it.icon} size={15} />
+          {sections.map((sec, si) => (
+            <div key={sec.title} role="group" aria-label={sec.title}>
+              <div
+                className="vm-section"
+                style={{
+                  fontSize: '9px',
+                  fontWeight: '700',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.07em',
+                  color: 'var(--text-faint)',
+                  padding: si === 0 ? '6px 12px 4px' : '10px 12px 4px',
+                  marginTop: si > 0 ? '2px' : '0',
+                  borderTop: si > 0 ? '1px solid var(--border-soft)' : 'none',
+                }}
+              >
+                {sec.title}
               </div>
-              <span className="vm-txt">
-                <b>{it.label}</b>
-                <span className="dim">{it.desc}</span>
-              </span>
-            </button>
+              {sec.items.map((it) => (
+                <button
+                  key={it.label}
+                  role="menuitem"
+                  className="vm-item"
+                  onClick={() => {
+                    it.fn()
+                    setOpen(false)
+                  }}
+                >
+                  <div className="vm-icon-box">
+                    <Icon name={it.icon} size={15} />
+                  </div>
+                  <span className="vm-txt">
+                    <b>{it.label}</b>
+                    <span className="dim">{it.desc}</span>
+                  </span>
+                </button>
+              ))}
+            </div>
           ))}
         </div>
       )}
