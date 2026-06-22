@@ -163,28 +163,41 @@ export default function ResultsView({ meta, batters, onSelect, favorConsistency 
       })
       .sort((a, b) => Number(b.allHit) - Number(a.allHit) || a.size - b.size)
   })()
-  const comboCashed = dayCombos.filter((c) => c.allHit).length
 
-  // Rolling 7-day combo scoreboard — all-hit combos across the week, scored on
-  // the full board (falling back to a day's first window / evening board) at
-  // sizes ≤3 so each day contributes on the same basis as the table above.
-  const comboWeek = comboDates.reduce(
-    (acc, d) => {
-      const recs = recByDay(d)
-      const src = comboByDate[d]?.length
-        ? comboByDate[d]
-        : comboWindowsByDate[d]?.[0]?.combos || comboLateByDate[d] || []
-      for (const c of src) {
+  // Per-day combo cashes, split by board type (sizes ≤3). "main" = the full
+  // board; "windows" = every start-window board summed. These are alternative
+  // groupings of the same slate, so a day's real combo haul is main + windows.
+  const boardTally = (d) => {
+    const recs = recByDay(d)
+    const count = (combos) => {
+      let hit = 0, tot = 0
+      for (const c of combos || []) {
         if (c.size > 3) continue
         const legs = (c.legs || []).map((pid) => recs.get(Number(pid)))
         if (!legs.length || legs.some((r) => !r)) continue
-        acc.total += 1
-        if (legs.every((r) => r.homered === true)) acc.cashed += 1
+        tot++
+        if (legs.every((r) => r.homered === true)) hit++
       }
+      return { hit, tot }
+    }
+    const full = count(comboByDate[d])
+    let wHit = 0, wTot = 0
+    for (const w of comboWindowsByDate[d] || []) { const x = count(w.combos); wHit += x.hit; wTot += x.tot }
+    return { full, windows: { hit: wHit, tot: wTot } }
+  }
+
+  // Rolling 7-day combo scoreboard — cashes across the full board AND every
+  // window board (sizes ≤3), so the headline reflects all the combos we posted.
+  const comboWeek = comboDates.reduce(
+    (acc, d) => {
+      const t = boardTally(d)
+      acc.cashed += t.full.hit + t.windows.hit
+      acc.total += t.full.tot + t.windows.tot
       return acc
     },
     { cashed: 0, total: 0 },
   )
+  const dayTally = activeComboDay ? boardTally(activeComboDay) : null
 
   const m = meta.modelMetrics
   const reliability = m?.reliability || []
@@ -341,7 +354,9 @@ export default function ResultsView({ meta, batters, onSelect, favorConsistency 
             <Icon name="Layers" size={14} style={{ color: 'var(--accent)' }} /> Combo results
             <span style={{ fontWeight: '400', textTransform: 'none', marginLeft: '6px', fontSize: '12px', color: 'var(--text-faint)' }}>
               · last 7d <b style={{ color: 'var(--strong)' }}>{comboWeek.cashed}</b>/{comboWeek.total} cashed
-              {activeComboDay ? ` · ${comboCashed}/${dayCombos.length} on ${activeComboDay.slice(5)}` : ''}
+              {activeComboDay && dayTally ? (
+                <> · {activeComboDay.slice(5)}: <b style={{ color: 'var(--strong)' }}>{dayTally.full.hit + dayTally.windows.hit}</b> hit <span style={{ opacity: 0.8 }}>(main {dayTally.full.hit} · windows {dayTally.windows.hit})</span></>
+              ) : ''}
             </span>
           </h3>
           <div className="combo-res-controls" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '14px' }}>
