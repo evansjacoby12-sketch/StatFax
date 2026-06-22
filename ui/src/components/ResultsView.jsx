@@ -6,6 +6,7 @@ import { GRADE_ORDER, gradeColor } from '../lib/badges.js'
 import { GradeChip } from './atoms.jsx'
 import { playerHeadshot } from '../lib/teams.js'
 import { hexA } from './atoms.jsx'
+import { legStatus } from '../lib/live.js'
 import LiveCombosView from './LiveCombosView.jsx'
 
 function computeAuc(rows) {
@@ -133,7 +134,7 @@ export default function ResultsView({ meta, batters, onSelect, favorConsistency 
   // combos render as #playerId with every leg a miss. When a leg has no record
   // we read its name + HR status straight from the live slate instead.
   const liveById = new Map(
-    (batters || []).map((b) => [Number(b.playerId), { name: b.name, homered: b.homeredThisGame === true || b.liveContext?.isHRThisGame === true }]),
+    (batters || []).map((b) => [Number(b.playerId), { name: b.name, st: legStatus(b) }]),
   )
   const dayCombos = (() => {
     if (!activeComboDay) return []
@@ -148,10 +149,14 @@ export default function ResultsView({ meta, batters, onSelect, favorConsistency 
           const r = recs.get(Number(pid))
           const lb = liveById.get(Number(pid))
           // Records (reconciled past days) are authoritative; live status only
-          // fills in when a leg has no record yet (today).
+          // fills in when a leg has no record yet (today). status: hit | live |
+          // dead — a still-playing (or unstarted) leg reads as live, not a miss.
           const name = r?.name || lb?.name || `#${pid}`
-          const homered = r ? r.homered === true : lb?.homered === true
-          return { name: name.split(' ').slice(-1)[0], homered }
+          let status
+          if (r) status = r.homered === true ? 'hit' : 'dead'
+          else if (lb) status = lb.st.code === 'hit' ? 'hit' : lb.st.code === 'dead' ? 'dead' : 'live'
+          else status = 'dead'
+          return { name: name.split(' ').slice(-1)[0], homered: status === 'hit', status }
         })
         const nHit = legs.filter((l) => l.homered).length
         return { strategy: c.strategy, size: c.size, nHit, allHit: legs.length > 0 && nHit === legs.length, legs }
@@ -385,8 +390,8 @@ export default function ResultsView({ meta, batters, onSelect, favorConsistency 
                 <span className="combo-res-size dim" style={{ fontSize: '11px', width: '50px' }}>{c.size}-leg</span>
                 <span className="combo-res-legs" style={{ fontSize: '12px', flex: '1' }}>
                   {c.legs.map((l, j) => (
-                    <span key={j} style={{ color: l.homered ? 'var(--strong)' : 'var(--text-dim)', fontWeight: l.homered ? '700' : '400' }}>
-                      {l.name} {l.homered ? '✅' : '❌'}{j < c.legs.length - 1 ? ' · ' : ''}
+                    <span key={j} style={{ color: l.status === 'hit' ? 'var(--strong)' : l.status === 'live' ? 'var(--accent)' : 'var(--text-dim)', fontWeight: l.status === 'hit' ? '700' : '400' }}>
+                      {l.name} {l.status === 'hit' ? '✅' : l.status === 'live' ? '⏳' : '❌'}{j < c.legs.length - 1 ? ' · ' : ''}
                     </span>
                   ))}
                 </span>
