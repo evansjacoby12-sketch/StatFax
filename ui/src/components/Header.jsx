@@ -29,8 +29,8 @@ function HelpMenu({ onOpenBuilder, onOpenGroups, onOpenSGP, onOpenSplits, onOpen
     {
       title: 'Parlays',
       items: [
-        { label: 'Parlay Builder', desc: 'Build your own slip — live odds, EV & correlation', icon: 'Sparkles', fn: onOpenBuilder },
         { label: 'Parlay Combos', desc: 'Auto-built chalk, value, lottery combos', icon: 'Layers', fn: onOpenGroups },
+        { label: 'Parlay Builder', desc: 'Build your own slip — live odds, EV & correlation', icon: 'Sparkles', fn: onOpenBuilder },
         { label: 'Same-Game Parlays', desc: 'Best correlated 2–4 leg SGPs', icon: 'Zap', fn: onOpenSGP },
       ],
     },
