@@ -15,6 +15,19 @@ const SIZES = [2, 3, 4]
 // Compact American odds, "—" when unpriced.
 const od = (a) => (Number.isFinite(a) ? american(a) : '—')
 
+// k-combinations of a small array (used to enumerate fill-in sets).
+function kCombos(arr, k) {
+  if (k <= 0) return [[]]
+  if (k > arr.length) return []
+  const res = []
+  const rec = (start, combo) => {
+    if (combo.length === k) { res.push(combo.slice()); return }
+    for (let i = start; i < arr.length; i++) { combo.push(arr[i]); rec(i + 1, combo); combo.pop() }
+  }
+  rec(0, [])
+  return res
+}
+
 // A small live-status pill for a leg / combo verdict.
 function LiveTag({ code, text, meta, size = 'sm' }) {
   const m = meta[code]
@@ -147,14 +160,37 @@ export default function ParlayBuilder({ batters, legs, slipSet, onToggle, onRemo
       .slice(0, 8)
   }, [batters, slipSet, usedGames])
 
-  // Auto-build combos for the chosen size, ranked by EV (then all-hit).
-  const combos = useMemo(() => {
-    const out = buildGroups(batters, { favorConsistency })
-    return (out[autoSize] || [])
-      .slice()
-      .sort((a, b) => (b.ev ?? -Infinity) - (a.ev ?? -Infinity) || (b.allHit ?? 0) - (a.allHit ?? 0))
-      .slice(0, 5)
-  }, [batters, autoSize, favorConsistency])
+  // Auto-build: suggest the best ways to COMPLETE the current slip to `autoSize`
+  // legs, ranked by the resulting parlay's EV (then all-hit). Each fill-in is the
+  // best bat in a game you're not already using (one per game). Empty slip →
+  // fall back to starter combos (the model's top combos for that size).
+  const autoSuggest = useMemo(() => {
+    const need = autoSize - legs.length
+    if (legs.length === 0) {
+      const out = buildGroups(batters, { favorConsistency })
+      const items = (out[autoSize] || [])
+        .slice()
+        .sort((a, b) => (b.ev ?? -Infinity) - (a.ev ?? -Infinity) || (b.allHit ?? 0) - (a.allHit ?? 0))
+        .slice(0, 5)
+      return { mode: 'starter', need: autoSize, items }
+    }
+    if (need <= 0) return { mode: 'full', need, items: [] }
+    // Candidate fill-ins: best non-final, non-SKIP bat per unused game.
+    const used = new Set(legs.map((b) => b.gamePk))
+    const perGame = new Map()
+    for (const b of batters || []) {
+      if (b.game?.isFinal || slipSet.has(b.id) || used.has(b.gamePk)) continue
+      if ((b.grade?.label || 'SKIP') === 'SKIP' || !Number.isFinite(b.hrProbability)) continue
+      const cur = perGame.get(b.gamePk)
+      if (!cur || (b.score ?? 0) > (cur.score ?? 0)) perGame.set(b.gamePk, b)
+    }
+    const cands = [...perGame.values()].sort((a, b) => (b.score ?? 0) - (a.score ?? 0)).slice(0, 8)
+    const items = kCombos(cands, need)
+      .map((fills) => ({ fills, p: buildParlay([...legs, ...fills], { correlate }) }))
+      .sort((a, b) => (b.p.ev ?? -Infinity) - (a.p.ev ?? -Infinity) || (b.p.modelAllHit ?? 0) - (a.p.modelAllHit ?? 0))
+      .slice(0, 6)
+    return { mode: 'complete', need, items }
+  }, [batters, autoSize, favorConsistency, legs, slipSet, correlate])
 
   const flash = (msg) => {
     setToast(msg)
@@ -268,9 +304,15 @@ export default function ParlayBuilder({ batters, legs, slipSet, onToggle, onRemo
                 <button key={s} onClick={() => setAutoSize(s)} style={{ flex: 1, fontSize: '12px', fontWeight: '700', padding: '7px', borderRadius: '8px', color: autoSize === s ? '#fff' : 'var(--text-dim)', background: autoSize === s ? 'var(--hover)' : 'transparent', border: `1px solid ${autoSize === s ? 'var(--accent)' : 'var(--border)'}` }}>{s}-leg</button>
               ))}
             </div>
-            <p className="dim" style={{ fontSize: '11px', marginBottom: '12px' }}>Top model-built combos for {autoSize} legs, ranked by betting EV. <b>Load</b> replaces your slip; <b>+</b> merges the legs in.</p>
+            <p className="dim" style={{ fontSize: '11px', marginBottom: '12px' }}>
+              {autoSuggest.mode === 'starter'
+                ? <>No legs yet — top model combos for {autoSize} legs to start from. <b>Load</b> adds them to your slip.</>
+                : autoSuggest.mode === 'full'
+                  ? <>Your slip already has {legs.length} legs. Pick a larger size to get fill-in suggestions.</>
+                  : <>Best <b>{autoSuggest.need}</b> {autoSuggest.need === 1 ? 'leg' : 'legs'} to add to your {legs.length}-leg slip, ranked by the finished parlay's EV. <b>Add</b> drops them in.</>}
+            </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {combos.length ? combos.map((c) => {
+              {autoSuggest.mode === 'starter' && (autoSuggest.items.length ? autoSuggest.items.map((c) => {
                 const cColor = GRADE_COLOR[c.grade] || 'var(--text-faint)'
                 return (
                   <div key={c.id} style={{ background: 'rgba(255,255,255,0.015)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '10px', padding: '10px 12px' }}>
@@ -278,10 +320,7 @@ export default function ParlayBuilder({ batters, legs, slipSet, onToggle, onRemo
                       <Icon name={c.icon || 'Layers'} size={13} style={{ color: 'var(--accent)' }} />
                       <span style={{ fontSize: '12.5px', fontWeight: '700', color: '#fff' }}>{c.label}</span>
                       <span style={{ color: cColor, borderColor: hexA(cColor, 0.4), borderWidth: '1px', borderStyle: 'solid', borderRadius: '5px', padding: '0 6px', fontSize: '10px', fontWeight: '800' }}>{c.grade}</span>
-                      <span style={{ marginLeft: 'auto', display: 'flex', gap: '6px' }}>
-                        <button onClick={() => onReplace(c.legs.map((b) => b.id))} style={{ fontSize: '11px', fontWeight: '700', color: 'var(--accent)', border: '1px solid var(--accent)', borderRadius: '6px', padding: '2px 9px' }}>Load</button>
-                        <button onClick={() => { c.legs.forEach((b) => { if (!slipSet.has(b.id)) onToggle(b) }) }} aria-label="Merge legs" style={{ fontSize: '11px', fontWeight: '800', color: 'var(--accent)', border: '1px solid var(--border)', borderRadius: '6px', padding: '2px 9px' }}>+</button>
-                      </span>
+                      <button onClick={() => onReplace(c.legs.map((b) => b.id))} style={{ marginLeft: 'auto', fontSize: '11px', fontWeight: '700', color: 'var(--accent)', border: '1px solid var(--accent)', borderRadius: '6px', padding: '2px 11px' }}>Load</button>
                     </div>
                     <div style={{ fontSize: '11px', color: 'var(--text-dim)' }}>
                       {c.legs.map((b) => lastFirst(b.name).split(',')[0]).join(' · ')}
@@ -293,7 +332,35 @@ export default function ParlayBuilder({ batters, legs, slipSet, onToggle, onRemo
                     </div>
                   </div>
                 )
-              }) : <div className="dim" style={{ fontSize: '12px', padding: '16px', textAlign: 'center' }}>Not enough eligible bats to build {autoSize}-leg combos.</div>}
+              }) : <div className="dim" style={{ fontSize: '12px', padding: '16px', textAlign: 'center' }}>Not enough eligible bats to build {autoSize}-leg combos.</div>)}
+
+              {autoSuggest.mode === 'complete' && (autoSuggest.items.length ? autoSuggest.items.map(({ fills, p }, i) => {
+                const cColor = p.grade ? GRADE_COLOR[p.grade.letter] : 'var(--text-faint)'
+                return (
+                  <div key={i} style={{ background: 'rgba(255,255,255,0.015)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '10px', padding: '10px 12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                      <Icon name="Plus" size={13} style={{ color: 'var(--accent)' }} />
+                      <span style={{ fontSize: '12.5px', fontWeight: '700', color: '#fff', flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {fills.map((b) => lastFirst(b.name).split(',')[0]).join(' + ')}
+                      </span>
+                      {p.grade && <span style={{ color: cColor, borderColor: hexA(cColor, 0.4), borderWidth: '1px', borderStyle: 'solid', borderRadius: '5px', padding: '0 6px', fontSize: '10px', fontWeight: '800' }}>{p.grade.letter}</span>}
+                      <button onClick={() => fills.forEach((b) => { if (!slipSet.has(b.id)) onToggle(b) })} style={{ fontSize: '11px', fontWeight: '700', color: 'var(--accent)', border: '1px solid var(--accent)', borderRadius: '6px', padding: '2px 11px' }}>Add</button>
+                    </div>
+                    <div style={{ fontSize: '10px', color: 'var(--text-faint)', marginBottom: '6px' }}>
+                      makes a {p.n}-leg with {legs.map((b) => lastFirst(b.name).split(',')[0]).join(' · ')}
+                    </div>
+                    <div style={{ display: 'flex', gap: '14px', fontSize: '10px' }}>
+                      <span className="dim">all-hit <b className="mono" style={{ color: 'var(--accent)' }}>{pct(p.modelAllHit, p.modelAllHit < 0.01 ? 2 : 1)}</b></span>
+                      {p.american != null && <span className="dim">odds <b className="mono" style={{ color: '#fff' }}>{od(p.american)}</b></span>}
+                      {p.ev != null && <span className="dim">EV <b className="mono" style={{ color: p.ev >= 0 ? 'var(--strong)' : 'var(--bad)' }}>{signedPct(p.ev, 0)}</b></span>}
+                    </div>
+                  </div>
+                )
+              }) : <div className="dim" style={{ fontSize: '12px', padding: '16px', textAlign: 'center' }}>No eligible bats in unused games to complete this parlay.</div>)}
+
+              {autoSuggest.mode === 'full' && (
+                <div className="dim" style={{ fontSize: '12px', padding: '16px', textAlign: 'center' }}>Your slip already has {legs.length} legs — pick a larger size above.</div>
+              )}
             </div>
           </>
         )}
