@@ -261,9 +261,22 @@ function WeatherCard({ g, onSelect, selectedId }) {
       </div>
 
       <div className="wxcard-helped" style={{ borderTop: '1px solid rgba(255,255,255,0.04)', paddingTop: '10px' }}>
-        <h4 className="pcard-h4" style={{ fontSize: '11px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-faint)', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '8px' }}>
-          <Icon name="Wind" size={11} style={{ color: 'var(--accent)' }} /> Helped by Air
-        </h4>
+        {(() => {
+          // Honest header: only call it "helped" when the air is genuinely a
+          // tailwind. On a neutral/suppressed park this list is just the bats
+          // ranked by air factor — i.e. the least-hurt, not boosted.
+          const f = g.envFactor
+          const helped = f != null && f >= 1.03
+          const suppressed = f != null && f <= 0.95
+          const title = helped ? 'Helped by Air' : suppressed ? 'Least suppressed by air' : 'Top bats · neutral air'
+          const color = helped ? 'var(--good)' : suppressed ? 'var(--bad)' : 'var(--text-faint)'
+          return (
+            <h4 className="pcard-h4" style={{ fontSize: '11px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-faint)', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '8px' }}>
+              <Icon name="Wind" size={11} style={{ color }} /> {title}
+              {f != null && <span style={{ marginLeft: 'auto', fontWeight: '700', color }}>{num(f, 2)}×</span>}
+            </h4>
+          )
+        })()}
         <ul className="ptarget-list" style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '4px' }}>
           {g.helped.slice(0, 4).map((b) => (
             <li
