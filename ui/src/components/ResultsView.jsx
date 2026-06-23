@@ -1,13 +1,10 @@
 import { useEffect, useState } from 'react'
 import Icon from './Icon.jsx'
-import Select from './Select.jsx'
 import { pct, num } from '../lib/format.js'
 import { GRADE_ORDER, gradeColor } from '../lib/badges.js'
 import { GradeChip } from './atoms.jsx'
 import { playerHeadshot } from '../lib/teams.js'
 import { hexA } from './atoms.jsx'
-import { legStatus } from '../lib/live.js'
-import LiveCombosView from './LiveCombosView.jsx'
 
 function computeAuc(rows) {
   const y = rows.map((r) => (r.homered ? 1 : 0))
@@ -27,13 +24,10 @@ function computeAuc(rows) {
   return (rankSum - (nPos * (nPos + 1)) / 2) / (nPos * nNeg)
 }
 
-export default function ResultsView({ meta, batters, onSelect, favorConsistency = false }) {
+export default function ResultsView({ meta }) {
   const [log, setLog] = useState(null)
   const [err, setErr] = useState(null)
   const [hrDay, setHrDay] = useState(null)
-  const [comboDay, setComboDay] = useState(null)
-  const [comboBoard, setComboBoard] = useState('full')
-  const [comboSize, setComboSize] = useState(0)
 
   useEffect(() => {
     let alive = true
@@ -93,112 +87,6 @@ export default function ResultsView({ meta, batters, onSelect, favorConsistency 
     }
   })
 
-  const STRAT_LABEL = { top: 'Top Picks', mix: 'Best Mix', stack: 'Signal Stack', hot: 'Hot Hand', power: 'Power Bats', matchup: 'Soft Matchup', park: 'Park & Air' }
-  const comboByDateGraded = log.combos?.byDate || {}
-  const comboFullByDate = log.combos?.fullByDate || {}
-  const comboByDate = { ...comboFullByDate, ...comboByDateGraded }
-  const comboLateByDate = log.combos?.lateByDate || {}
-  const comboWindowsByDate = log.combos?.windowsByDate || {}
-  
-  const comboDates = [...new Set([
-    ...Object.keys(comboByDate).filter((d) => (comboByDate[d] || []).length),
-    ...Object.keys(comboWindowsByDate).filter((d) => (comboWindowsByDate[d] || []).length),
-  ])].sort().reverse().slice(0, RECENT_DAYS)
-  const activeComboDay = comboDay && comboDates.includes(comboDay) ? comboDay : comboDates[0] || null
-  
-  const windows = (activeComboDay && comboWindowsByDate[activeComboDay]) || []
-  const hasFull = activeComboDay && (comboByDate[activeComboDay] || []).length > 0
-  const hasLate = activeComboDay && (comboLateByDate[activeComboDay] || []).length > 0
-  
-  const wIdx = /^w(\d+)$/.test(comboBoard) ? Number(comboBoard.slice(1)) : -1
-  const board = windows[wIdx] ? comboBoard
-    : comboBoard === 'late' && hasLate ? 'late'
-    : hasFull ? 'full'
-    : windows.length ? 'w0'
-    : 'full'
-  const effWIdx = board === 'full' || board === 'late' ? -1 : (wIdx >= 0 ? wIdx : 0)
-  // Board dropdown options: full board, each time window, or the evening board.
-  const boardOptions = [
-    ...(hasFull ? [{ value: 'full', label: 'Full Board' }] : []),
-    ...windows.map((w, i) => ({ value: `w${i}`, label: `${w.label} (${w.games}g)` })),
-    ...(!windows.length && hasLate ? [{ value: 'late', label: 'Evening Board' }] : []),
-  ]
-  
-  const recByDay = (d) => {
-    const map = new Map()
-    for (const r of log.records?.[d] || []) map.set(Number(r.playerId), r)
-    return map
-  }
-  // Live fallback for the current (un-reconciled) day: the backtest log has no
-  // graded records until reconcile runs after games, so without this today's
-  // combos render as #playerId with every leg a miss. When a leg has no record
-  // we read its name + HR status straight from the live slate instead.
-  const liveById = new Map(
-    (batters || []).map((b) => [Number(b.playerId), { name: b.name, st: legStatus(b) }]),
-  )
-  const dayCombos = (() => {
-    if (!activeComboDay) return []
-    const recs = recByDay(activeComboDay)
-    const src = windows[effWIdx] ? windows[effWIdx].combos
-      : board === 'late' ? comboLateByDate[activeComboDay]
-      : comboByDate[activeComboDay]
-    return (src || [])
-      .filter((c) => c.size <= 3 && (!comboSize || c.size === comboSize))
-      .map((c) => {
-        const legs = (c.legs || []).map((pid) => {
-          const r = recs.get(Number(pid))
-          const lb = liveById.get(Number(pid))
-          // Records (reconciled past days) are authoritative; live status only
-          // fills in when a leg has no record yet (today). status: hit | live |
-          // dead — a still-playing (or unstarted) leg reads as live, not a miss.
-          const name = r?.name || lb?.name || `#${pid}`
-          let status
-          if (r) status = r.homered === true ? 'hit' : 'dead'
-          else if (lb) status = lb.st.code === 'hit' ? 'hit' : lb.st.code === 'dead' ? 'dead' : 'live'
-          else status = 'dead'
-          return { name: name.split(' ').slice(-1)[0], homered: status === 'hit', status }
-        })
-        const nHit = legs.filter((l) => l.homered).length
-        return { strategy: c.strategy, size: c.size, nHit, allHit: legs.length > 0 && nHit === legs.length, legs }
-      })
-      .sort((a, b) => Number(b.allHit) - Number(a.allHit) || a.size - b.size)
-  })()
-
-  // Per-day combo cashes, split by board type (sizes ≤3). "main" = the full
-  // board; "windows" = every start-window board summed. These are alternative
-  // groupings of the same slate, so a day's real combo haul is main + windows.
-  const boardTally = (d) => {
-    const recs = recByDay(d)
-    const count = (combos) => {
-      let hit = 0, tot = 0
-      for (const c of combos || []) {
-        if (c.size > 3) continue
-        const legs = (c.legs || []).map((pid) => recs.get(Number(pid)))
-        if (!legs.length || legs.some((r) => !r)) continue
-        tot++
-        if (legs.every((r) => r.homered === true)) hit++
-      }
-      return { hit, tot }
-    }
-    const full = count(comboByDate[d])
-    let wHit = 0, wTot = 0
-    for (const w of comboWindowsByDate[d] || []) { const x = count(w.combos); wHit += x.hit; wTot += x.tot }
-    return { full, windows: { hit: wHit, tot: wTot } }
-  }
-
-  // Rolling 7-day combo scoreboard — cashes across the full board AND every
-  // window board (sizes ≤3), so the headline reflects all the combos we posted.
-  const comboWeek = comboDates.reduce(
-    (acc, d) => {
-      const t = boardTally(d)
-      acc.cashed += t.full.hit + t.windows.hit
-      acc.total += t.full.tot + t.windows.tot
-      return acc
-    },
-    { cashed: 0, total: 0 },
-  )
-  const dayTally = activeComboDay ? boardTally(activeComboDay) : null
-
   const m = meta.modelMetrics
   const reliability = m?.reliability || []
 
@@ -213,15 +101,6 @@ export default function ResultsView({ meta, batters, onSelect, favorConsistency 
 
   return (
     <div className="results">
-      {batters && (
-        <section className="results-card" style={{ background: 'rgba(16, 24, 48, 0.45)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '12px', padding: '20px', marginBottom: '24px' }}>
-          <h3 className="section-title" style={{ fontSize: '13px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '16px', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: '8px' }}>
-            <Icon name="Activity" size={14} style={{ color: 'var(--accent)' }} /> Live combos
-            <span style={{ fontWeight: '400', textTransform: 'none', marginLeft: '6px', fontSize: '12px', color: 'var(--text-faint)' }}>· today, in progress</span>
-          </h3>
-          <LiveCombosView batters={batters} onSelect={onSelect} favorConsistency={favorConsistency} />
-        </section>
-      )}
       <div className="results-kpis" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px', marginBottom: '24px' }}>
         <Kpi label="Discrimination (AUC)" value={Number.isFinite(auc) ? auc.toFixed(3) : '—'} sub="ranking quality · 0.5 = random" accent="var(--prime)" />
         <Kpi label="Top-decile hit rate" value={pct(topRate, 0)} sub={`${(topRate / base).toFixed(1)}x vs base ${pct(base, 0)}`} accent="var(--strong)" />
@@ -341,80 +220,6 @@ export default function ResultsView({ meta, batters, onSelect, favorConsistency 
           <p className="chart-cap dim">No PRIME/STRONG picks homered yet.</p>
         )}
       </section>
-
-      {comboDates.length > 0 && (
-        <section className="results-card" style={{
-          background: 'rgba(16, 24, 48, 0.45)',
-          border: '1px solid rgba(255,255,255,0.06)',
-          borderRadius: '12px',
-          padding: '20px',
-          marginBottom: '24px'
-        }}>
-          <h3 className="section-title" style={{ fontSize: '13px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '16px', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: '8px' }}>
-            <Icon name="Layers" size={14} style={{ color: 'var(--accent)' }} /> Combo results
-            <span style={{ fontWeight: '400', textTransform: 'none', marginLeft: '6px', fontSize: '12px', color: 'var(--text-faint)' }}>
-              · last 7d <b style={{ color: 'var(--strong)' }}>{comboWeek.cashed}</b>/{comboWeek.total} cashed
-              {activeComboDay && dayTally ? (
-                <> · {activeComboDay.slice(5)}: <b style={{ color: 'var(--strong)' }}>{dayTally.full.hit + dayTally.windows.hit}</b> hit <span style={{ opacity: 0.8 }}>(main {dayTally.full.hit} · windows {dayTally.windows.hit})</span></>
-              ) : ''}
-            </span>
-          </h3>
-          <div className="combo-res-controls" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '14px' }}>
-            {boardOptions.length > 1 && (
-              <Select
-                icon="LayoutGrid"
-                title="Board"
-                ariaLabel="Board"
-                value={board}
-                onChange={(val) => setComboBoard(val)}
-                options={boardOptions}
-              />
-            )}
-            {comboDates.length > 1 && (
-              <Select
-                icon="Clock"
-                title="Day"
-                ariaLabel="Results day"
-                value={activeComboDay}
-                onChange={(d) => setComboDay(d)}
-                options={comboDates.map((d) => ({ value: d, label: d.slice(5) }))}
-              />
-            )}
-            <Select
-              icon="Layers"
-              title="Legs"
-              ariaLabel="Combo size"
-              value={comboSize}
-              onChange={(k) => setComboSize(k)}
-              options={[{ value: 0, label: 'All sizes' }, { value: 2, label: '2-leg' }, { value: 3, label: '3-leg' }]}
-            />
-          </div>
-          <ul className="combo-res" style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {dayCombos.map((c, i) => (
-              <li className={`combo-res-row ${c.allHit ? 'hit' : 'miss'}`} key={`${c.strategy}-${c.size}-${i}`} style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                background: c.allHit ? 'rgba(16, 185, 129, 0.08)' : 'rgba(255,255,255,0.02)',
-                border: `1px solid ${c.allHit ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255,255,255,0.04)'}`,
-                padding: '10px 14px',
-                borderRadius: '8px'
-              }}>
-                <span className="combo-res-badge" style={{ fontSize: '16px' }}>{c.allHit ? '🎯' : `${c.nHit}/${c.size}`}</span>
-                <span className="combo-res-strat" style={{ fontWeight: '700', fontSize: '13px', color: '#fff', width: '100px' }}>{STRAT_LABEL[c.strategy] || c.strategy}</span>
-                <span className="combo-res-size dim" style={{ fontSize: '11px', width: '50px' }}>{c.size}-leg</span>
-                <span className="combo-res-legs" style={{ fontSize: '12px', flex: '1' }}>
-                  {c.legs.map((l, j) => (
-                    <span key={j} style={{ color: l.status === 'hit' ? 'var(--strong)' : l.status === 'live' ? 'var(--accent)' : 'var(--text-dim)', fontWeight: l.status === 'hit' ? '700' : '400' }}>
-                      {l.name} {l.status === 'hit' ? '✅' : l.status === 'live' ? '⏳' : '❌'}{j < c.legs.length - 1 ? ' · ' : ''}
-                    </span>
-                  ))}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
 
       <section className="results-card" style={{
         background: 'rgba(16, 24, 48, 0.45)',

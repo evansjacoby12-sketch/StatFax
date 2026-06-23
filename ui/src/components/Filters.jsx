@@ -38,6 +38,7 @@ export default function Filters({ value, onChange, gradeCounts, games, badgeCoun
             { id: 'board', label: 'Board', icon: 'List', desc: 'Ranked board' },
             { id: 'games', label: 'Games', icon: 'LayoutGrid', desc: 'Game-by-game' },
             { id: 'pitchers', label: 'Pitchers', icon: 'Crosshair', desc: 'Pitcher vulnerability' },
+            { id: 'combos', label: 'Combos', icon: 'Layers', desc: 'Live + settled combo results' },
             { id: 'weather', label: 'Weather', icon: 'Wind', desc: 'Weather report' },
             { id: 'results', label: 'Results', icon: 'Activity', desc: 'Model track record' }
           ].map((tab) => (

@@ -18,6 +18,7 @@ import SameGameView from './components/SameGameView.jsx'
 import CheatSheet from './components/CheatSheet.jsx'
 import BacktestView from './components/BacktestView.jsx'
 import ResultsView from './components/ResultsView.jsx'
+import CombosView from './components/CombosView.jsx'
 import PlayerDrawer from './components/PlayerDrawer.jsx'
 import ZoneView from './components/ZoneView.jsx'
 import ParlaySlip from './components/ParlaySlip.jsx'
@@ -40,7 +41,7 @@ const LIVE_REFRESH_MS = 30_000 // faster cadence while a game is actually live
 
 // Each view is its own page via a URL hash (#board, #pitchers, …) — bookmarkable
 // and back/forward navigable. Hash routing works as-is on static hosting.
-const VIEWS = new Set(['board', 'games', 'pitchers', 'weather', 'results'])
+const VIEWS = new Set(['board', 'games', 'pitchers', 'weather', 'combos', 'results'])
 const viewFromHash = () => {
   const h = (typeof location !== 'undefined' ? location.hash : '').replace(/^#\/?/, '')
   return VIEWS.has(h) ? h : null
@@ -431,7 +432,9 @@ export default function App() {
 
       <main className="main">
         {view === 'results' ? (
-          <ResultsView meta={data.meta} batters={all} onSelect={(b) => setSelectedId(b.id)} favorConsistency={favorConsistency} />
+          <ResultsView meta={data.meta} />
+        ) : view === 'combos' ? (
+          <CombosView batters={all} onSelect={(b) => setSelectedId(b.id)} favorConsistency={favorConsistency} />
         ) : view === 'pitchers' ? (
           <PitchersView
             batters={all}
@@ -521,6 +524,7 @@ export default function App() {
           { id: 'board', label: 'Board', icon: 'List' },
           { id: 'games', label: 'Games', icon: 'LayoutGrid' },
           { id: 'pitchers', label: 'Pitchers', icon: 'Crosshair' },
+          { id: 'combos', label: 'Combos', icon: 'Layers' },
           { id: 'weather', label: 'Weather', icon: 'Wind' },
           { id: 'results', label: 'Results', icon: 'Activity' }
         ].map((tab) => (
