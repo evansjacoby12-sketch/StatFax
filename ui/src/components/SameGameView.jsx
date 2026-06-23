@@ -22,7 +22,10 @@ function sgpStars(legs, tone) {
 // Same-Game Parlays: the best `size` bats from ONE game stacked together.
 // Honors the same consistency lean as the combos page.
 function buildSGP(batters, size, { favorConsistency } = {}) {
-  const rankVal = (b) => (b.hrProbability ?? 0) * (favorConsistency ? consistencyFactor(b) : 1)
+  // Rank by model score (grade quality) so an SGP stacks a game's best-graded
+  // bats — the PRIME/STRONG studs you'd actually stack — matching the settled
+  // SGP record (server buildSGPRecords). HR prob breaks ties.
+  const rankVal = (b) => (b.score ?? 0) * (favorConsistency ? consistencyFactor(b) : 1)
   const byGame = new Map()
   for (const b of batters || []) {
     // Show every game regardless of state (pregame / live / final).
@@ -35,7 +38,7 @@ function buildSGP(batters, size, { favorConsistency } = {}) {
   for (const g of byGame.values()) {
     const legs = g.bats
       .slice()
-      .sort((a, b) => rankVal(b) - rankVal(a) || (b.score ?? 0) - (a.score ?? 0) || String(a.id).localeCompare(String(b.id)))
+      .sort((a, b) => rankVal(b) - rankVal(a) || (b.hrProbability ?? 0) - (a.hrProbability ?? 0) || String(a.id).localeCompare(String(b.id)))
       .slice(0, size)
     if (legs.length < size) continue
     const probs = legs.map((b) => b.hrProbability ?? 0)

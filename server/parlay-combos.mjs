@@ -141,6 +141,40 @@ export function gradeCombos(combos, homerers) {
 }
 
 /**
+ * Same-game parlay records — for each game, the best `size` bats stacked (top by
+ * frozen pregame HR prob, score as tiebreak). One SGP per game per size. The
+ * cross-game combo board structurally takes only one bat per game, so it misses
+ * the same-game stacks that often carry a slate; freezing these lets the Combos
+ * page grade SGPs against actual HRs the same way it grades combos.
+ * Returns [{ gamePk, size, legs: [playerId, …], pred }].
+ */
+export function buildSGPRecords(rows, { sizes = [2, 3] } = {}) {
+  const byGame = new Map();
+  for (const r of rows || []) {
+    if (!r || r.gamePk == null) continue;
+    if (!r.grade || r.grade === 'SKIP') continue;
+    if (!Number.isFinite(r.hrProb)) continue;
+    if (!byGame.has(r.gamePk)) byGame.set(r.gamePk, []);
+    byGame.get(r.gamePk).push(r);
+  }
+  const out = [];
+  for (const [gamePk, bats] of byGame) {
+    // Rank by model SCORE (grade quality) so an SGP stacks a game's best-graded
+    // bats — the PRIME/STRONG studs a user would actually stack — not whichever
+    // fringe bat carries the highest raw HR prob. HR prob breaks ties.
+    const ranked = bats.slice().sort(
+      (a, b) => (b.score ?? 0) - (a.score ?? 0) || (b.hrProb ?? 0) - (a.hrProb ?? 0) || (a.playerId - b.playerId),
+    );
+    for (const size of sizes) {
+      if (ranked.length < size) continue;
+      const legs = ranked.slice(0, size);
+      out.push({ gamePk, size, legs: legs.map((l) => l.playerId), pred: allHitProb(legs.map((l) => l.hrProb)) });
+    }
+  }
+  return out;
+}
+
+/**
  * Append one graded day into the combo log, which lives embedded on the backtest
  * log object (`log.combos.byDate`) so it rides the same R2/cache persistence for
  * free. Idempotent per date; trims to the backtest log's own rolling date window

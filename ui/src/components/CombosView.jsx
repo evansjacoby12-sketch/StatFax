@@ -101,7 +101,30 @@ export default function CombosView({ batters, onSelect, favorConsistency = false
     }
     const comboWeek = comboDates.reduce((acc, d) => { const t = boardTally(d); acc.cashed += t.full.hit + t.windows.hit; acc.total += t.full.tot + t.windows.tot; return acc }, { cashed: 0, total: 0 })
     const dayTally = activeComboDay ? boardTally(activeComboDay) : null
-    return { comboDates, activeComboDay, board, boardOptions, dayCombos, comboWeek, dayTally }
+
+    // Same-game parlays — one frozen SGP per game per size (server sgpByDate),
+    // graded the same way (records, with the live fallback for today).
+    const sgpRaw = (activeComboDay && (log.combos?.sgpByDate?.[activeComboDay] || [])) || []
+    const recsForSgp = activeComboDay ? recByDay(activeComboDay) : new Map()
+    const sgpDay = sgpRaw
+      .filter((s) => !comboSize || s.size === comboSize)
+      .map((s) => {
+        const legs = (s.legs || []).map((pid) => {
+          const r = recsForSgp.get(Number(pid))
+          const lb = liveById.get(Number(pid))
+          const name = r?.name || lb?.name || `#${pid}`
+          let status
+          if (r) status = r.homered === true ? 'hit' : 'dead'
+          else if (lb) status = lb.st.code === 'hit' ? 'hit' : lb.st.code === 'dead' ? 'dead' : 'live'
+          else status = 'dead'
+          return { name: name.split(' ').slice(-1)[0], status }
+        })
+        const nHit = legs.filter((l) => l.status === 'hit').length
+        return { gamePk: s.gamePk, size: s.size, legs, nHit, allHit: legs.length > 0 && nHit === legs.length }
+      })
+      .sort((a, b) => Number(b.allHit) - Number(a.allHit) || b.nHit - a.nHit || a.size - b.size)
+    const sgpCashed = sgpDay.filter((s) => s.allHit).length
+    return { comboDates, activeComboDay, board, boardOptions, dayCombos, comboWeek, dayTally, sgpDay, sgpCashed }
   })()
 
   return (
@@ -164,6 +187,37 @@ export default function CombosView({ batters, onSelect, favorConsistency = false
               </li>
             ))}
           </ul>
+
+          {settled.sgpDay.length > 0 && (
+            <>
+              <h3 className="section-title" style={{ ...H3, marginTop: '22px' }}>
+                <Icon name="Zap" size={14} style={{ color: 'var(--accent)' }} /> Same-game parlays
+                <span style={{ fontWeight: '400', textTransform: 'none', marginLeft: '6px', fontSize: '12px', color: 'var(--text-faint)' }}>
+                  · <b style={{ color: 'var(--strong)' }}>{settled.sgpCashed}</b>/{settled.sgpDay.length} cashed {settled.activeComboDay ? `on ${settled.activeComboDay.slice(5)}` : ''} · best bats per game
+                </span>
+              </h3>
+              <ul className="combo-res" style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {settled.sgpDay.map((s, i) => (
+                  <li className={`combo-res-row ${s.allHit ? 'hit' : 'miss'}`} key={`sgp-${s.gamePk}-${s.size}-${i}`} style={{
+                    display: 'flex', alignItems: 'center', gap: '12px',
+                    background: s.allHit ? 'rgba(16, 185, 129, 0.08)' : 'rgba(255,255,255,0.02)',
+                    border: `1px solid ${s.allHit ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255,255,255,0.04)'}`,
+                    padding: '10px 14px', borderRadius: '8px'
+                  }}>
+                    <span className="combo-res-badge" style={{ fontSize: '16px' }}>{s.allHit ? '🎯' : `${s.nHit}/${s.size}`}</span>
+                    <span className="combo-res-size dim" style={{ fontSize: '11px', width: '74px' }}>{s.size}-leg SGP</span>
+                    <span className="combo-res-legs" style={{ fontSize: '12px', flex: '1' }}>
+                      {s.legs.map((l, j) => (
+                        <span key={j} style={{ color: l.status === 'hit' ? 'var(--strong)' : l.status === 'live' ? 'var(--accent)' : 'var(--text-dim)', fontWeight: l.status === 'hit' ? '700' : '400' }}>
+                          {l.name} {l.status === 'hit' ? '✅' : l.status === 'live' ? '⏳' : '❌'}{j < s.legs.length - 1 ? ' · ' : ''}
+                        </span>
+                      ))}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
         </section>
       ) : (
         <div className="empty-note" style={{ padding: '32px', textAlign: 'center', color: 'var(--text-faint)' }}>No graded combo days yet.</div>

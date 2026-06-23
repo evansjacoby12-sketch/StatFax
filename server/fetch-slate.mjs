@@ -240,6 +240,7 @@ import {
 import {
   comboRowFromSnapshot,
   buildComboRecords,
+  buildSGPRecords,
   gradeCombos,
   bestAvailableCombo,
   appendComboDay,
@@ -1951,13 +1952,14 @@ async function main() {
       const local = JSON.parse(readFileSync(BACKTEST_OUT_PATH, 'utf8'));
       if ((local?.dates?.length || 0) > (backtestLog?.dates?.length || 0)) backtestLog = local;
       const lc = local?.combos, bc = backtestLog?.combos;
-      if (lc?.byDate || bc?.byDate || lc?.lateByDate || bc?.lateByDate || lc?.windowsByDate || bc?.windowsByDate || lc?.fullByDate || bc?.fullByDate) {
+      if (lc?.byDate || bc?.byDate || lc?.lateByDate || bc?.lateByDate || lc?.windowsByDate || bc?.windowsByDate || lc?.fullByDate || bc?.fullByDate || lc?.sgpByDate || bc?.sgpByDate) {
         backtestLog.combos = {
           byDate:        { ...(bc?.byDate || {}),        ...(lc?.byDate || {}) },
           bestByDate:    { ...(bc?.bestByDate || {}),    ...(lc?.bestByDate || {}) },
           lateByDate:    { ...(bc?.lateByDate || {}),    ...(lc?.lateByDate || {}) },
           windowsByDate: { ...(bc?.windowsByDate || {}), ...(lc?.windowsByDate || {}) },
           fullByDate:    { ...(bc?.fullByDate || {}),    ...(lc?.fullByDate || {}) },
+          sgpByDate:     { ...(bc?.sgpByDate || {}),     ...(lc?.sgpByDate || {}) },
         };
       }
     }
@@ -4050,6 +4052,29 @@ async function main() {
       for (const d of fk.slice(0, -14)) delete backtestLog.combos.fullByDate[d];
     }
   } catch (e) { console.warn(`[combo] fullByDate capture skipped: ${e?.message}`); }
+
+  // Same-game parlays (best 2/3 bats per game, frozen pregame) so the Combos
+  // page can grade SGPs against actual HRs day-by-day — the cross-game board
+  // takes one bat per game and misses the same-game stacks that carry slates.
+  try {
+    const seenS = new Set();
+    const sgpCr = [];
+    for (const r of Object.values(payload.scoredBatters || {})) {
+      if (r.playerId == null || seenS.has(r.playerId)) continue;
+      seenS.add(r.playerId);
+      const x = comboRowFromSnapshot(r);
+      if (x) sgpCr.push(x);
+    }
+    const sgps = buildSGPRecords(sgpCr, { sizes: [2, 3] });
+    if (sgps.length) {
+      backtestLog.combos = backtestLog.combos || {};
+      backtestLog.combos.sgpByDate = backtestLog.combos.sgpByDate || {};
+      backtestLog.combos.sgpByDate[date] = sgps;
+      const sk = Object.keys(backtestLog.combos.sgpByDate).sort();
+      for (const d of sk.slice(0, -14)) delete backtestLog.combos.sgpByDate[d]; // keep ~2 weeks
+      console.log(`[sgp] ${date}: froze ${sgps.length} same-game parlays`);
+    }
+  } catch (e) { console.warn(`[sgp] freeze skipped (non-fatal): ${e?.message}`); }
 
   // Freeze this run's scoreBatter() inputs alongside the slate so the offline
   // lab (`npm run lab:score`) can re-score engine variants on identical inputs.
