@@ -102,9 +102,26 @@ export default function CombosView({ batters, onSelect, favorConsistency = false
     const comboWeek = comboDates.reduce((acc, d) => { const t = boardTally(d); acc.cashed += t.full.hit + t.windows.hit; acc.total += t.full.tot + t.windows.tot; return acc }, { cashed: 0, total: 0 })
     const dayTally = activeComboDay ? boardTally(activeComboDay) : null
 
-    // Same-game parlays — one frozen SGP per game per size (server sgpByDate),
-    // graded the same way (records, with the live fallback for today).
-    const sgpRaw = (activeComboDay && (log.combos?.sgpByDate?.[activeComboDay] || [])) || []
+    // Same-game parlays — one SGP per game per size. Prefer the frozen pregame
+    // freeze (sgpByDate); for past days never frozen, reconstruct from that day's
+    // reconciled records (best-by-score bats per game) so history shows up now.
+    const sgpSource = (d) => {
+      const frozen = log.combos?.sgpByDate?.[d]
+      if (frozen && frozen.length) return frozen
+      const byGame = new Map()
+      for (const r of log.records?.[d] || []) {
+        if (r.gamePk == null || !r.grade || r.grade === 'SKIP' || !Number.isFinite(r.score)) continue
+        if (!byGame.has(r.gamePk)) byGame.set(r.gamePk, [])
+        byGame.get(r.gamePk).push(r)
+      }
+      const out = []
+      for (const [gamePk, bats] of byGame) {
+        const ranked = bats.slice().sort((a, b) => (b.score - a.score) || ((b.simHRProb ?? 0) - (a.simHRProb ?? 0)) || (a.playerId - b.playerId))
+        for (const size of [2, 3]) { if (ranked.length < size) continue; out.push({ gamePk, size, legs: ranked.slice(0, size).map((l) => l.playerId) }) }
+      }
+      return out
+    }
+    const sgpRaw = activeComboDay ? sgpSource(activeComboDay) : []
     const recsForSgp = activeComboDay ? recByDay(activeComboDay) : new Map()
     const sgpDay = sgpRaw
       .filter((s) => !comboSize || s.size === comboSize)
