@@ -4,6 +4,7 @@ import { GradeChip } from './atoms.jsx'
 import { pct, num } from '../lib/format.js'
 import { lastFirst, consistencyFactor, legFlags, legIsBad, risingForm } from '../lib/groups.js'
 import { correlatedJoint, gameCorrelation } from '../lib/parlay.js'
+import { comboStatus, legStatus, VERDICT_META, LEG_META } from '../lib/live.js'
 import { gradeFor } from '../lib/combo-engine.js'
 
 const SIZES = [2, 3, 4]
@@ -80,6 +81,8 @@ export default function SameGameView({ batters, onSelect, favorConsistency = fal
           {sgps.map((g) => {
             const c = GRADE_COLOR[g.grade]
             const matchup = g.game ? `${g.game.awayTeam?.abbr} @ ${g.game.homeTeam?.abbr}` : `Game ${g.gamePk}`
+            const live = comboStatus(g.legs)
+            const lv = VERDICT_META[live.code]
             return (
               <section className={`grp-card sgp-card tone-${g.tone} ${g.provisional ? 'provisional' : ''}`} key={g.gamePk} style={{ '--gc': c }}>
                 <header className="grp-head">
@@ -88,10 +91,10 @@ export default function SameGameView({ batters, onSelect, favorConsistency = fal
                     {matchup}
                     {g.parkHR != null && <span className="dim"> · park {g.parkHR.toFixed(2)}×</span>}
                   </span>
-                  {g.game?.isFinal ? (
-                    <span className="grp-state-tag final">FINAL</span>
-                  ) : g.game?.isLive ? (
-                    <span className="grp-state-tag live"><Icon name="Activity" size={10} /> LIVE</span>
+                  {live.started ? (
+                    <span className="grp-live-tag" title={`Live: ${live.hits}/${live.n} legs homered`} style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '10px', fontWeight: '800', color: lv.color, background: `color-mix(in srgb, ${lv.color} 12%, transparent)`, border: `1px solid color-mix(in srgb, ${lv.color} 35%, transparent)`, borderRadius: '5px', padding: '1px 6px' }}>
+                      <Icon name={lv.icon} size={10} className={live.code === 'live' ? 'spin-pulse' : ''} /> {lv.label} {live.hits}/{live.n}
+                    </span>
                   ) : g.provisional ? (
                     <span className="grp-prov-tag"><Icon name="Clock" size={10} /> PROVISIONAL</span>
                   ) : (
@@ -114,11 +117,18 @@ export default function SameGameView({ batters, onSelect, favorConsistency = fal
                 <ul className="grp-legs">
                   {g.legs.map((b, i) => {
                     const info = g.legInfo[i]
+                    const st = legStatus(b)
+                    const sm = LEG_META[st.code]
                     return (
-                      <li className={`sgp-leg ${info.bad ? 'weak-leg' : ''}`} key={b.id} onClick={() => onSelect(b)} role="button" tabIndex={0}>
+                      <li className={`sgp-leg ${info.bad ? 'weak-leg' : ''}`} key={b.id} onClick={() => onSelect(b)} role="button" tabIndex={0} style={st.code === 'hit' ? { background: 'color-mix(in srgb, var(--strong) 7%, transparent)' } : st.code === 'dead' ? { opacity: 0.6 } : undefined}>
                         <span className="sgp-leg-ord mono">{i + 1}</span>
                         <div className="sgp-leg-body">
                           <span className="sgp-leg-name">{lastFirst(b.name)}</span>
+                          {st.code !== 'pending' && (
+                            <span className="grp-chip" style={{ color: sm.color, background: `color-mix(in srgb, ${sm.color} 12%, transparent)`, borderColor: 'transparent' }} title={st.code === 'hit' ? 'Homered' : st.code === 'dead' ? 'Game final — no HR' : 'Game in progress'}>
+                              <Icon name={sm.icon} size={10} className={st.code === 'live' ? 'spin-pulse' : ''} /> {st.code === 'hit' ? 'HR' : st.code === 'dead' ? 'no HR' : st.label}
+                            </span>
+                          )}
                           {info.unconfirmed && <span className="grp-chip unconf"><Icon name="Clock" size={10} /> NO LINEUP</span>}
                           {info.rising && <span className="grp-chip rising" title={`Rising — L14 barrel ${info.rising.recent.toFixed(0)}% vs ${info.rising.season.toFixed(0)}% season (+${info.rising.delta.toFixed(0)} pts)`}><Icon name="TrendingUp" size={10} /> RISING</span>}
                           {info.bad && <span className="grp-chip weak" title={info.flags.join(' · ') || 'long-shot HR%'}><Icon name="TriangleAlert" size={10} /> WEAK</span>}
