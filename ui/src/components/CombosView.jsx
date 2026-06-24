@@ -21,6 +21,7 @@ export default function CombosView({ batters, onSelect, favorConsistency = false
   const [comboDay, setComboDay] = useState(null)
   const [comboBoard, setComboBoard] = useState('full')
   const [comboSize, setComboSize] = useState(0)
+  const [winnersOnly, setWinnersOnly] = useState(false)
 
   useEffect(() => {
     let alive = true
@@ -182,9 +183,26 @@ export default function CombosView({ batters, onSelect, favorConsistency = false
               <Select icon="Clock" title="Day" ariaLabel="Results day" value={settled.activeComboDay} onChange={setComboDay} options={settled.comboDates.map((d) => ({ value: d, label: d.slice(5) }))} />
             )}
             <Select icon="Layers" title="Legs" ariaLabel="Combo size" value={comboSize} onChange={setComboSize} options={[{ value: 0, label: 'All sizes' }, { value: 2, label: '2-leg' }, { value: 3, label: '3-leg' }]} />
+            <button
+              className={`badge-toggle ${winnersOnly ? 'on' : ''}`}
+              onClick={() => setWinnersOnly((v) => !v)}
+              aria-pressed={winnersOnly}
+              title="Show only combos that cashed (all legs homered)"
+              style={{ borderColor: winnersOnly ? 'var(--strong)' : 'var(--border)', background: winnersOnly ? 'color-mix(in srgb, var(--strong) 12%, transparent)' : 'transparent', color: winnersOnly ? 'var(--strong)' : 'var(--text-dim)' }}
+            >
+              <Icon name="Check" size={12} /> Winners only
+            </button>
           </div>
+          {(() => {
+            const shownCombos = settled.dayCombos.filter((c) => !winnersOnly || c.allHit)
+            const shownSgp = settled.sgpDay.filter((s) => !winnersOnly || s.allHit)
+            return (
+          <>
+          {shownCombos.length === 0 ? (
+            <div className="dim" style={{ fontSize: '12px', padding: '14px', textAlign: 'center' }}>{winnersOnly ? 'No cross-game combos cashed this day.' : 'No combos for this board.'}</div>
+          ) : (
           <ul className="combo-res" style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {settled.dayCombos.map((c, i) => (
+            {shownCombos.map((c, i) => (
               <li className={`combo-res-row ${c.allHit ? 'hit' : 'miss'}`} key={`${c.strategy}-${c.size}-${i}`} style={{
                 display: 'flex', alignItems: 'center', gap: '12px',
                 background: c.allHit ? 'rgba(16, 185, 129, 0.08)' : 'rgba(255,255,255,0.02)',
@@ -204,8 +222,9 @@ export default function CombosView({ batters, onSelect, favorConsistency = false
               </li>
             ))}
           </ul>
+          )}
 
-          {settled.sgpDay.length > 0 && (
+          {shownSgp.length > 0 && (
             <>
               <h3 className="section-title" style={{ ...H3, marginTop: '22px' }}>
                 <Icon name="Zap" size={14} style={{ color: 'var(--accent)' }} /> Same-game parlays
@@ -214,7 +233,7 @@ export default function CombosView({ batters, onSelect, favorConsistency = false
                 </span>
               </h3>
               <ul className="combo-res" style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {settled.sgpDay.map((s, i) => (
+                {shownSgp.map((s, i) => (
                   <li className={`combo-res-row ${s.allHit ? 'hit' : 'miss'}`} key={`sgp-${s.gamePk}-${s.size}-${i}`} style={{
                     display: 'flex', alignItems: 'center', gap: '12px',
                     background: s.allHit ? 'rgba(16, 185, 129, 0.08)' : 'rgba(255,255,255,0.02)',
@@ -235,6 +254,9 @@ export default function CombosView({ batters, onSelect, favorConsistency = false
               </ul>
             </>
           )}
+          </>
+          )
+          })()}
         </section>
       ) : (
         <div className="empty-note" style={{ padding: '32px', textAlign: 'center', color: 'var(--text-faint)' }}>No graded combo days yet.</div>
