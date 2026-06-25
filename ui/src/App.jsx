@@ -579,6 +579,7 @@ export default function App() {
       {selected && (
         <PlayerDrawer
           batter={selected}
+          batters={all}
           onClose={() => setSelectedId(null)}
           watched={watchlist.has(selected.id)}
           inSlip={slipSet.has(selected.id)}

@@ -70,7 +70,7 @@ function useCountUp(target, ms = 550) {
   return v
 }
 
-export default function PlayerDrawer({ batter: b, onClose, watched, inSlip, onToggleWatch, onToggleSlip, onOpenZone, onOpenPitcher }) {
+export default function PlayerDrawer({ batter: b, batters, onClose, watched, inSlip, onToggleWatch, onToggleSlip, onOpenZone, onOpenPitcher }) {
   const trapRef = useFocusTrap()
   const liveMode = useLiveMode()
 
@@ -132,7 +132,7 @@ export default function PlayerDrawer({ batter: b, onClose, watched, inSlip, onTo
           <StatcastSection b={b} />
           <PercentileSection b={b} />
           <EnvSection b={b} />
-          <PitcherSection b={b} onOpenPitcher={onOpenPitcher} />
+          <PitcherSection b={b} batters={batters} onOpenPitcher={onOpenPitcher} />
           <OddsSection b={b} />
           {liveMode && b.game?.isLive && <LiveSection b={b} />}
           <TechReasons b={b} />
@@ -858,13 +858,16 @@ function ballTone(goAo) {
   return null
 }
 
-function PitcherSection({ b, onOpenPitcher }) {
+function PitcherSection({ b, batters, onOpenPitcher }) {
   const p = b.pitcher
   if (!p) return null
   const s = p.season || {}
-  // Per-start strikeout projection (neutral opponent — the drawer doesn't carry
-  // the full lineup; the Pitchers page opponent-adjusts it).
-  const estK = estimatedKs(p)
+  // Per-start strikeout projection, opponent-adjusted: this pitcher faces b's
+  // whole lineup (same game + same team), so their combined K% feeds the
+  // estimate — same as the Pitchers page. Falls back to neutral if the lineup
+  // isn't available.
+  const lineup = (batters || []).filter((x) => x.gamePk === b.gamePk && x.team === b.team)
+  const estK = estimatedKs(p, lineup)
   const split = b.batSide === 'L' ? p.splits?.vl : p.splits?.vr
   const rf = p.recentForm
   const canOpen = !!onOpenPitcher && p.id != null
@@ -900,7 +903,7 @@ function PitcherSection({ b, onOpenPitcher }) {
         <Cell k="ERA" v={num(s.era, 2)} />
         <Cell k="HR/9" v={num(s.hrPer9, 2)} tone={s.hrPer9 >= 1.3 ? 'good' : s.hrPer9 <= 0.9 ? 'bad' : null} />
         <Cell k="K/9" v={num(s.kPer9, 1)} />
-        <Cell k="Est K" v={estK ? `${Math.round(estK.k)}` : '—'} title={estK ? `Projected strikeouts this start: ${estK.lo}–${estK.hi} (≈${estK.expIP.toFixed(1)} IP). Neutral opponent — the Pitchers page adjusts for the lineup.` : 'Need a season K sample.'} />
+        <Cell k="Est K" v={estK ? `${Math.round(estK.k)}` : '—'} title={estK ? `Projected strikeouts this start: ${estK.lo}–${estK.hi} (≈${estK.expIP.toFixed(1)} IP vs a ${pct(estK.oppK, 0)}-K lineup).` : 'Need a season K sample.'} />
         <Cell k="WHIP" v={num(s.whip, 2)} />
         <Cell k="IP" v={num(s.ip, 1)} />
         <Cell
