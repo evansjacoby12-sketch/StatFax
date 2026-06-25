@@ -192,7 +192,7 @@ function PvpRow({ e, onSelect }) {
       </div>
       <div className="pvp-stats mono">
         <span><b style={{ color: '#fff' }}>{num(s.hrPer9, 2)}</b> HR/9</span>
-        <span><b style={{ color: '#fff' }}>{sav.barrelPctAllowed != null ? num(sav.barrelPctAllowed, 1) : '—'}%</b> brl</span>
+        <span title={e.estK ? `Projected strikeouts: ${e.estK.lo}–${e.estK.hi} (≈${e.estK.expIP.toFixed(1)} IP vs a ${pct(e.estK.oppK, 0)}-K lineup)` : undefined}><b style={{ color: 'var(--accent)' }}>{e.estK ? Math.round(e.estK.k) : '—'}</b> est K</span>
         <span><b style={{ color: '#fff' }}>{sav.exitVeloAgainst != null ? num(sav.exitVeloAgainst, 0) : '—'}</b> EV</span>
       </div>
       <div className="pvp-bats" style={{ justifyContent: 'flex-end' }}>
@@ -287,6 +287,7 @@ export function PitcherCard({ entry, onSelect, selectedId, watchlist, slip }) {
       }}>
         <Stat label="HR/9" value={num(season.hrPer9, 2)} tone={tone(season.hrPer9, { hi: 1.4, lo: 0.9 })} />
         <Stat label="K/9" value={num(season.kPer9, 1)} tone={tone(season.kPer9, { hi: 10, lo: 6.5, invert: true })} />
+        <Stat label="Est K" value={entry.estK ? `${Math.round(entry.estK.k)}` : '—'} sub={entry.estK ? `${entry.estK.lo}–${entry.estK.hi}` : null} />
         <Stat label="ERA" value={num(season.era, 2)} tone={tone(season.era, { hi: 4.6, lo: 3.0 })} />
         <Stat label="Barrel%" value={sav.barrelPctAllowed != null ? num(sav.barrelPctAllowed, 1) : '—'} tone={tone(sav.barrelPctAllowed, { hi: 9, lo: 6 })} />
         <Stat label="EV against" value={sav.exitVeloAgainst != null ? `${num(sav.exitVeloAgainst, 1)}` : '—'} tone={tone(sav.exitVeloAgainst, { hi: 90, lo: 87 })} />

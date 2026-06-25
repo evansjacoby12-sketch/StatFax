@@ -21,6 +21,40 @@ export function attackSideFor(pitcher) {
   return null
 }
 
+// Projected strikeouts for a start: the pitcher's K rate per batter faced
+// (season, nudged toward recent form) × expected batters faced (recent avg IP
+// per start × ~4.3 BF/IP) × an opponent adjustment (this lineup's K rate vs
+// league). A transparent estimate, not a betting line — gives a "~6 K (5–8)"
+// read on the Pitchers page. Returns { k, lo, hi, expIP } or null.
+const LEAGUE_K_PCT = 0.22
+const BF_PER_IP = 4.3
+export function estimatedKs(pitcher, targets) {
+  const s = pitcher?.season || {}
+  let kRate = s.bf > 0 && Number.isFinite(s.k) ? s.k / s.bf
+    : Number.isFinite(s.kPer9) ? (s.kPer9 / 9) / BF_PER_IP
+    : null
+  if (kRate == null) return null
+  const rf = pitcher?.recentForm
+  if (rf && Number.isFinite(rf.k9)) kRate = kRate * 0.7 + ((rf.k9 / 9) / BF_PER_IP) * 0.3
+  // Expected innings — recent avg per start, clamped to a real start length.
+  const ipVals = (rf?.recentStarts || []).map((x) => x.ip).filter(Number.isFinite).slice(0, 6)
+  let expIP = ipVals.length ? ipVals.reduce((a, b) => a + b, 0) / ipVals.length
+    : Number.isFinite(rf?.ip) && rf?.games ? rf.ip / rf.games : 5.3
+  expIP = Math.max(3.5, Math.min(7, expIP))
+  const expBF = expIP * BF_PER_IP
+  // Opponent K rate — the lineup actually facing him.
+  const oppKs = (targets || []).map((b) => {
+    const ss = b.season
+    if (!ss || !(ss.ab > 0)) return null
+    const pa = (ss.ab || 0) + (ss.bb || 0)
+    return pa > 0 ? (ss.k || 0) / pa : null
+  }).filter((v) => v != null)
+  const oppK = oppKs.length ? oppKs.reduce((a, b) => a + b, 0) / oppKs.length : LEAGUE_K_PCT
+  const oppAdj = Math.max(0.85, Math.min(1.18, oppK / LEAGUE_K_PCT))
+  const est = expBF * kRate * oppAdj
+  return { k: est, lo: Math.max(0, Math.round(est - 1.6)), hi: Math.round(est + 1.6), expIP, oppK }
+}
+
 export function groupPitchers(batters) {
   const map = new Map()
   for (const b of batters || []) {
@@ -62,6 +96,7 @@ export function groupPitchers(batters) {
         (a.playerId ?? 0) - (b.playerId ?? 0), // stable final key — no shuffle on full ties
     )
     e.topProb = e.targets[0]?.hrProbability ?? 0
+    e.estK = estimatedKs(e.pitcher, e.targets)
     return e
   })
 
