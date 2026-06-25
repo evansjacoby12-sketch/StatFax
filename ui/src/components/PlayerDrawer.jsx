@@ -10,6 +10,7 @@ import { interpretWind } from '../lib/wind.js'
 import { playerHeadshot, teamColor } from '../lib/teams.js'
 import { toolGrades, heatBreakdown, scoutVerdict, gradeLabel, hrSetup } from '../lib/scout.js'
 import { blastOf, blastVsHandOf } from '../lib/groups.js'
+import { estimatedKs } from '../lib/pitchers.js'
 import { useLiveMode } from '../lib/liveMode.js'
 import { useEliLevel, reasonsForLevel } from '../lib/eliLevel.js'
 
@@ -861,6 +862,9 @@ function PitcherSection({ b, onOpenPitcher }) {
   const p = b.pitcher
   if (!p) return null
   const s = p.season || {}
+  // Per-start strikeout projection (neutral opponent — the drawer doesn't carry
+  // the full lineup; the Pitchers page opponent-adjusts it).
+  const estK = estimatedKs(p)
   const split = b.batSide === 'L' ? p.splits?.vl : p.splits?.vr
   const rf = p.recentForm
   const canOpen = !!onOpenPitcher && p.id != null
@@ -896,6 +900,7 @@ function PitcherSection({ b, onOpenPitcher }) {
         <Cell k="ERA" v={num(s.era, 2)} />
         <Cell k="HR/9" v={num(s.hrPer9, 2)} tone={s.hrPer9 >= 1.3 ? 'good' : s.hrPer9 <= 0.9 ? 'bad' : null} />
         <Cell k="K/9" v={num(s.kPer9, 1)} />
+        <Cell k="Est K" v={estK ? `${Math.round(estK.k)}` : '—'} title={estK ? `Projected strikeouts this start: ${estK.lo}–${estK.hi} (≈${estK.expIP.toFixed(1)} IP). Neutral opponent — the Pitchers page adjusts for the lineup.` : 'Need a season K sample.'} />
         <Cell k="WHIP" v={num(s.whip, 2)} />
         <Cell k="IP" v={num(s.ip, 1)} />
         <Cell
