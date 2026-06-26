@@ -23,6 +23,7 @@ export function attackSideFor(pitcher) {
 
 const LEAGUE_K_PCT = 0.22
 const BF_PER_IP = 4.3
+const LEAGUE_WHIFF_PCT = 24.5
 
 // Poisson CDF — P(X ≤ k) for X ~ Poisson(lambda). Used to compute K-over
 // probabilities without any lookup tables. Fast for k ≤ 20.
@@ -69,12 +70,27 @@ export const K_LINES = [3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5, 10.5]
 
 export function kBrain(pitcher, targets) {
   const s = pitcher?.season || {}
-  // Blended K rate: 60% season + 40% recent-form, each expressed as K per BF.
+  // ── Step A: Base K rate from splits (lineup-composition-weighted) ──────────
+  const vl = pitcher?.splits?.vl
+  const vr = pitcher?.splits?.vr
+  const vlKRate = (vl?.kPct != null && Number.isFinite(vl.kPct)) ? vl.kPct / 100 : null
+  const vrKRate = (vr?.kPct != null && Number.isFinite(vr.kPct)) ? vr.kPct / 100 : null
+  let splitKRate = null
+  if (vlKRate != null && vrKRate != null) {
+    const lhbCount = (targets || []).filter((b) => effSide(b.batSide, pitcher?.hand) === 'L').length
+    const rhbCount = (targets || []).filter((b) => effSide(b.batSide, pitcher?.hand) === 'R').length
+    const totalHanded = lhbCount + rhbCount || 1
+    splitKRate = (vlKRate * lhbCount + vrKRate * rhbCount) / totalHanded
+  }
+
+  // Season fallback.
   let seasonKRate = s.bf > 0 && Number.isFinite(s.k) ? s.k / s.bf
     : Number.isFinite(s.kPer9) ? (s.kPer9 / 9) / BF_PER_IP
     : null
-  if (seasonKRate == null) return null
+  if (seasonKRate == null && splitKRate == null) return null
+  if (seasonKRate == null) seasonKRate = splitKRate
 
+  // ── Step B: Recent form blend ───────────────────────────────────────────────
   const rf = pitcher?.recentForm
   let recentKRate = null
   const recentStarts = (rf?.recentStarts || []).filter((x) => Number.isFinite(x.ip) && x.ip > 0)
@@ -89,12 +105,30 @@ export function kBrain(pitcher, targets) {
     recentKRate = (rf.k9 / 9) / BF_PER_IP
   }
 
-  const kRate = recentKRate != null
-    ? seasonKRate * 0.6 + recentKRate * 0.4
-    : seasonKRate
+  let baseKRate
+  if (splitKRate != null) {
+    baseKRate = recentKRate != null
+      ? splitKRate * 0.55 + recentKRate * 0.45
+      : splitKRate
+  } else {
+    baseKRate = recentKRate != null
+      ? seasonKRate * 0.60 + recentKRate * 0.40
+      : seasonKRate
+  }
 
-  // Pitch-mix whiff boost — elevates kRate for swing-and-miss arsenals.
-  const boost = pitchMixKBoost(pitcher?.pitchMix)
+  // ── Step C: Whiff% adjustment (Statcast) ───────────────────────────────────
+  const whiffPct = pitcher?.savant?.whiffPct
+  let kRate = baseKRate
+  if (whiffPct != null && Number.isFinite(whiffPct)) {
+    const whiffRelative = (whiffPct - LEAGUE_WHIFF_PCT) / LEAGUE_WHIFF_PCT
+    kRate = baseKRate * (1 + whiffRelative * 0.25)
+  }
+  kRate = Math.min(0.45, kRate)
+
+  // ── Step D: Pitch-mix boost only when whiffPct is unavailable ─────────────
+  const boost = (whiffPct != null && Number.isFinite(whiffPct))
+    ? 0
+    : pitchMixKBoost(pitcher?.pitchMix)
   const adjustedKRate = kRate + boost
 
   // Expected IP: mean of recent starts (trimmed to 6), with variance for the
@@ -154,7 +188,7 @@ export function kBrain(pitcher, targets) {
   const lo = Math.max(0, findPoiQuantile(lambda, 0.10))
   const hi = findPoiQuantile(lambda, 0.90)
 
-  return { k: est, lo, hi, expIP, ipSD, oppK, lambda, probs, trend, conf, boost }
+  return { k: est, lo, hi, expIP, ipSD, oppK, lambda, probs, trend, conf, boost, splitKRate, whiffPct: whiffPct ?? null }
 }
 
 // Binary search for the smallest k s.t. P(X ≤ k) ≥ p.
@@ -170,7 +204,7 @@ export function estimatedKs(pitcher, targets) {
   return kBrain(pitcher, targets)
 }
 
-export function groupPitchers(batters) {
+export function groupPitchers(batters, kDistByPitcher = {}) {
   const map = new Map()
   for (const b of batters || []) {
     const p = b.pitcher
@@ -211,7 +245,7 @@ export function groupPitchers(batters) {
         (a.playerId ?? 0) - (b.playerId ?? 0), // stable final key — no shuffle on full ties
     )
     e.topProb = e.targets[0]?.hrProbability ?? 0
-    e.estK = estimatedKs(e.pitcher, e.targets)
+    e.estK = kDistByPitcher[e.key] ?? estimatedKs(e.pitcher, e.targets)
     return e
   })
 
