@@ -44,6 +44,10 @@ export default function CombosView({ batters, onSelect, favorConsistency = false
     ])].sort().reverse().slice(0, RECENT_DAYS)
     if (!comboDates.length) return { comboDates: [] }
     const activeComboDay = comboDay && comboDates.includes(comboDay) ? comboDay : comboDates[0] || null
+    // Staleness: warn if the most recent combo date is >2 days behind today.
+    const latestDate = comboDates[0] || null
+    const daysBehind = latestDate ? Math.floor((Date.now() - new Date(latestDate + 'T12:00:00Z').getTime()) / 86400000) - 1 : null
+    const isStale = daysBehind != null && daysBehind > 1
     const windows = (activeComboDay && comboWindowsByDate[activeComboDay]) || []
     const hasFull = activeComboDay && (comboByDate[activeComboDay] || []).length > 0
     const hasLate = activeComboDay && (comboLateByDate[activeComboDay] || []).length > 0
@@ -142,7 +146,7 @@ export default function CombosView({ batters, onSelect, favorConsistency = false
       })
       .sort((a, b) => Number(b.allHit) - Number(a.allHit) || b.nHit - a.nHit || a.size - b.size)
     const sgpCashed = sgpDay.filter((s) => s.allHit).length
-    return { comboDates, activeComboDay, board, boardOptions, dayCombos, comboWeek, dayTally, sgpDay, sgpCashed }
+    return { comboDates, activeComboDay, board, boardOptions, dayCombos, comboWeek, dayTally, sgpDay, sgpCashed, isStale, latestDate, daysBehind }
   })()
 
   return (
@@ -165,6 +169,13 @@ export default function CombosView({ batters, onSelect, favorConsistency = false
       ) : !log ? (
         <div className="results-loading" style={{ display: 'flex', justifyContent: 'center', padding: '48px', color: 'var(--text-dim)', fontWeight: '600' }}>Loading combo record…</div>
       ) : settled && settled.comboDates.length > 0 ? (
+        <>
+        {settled.isStale && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', marginBottom: '12px', borderRadius: '8px', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', color: 'rgb(245,158,11)', fontSize: '12px' }}>
+            <Icon name="TriangleAlert" size={14} />
+            <span>Combo data is {settled.daysBehind}d stale (last: {settled.latestDate?.slice(5)}) — slate cron may be down.</span>
+          </div>
+        )}
         <section className="results-card" style={{ ...CARD, marginBottom: 0 }}>
           <h3 className="section-title" style={H3}>
             <Icon name="Layers" size={14} style={{ color: 'var(--accent)' }} /> Combo results
@@ -258,6 +269,7 @@ export default function CombosView({ batters, onSelect, favorConsistency = false
           )
           })()}
         </section>
+        </>
       ) : (
         <div className="empty-note" style={{ padding: '32px', textAlign: 'center', color: 'var(--text-faint)' }}>No graded combo days yet.</div>
       )}

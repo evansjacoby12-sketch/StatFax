@@ -4069,10 +4069,15 @@ async function main() {
     if (sgps.length) {
       backtestLog.combos = backtestLog.combos || {};
       backtestLog.combos.sgpByDate = backtestLog.combos.sgpByDate || {};
-      backtestLog.combos.sgpByDate[date] = sgps;
-      const sk = Object.keys(backtestLog.combos.sgpByDate).sort();
-      for (const d of sk.slice(0, -14)) delete backtestLog.combos.sgpByDate[d]; // keep ~2 weeks
-      console.log(`[sgp] ${date}: froze ${sgps.length} same-game parlays`);
+      // Freeze-once: first run of the day captures pregame picks. Later runs
+      // (in-game, post-game) don't overwrite so the scorecard reflects actual
+      // pregame selections, not mid-game board shifts.
+      if (!backtestLog.combos.sgpByDate[date]) {
+        backtestLog.combos.sgpByDate[date] = sgps;
+        const sk = Object.keys(backtestLog.combos.sgpByDate).sort();
+        for (const d of sk.slice(0, -14)) delete backtestLog.combos.sgpByDate[d]; // keep ~2 weeks
+        console.log(`[sgp] ${date}: froze ${sgps.length} same-game parlays (pregame)`);
+      }
     }
   } catch (e) { console.warn(`[sgp] freeze skipped (non-fatal): ${e?.message}`); }
 
