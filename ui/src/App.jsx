@@ -438,6 +438,7 @@ export default function App() {
         ) : view === 'pitchers' ? (
           <PitchersView
             batters={all}
+            kDistByPitcher={data?.kDistByPitcher || {}}
             onSelect={(b) => setSelectedId(b.id)}
             selectedId={selectedId}
             watchlist={watchlist}

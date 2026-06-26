@@ -13,11 +13,11 @@ const PSORT = [
   { k: 'time', label: 'Game time' },
 ]
 
-export default function PitchersView({ batters, onSelect, selectedId, watchlist, slip, focusKey, onFocusDone }) {
+export default function PitchersView({ batters, kDistByPitcher = {}, onSelect, selectedId, watchlist, slip, focusKey, onFocusDone }) {
   const [sort, setSort] = useState('vuln')
   const [view, setView] = useState('preview')
   const [kOpen, setKOpen] = useState(false)
-  const grouped = useMemo(() => groupPitchers(batters), [batters])
+  const grouped = useMemo(() => groupPitchers(batters, kDistByPitcher), [batters, kDistByPitcher])
   
   const pitchers = useMemo(() => {
     if (sort !== 'time') return grouped
@@ -137,6 +137,11 @@ const CONF_COLOR = { high: 'var(--strong)', med: 'var(--accent)', low: 'var(--te
 function KBrainView({ pitchers }) {
   // Per-pitcher line input: pitcherId → user-entered sportsbook line
   const [lines, setLines] = useState({})
+  const [kLog, setKLog] = useState(null)
+  useEffect(() => {
+    fetch(`${import.meta.env.BASE_URL}data/backtest-log.json`, { cache: 'no-store' })
+      .then(r => r.ok ? r.json() : null).then(d => d && setKLog(d)).catch(() => {})
+  }, [])
   const arms = [...pitchers]
     .filter((e) => e.estK && Number.isFinite(e.estK.lambda))
     .sort((a, b) => (b.estK.lambda - a.estK.lambda))
@@ -157,9 +162,8 @@ function KBrainView({ pitchers }) {
         const myLineNum = myLine !== undefined && myLine !== '' ? parseFloat(myLine) : null
         const myProb = myLineNum != null && Number.isFinite(myLineNum) ? kOverProb(ek.lambda, myLineNum) : null
 
-        // Show 4 key thresholds around the est K
-        const anchor = Math.round(ek.k)
-        const showLines = K_LINES.filter((l) => l >= anchor - 2 && l <= anchor + 2).slice(0, 5)
+        // Show ALL K lines; skip only those with < 3% probability (not worth displaying).
+        const showLines = K_LINES.filter((l) => (ek.probs[l] ?? 0) >= 0.03)
 
         return (
           <div key={e.key} style={{ background: 'rgba(16,24,48,0.45)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '12px', padding: '14px 16px' }}>
@@ -200,6 +204,11 @@ function KBrainView({ pitchers }) {
                       <div style={{ height: '100%', width: `${pct100}%`, background: barColor, borderRadius: '99px', transition: 'width 0.3s' }} />
                     </div>
                     <span className="mono" style={{ width: '34px', textAlign: 'right', fontWeight: '700', color: barColor }}>{pct100.toFixed(0)}%</span>
+                    {p >= 0.60 ? (
+                      <span style={{ fontSize: '9px', fontWeight: '700', color: 'var(--strong)', textTransform: 'uppercase', letterSpacing: '0.04em', flexShrink: 0 }}>value</span>
+                    ) : p <= 0.35 ? (
+                      <span style={{ fontSize: '9px', fontWeight: '700', color: 'var(--bad)', textTransform: 'uppercase', letterSpacing: '0.04em', flexShrink: 0 }}>fade</span>
+                    ) : null}
                   </div>
                 )
               })}
@@ -227,6 +236,57 @@ function KBrainView({ pitchers }) {
           </div>
         )
       })}
+
+      {/* K-prop results scorecard */}
+      {(() => {
+        const resultsByDate = kLog?.kProps?.resultsByDate
+        if (!resultsByDate) return null
+        const dates = Object.keys(resultsByDate).sort().slice(-7).reverse()
+        if (!dates.length) return null
+        let totalHits = 0, totalGraded = 0
+        for (const d of dates) {
+          for (const e of resultsByDate[d] || []) {
+            if (e.actualK != null) {
+              totalGraded++
+              if (e.actualK >= e.lo && e.actualK <= e.hi) totalHits++
+            }
+          }
+        }
+        return (
+          <div style={{ marginTop: '20px', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+              <span style={{ fontSize: '12px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-faint)' }}>K-prop record</span>
+              {totalGraded > 0 && (
+                <span style={{ fontSize: '11px', color: totalHits / totalGraded >= 0.65 ? 'var(--strong)' : totalHits / totalGraded >= 0.45 ? '#f59e0b' : 'var(--bad)' }}>
+                  {totalHits}/{totalGraded} within range ({(totalHits / totalGraded * 100).toFixed(0)}% hit rate)
+                </span>
+              )}
+            </div>
+            {dates.map((d) => {
+              const rows = (resultsByDate[d] || []).filter(e => e.actualK != null)
+              if (!rows.length) return null
+              return (
+                <div key={d} style={{ marginBottom: '12px' }}>
+                  <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '5px' }}>{d}</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                    {rows.map((e, i) => {
+                      const hit = e.actualK >= e.lo && e.actualK <= e.hi
+                      return (
+                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', padding: '4px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: '6px' }}>
+                          <span style={{ flex: 1, fontWeight: '600', color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{e.name}</span>
+                          <span className="mono" style={{ color: 'var(--text-faint)', flexShrink: 0 }}>est {e.lo}–{e.hi}</span>
+                          <span className="mono" style={{ color: '#fff', fontWeight: '700', flexShrink: 0 }}>actual {e.actualK}</span>
+                          <span style={{ flexShrink: 0 }}>{hit ? '✅' : '❌'}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )
+      })()}
     </div>
   )
 }

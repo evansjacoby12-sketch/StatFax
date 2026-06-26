@@ -460,3 +460,36 @@ export async function repairRecentDays(log, maxScan = 7) {
   if (totalFixed) console.log(`[calib] repair: upgraded ${totalFixed} false-miss record(s) across ${candidates.length} unsettled day(s)`);
   return log;
 }
+
+/**
+ * Fetch actual starter K totals for each game on `date`.
+ * Returns Map<`${pitcherId}-${gamePk}`, { k, ip, name }> for all games that finished.
+ * allFinal = true when every scheduled game is Final.
+ */
+export async function fetchPitcherKsForDate(date) {
+  const sched = await getJson(`${MLB_BASE}/schedule?sportId=1&date=${date}`);
+  const games = sched?.dates?.[0]?.games || [];
+  const out = new Map();
+  let finalCount = 0;
+  for (const g of games) {
+    if (g.status?.abstractGameState !== 'Final') continue;
+    finalCount++;
+    const bs = await getJson(`${MLB_BASE}/game/${g.gamePk}/boxscore`);
+    for (const side of ['home', 'away']) {
+      const pitcherIds = bs?.teams?.[side]?.pitchers || [];
+      if (!pitcherIds.length) continue;
+      const starterId = pitcherIds[0];  // first pitcher = starter
+      const playerKey = `ID${starterId}`;
+      const p = bs?.teams?.[side]?.players?.[playerKey];
+      if (!p) continue;
+      const ks = p?.stats?.pitching?.strikeOuts;
+      const ip = p?.stats?.pitching?.inningsPitched;
+      const name = p?.person?.fullName || '';
+      if (Number.isFinite(ks)) {
+        out.set(`${starterId}-${g.gamePk}`, { k: ks, ip: ip ? parseFloat(ip) : null, name });
+      }
+    }
+  }
+  const allFinal = games.length > 0 && finalCount === games.length;
+  return { outcomes: out, allFinal };
+}

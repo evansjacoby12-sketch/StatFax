@@ -236,6 +236,7 @@ import {
   repairRecentDays,
   computeMultipliers,
   fetchHomerersForDate,
+  fetchPitcherKsForDate,
 } from './reconcile.mjs';
 import {
   comboRowFromSnapshot,
@@ -246,6 +247,131 @@ import {
   appendComboDay,
   comboScorecard,
 } from './parlay-combos.mjs';
+
+// ─── Server-side K-distribution estimator (mirrors client kBrain) ────────────
+// Produces { k, lo, hi, lambda, probs } for a pitcher start against a given
+// batter list. No trend/conf needed here — just the Poisson distribution for
+// the freeze + scorecard. Inline Poisson math; no external dependencies.
+const _SS_LEAGUE_K_PCT   = 0.22;
+const _SS_BF_PER_IP      = 4.3;
+const _SS_LEAGUE_WHIFF   = 24.5;
+const _SS_K_LINES        = [3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5, 10.5];
+
+function _ssEffSide(batSide, pitcherHand) {
+  if (batSide === 'S') return pitcherHand === 'L' ? 'R' : 'L';
+  return batSide || 'R';
+}
+function _ssPoissonCDF(k, lambda) {
+  if (lambda <= 0) return 1;
+  let sum = 0, term = Math.exp(-lambda);
+  for (let i = 0; i <= Math.floor(k); i++) { sum += term; term *= lambda / (i + 1); }
+  return Math.min(1, sum);
+}
+function _ssFindQuantile(lambda, p) {
+  let k = Math.max(0, Math.round(lambda - 3));
+  while (_ssPoissonCDF(k, lambda) < p && k < 30) k++;
+  return k;
+}
+function _ssKOverProb(lambda, line) {
+  if (!Number.isFinite(lambda) || lambda <= 0) return null;
+  return 1 - _ssPoissonCDF(Math.floor(line), lambda);
+}
+function _ssPitchMixKBoost(pitchMix) {
+  if (!pitchMix) return 0;
+  const LIFT = { sl: 0.012, st: 0.015, cu: 0.010, kc: 0.010, ch: 0.009, fs: 0.011 };
+  let boost = 0;
+  for (const [code, lift] of Object.entries(LIFT)) {
+    const raw = Number(pitchMix[`${code}Pct`] ?? 0);
+    const pct = raw > 1.5 ? raw / 100 : raw;
+    boost += pct * lift;
+  }
+  return Math.min(0.04, boost);
+}
+
+function computeKDist(pitcher, targets) {
+  const s = pitcher?.season || {};
+
+  // Step A: splits-weighted base rate
+  const vl = pitcher?.splits?.vl;
+  const vr = pitcher?.splits?.vr;
+  const vlKRate = (vl?.kPct != null && Number.isFinite(vl.kPct)) ? vl.kPct / 100 : null;
+  const vrKRate = (vr?.kPct != null && Number.isFinite(vr.kPct)) ? vr.kPct / 100 : null;
+  let splitKRate = null;
+  if (vlKRate != null && vrKRate != null) {
+    const lhbCount = (targets || []).filter(b => _ssEffSide(b.batSide, pitcher?.hand) === 'L').length;
+    const rhbCount = (targets || []).filter(b => _ssEffSide(b.batSide, pitcher?.hand) === 'R').length;
+    const totalHanded = lhbCount + rhbCount || 1;
+    splitKRate = (vlKRate * lhbCount + vrKRate * rhbCount) / totalHanded;
+  }
+  let seasonKRate = s.bf > 0 && Number.isFinite(s.k) ? s.k / s.bf
+    : Number.isFinite(s.kPer9) ? (s.kPer9 / 9) / _SS_BF_PER_IP
+    : null;
+  if (seasonKRate == null && splitKRate == null) return null;
+  if (seasonKRate == null) seasonKRate = splitKRate;
+
+  // Step B: recent form blend
+  const rf = pitcher?.recentForm;
+  let recentKRate = null;
+  const recentStarts = (rf?.recentStarts || []).filter(x => Number.isFinite(x.ip) && x.ip > 0);
+  if (recentStarts.length >= 2) {
+    const kbf = recentStarts.slice(0, 6).map(x => {
+      const bf = x.bf ?? (x.ip * _SS_BF_PER_IP);
+      return bf > 0 && Number.isFinite(x.k) ? x.k / bf : null;
+    }).filter(v => v != null);
+    if (kbf.length) recentKRate = kbf.reduce((a, b) => a + b, 0) / kbf.length;
+  } else if (Number.isFinite(rf?.k9)) {
+    recentKRate = (rf.k9 / 9) / _SS_BF_PER_IP;
+  }
+  let baseKRate;
+  if (splitKRate != null) {
+    baseKRate = recentKRate != null ? splitKRate * 0.55 + recentKRate * 0.45 : splitKRate;
+  } else {
+    baseKRate = recentKRate != null ? seasonKRate * 0.60 + recentKRate * 0.40 : seasonKRate;
+  }
+
+  // Step C: whiff% adjustment
+  const whiffPct = pitcher?.savant?.whiffPct;
+  let kRate = baseKRate;
+  if (whiffPct != null && Number.isFinite(whiffPct)) {
+    const whiffRelative = (whiffPct - _SS_LEAGUE_WHIFF) / _SS_LEAGUE_WHIFF;
+    kRate = baseKRate * (1 + whiffRelative * 0.25);
+  }
+  kRate = Math.min(0.45, kRate);
+
+  // Step D: pitch-mix boost only when whiffPct unavailable
+  const boost = (whiffPct != null && Number.isFinite(whiffPct))
+    ? 0 : _ssPitchMixKBoost(pitcher?.pitchMix);
+  const adjustedKRate = kRate + boost;
+
+  // Expected IP
+  const ipVals = recentStarts.map(x => x.ip).filter(Number.isFinite).slice(0, 6);
+  let expIP;
+  if (ipVals.length >= 2) {
+    expIP = ipVals.reduce((a, b) => a + b, 0) / ipVals.length;
+  } else {
+    expIP = Number.isFinite(rf?.ip) && rf?.games > 0 ? rf.ip / rf.games : 5.3;
+  }
+  expIP = Math.max(3.5, Math.min(7.5, expIP));
+  const expBF = expIP * _SS_BF_PER_IP;
+
+  // Opponent adjustment
+  const oppKs = (targets || []).map(b => {
+    const ss = b.season;
+    if (!ss || !(ss.ab > 0)) return null;
+    const pa = (ss.ab || 0) + (ss.bb || 0);
+    return pa > 0 ? (ss.k || 0) / pa : null;
+  }).filter(v => v != null);
+  const oppK = oppKs.length ? oppKs.reduce((a, b) => a + b, 0) / oppKs.length : _SS_LEAGUE_K_PCT;
+  const oppAdj = Math.max(0.82, Math.min(1.22, oppK / _SS_LEAGUE_K_PCT));
+
+  const lambda = expBF * adjustedKRate * oppAdj;
+  const probs = {};
+  for (const line of _SS_K_LINES) probs[line] = _ssKOverProb(lambda, line);
+  const lo = Math.max(0, _ssFindQuantile(lambda, 0.10));
+  const hi = _ssFindQuantile(lambda, 0.90);
+
+  return { k: lambda, lo, hi, lambda, probs };
+}
 
 // Intraday board history — append a compact snapshot of TODAY's canonical combos
 // (one per strategy/size) + lineup-confirmation state on every run, so we can
@@ -3946,6 +4072,27 @@ async function main() {
     _nanDebug: nanDebug.slice(0, 100),
   };
 
+  // ─── Server-side K-distribution pre-computation ──────────────────────────
+  // Group scoredBatters by pitcher (pitcherId-gamePk) and compute kDist for
+  // each. Mirrors the client-side kBrain() so the UI can use the pre-computed
+  // value directly from daily.json instead of recomputing on every render.
+  try {
+    const kDistByPitcher = {};
+    const pitcherGroups = new Map();
+    for (const row of Object.values(payload.scoredBatters || {})) {
+      if (!row?.pitcher?.id || row.gamePk == null) continue;
+      const key = `${row.pitcher.id}-${row.gamePk}`;
+      if (!pitcherGroups.has(key)) pitcherGroups.set(key, { pitcher: row.pitcher, targets: [] });
+      pitcherGroups.get(key).targets.push(row);
+    }
+    for (const [key, { pitcher, targets }] of pitcherGroups) {
+      const kd = computeKDist(pitcher, targets);
+      if (kd) kDistByPitcher[key] = kd;
+    }
+    payload.kDistByPitcher = kDistByPitcher;
+    console.log(`[kbrain] computed K dist for ${Object.keys(kDistByPitcher).length} pitchers`);
+  } catch (e) { console.warn(`[kbrain] skipped: ${e?.message}`); }
+
   // ─── Data-quality flags ──────────────────────────────────────────────────
   // Surface anomalies that would silently degrade scores: missing weather
   // for outdoor games, doubleheader games with too few scored batters
@@ -4080,6 +4227,56 @@ async function main() {
       }
     }
   } catch (e) { console.warn(`[sgp] freeze skipped (non-fatal): ${e?.message}`); }
+
+  // K-prop scorecard: freeze today's K estimates so we can grade them tomorrow
+  try {
+    if (payload.kDistByPitcher && Object.keys(payload.kDistByPitcher).length) {
+      backtestLog.kProps = backtestLog.kProps || {};
+      backtestLog.kProps.estByDate = backtestLog.kProps.estByDate || {};
+      if (!backtestLog.kProps.estByDate[date]) {
+        backtestLog.kProps.estByDate[date] = Object.entries(payload.kDistByPitcher)
+          .map(([key, kd]) => {
+            const [pitcherIdStr, gamePkStr] = key.split('-');
+            const sample = Object.values(payload.scoredBatters || {}).find(
+              r => String(r.pitcher?.id) === pitcherIdStr && String(r.gamePk) === gamePkStr
+            );
+            return {
+              key,
+              pitcherId: Number(pitcherIdStr),
+              gamePk: Number(gamePkStr),
+              name: sample?.pitcher?.name || '',
+              estK: kd.k,
+              lo: kd.lo,
+              hi: kd.hi,
+              lambda: kd.lambda,
+              probs: kd.probs,
+            };
+          });
+        const dk = Object.keys(backtestLog.kProps.estByDate).sort();
+        for (const d of dk.slice(0, -14)) delete backtestLog.kProps.estByDate[d];
+        console.log(`[kbrain] ${date}: froze ${backtestLog.kProps.estByDate[date].length} K estimates`);
+      }
+    }
+  } catch (e) { console.warn(`[kbrain] freeze skipped: ${e?.message}`); }
+
+  // Grade yesterday's K-prop estimates against actual outcomes
+  try {
+    const kEsts = backtestLog.kProps?.estByDate?.[yesterdayCT];
+    if (kEsts?.length && yesterdayOutcomes?.allFinal) {
+      if (!backtestLog.kProps.resultsByDate) backtestLog.kProps.resultsByDate = {};
+      if (!backtestLog.kProps.resultsByDate[yesterdayCT]) {
+        const { outcomes: kOutcomes } = await fetchPitcherKsForDate(yesterdayCT);
+        const graded = kEsts.map((e) => {
+          const actual = kOutcomes.get(e.key);
+          return { ...e, actualK: actual?.k ?? null, actualIP: actual?.ip ?? null };
+        }).filter((e) => e.actualK != null);
+        backtestLog.kProps.resultsByDate[yesterdayCT] = graded;
+        const dk = Object.keys(backtestLog.kProps.resultsByDate).sort();
+        for (const d of dk.slice(0, -14)) delete backtestLog.kProps.resultsByDate[d];
+        console.log(`[kbrain] graded ${graded.length} K props for ${yesterdayCT}`);
+      }
+    }
+  } catch (e) { console.warn(`[kbrain] grade skipped: ${e?.message}`); }
 
   // Freeze this run's scoreBatter() inputs alongside the slate so the offline
   // lab (`npm run lab:score`) can re-score engine variants on identical inputs.
