@@ -21,28 +21,98 @@ export function attackSideFor(pitcher) {
   return null
 }
 
-// Projected strikeouts for a start: the pitcher's K rate per batter faced
-// (season, nudged toward recent form) × expected batters faced (recent avg IP
-// per start × ~4.3 BF/IP) × an opponent adjustment (this lineup's K rate vs
-// league). A transparent estimate, not a betting line — gives a "~6 K (5–8)"
-// read on the Pitchers page. Returns { k, lo, hi, expIP } or null.
 const LEAGUE_K_PCT = 0.22
 const BF_PER_IP = 4.3
-export function estimatedKs(pitcher, targets) {
+
+// Poisson CDF — P(X ≤ k) for X ~ Poisson(lambda). Used to compute K-over
+// probabilities without any lookup tables. Fast for k ≤ 20.
+function poissonCDF(k, lambda) {
+  if (lambda <= 0) return 1
+  let sum = 0, term = Math.exp(-lambda)
+  for (let i = 0; i <= Math.floor(k); i++) {
+    sum += term
+    term *= lambda / (i + 1)
+  }
+  return Math.min(1, sum)
+}
+// P(K > line) for a half-integer sportsbook line (e.g. 6.5 → P(K ≥ 7)).
+export function kOverProb(lambda, line) {
+  if (!Number.isFinite(lambda) || lambda <= 0) return null
+  return 1 - poissonCDF(Math.floor(line), lambda)
+}
+
+// Whiff-rate boost from pitch mix: pitches with above-average swing-and-miss
+// rates lift the pitcher's K rate beyond what raw K/9 captures. Coefficients
+// are approximate relative whiff lift per 10% usage vs. a 4-seam-only arm.
+const WHIFF_LIFT = { sl: 0.012, st: 0.015, cu: 0.010, kc: 0.010, ch: 0.009, fs: 0.011 }
+function pitchMixKBoost(pitchMix) {
+  if (!pitchMix) return 0
+  let boost = 0
+  for (const [code, lift] of Object.entries(WHIFF_LIFT)) {
+    const raw = Number(pitchMix[`${code}Pct`] ?? 0)
+    const pct = raw > 1.5 ? raw / 100 : raw // normalise fractions
+    boost += pct * lift
+  }
+  return Math.min(0.04, boost) // cap at +4 pp so outliers don't blow up
+}
+
+// ─── Core K brain ────────────────────────────────────────────────────────────
+// Returns full Poisson-based K distribution for a pitcher start.
+//
+//   lambda  = kRate × expBF × oppAdj    (mean K expectation)
+//   probs   = P(K ≥ n) at every half-integer sportsbook threshold 3.5–10.5
+//   trend   = 'up' | 'down' | 'flat'    from last-3 vs prior-3 recent starts
+//   conf    = 'high' | 'med' | 'low'    data quality flag
+//
+// Returns null when there's not enough data to form a meaningful estimate.
+export const K_LINES = [3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5, 10.5]
+
+export function kBrain(pitcher, targets) {
   const s = pitcher?.season || {}
-  let kRate = s.bf > 0 && Number.isFinite(s.k) ? s.k / s.bf
+  // Blended K rate: 60% season + 40% recent-form, each expressed as K per BF.
+  let seasonKRate = s.bf > 0 && Number.isFinite(s.k) ? s.k / s.bf
     : Number.isFinite(s.kPer9) ? (s.kPer9 / 9) / BF_PER_IP
     : null
-  if (kRate == null) return null
+  if (seasonKRate == null) return null
+
   const rf = pitcher?.recentForm
-  if (rf && Number.isFinite(rf.k9)) kRate = kRate * 0.7 + ((rf.k9 / 9) / BF_PER_IP) * 0.3
-  // Expected innings — recent avg per start, clamped to a real start length.
-  const ipVals = (rf?.recentStarts || []).map((x) => x.ip).filter(Number.isFinite).slice(0, 6)
-  let expIP = ipVals.length ? ipVals.reduce((a, b) => a + b, 0) / ipVals.length
-    : Number.isFinite(rf?.ip) && rf?.games ? rf.ip / rf.games : 5.3
-  expIP = Math.max(3.5, Math.min(7, expIP))
+  let recentKRate = null
+  const recentStarts = (rf?.recentStarts || []).filter((x) => Number.isFinite(x.ip) && x.ip > 0)
+  if (recentStarts.length >= 2) {
+    // Per-start K/BF from game logs — most accurate recent signal.
+    const kbf = recentStarts.slice(0, 6).map((x) => {
+      const bf = x.bf ?? (x.ip * BF_PER_IP)
+      return bf > 0 && Number.isFinite(x.k) ? x.k / bf : null
+    }).filter((v) => v != null)
+    if (kbf.length) recentKRate = kbf.reduce((a, b) => a + b, 0) / kbf.length
+  } else if (Number.isFinite(rf?.k9)) {
+    recentKRate = (rf.k9 / 9) / BF_PER_IP
+  }
+
+  const kRate = recentKRate != null
+    ? seasonKRate * 0.6 + recentKRate * 0.4
+    : seasonKRate
+
+  // Pitch-mix whiff boost — elevates kRate for swing-and-miss arsenals.
+  const boost = pitchMixKBoost(pitcher?.pitchMix)
+  const adjustedKRate = kRate + boost
+
+  // Expected IP: mean of recent starts (trimmed to 6), with variance for the
+  // confidence interval. Falls back to season avg then a league-average 5.3.
+  const ipVals = recentStarts.map((x) => x.ip).filter(Number.isFinite).slice(0, 6)
+  let expIP, ipSD
+  if (ipVals.length >= 2) {
+    expIP = ipVals.reduce((a, b) => a + b, 0) / ipVals.length
+    const variance = ipVals.reduce((a, b) => a + (b - expIP) ** 2, 0) / ipVals.length
+    ipSD = Math.sqrt(variance)
+  } else {
+    expIP = Number.isFinite(rf?.ip) && rf?.games > 0 ? rf.ip / rf.games : 5.3
+    ipSD = 1.2 // default uncertainty when we don't have game logs
+  }
+  expIP = Math.max(3.5, Math.min(7.5, expIP))
   const expBF = expIP * BF_PER_IP
-  // Opponent K rate — the lineup actually facing him.
+
+  // Opponent adjustment: compare this lineup's K rate to league average.
   const oppKs = (targets || []).map((b) => {
     const ss = b.season
     if (!ss || !(ss.ab > 0)) return null
@@ -50,9 +120,54 @@ export function estimatedKs(pitcher, targets) {
     return pa > 0 ? (ss.k || 0) / pa : null
   }).filter((v) => v != null)
   const oppK = oppKs.length ? oppKs.reduce((a, b) => a + b, 0) / oppKs.length : LEAGUE_K_PCT
-  const oppAdj = Math.max(0.85, Math.min(1.18, oppK / LEAGUE_K_PCT))
-  const est = expBF * kRate * oppAdj
-  return { k: est, lo: Math.max(0, Math.round(est - 1.6)), hi: Math.round(est + 1.6), expIP, oppK }
+  const oppAdj = Math.max(0.82, Math.min(1.22, oppK / LEAGUE_K_PCT))
+
+  // λ = mean K count this start (Poisson parameter).
+  const lambda = expBF * adjustedKRate * oppAdj
+
+  // P(K ≥ n) at every sportsbook threshold.
+  const probs = {}
+  for (const line of K_LINES) probs[line] = kOverProb(lambda, line)
+
+  // Trend: compare K/BF in last 3 vs the 3 before that.
+  let trend = 'flat'
+  if (recentStarts.length >= 4) {
+    const byKBF = recentStarts.slice(0, 6).map((x) => {
+      const bf = x.bf ?? (x.ip * BF_PER_IP)
+      return bf > 0 && Number.isFinite(x.k) ? x.k / bf : null
+    }).filter((v) => v != null)
+    if (byKBF.length >= 4) {
+      const recent3 = byKBF.slice(0, 3).reduce((a, b) => a + b, 0) / 3
+      const prior3  = byKBF.slice(3).reduce((a, b) => a + b, 0) / byKBF.slice(3).length
+      if (recent3 > prior3 * 1.07) trend = 'up'
+      else if (recent3 < prior3 * 0.93) trend = 'down'
+    }
+  }
+
+  // Confidence flag.
+  const conf = recentStarts.length >= 4 && s.bf >= 100 ? 'high'
+    : recentStarts.length >= 2 || s.bf >= 50 ? 'med'
+    : 'low'
+
+  const est = lambda
+  // lo/hi = 10th–90th percentile via Poisson quantile (simple binary search).
+  const lo = Math.max(0, findPoiQuantile(lambda, 0.10))
+  const hi = findPoiQuantile(lambda, 0.90)
+
+  return { k: est, lo, hi, expIP, ipSD, oppK, lambda, probs, trend, conf, boost }
+}
+
+// Binary search for the smallest k s.t. P(X ≤ k) ≥ p.
+function findPoiQuantile(lambda, p) {
+  let k = Math.max(0, Math.round(lambda - 3))
+  while (poissonCDF(k, lambda) < p && k < 30) k++
+  return k
+}
+
+// Backwards-compat alias — existing callers (PitchersView, PlayerDrawer) get
+// the same shape they expect; kBrain adds lambda/probs/trend/conf on top.
+export function estimatedKs(pitcher, targets) {
+  return kBrain(pitcher, targets)
 }
 
 export function groupPitchers(batters) {

@@ -1,7 +1,7 @@
 import { useMemo, useEffect, useState } from 'react'
 import Icon from './Icon.jsx'
 import { GradeChip, ScoreRing, ProbBar, Stat } from './atoms.jsx'
-import { groupPitchers, pitchUsage, effSide } from '../lib/pitchers.js'
+import { groupPitchers, pitchUsage, effSide, K_LINES, kOverProb } from '../lib/pitchers.js'
 import { pct, num, rate, gameTime } from '../lib/format.js'
 import { teamColor, teamLogo, playerHeadshot, hexToRgba } from '../lib/teams.js'
 import { useLiveMode } from '../lib/liveMode.js'
@@ -61,8 +61,8 @@ export default function PitchersView({ batters, onSelect, selectedId, watchlist,
         >
           Vulnerability
         </button>
-        <button 
-          className={`badge-toggle ${view === 'detail' ? 'on' : ''}`} 
+        <button
+          className={`badge-toggle ${view === 'detail' ? 'on' : ''}`}
           onClick={() => setView('detail')}
           style={{
             borderColor: view === 'detail' ? 'var(--accent)' : 'var(--border-soft)',
@@ -71,6 +71,17 @@ export default function PitchersView({ batters, onSelect, selectedId, watchlist,
           }}
         >
           Detail Cards
+        </button>
+        <button
+          className={`badge-toggle ${view === 'kbrain' ? 'on' : ''}`}
+          onClick={() => setView('kbrain')}
+          style={{
+            borderColor: view === 'kbrain' ? 'var(--accent)' : 'var(--border-soft)',
+            background: view === 'kbrain' ? 'var(--hover)' : 'transparent',
+            color: view === 'kbrain' ? '#fff' : 'var(--text-faint)'
+          }}
+        >
+          <Icon name="Zap" size={11} style={{ marginRight: '3px' }} />K Brain
         </button>
         
         {view === 'detail' && (
@@ -96,7 +107,9 @@ export default function PitchersView({ batters, onSelect, selectedId, watchlist,
 
       <KParlaySection pitchers={grouped} open={kOpen} onToggle={() => setKOpen((v) => !v)} />
 
-      {view === 'preview' ? (
+      {view === 'kbrain' ? (
+        <KBrainView pitchers={grouped} />
+      ) : view === 'preview' ? (
         <PitcherPreview pitchers={grouped} onSelect={onSelect} />
       ) : (
         <div className="pitchers" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: '20px' }}>
@@ -113,6 +126,108 @@ export default function PitchersView({ batters, onSelect, selectedId, watchlist,
         </div>
       )}
     </>
+  )
+}
+
+// ─── K Brain view ────────────────────────────────────────────────────────────
+const TREND_ICON = { up: '↑', down: '↓', flat: '→' }
+const TREND_COLOR = { up: 'var(--strong)', down: 'var(--bad)', flat: 'var(--text-faint)' }
+const CONF_COLOR = { high: 'var(--strong)', med: 'var(--accent)', low: 'var(--text-faint)' }
+
+function KBrainView({ pitchers }) {
+  // Per-pitcher line input: pitcherId → user-entered sportsbook line
+  const [lines, setLines] = useState({})
+  const arms = [...pitchers]
+    .filter((e) => e.estK && Number.isFinite(e.estK.lambda))
+    .sort((a, b) => (b.estK.lambda - a.estK.lambda))
+
+  if (!arms.length) {
+    return <div className="empty-note" style={{ padding: '48px', textAlign: 'center', color: 'var(--text-faint)' }}>No K estimates available — missing recent start data.</div>
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+      <div style={{ fontSize: '11px', color: 'var(--text-faint)', marginBottom: '4px' }}>
+        Poisson K distribution per start. Enter the sportsbook's line to see implied edge.
+      </div>
+      {arms.map((e) => {
+        const ek = e.estK
+        const oppTeam = e.targets[0]?.team || '?'
+        const myLine = lines[e.key]
+        const myLineNum = myLine !== undefined && myLine !== '' ? parseFloat(myLine) : null
+        const myProb = myLineNum != null && Number.isFinite(myLineNum) ? kOverProb(ek.lambda, myLineNum) : null
+
+        // Show 4 key thresholds around the est K
+        const anchor = Math.round(ek.k)
+        const showLines = K_LINES.filter((l) => l >= anchor - 2 && l <= anchor + 2).slice(0, 5)
+
+        return (
+          <div key={e.key} style={{ background: 'rgba(16,24,48,0.45)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '12px', padding: '14px 16px' }}>
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px', flexWrap: 'wrap' }}>
+              <img src={playerHeadshot(e.pitcher.id, 60)} alt="" loading="lazy" style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover', background: 'rgba(255,255,255,0.04)', flexShrink: 0 }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: '800', fontSize: '14px', color: '#fff' }}>{e.pitcher.name}</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-faint)' }}>
+                  {e.pitcher.hand}HP · vs {oppTeam}
+                  {e.game?.gameDate && <span> · {gameTime(e.game.gameDate)}</span>}
+                </div>
+              </div>
+              {/* Est K badge */}
+              <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                <div style={{ fontSize: '22px', fontWeight: '900', color: '#fff', lineHeight: 1 }}>{ek.k.toFixed(1)}</div>
+                <div style={{ fontSize: '10px', color: 'var(--text-faint)' }}>est K ({ek.lo}–{ek.hi})</div>
+              </div>
+              {/* Trend + conf */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', flexShrink: 0 }}>
+                <span style={{ fontSize: '16px', color: TREND_COLOR[ek.trend] }}>{TREND_ICON[ek.trend]}</span>
+                <span style={{ fontSize: '9px', color: CONF_COLOR[ek.conf], textTransform: 'uppercase', letterSpacing: '0.04em' }}>{ek.conf}</span>
+              </div>
+            </div>
+
+            {/* K-over probability bars */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginBottom: '10px' }}>
+              {showLines.map((line) => {
+                const p = ek.probs[line]
+                if (p == null) return null
+                const pct100 = p * 100
+                // Colour: green ≥60%, yellow 40–59%, red <40%
+                const barColor = pct100 >= 60 ? 'var(--strong)' : pct100 >= 40 ? '#f59e0b' : 'var(--bad)'
+                return (
+                  <div key={line} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px' }}>
+                    <span className="mono" style={{ width: '32px', color: 'var(--text-dim)', flexShrink: 0 }}>{line}+</span>
+                    <div style={{ flex: 1, height: '6px', background: 'rgba(255,255,255,0.06)', borderRadius: '99px', overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${pct100}%`, background: barColor, borderRadius: '99px', transition: 'width 0.3s' }} />
+                    </div>
+                    <span className="mono" style={{ width: '34px', textAlign: 'right', fontWeight: '700', color: barColor }}>{pct100.toFixed(0)}%</span>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Sportsbook line input */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '11px', color: 'var(--text-faint)', flexShrink: 0 }}>Book line:</span>
+              <input
+                type="number"
+                step="0.5"
+                min="0"
+                max="15"
+                placeholder="e.g. 6.5"
+                value={lines[e.key] ?? ''}
+                onChange={(ev) => setLines((prev) => ({ ...prev, [e.key]: ev.target.value }))}
+                style={{ width: '70px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '4px 8px', color: '#fff', fontSize: '12px', fontFamily: 'monospace' }}
+              />
+              {myProb != null && Number.isFinite(myProb) && (
+                <span style={{ fontSize: '12px', fontWeight: '700', color: myProb >= 0.55 ? 'var(--strong)' : myProb >= 0.40 ? '#f59e0b' : 'var(--bad)' }}>
+                  {(myProb * 100).toFixed(0)}% over · {myProb >= 0.55 ? 'value ✓' : myProb <= 0.35 ? 'fade ✗' : 'neutral'}
+                </span>
+              )}
+            </div>
+          </div>
+        )
+      })}
+    </div>
   )
 }
 
