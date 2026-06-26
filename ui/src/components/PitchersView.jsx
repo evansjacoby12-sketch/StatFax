@@ -1,4 +1,4 @@
-import { useMemo, useEffect, useState } from 'react'
+import { useMemo, useEffect, useState, useCallback } from 'react'
 import Icon from './Icon.jsx'
 import { GradeChip, ScoreRing, ProbBar, Stat } from './atoms.jsx'
 import { groupPitchers, pitchUsage, effSide } from '../lib/pitchers.js'
@@ -175,16 +175,51 @@ function PitcherPreview({ pitchers, onSelect }) {
   )
 }
 
+// Build 2-leg and 3-leg SGP suggestions from the top targets for a pitcher.
+// Joint probability is a naive product (no within-game correlation adjustment)
+// but gives a useful fair-value floor for the SGP price.
+function sgpLegs(targets, n) {
+  const seen = new Set()
+  const pool = targets.filter((b) => b.playerId != null && Number.isFinite(b.hrProbability) && !seen.has(b.playerId) && seen.add(b.playerId))
+  if (pool.length < n) return null
+  const legs = pool.slice(0, n)
+  const prob = legs.reduce((acc, b) => acc * b.hrProbability, 1)
+  return { legs, prob }
+}
+
+function SgpCombo({ legs, prob, onSelect }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+      {legs.map((b, i) => (
+        <span key={b.playerId} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <button
+            className={`pvp-bat ${(b.grade?.label || b.grade) === 'PRIME' ? 'prime' : ''}`}
+            onClick={() => onSelect?.(b)}
+            title={`${b.name} · ${pct(b.hrProbability, 1)} HR`}
+            style={{ fontSize: '11px' }}
+          >
+            {lastName(b.name)}
+          </button>
+          {i < legs.length - 1 && <span style={{ color: 'var(--text-faint)', fontSize: '10px' }}>+</span>}
+        </span>
+      ))}
+      <span className="mono" style={{ marginLeft: '4px', fontSize: '10px', color: 'var(--text-faint)' }}>~{pct(prob, 1)} fair</span>
+    </div>
+  )
+}
+
 function PvpRow({ e, onSelect }) {
+  const [open, setOpen] = useState(false)
   const p = e.pitcher
   const s = p.season || {}
   const sav = p.savant || {}
-  const atk = e.attackSide === 'L' ? 'LHB' : e.attackSide === 'R' ? 'RHB' : '—'
   const seen = new Set()
   const tg = e.targets.filter((b) => b.playerId != null && !seen.has(b.playerId) && seen.add(b.playerId)).slice(0, 4)
   const oppTeam = tg[0]?.team || '?'
+  const sgp2 = sgpLegs(e.targets, 2)
+  const sgp3 = sgpLegs(e.targets, 3)
   return (
-    <div className="pvp-row">
+    <div className="pvp-row" style={{ flexWrap: 'wrap' }}>
       <div className="pvp-p" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
         <span className="pvp-name" style={{ color: '#fff', fontWeight: '600' }}>{p.name}</span>
         <span className="pvp-hand dim"> ({p.hand})</span>
@@ -206,7 +241,35 @@ function PvpRow({ e, onSelect }) {
             {lastName(b.name)}
           </button>
         ))}
+        {(sgp2 || sgp3) && (
+          <button
+            className="pvp-chevron"
+            onClick={(ev) => { ev.stopPropagation(); setOpen((v) => !v) }}
+            aria-expanded={open}
+            title={open ? 'Hide SGP combos' : 'Show SGP combos'}
+            style={{ background: 'none', border: 'none', padding: '2px 4px', cursor: 'pointer', color: open ? 'var(--accent)' : 'var(--text-faint)', display: 'flex', alignItems: 'center' }}
+          >
+            <Icon name={open ? 'ChevronUp' : 'ChevronDown'} size={13} />
+          </button>
+        )}
       </div>
+      {open && (sgp2 || sgp3) && (
+        <div className="pvp-sgp" style={{ width: '100%', padding: '8px 8px 4px', display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid rgba(255,255,255,0.04)', marginTop: '4px' }}>
+          <span style={{ fontSize: '10px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-faint)' }}>SGP combos</span>
+          {sgp2 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '10px', color: 'var(--text-faint)', width: '28px' }}>2-leg</span>
+              <SgpCombo legs={sgp2.legs} prob={sgp2.prob} onSelect={onSelect} />
+            </div>
+          )}
+          {sgp3 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '10px', color: 'var(--text-faint)', width: '28px' }}>3-leg</span>
+              <SgpCombo legs={sgp3.legs} prob={sgp3.prob} onSelect={onSelect} />
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -222,6 +285,7 @@ function tone(value, { hi, lo, invert = false }) {
 }
 
 export function PitcherCard({ entry, onSelect, selectedId, watchlist, slip }) {
+  const [sgpOpen, setSgpOpen] = useState(false)
   const { pitcher, vuln, targets, team, game, attackSide } = entry
   const color = teamColor(team?.id)
   const logo = teamLogo(team?.id)
@@ -375,6 +439,41 @@ export function PitcherCard({ entry, onSelect, selectedId, watchlist, slip }) {
               </li>
             ))}
           </ul>
+
+          {/* SGP combos — collapsible */}
+          {(() => {
+            const sgp2 = sgpLegs(targets, 2)
+            const sgp3 = sgpLegs(targets, 3)
+            if (!sgp2 && !sgp3) return null
+            return (
+              <div style={{ marginTop: '10px' }}>
+                <button
+                  onClick={() => setSgpOpen((v) => !v)}
+                  style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'none', border: 'none', padding: '4px 0', cursor: 'pointer', color: sgpOpen ? 'var(--accent)' : 'var(--text-faint)', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}
+                >
+                  <Icon name="Zap" size={11} />
+                  SGP combos
+                  <Icon name={sgpOpen ? 'ChevronUp' : 'ChevronDown'} size={11} style={{ marginLeft: '2px' }} />
+                </button>
+                {sgpOpen && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '6px', padding: '10px 12px', background: 'rgba(0,0,0,0.15)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px' }}>
+                    {sgp2 && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '10px', color: 'var(--text-faint)', minWidth: '30px' }}>2-leg</span>
+                        <SgpCombo legs={sgp2.legs} prob={sgp2.prob} onSelect={onSelect} />
+                      </div>
+                    )}
+                    {sgp3 && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '10px', color: 'var(--text-faint)', minWidth: '30px' }}>3-leg</span>
+                        <SgpCombo legs={sgp3.legs} prob={sgp3.prob} onSelect={onSelect} />
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )
+          })()}
         </div>
 
         {/* Pitch mix + splits/fatigue */}
