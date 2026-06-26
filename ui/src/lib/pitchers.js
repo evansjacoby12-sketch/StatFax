@@ -68,7 +68,20 @@ function pitchMixKBoost(pitchMix) {
 // Returns null when there's not enough data to form a meaningful estimate.
 export const K_LINES = [3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5, 10.5]
 
-export function kBrain(pitcher, targets) {
+// Temperature and umpire adjustments — same logic as server-side computeKDist.
+function tempAdj(weather) {
+  if (!weather || weather.roofClosed) return 1
+  const t = weather.tempF
+  if (!Number.isFinite(t)) return 1
+  return Math.max(0.92, Math.min(1.08, 1 + (t - 72) * 0.003))
+}
+function umpireKAdj(umpire) {
+  const hf = umpire?.hrFactor
+  if (!Number.isFinite(hf)) return 1
+  return Math.max(0.92, Math.min(1.08, 1 + (1 - hf) * 0.15))
+}
+
+export function kBrain(pitcher, targets, { weather, umpire } = {}) {
   const s = pitcher?.season || {}
   // ── Step A: Base K rate from splits (lineup-composition-weighted) ──────────
   const vl = pitcher?.splits?.vl
@@ -157,7 +170,9 @@ export function kBrain(pitcher, targets) {
   const oppAdj = Math.max(0.82, Math.min(1.22, oppK / LEAGUE_K_PCT))
 
   // λ = mean K count this start (Poisson parameter).
-  const lambda = expBF * adjustedKRate * oppAdj
+  const tAdj = tempAdj(weather)
+  const uAdj = umpireKAdj(umpire)
+  const lambda = expBF * adjustedKRate * oppAdj * tAdj * uAdj
 
   // P(K ≥ n) at every sportsbook threshold.
   const probs = {}
@@ -188,7 +203,7 @@ export function kBrain(pitcher, targets) {
   const lo = Math.max(0, findPoiQuantile(lambda, 0.10))
   const hi = findPoiQuantile(lambda, 0.90)
 
-  return { k: est, lo, hi, expIP, ipSD, oppK, lambda, probs, trend, conf, boost, splitKRate, whiffPct: whiffPct ?? null }
+  return { k: est, lo, hi, expIP, ipSD, oppK, lambda, probs, trend, conf, boost, splitKRate, whiffPct: whiffPct ?? null, tempAdj: tAdj, umpireAdj: uAdj, tempF: weather?.tempF ?? null }
 }
 
 // Binary search for the smallest k s.t. P(X ≤ k) ≥ p.

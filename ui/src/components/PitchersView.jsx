@@ -189,6 +189,22 @@ function KBrainView({ pitchers }) {
               </div>
             </div>
 
+            {/* Environment factors */}
+            {(ek.tempAdj != null || ek.umpireAdj != null) && (
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '8px' }}>
+                {ek.tempF != null && (
+                  <span style={{ fontSize: '10px', padding: '2px 7px', borderRadius: '4px', background: 'rgba(255,255,255,0.05)', color: ek.tempAdj < 0.97 ? 'var(--bad)' : ek.tempAdj > 1.02 ? 'var(--strong)' : 'var(--text-faint)' }}>
+                    {Math.round(ek.tempF)}°F {ek.tempAdj < 0.97 ? '❄ cold suppressed' : ek.tempAdj > 1.02 ? '☀ warm boost' : ''}
+                  </span>
+                )}
+                {ek.umpireAdj != null && ek.umpireAdj !== 1 && (
+                  <span style={{ fontSize: '10px', padding: '2px 7px', borderRadius: '4px', background: 'rgba(255,255,255,0.05)', color: ek.umpireAdj > 1.01 ? 'var(--strong)' : 'var(--bad)' }}>
+                    UMP {ek.umpireAdj > 1.01 ? '+ K zone' : '− K zone'}
+                  </span>
+                )}
+              </div>
+            )}
+
             {/* K-over probability bars */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginBottom: '10px' }}>
               {showLines.map((line) => {

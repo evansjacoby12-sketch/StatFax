@@ -288,7 +288,24 @@ function _ssPitchMixKBoost(pitchMix) {
   return Math.min(0.04, boost);
 }
 
-function computeKDist(pitcher, targets) {
+// Temperature adjustment: cold air reduces grip/spin → fewer Ks; hot → slight boost.
+// Ignored for indoor (roofClosed) venues. Clamped ±8%.
+function _ssTempAdj(weather) {
+  if (!weather || weather.roofClosed) return 1;
+  const t = weather.tempF;
+  if (!Number.isFinite(t)) return 1;
+  return Math.max(0.92, Math.min(1.08, 1 + (t - 72) * 0.003));
+}
+// Umpire K adjustment via hrFactor as a zone-size proxy.
+// Tight zone (low hrFactor) → more Ks; generous zone (high hrFactor) → fewer Ks.
+// Kept intentionally light (±8% max) since hrFactor measures HR-friendliness, not zone size directly.
+function _ssUmpireKAdj(umpire) {
+  const hf = umpire?.hrFactor;
+  if (!Number.isFinite(hf)) return 1;
+  return Math.max(0.92, Math.min(1.08, 1 + (1 - hf) * 0.15));
+}
+
+function computeKDist(pitcher, targets, { weather, umpire } = {}) {
   const s = pitcher?.season || {};
 
   // Step A: splits-weighted base rate
@@ -364,13 +381,15 @@ function computeKDist(pitcher, targets) {
   const oppK = oppKs.length ? oppKs.reduce((a, b) => a + b, 0) / oppKs.length : _SS_LEAGUE_K_PCT;
   const oppAdj = Math.max(0.82, Math.min(1.22, oppK / _SS_LEAGUE_K_PCT));
 
-  const lambda = expBF * adjustedKRate * oppAdj;
+  const tempAdj    = _ssTempAdj(weather);
+  const umpireAdj  = _ssUmpireKAdj(umpire);
+  const lambda = expBF * adjustedKRate * oppAdj * tempAdj * umpireAdj;
   const probs = {};
   for (const line of _SS_K_LINES) probs[line] = _ssKOverProb(lambda, line);
   const lo = Math.max(0, _ssFindQuantile(lambda, 0.10));
   const hi = _ssFindQuantile(lambda, 0.90);
 
-  return { k: lambda, lo, hi, lambda, probs };
+  return { k: lambda, lo, hi, lambda, probs, tempAdj, umpireAdj, tempF: weather?.tempF ?? null };
 }
 
 // Intraday board history — append a compact snapshot of TODAY's canonical combos
@@ -4086,7 +4105,10 @@ async function main() {
       pitcherGroups.get(key).targets.push(row);
     }
     for (const [key, { pitcher, targets }] of pitcherGroups) {
-      const kd = computeKDist(pitcher, targets);
+      const gamePk = targets[0]?.gamePk;
+      const weather = gamePk != null ? (weatherByGame[gamePk] || null) : null;
+      const umpire  = targets[0]?.umpire || null;
+      const kd = computeKDist(pitcher, targets, { weather, umpire });
       if (kd) kDistByPitcher[key] = kd;
     }
     payload.kDistByPitcher = kDistByPitcher;
