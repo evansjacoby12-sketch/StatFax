@@ -289,13 +289,26 @@ function sprayFenceFit(savantStats, stadium, effectiveBatSide) {
   const pull   = savantStats?.pullPct;
   const fences = stadium?.fences;
   if (pull == null || !fences || !effectiveBatSide) return 0;
-  if (pull < 40) return 0;                                   // only meaningful for pull-heavy bats
-  const pullGap = effectiveBatSide === 'L' ? fences.rfGap : fences.lfGap;
+  if (pull < 40) return 0;
+
+  const isRHB   = effectiveBatSide !== 'L';
+  const pullGap = isRHB ? fences.lfGap : fences.rfGap;
+  const wallHt  = isRHB ? (fences.lfWallHt ?? 8) : (fences.rfWallHt ?? 8);
   if (!Number.isFinite(pullGap)) return 0;
-  const shortness = 378 - pullGap;                           // + = shorter than league avg (HR-friendly)
-  const lean      = pull - 40;                               // 0..~15 above the pull-heavy threshold
-  const raw       = (shortness / 8) * (1 + lean / 25);       // shortness dominates, pull-lean amplifies
-  return Math.max(-2, Math.min(3, Math.round(raw)));
+
+  const shortness = 378 - pullGap;          // + = shorter than league avg (HR-friendly)
+  const lean      = pull - 40;              // pull intensity above the HR-relevant threshold
+  const distRaw   = (shortness / 8) * (1 + lean / 25);
+
+  // Tall-fence penalty: walls significantly above the 8 ft standard catch fly
+  // balls that would clear in most parks. Pull-heavy bats are most exposed
+  // because they concentrate fly balls at that exact wall.
+  const pullScale   = Math.min(1.0, lean / 12);          // ramps from 0 at 40% to full at 52%+
+  let heightPenalty = 0;
+  if (wallHt > 30)      heightPenalty = -2.5 * pullScale; // Green Monster tier (BOS LF)
+  else if (wallHt > 18) heightPenalty = -1.5 * pullScale; // scoreboard tier (CLE LF, PIT RF)
+
+  return Math.max(-4, Math.min(3, Math.round(distRaw + heightPenalty)));
 }
 
 /**
@@ -1345,19 +1358,44 @@ export function scoreBatter(
   // 24.3%) — the combo carried no extra information.
   const dueAndHotBonus = 0;
 
-  // Recent batted-ball surge (−4 to +6): barrel% over the last ~14 days vs the
-  // batter's season barrel rate. Squaring the ball up RIGHT NOW is a sharper
-  // short-term HR signal than season-long contact quality — the single most
-  // predictive 7-14 day metric in public research. Needs a real sample (≥8 BBE).
+  // Recent batted-ball quality — exponential time-decay over two Statcast windows.
+  // W_d = e^(-0.1 × d): 7-day midpoint (d ≈ 3.5) → 0.704, 8-14-day midpoint
+  // (d ≈ 10.5) → 0.351. Normalised weights: 7d ≈ 0.667, outer gap ≈ 0.333.
+  // A barrel hit yesterday counts ~2× a barrel from 10 days ago. Falls back to
+  // the flat 14-day rate for pre-upgrade snapshots or when only one window exists.
   let recentBarrelAdj = 0;
-  if (recentBarrel && Number.isFinite(recentBarrel.recentBarrelPct) && recentBarrel.recentBBE >= 8) {
-    const seasonBarrel = Number.isFinite(savantStats?.barrelPctBBE) ? savantStats.barrelPctBBE
-                       : Number.isFinite(savantStats?.barrelPct)    ? savantStats.barrelPct
-                       : null;
-    if (seasonBarrel != null) {
-      recentBarrelAdj = Math.max(-4, Math.min(6, Math.round((recentBarrel.recentBarrelPct - seasonBarrel) * 0.5)));
-    } else if (recentBarrel.recentBarrelPct >= 12) {
-      recentBarrelAdj = 3; // strong absolute recent rate, no season baseline to compare against
+  const seasonBarrel = Number.isFinite(savantStats?.barrelPctBBE) ? savantStats.barrelPctBBE
+                     : Number.isFinite(savantStats?.barrelPct)    ? savantStats.barrelPct
+                     : null;
+
+  if (recentBarrel) {
+    const r7  = recentBarrel.sevenDay    ?? null;
+    const r14 = recentBarrel.fourteenDay ?? null;
+
+    let decayedPct = null;
+    if (r7 && r14 && r7.bbe >= 4 && r14.bbe >= 8 && r14.bbe > r7.bbe) {
+      const W7      = 0.667;
+      const W14     = 0.333;
+      const brl7    = r7.pct  * r7.bbe  / 100;
+      const brl14t  = r14.pct * r14.bbe / 100;
+      const brl8_14 = Math.max(0, brl14t - brl7);
+      const bbe8_14 = r14.bbe - r7.bbe;
+      const denom   = W7 * r7.bbe + W14 * bbe8_14;
+      if (denom > 0) decayedPct = (W7 * brl7 + W14 * brl8_14) / denom * 100;
+    } else if (r14 && r14.bbe >= 8) {
+      decayedPct = r14.pct;
+    } else if (r7 && r7.bbe >= 4) {
+      decayedPct = r7.pct;
+    } else if (Number.isFinite(recentBarrel.recentBarrelPct) && (recentBarrel.recentBBE ?? 0) >= 8) {
+      decayedPct = recentBarrel.recentBarrelPct;   // legacy flat format
+    }
+
+    if (decayedPct != null) {
+      if (seasonBarrel != null) {
+        recentBarrelAdj = Math.max(-4, Math.min(6, Math.round((decayedPct - seasonBarrel) * 0.5)));
+      } else if (decayedPct >= 12) {
+        recentBarrelAdj = 3;
+      }
     }
   }
 
@@ -1471,9 +1509,15 @@ export function scoreBatter(
     ? Math.min(6, Math.max(-4, (h2h.hrRate - 0.04) * 100))
     : 0;
 
-  // Contact quality (Statcast outcomes): how badly batters are squaring this pitcher up
-  const contactQScore = pitcherContactScore(pitcherSavant);
-  const contactFactor = Math.min(10, Math.max(-10, (contactQScore - 50) * 0.2));
+  // Contact quality: starter Statcast outcomes blended toward league-average
+  // bullpen (50) by batting order. Lower-order batters face more relievers, so
+  // a hittable starter has less leverage on their overall PA mix.
+  const starterContactQ  = pitcherContactScore(pitcherSavant);
+  const bullpenContactWt = battingOrder != null
+    ? (battingOrder <= 3 ? 0.26 : battingOrder <= 6 ? 0.36 : 0.46)
+    : 0.36;
+  const blendedContactQ  = starterContactQ * (1 - bullpenContactWt) + 50 * bullpenContactWt;
+  const contactFactor = Math.min(10, Math.max(-10, (blendedContactQ - 50) * 0.2));
 
   // Zone location: is this pitcher living in the heart of the plate?
   const zoneFactor = zoneLocationFactor(pitcherSavant);

@@ -196,6 +196,24 @@ async function fetchOnePitcherVeloTrend(pitcherId, season, recentCutoff) {
 }
 
 /**
+ * Fetches recent batter barrels for both a 7-day and a 14-day window in
+ * parallel. The two aggregates are anchor points for exponential time-decay
+ * weighting in ProbabilityEngine.js:
+ *   W_d = e^(-0.1 × d) — 7d mid (d≈3.5) → 0.704, 8-14d mid (d≈10.5) → 0.351
+ *   Normalised: 7d ≈ 0.667 weight, 8-14d gap ≈ 0.333 weight.
+ *
+ * @returns {Promise<{sevenDay: Record, fourteenDay: Record}>}
+ */
+export async function fetchRecentBatterBarrelsMultiWindow(season, { endDate, minBBE = 8 } = {}) {
+  if (!endDate) return { sevenDay: {}, fourteenDay: {} };
+  const [sevenDay, fourteenDay] = await Promise.all([
+    fetchRecentBatterBarrels(season, { windowDays: 7,  endDate, minBBE: Math.max(3, Math.floor(minBBE / 2)) }),
+    fetchRecentBatterBarrels(season, { windowDays: 14, endDate, minBBE }),
+  ]);
+  return { sevenDay, fourteenDay };
+}
+
+/**
  * @param {number[]} pitcherIds  today's starting pitcher ids
  * @param {number} season
  * @param {{ windowDays?: number, endDate: string, concurrency?: number }} opts

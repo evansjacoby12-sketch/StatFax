@@ -613,7 +613,7 @@ const EXPERIMENTAL_ML_RANK = true;
 const EXPERIMENTAL_ML_RANK_CAP = 0.25; // "nudge, don't dominate" — small-sample-safe
 import { fetchBatterExpectedStats } from './statcastExpected.mjs';
 import { fetchCatcherFraming } from './catcherFraming.mjs';
-import { fetchRecentBatterBarrels, fetchRecentPitcherVelo } from './statcastRecent.mjs';
+import { fetchRecentBatterBarrelsMultiWindow, fetchRecentPitcherVelo } from './statcastRecent.mjs';
 import { applySimResolution } from './lib/simResolution.mjs';
 
 // ─── HTTP helpers ────────────────────────────────────────────────────────────
@@ -2523,14 +2523,14 @@ async function main() {
   //                        hittable). Only today's ~30 starters, bounded conc.
   // See server/statcastRecent.mjs.
   const starterIds = games.flatMap(g => [g.awayPitcher?.id, g.homePitcher?.id]).filter(Boolean);
-  let recentBarrels = {}, pitcherVeloTrend = {};
+  let recentBarrels = { sevenDay: {}, fourteenDay: {} }, pitcherVeloTrend = {};
   try {
     const recStart = Date.now();
     [recentBarrels, pitcherVeloTrend] = await Promise.all([
-      fetchRecentBatterBarrels(SEASON, { windowDays: 14, endDate: date }),
+      fetchRecentBatterBarrelsMultiWindow(SEASON, { endDate: date }),
       fetchRecentPitcherVelo(starterIds, SEASON, { windowDays: 21, endDate: date }),
     ]);
-    console.log(`[recent] barrels:${Object.keys(recentBarrels).length} batters · veloTrend:${Object.keys(pitcherVeloTrend).length}/${new Set(starterIds).size} starters (${Date.now() - recStart}ms)`);
+    console.log(`[recent] barrels:${Object.keys(recentBarrels.fourteenDay ?? {}).length} batters · veloTrend:${Object.keys(pitcherVeloTrend).length}/${new Set(starterIds).size} starters (${Date.now() - recStart}ms)`);
   } catch (e) {
     console.warn(`[recent] fetch failed: ${e?.message}`);
   }
@@ -2948,7 +2948,16 @@ async function main() {
         const oppCatcherFramingRuns = (oppCatcherId != null && catcherFraming[oppCatcherId])
           ? catcherFraming[oppCatcherId].framingRuns
           : null;
-        const recentBarrelForBatter = recentBarrels[id] ?? null;
+        const r7  = recentBarrels.sevenDay?.[id]    ?? null;
+        const r14 = recentBarrels.fourteenDay?.[id] ?? null;
+        const recentBarrelForBatter = (r7 || r14) ? {
+          sevenDay:    r7  ? { pct: r7.recentBarrelPct,  bbe: r7.recentBBE  } : null,
+          fourteenDay: r14 ? { pct: r14.recentBarrelPct, bbe: r14.recentBBE } : null,
+          // Legacy flat fields — read by reconcile.mjs / combo-engine.js
+          recentBarrelPct: (r14 ?? r7).recentBarrelPct,
+          recentEV:        (r14 ?? r7).recentEV,
+          recentBBE:       (r14 ?? r7).recentBBE,
+        } : null;
         const veloTrendForPitcher   = opposingPitcher ? (pitcherVeloTrend[opposingPitcher.id] ?? null) : null;
 
         // Build the argument list once so it's a single source of truth: we
