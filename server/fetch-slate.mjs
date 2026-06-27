@@ -155,6 +155,12 @@ function umpireHrFactor(name) {
   const f = umpireFactorsRaw.umpires?.[name];
   return Number.isFinite(f) ? f : (umpireFactorsRaw._default ?? 1.0);
 }
+// Resolve a name → K multiplier. Tight zones → more Ks (kFactor > 1).
+function umpireKFactor(name) {
+  if (!name) return 1.0;
+  const f = umpireFactorsRaw.kFactors?.[name];
+  return Number.isFinite(f) ? f : 1.0;
+}
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const OUT_PATH  = resolve(__dirname, '../dist/daily.json');
@@ -296,16 +302,17 @@ function _ssTempAdj(weather) {
   if (!Number.isFinite(t)) return 1;
   return Math.max(0.92, Math.min(1.08, 1 + (t - 72) * 0.003));
 }
-// Umpire K adjustment via hrFactor as a zone-size proxy.
-// Tight zone (low hrFactor) → more Ks; generous zone (high hrFactor) → fewer Ks.
-// Kept intentionally light (±8% max) since hrFactor measures HR-friendliness, not zone size directly.
+// Umpire K adjustment. Uses dedicated kFactor when available (from umpire-factors.json kFactors table);
+// falls back to hrFactor proxy for unlisted umpires (tight HR zone ≈ tight K zone).
 function _ssUmpireKAdj(umpire) {
+  const kf = umpire?.kFactor;
+  if (Number.isFinite(kf)) return Math.max(0.92, Math.min(1.08, kf));
   const hf = umpire?.hrFactor;
   if (!Number.isFinite(hf)) return 1;
   return Math.max(0.92, Math.min(1.08, 1 + (1 - hf) * 0.15));
 }
 
-function computeKDist(pitcher, targets, { weather, umpire } = {}) {
+function computeKDist(pitcher, targets, { weather, umpire, parkFactorK } = {}) {
   const s = pitcher?.season || {};
 
   // Step A: splits-weighted base rate
@@ -383,13 +390,14 @@ function computeKDist(pitcher, targets, { weather, umpire } = {}) {
 
   const tempAdj    = _ssTempAdj(weather);
   const umpireAdj  = _ssUmpireKAdj(umpire);
-  const lambda = expBF * adjustedKRate * oppAdj * tempAdj * umpireAdj;
+  const pAdj       = Number.isFinite(parkFactorK) && parkFactorK > 0 ? parkFactorK : 1.0;
+  const lambda = expBF * adjustedKRate * oppAdj * tempAdj * umpireAdj * pAdj;
   const probs = {};
   for (const line of _SS_K_LINES) probs[line] = _ssKOverProb(lambda, line);
   const lo = Math.max(0, _ssFindQuantile(lambda, 0.10));
   const hi = _ssFindQuantile(lambda, 0.90);
 
-  return { k: lambda, lo, hi, lambda, probs, tempAdj, umpireAdj, tempF: weather?.tempF ?? null };
+  return { k: lambda, lo, hi, lambda, probs, tempAdj, umpireAdj, parkKAdj: pAdj, tempF: weather?.tempF ?? null };
 }
 
 // Intraday board history — append a compact snapshot of TODAY's canonical combos
@@ -1104,7 +1112,22 @@ async function fetchLiveGameContext(gamePk) {
       }
     }
 
-    return { perBatter, currentInning, runDiff };
+    // Per-pitcher K tracking: grab starter's current Ks from the live boxscore.
+    const boxscore = data?.liveData?.boxscore;
+    const perPitcher = {};
+    for (const side of ['home', 'away']) {
+      const pitcherIds = boxscore?.teams?.[side]?.pitchers || [];
+      if (!pitcherIds.length) continue;
+      const starterId = pitcherIds[0];
+      const player = boxscore?.teams?.[side]?.players?.[`ID${starterId}`];
+      const ks = player?.stats?.pitching?.strikeOuts;
+      const ip = player?.stats?.pitching?.inningsPitched;
+      if (Number.isFinite(ks)) {
+        perPitcher[starterId] = { ks, ip: ip != null ? parseFloat(ip) : null };
+      }
+    }
+
+    return { perBatter, perPitcher, currentInning, runDiff };
   } catch {
     return null;
   }
@@ -2800,6 +2823,7 @@ async function main() {
     // src/sports/mlb/data/umpire-factors.json for the table + TODO.
     const homePlateUmpire = umpiresByGame.get(game.gamePk) || null;
     const umpFactor       = umpireHrFactor(homePlateUmpire?.name);
+    const umpKFactor      = umpireKFactor(homePlateUmpire?.name);
 
     const scoreSide = (ids, opposingPitcher, orderMap, batterTeamAbbr, isHome, opposingTeamId) => {
       const pd          = opposingPitcher ? pitcherStats[opposingPitcher.id] : null;
@@ -3074,18 +3098,23 @@ async function main() {
         const pitcherTeamAbbr        = isHome ? game.awayTeam.abbr : game.homeTeam.abbr;
         const pitcherHomeStadium     = findStadiumByTeam(pitcherTeamAbbr);
         const pitcherHomeParkFactor  = pitcherHomeStadium?.parkFactor ?? 1.0;
+        // Game-venue park factors for today's environment (may differ from pitcher's home park).
+        const gameParkHRFactor       = stadium?.parkFactor ?? 1.0;
+        const gameParkKFactor        = stadium?.parkFactorK ?? 1.0;
 
         const pitcherBlock = opposingPitcher ? {
-          id:             opposingPitcher.id,
-          name:           opposingPitcher.name,
-          hand:           pitcherHandForCarry,
-          season:         pd?.season ?? null,
-          splits:         pd?.splits ?? null,
-          recentForm:     recentForm,
-          savant:         pitcherSavant,
-          pitchMix:       pitchMix,
-          xStats:         pitcherXStats[opposingPitcher.id] ?? null,
-          homeParkFactor: pitcherHomeParkFactor,
+          id:              opposingPitcher.id,
+          name:            opposingPitcher.name,
+          hand:            pitcherHandForCarry,
+          season:          pd?.season ?? null,
+          splits:          pd?.splits ?? null,
+          recentForm:      recentForm,
+          savant:          pitcherSavant,
+          pitchMix:        pitchMix,
+          xStats:          pitcherXStats[opposingPitcher.id] ?? null,
+          homeParkFactor:  pitcherHomeParkFactor,
+          gameParkHRFactor,
+          gameParkKFactor,
         } : null;
 
         // Doubleheader fix: write under BOTH a composite key
@@ -3186,7 +3215,7 @@ async function main() {
           // Home-plate umpire (when announced — usually ~24h before first
           // pitch). Stored even when the HR factor is neutral 1.0 so the
           // modal can display the ump name regardless.
-          umpire:     homePlateUmpire ? { ...homePlateUmpire, hrFactor: umpFactor } : null,
+          umpire:     homePlateUmpire ? { ...homePlateUmpire, hrFactor: umpFactor, kFactor: umpKFactor } : null,
           // Short-window recency signals (also fed into scoreBatter above) —
           // surfaced on the row so they're logged for model training and can be
           // shown in the modal Scout Report later.
@@ -3710,6 +3739,7 @@ async function main() {
   // Skips pre-game + Final games (nothing to enrich). Pre-game scores
   // stay at their pre-game model output; Final games' results land in
   // homerersByGame via the next block.
+  const liveKsByPitcher = {};
   const liveGames = games.filter(g => g.isLive);
   if (liveGames.length) {
     const liveStart = Date.now();
@@ -3727,6 +3757,11 @@ async function main() {
       if (!ctx) continue;
       const pullRisk = ctx.runDiff >= 8 && ctx.currentInning >= 5;
       if (pullRisk) livePullRisk++;
+
+      // Expose starter live Ks for the K Brain live inning display.
+      for (const [pitcherId, pData] of Object.entries(ctx.perPitcher || {})) {
+        liveKsByPitcher[`${pitcherId}-${gamePk}`] = pData;
+      }
 
       // Iterate composite keys only (`${id}-${gamePk}`) — legacy bare-id
       // keys are a back-compat mirror; tagging only composite keeps the
@@ -3776,6 +3811,7 @@ async function main() {
     }
     console.log(`[slate] live-context: tagged ${liveTagged} rows (${liveNearMisses} near-miss, ${livePullRisk} pull-risk games) in ${((Date.now() - liveStart) / 1000).toFixed(2)}s`);
   }
+  payload.liveKsByPitcher = liveKsByPitcher;
 
   // 8.7) For TODAY's Final games, fetch box scores to determine which
   // batters actually homered. The UI uses this to show an "HR ✓" indicator
@@ -4106,9 +4142,10 @@ async function main() {
     }
     for (const [key, { pitcher, targets }] of pitcherGroups) {
       const gamePk = targets[0]?.gamePk;
-      const weather = gamePk != null ? (weatherByGame[gamePk] || null) : null;
-      const umpire  = targets[0]?.umpire || null;
-      const kd = computeKDist(pitcher, targets, { weather, umpire });
+      const weather     = gamePk != null ? (weatherByGame[gamePk] || null) : null;
+      const umpire      = targets[0]?.umpire || null;
+      const parkFactorK = pitcher?.gameParkKFactor ?? 1.0;
+      const kd = computeKDist(pitcher, targets, { weather, umpire, parkFactorK });
       if (kd) kDistByPitcher[key] = kd;
     }
     payload.kDistByPitcher = kDistByPitcher;

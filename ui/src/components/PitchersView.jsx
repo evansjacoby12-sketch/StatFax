@@ -13,7 +13,7 @@ const PSORT = [
   { k: 'time', label: 'Game time' },
 ]
 
-export default function PitchersView({ batters, kDistByPitcher = {}, onSelect, selectedId, watchlist, slip, focusKey, onFocusDone }) {
+export default function PitchersView({ batters, kDistByPitcher = {}, liveKsByPitcher = {}, onSelect, selectedId, watchlist, slip, focusKey, onFocusDone }) {
   const [sort, setSort] = useState('vuln')
   const [view, setView] = useState('preview')
   const [kOpen, setKOpen] = useState(false)
@@ -108,7 +108,7 @@ export default function PitchersView({ batters, kDistByPitcher = {}, onSelect, s
       <KParlaySection pitchers={grouped} open={kOpen} onToggle={() => setKOpen((v) => !v)} />
 
       {view === 'kbrain' ? (
-        <KBrainView pitchers={grouped} />
+        <KBrainView pitchers={grouped} liveKsByPitcher={liveKsByPitcher} />
       ) : view === 'preview' ? (
         <PitcherPreview pitchers={grouped} onSelect={onSelect} />
       ) : (
@@ -134,7 +134,7 @@ const TREND_ICON = { up: '↑', down: '↓', flat: '→' }
 const TREND_COLOR = { up: 'var(--strong)', down: 'var(--bad)', flat: 'var(--text-faint)' }
 const CONF_COLOR = { high: 'var(--strong)', med: 'var(--accent)', low: 'var(--text-faint)' }
 
-function KBrainView({ pitchers }) {
+function KBrainView({ pitchers, liveKsByPitcher = {} }) {
   // Per-pitcher line input: pitcherId → user-entered sportsbook line
   const [lines, setLines] = useState({})
   const [kLog, setKLog] = useState(null)
@@ -165,6 +165,8 @@ function KBrainView({ pitchers }) {
         // Show ALL K lines; skip only those with < 3% probability (not worth displaying).
         const showLines = K_LINES.filter((l) => (ek.probs[l] ?? 0) >= 0.03)
 
+        const liveK = liveKsByPitcher[e.key]
+
         return (
           <div key={e.key} style={{ background: 'rgba(16,24,48,0.45)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '12px', padding: '14px 16px' }}>
             {/* Header */}
@@ -177,6 +179,13 @@ function KBrainView({ pitchers }) {
                   {e.game?.gameDate && <span> · {gameTime(e.game.gameDate)}</span>}
                 </div>
               </div>
+              {/* Live K count (in-progress games) */}
+              {liveK && (
+                <div style={{ textAlign: 'center', flexShrink: 0, background: 'rgba(99,220,99,0.12)', border: '1px solid rgba(99,220,99,0.25)', borderRadius: '8px', padding: '4px 10px' }}>
+                  <div style={{ fontSize: '20px', fontWeight: '900', color: 'var(--strong)', lineHeight: 1 }}>{liveK.ks}K</div>
+                  <div style={{ fontSize: '9px', color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>live{liveK.ip != null ? ` · ${liveK.ip} IP` : ''}</div>
+                </div>
+              )}
               {/* Est K badge */}
               <div style={{ textAlign: 'right', flexShrink: 0 }}>
                 <div style={{ fontSize: '22px', fontWeight: '900', color: '#fff', lineHeight: 1 }}>{ek.k.toFixed(1)}</div>
@@ -190,7 +199,7 @@ function KBrainView({ pitchers }) {
             </div>
 
             {/* Environment factors */}
-            {(ek.tempAdj != null || ek.umpireAdj != null) && (
+            {(ek.tempAdj != null || ek.umpireAdj != null || ek.parkKAdj != null) && (
               <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '8px' }}>
                 {ek.tempF != null && (
                   <span style={{ fontSize: '10px', padding: '2px 7px', borderRadius: '4px', background: 'rgba(255,255,255,0.05)', color: ek.tempAdj < 0.97 ? 'var(--bad)' : ek.tempAdj > 1.02 ? 'var(--strong)' : 'var(--text-faint)' }}>
@@ -200,6 +209,11 @@ function KBrainView({ pitchers }) {
                 {ek.umpireAdj != null && ek.umpireAdj !== 1 && (
                   <span style={{ fontSize: '10px', padding: '2px 7px', borderRadius: '4px', background: 'rgba(255,255,255,0.05)', color: ek.umpireAdj > 1.01 ? 'var(--strong)' : 'var(--bad)' }}>
                     UMP {ek.umpireAdj > 1.01 ? '+ K zone' : '− K zone'}
+                  </span>
+                )}
+                {ek.parkKAdj != null && ek.parkKAdj !== 1 && (
+                  <span style={{ fontSize: '10px', padding: '2px 7px', borderRadius: '4px', background: 'rgba(255,255,255,0.05)', color: ek.parkKAdj < 0.97 ? 'var(--bad)' : ek.parkKAdj > 1.02 ? 'var(--strong)' : 'var(--text-faint)' }}>
+                    park {ek.parkKAdj > 1 ? `+${((ek.parkKAdj - 1) * 100).toFixed(0)}% K` : `${((ek.parkKAdj - 1) * 100).toFixed(0)}% K`}
                   </span>
                 )}
               </div>

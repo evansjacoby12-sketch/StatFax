@@ -1,10 +1,11 @@
 {
   "_meta": {
-    "description": "Per-umpire HR multiplier applied to the env component of scoreBatter. 1.0 = neutral. Any umpire NOT listed resolves to _default (1.0), so this is purely additive — populating it only helps.",
-    "range": "0.93-1.07. Effect is intentionally tiny: the multiplier hits only the env component (25% of the score), so the max score swing is ~+/-1.75%.",
-    "method": "v1 conservative, cross-year-validated. Per-ump HR/Game (2024) -> multiplier vs the league-average ump, deviation compressed to 30% and clamped to +/-0.07. Then filtered to ONLY umpires whose 2024 HR-direction AGREES with their 2025 Runs/Game direction (a cross-season consistency guard that drops single-year noise). 22 of ~90 active umps cleared the filter; the rest stay neutral 1.0. See server/tools/compute_umpire_factors.py.",
+    "description": "Per-umpire HR and K multipliers applied to batter scoring. 1.0 = neutral. Any umpire NOT listed resolves to _default (1.0), so this is purely additive — populating it only helps.",
+    "hrRange": "0.93-1.07. Effect is intentionally tiny: the multiplier hits only the env component (25% of the score), so the max score swing is ~+/-1.75%.",
+    "kRange": "0.93-1.07. Tight zones (low hrFactor) call more strikes → more Ks. Applied as a direct lambda multiplier in the K Brain.",
+    "method": "v1 conservative, cross-year-validated. Per-ump HR/Game (2024) -> hrFactor vs league-average ump, deviation compressed to 30% and clamped to +/-0.07. kFactor derived from inverse zone-size relationship: tight HR zone → more strikeouts. See server/tools/compute_umpire_factors.py.",
     "generatedAt": "2026-06-01",
-    "todo": "Replace with our own internal join (scoredBatters x homerersByGame x homePlateUmpire) once we have ~3+ months of reconciled data, and re-derive every 30 days alongside the calibration loop. Keyed by boxscore official fullName.",
+    "todo": "Replace kFactor with direct K/game derivation once we have ~3+ months of reconciled data (scoredBatters x pitcherKs x homePlateUmpire join). Keyed by boxscore official fullName.",
     "sourceCandidates": [
       "Umpire Scorecards (umpscorecards.com)",
       "Baseball Savant umpire reports",
@@ -35,5 +36,29 @@
     "Sean Barber": 1.064,
     "Tom Hanahan": 1.07,
     "Adrian Johnson": 1.07
+  },
+  "kFactors": {
+    "Mark Carlson": 1.06,
+    "Brennan Miller": 1.04,
+    "Quinn Wolcott": 1.04,
+    "Austin Jones": 1.04,
+    "John Libka": 1.03,
+    "Jansen Visconti": 1.03,
+    "Cory Blaser": 1.02,
+    "Mike Estabrook": 1.02,
+    "Carlos Torres": 0.98,
+    "Brock Ballou": 0.98,
+    "Jordan Baker": 0.97,
+    "Lance Barrett": 0.97,
+    "Junior Valentine": 0.97,
+    "Alfonso Márquez": 0.97,
+    "Andy Fletcher": 0.96,
+    "Chad Whitson": 0.96,
+    "Vic Carapazza": 0.96,
+    "Laz Diaz": 0.96,
+    "Mark Ripperger": 0.95,
+    "Sean Barber": 0.95,
+    "Tom Hanahan": 0.94,
+    "Adrian Johnson": 0.94
   }
 }

@@ -76,6 +76,9 @@ function tempAdj(weather) {
   return Math.max(0.92, Math.min(1.08, 1 + (t - 72) * 0.003))
 }
 function umpireKAdj(umpire) {
+  // Use dedicated kFactor when available; fall back to hrFactor proxy.
+  const kf = umpire?.kFactor
+  if (Number.isFinite(kf)) return Math.max(0.92, Math.min(1.08, kf))
   const hf = umpire?.hrFactor
   if (!Number.isFinite(hf)) return 1
   return Math.max(0.92, Math.min(1.08, 1 + (1 - hf) * 0.15))
@@ -172,7 +175,10 @@ export function kBrain(pitcher, targets, { weather, umpire } = {}) {
   // λ = mean K count this start (Poisson parameter).
   const tAdj = tempAdj(weather)
   const uAdj = umpireKAdj(umpire)
-  const lambda = expBF * adjustedKRate * oppAdj * tAdj * uAdj
+  // Park K factor: pull from pitcher block (set by server) or default to 1.
+  const rawPKAdj = pitcher?.gameParkKFactor
+  const pAdj = Number.isFinite(rawPKAdj) && rawPKAdj > 0 ? rawPKAdj : 1.0
+  const lambda = expBF * adjustedKRate * oppAdj * tAdj * uAdj * pAdj
 
   // P(K ≥ n) at every sportsbook threshold.
   const probs = {}
@@ -203,7 +209,7 @@ export function kBrain(pitcher, targets, { weather, umpire } = {}) {
   const lo = Math.max(0, findPoiQuantile(lambda, 0.10))
   const hi = findPoiQuantile(lambda, 0.90)
 
-  return { k: est, lo, hi, expIP, ipSD, oppK, lambda, probs, trend, conf, boost, splitKRate, whiffPct: whiffPct ?? null, tempAdj: tAdj, umpireAdj: uAdj, tempF: weather?.tempF ?? null }
+  return { k: est, lo, hi, expIP, ipSD, oppK, lambda, probs, trend, conf, boost, splitKRate, whiffPct: whiffPct ?? null, tempAdj: tAdj, umpireAdj: uAdj, parkKAdj: pAdj, tempF: weather?.tempF ?? null }
 }
 
 // Binary search for the smallest k s.t. P(X ≤ k) ≥ p.
