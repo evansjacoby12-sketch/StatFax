@@ -3101,10 +3101,6 @@ async function main() {
         const pitcherTeamAbbr        = isHome ? game.awayTeam.abbr : game.homeTeam.abbr;
         const pitcherHomeStadium     = findStadiumByTeam(pitcherTeamAbbr);
         const pitcherHomeParkFactor  = pitcherHomeStadium?.parkFactor ?? 1.0;
-        // Game-venue park factors for today's environment (may differ from pitcher's home park).
-        const gameParkHRFactor       = stadium?.parkFactor ?? 1.0;
-        const gameParkKFactor        = stadium?.parkFactorK ?? 1.0;
-
         const pitcherBlock = opposingPitcher ? {
           id:              opposingPitcher.id,
           name:            opposingPitcher.name,
@@ -3116,8 +3112,8 @@ async function main() {
           pitchMix:        pitchMix,
           xStats:          pitcherXStats[opposingPitcher.id] ?? null,
           homeParkFactor:  pitcherHomeParkFactor,
-          gameParkHRFactor,
-          gameParkKFactor,
+          gameParkHRFactor: stadium?.parkFactor ?? 1.0,
+          gameParkKFactor:  stadium?.parkFactorK ?? 1.0,
         } : null;
 
         // Doubleheader fix: write under BOTH a composite key
