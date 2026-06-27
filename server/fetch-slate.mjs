@@ -3676,6 +3676,11 @@ async function main() {
   }
   console.log(`[slate] zone bonus applied to ${zoneScoreApplied} rows in ${((Date.now() - zoneScoreStart) / 1000).toFixed(2)}s`);
 
+  // Day rating computed here — BEFORE the PRIME cap — so supply uses the raw
+  // PRIME count. The cap is a display cap (prevents board flooding); it must not
+  // reduce the supply signal used to gauge slate quality.
+  const preCapDayRating = computeDayRating(scoredBatters, games);
+
   // ─── PRIME relative cap ─────────────────────────────────────────────────────
   // Runs AFTER all pregame score/grade passes (incl. the zone-bonus re-grade
   // above) so it's the final word on the pregame grade, and BEFORE the live-decay
@@ -4069,7 +4074,7 @@ async function main() {
     // accumulating answer to "have our combos hit?" — see server/parlay-combos.mjs.
     comboScorecard: comboScorecard(backtestLog),  // { days, overall, byStrategy, bySize }
     // Day Rating (1-5★) — "should I bet HR props today?" gauge.
-    dayRating: computeDayRating(scoredBatters, games),
+    dayRating: preCapDayRating,
 
     // ensembleMeta: out-of-sample holdout comparison of the ML stacker vs the
     // rule model, and the gated blend weight actually applied to scores.
