@@ -155,6 +155,11 @@ function umpireHrFactor(name) {
   const f = umpireFactorsRaw.umpires?.[name];
   return Number.isFinite(f) ? f : (umpireFactorsRaw._default ?? 1.0);
 }
+// Resolve a name → zone style string ('high'|'low'|'wide') or null.
+function umpireZoneStyleFor(name) {
+  if (!name) return null;
+  return umpireFactorsRaw.zoneStyles?.[name] ?? null;
+}
 // Resolve a name → K multiplier. Tight zones → more Ks (kFactor > 1).
 function umpireKFactor(name) {
   if (!name) return 1.0;
@@ -435,15 +440,35 @@ function computeKDist(pitcher, targets, { weather, umpire, parkFactorK } = {}) {
   }
 
   // ── TTTO penalty (Third Time Through the Order) ────────────────────────────
-  // K rates decay ~12% for batters facing a starter the 3rd time through the
-  // lineup (BF 19+). Applied proportionally across the projected outing.
+  // Pitchers with richer arsenals (4+ pitch types ≥10% usage) degrade less
+  // on third exposure — diverse sequencing keeps batters off-balance longer.
+  // Two-pitch arms show steeper decay. Scale the 12% baseline ±3pp by diversity.
+  const PM = pitcher?.pitchMix;
+  const pitchDiversity = PM
+    ? ['ffPct','siPct','fcPct','slPct','cuPct','kcPct','chPct','fsPct']
+        .filter(f => (PM[f] ?? 0) >= 10).length
+    : 2;
+  const tttoRate    = pitchDiversity >= 4 ? 0.096 : pitchDiversity <= 2 ? 0.144 : 0.12;
   const tttoBF      = Math.max(0, expBF - 18);
-  const tttoPenalty = expBF > 0 ? (1 - tttoBF * 0.12 / expBF) : 1.0;
+  const tttoPenalty = expBF > 0 ? (1 - tttoBF * tttoRate / expBF) : 1.0;
 
   // ── Environmental multipliers ──────────────────────────────────────────────
-  const tempAdj   = _ssTempAdj(weather);
-  const umpireAdj = _ssUmpireKAdj(umpire);
-  const pAdj      = Number.isFinite(parkFactorK) && parkFactorK > 0 ? parkFactorK : 1.0;
+  const tempAdj = _ssTempAdj(weather);
+  // Base K factor from umpire's overall zone size, then apply a pitch-location ×
+  // zone-tendency interaction: a "low"-zone ump rewards breaking-ball-heavy
+  // pitchers; a "high"-zone ump rewards FB-heavy arms; "wide" is a flat boost.
+  let umpireAdj = _ssUmpireKAdj(umpire);
+  const umpZone = umpire?.zoneStyle;
+  if (umpZone && PM) {
+    const fastPct  = ((PM.ffPct ?? 0) + (PM.siPct ?? 0) + (PM.fcPct ?? 0)) / 100;
+    const breakPct = ((PM.slPct ?? 0) + (PM.cuPct ?? 0) + (PM.kcPct ?? 0)) / 100;
+    let zoneX = 1.0;
+    if      (umpZone === 'high' && fastPct  > 0.40) zoneX = 1 + (fastPct  - 0.40) * 0.08;
+    else if (umpZone === 'low'  && breakPct > 0.25) zoneX = 1 + (breakPct - 0.25) * 0.08;
+    else if (umpZone === 'wide')                    zoneX = 1.015;
+    umpireAdj = Math.min(1.12, umpireAdj * zoneX);
+  }
+  const pAdj = Number.isFinite(parkFactorK) && parkFactorK > 0 ? parkFactorK : 1.0;
 
   const lambda = expBF * adjustedKRate * oppAdj * tempAdj * umpireAdj * pAdj * tttoPenalty;
   const probs = {};
@@ -3280,7 +3305,7 @@ async function main() {
           // Home-plate umpire (when announced — usually ~24h before first
           // pitch). Stored even when the HR factor is neutral 1.0 so the
           // modal can display the ump name regardless.
-          umpire:     homePlateUmpire ? { ...homePlateUmpire, hrFactor: umpFactor, kFactor: umpKFactor } : null,
+          umpire:     homePlateUmpire ? { ...homePlateUmpire, hrFactor: umpFactor, kFactor: umpKFactor, zoneStyle: umpireZoneStyleFor(homePlateUmpire.name) } : null,
           // Short-window recency signals (also fed into scoreBatter above) —
           // surfaced on the row so they're logged for model training and can be
           // shown in the modal Scout Report later.

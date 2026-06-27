@@ -37,6 +37,21 @@
     "Tom Hanahan": 1.07,
     "Adrian Johnson": 1.07
   },
+  "zoneStyles": {
+    "_doc": "Dominant zone tendency keyed by umpire name. 'high' = generous with up-in-zone pitches; 'low' = prefers low-zone calls; 'wide' = expansive overall strike zone. Absent = neutral. Used in K Brain to multiply the base kFactor by a pitch-location x umpire interaction term.",
+    "Mark Carlson":   "low",
+    "Quinn Wolcott":  "low",
+    "Austin Jones":   "low",
+    "Laz Diaz":       "wide",
+    "Vic Carapazza":  "wide",
+    "Chad Whitson":   "wide",
+    "Tom Hanahan":    "wide",
+    "Adrian Johnson": "wide",
+    "Mark Ripperger": "wide",
+    "Sean Barber":    "high",
+    "Lance Barrett":  "high",
+    "Andy Fletcher":  "high"
+  },
   "kFactors": {
     "Mark Carlson": 1.06,
     "Brennan Miller": 1.04,

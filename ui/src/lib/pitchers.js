@@ -212,14 +212,31 @@ export function kBrain(pitcher, targets, { weather, umpire } = {}) {
   }
 
   // ── TTTO penalty (Third Time Through the Order) ────────────────────────────
-  // K rates decay ~12% for batters seeing the starter a 3rd time (BF 19+).
-  // Applied proportionally: fraction of outing beyond BF 18 × 0.12 decay.
+  // K rates decay by pitch-type diversity: diverse arsenals retain deception
+  // through TTTO. Rate: 4+ pitches → 9.6%, 3 → 12%, ≤2 → 14.4%.
+  const PM = pitcher?.pitchMix
+  const pitchDiversity = PM
+    ? ['ffPct','siPct','fcPct','slPct','cuPct','kcPct','chPct','fsPct']
+        .filter(f => (PM[f] ?? 0) >= 10).length
+    : 2
+  const tttoRate    = pitchDiversity >= 4 ? 0.096 : pitchDiversity <= 2 ? 0.144 : 0.12
   const tttoBF      = Math.max(0, expBF - 18)
-  const tttoPenalty = expBF > 0 ? (1 - tttoBF * 0.12 / expBF) : 1.0
+  const tttoPenalty = expBF > 0 ? (1 - tttoBF * tttoRate / expBF) : 1.0
 
   // ── Environmental multipliers ──────────────────────────────────────────────
   const tAdj = tempAdj(weather)
-  const uAdj = umpireKAdj(umpire)
+  let uAdj = umpireKAdj(umpire)
+  // Umpire zone style × pitcher pitch-location tendency interaction.
+  const umpZone = umpire?.zoneStyle
+  if (umpZone && PM) {
+    const fastPct  = ((PM.ffPct ?? 0) + (PM.siPct ?? 0) + (PM.fcPct ?? 0)) / 100
+    const breakPct = ((PM.slPct ?? 0) + (PM.cuPct ?? 0) + (PM.kcPct ?? 0)) / 100
+    let zoneX = 1.0
+    if      (umpZone === 'high' && fastPct  > 0.40) zoneX = 1 + (fastPct  - 0.40) * 0.08
+    else if (umpZone === 'low'  && breakPct > 0.25) zoneX = 1 + (breakPct - 0.25) * 0.08
+    else if (umpZone === 'wide')                    zoneX = 1.015
+    uAdj = Math.min(1.12, uAdj * zoneX)
+  }
   const rawPKAdj = pitcher?.gameParkKFactor
   const pAdj = Number.isFinite(rawPKAdj) && rawPKAdj > 0 ? rawPKAdj : 1.0
 
