@@ -36,8 +36,9 @@ import UpdateBanner from './components/UpdateBanner.jsx'
 import Icon from './components/Icon.jsx'
 import './app.css'
 
-const AUTO_REFRESH_MS = 60_000
-const LIVE_REFRESH_MS = 30_000 // faster cadence while a game is actually live
+const AUTO_REFRESH_MS    = 60_000
+const LIVE_REFRESH_MS    = 30_000  // faster cadence while a game is actually live
+const SLATE_REFRESH_MS   = 3 * 60_000 // always-on background poll — pipeline runs every 10 min
 
 // Each view is its own page via a URL hash (#board, #pitchers, …) — bookmarkable
 // and back/forward navigable. Hash routing works as-is on static hosting.
@@ -189,6 +190,25 @@ export default function App() {
     const t = setInterval(load, ms)
     return () => clearInterval(t)
   }, [autoRefresh, liveScores, livePhase.anyLive, livePhase.anyPending, load])
+
+  // Silent background poll — always fires every 3 min regardless of toggles.
+  // Only swaps in fresh data when generatedAt actually changed, so there's no
+  // flicker or loading spinner for a 19-minute session with a stale slate.
+  useEffect(() => {
+    const poll = async () => {
+      try {
+        const fresh = await loadSlate()
+        setState((s) => {
+          if (!s.data || fresh.meta?.generatedAt !== s.data.meta?.generatedAt) {
+            return { status: 'ready', data: fresh, error: null }
+          }
+          return s
+        })
+      } catch { /* fail soft — active session keeps current data */ }
+    }
+    const t = setInterval(poll, SLATE_REFRESH_MS)
+    return () => clearInterval(t)
+  }, [])
 
   // Esc closes the topmost overlay.
   useEffect(() => {
