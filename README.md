@@ -1,126 +1,127 @@
-# statfax-brain
+# StatFax
 
-The **headless brain** of StatFax — the MLB home-run probability engine, the
-data pipeline that feeds it, and the offline model lab. **No UI.** Forked out of
-the HRSauce app so you can iterate on the model (and build a fresh UI on top)
-without the React Native app in the way.
+MLB home-run and strikeout prop projection engine + live board. Deployed at **statfax.online**.
 
-Pure Node 20 (ESM, global `fetch`). The only npm dependency is `esbuild`.
+## What it is
 
-```bash
-npm install              # just esbuild
-npm run build-model      # bundle the engine → server/.build/model.mjs
-npm run lab:score        # prove the engine bundles + loads, fully offline
-npm run lab:pull         # download R2 backtest data → model-lab/data/
-npm run lab:backtest     # offline metrics on the model
-npm run lab:train        # train a model on the logged feature vectors
-npm run slate            # run the full live pipeline (needs network; no keys)
+A fully automated daily pipeline that scores every batter on today's MLB slate for HR probability and every starting pitcher for projected strikeouts. The scored snapshot is published to Cloudflare R2 and served to a React UI via GitHub Pages.
+
+## Architecture
+
 ```
+Cloudflare Worker (cron, every 10 min)
+  → repository_dispatch → GitHub Actions
 
-## What's here
+GitHub Actions ("Build slate + deploy")
+  1. npm run build-model      bundle the scoring engine
+  2. npm run slate            live pipeline → dist/daily.json
+  3. R2 upload                publish snapshot to Cloudflare R2
+  4. npm run build (ui/)      build Vite + React board
+  5. GitHub Pages deploy      serve at statfax.online
+```
 
 ```
 src/
-  sports/mlb/logic/   ProbabilityEngine.js (scoreBatter) + all scoring modules
-  sports/mlb/data/    static data — stadiums, park factors, umpire factors, …
-  sports/mlb/api/     MLBService — MLB Stats API client
-  logic/              windInterpreter, pitcherVulnerability, …
-  data/               team colors + other static JSON
-  utils/, api/        support (backtest log reader, snapshot client). NOTE: a few
-                      app-glue files here still import react-native / expo-* /
-                      @sentry (notifications, pushNotifications, pollers,
-                      SentryConfig, SupabaseClient). The engine + pipeline never
-                      import them — they're harmless carry-along you can delete.
+  sports/mlb/logic/     ProbabilityEngine.js (scoreBatter) + scoring modules
+  sports/mlb/data/      stadiums.json (park factors + K factors), umpire-factors.json
+  logic/                pitcherVulnerability, windInterpreter, …
 server/
-  fetch-slate.mjs     the pipeline: fetch MLB API + Savant + weather, score
-                      every batter, emit dist/daily.json
-  build-model.mjs     esbuild-bundles the engine for Node (server/.build/model.mjs)
-  reconcile.mjs       calibration loop (reconcile predictions vs outcomes)
-  weather.mjs, statcast*.mjs, catcherFraming.mjs, fetch-zone-matchup.mjs
-  models/             ensemble.mjs + trainEnsembleWeights.mjs (learned stacker)
-  lib/asyncstorage-stub.mjs   RN-only shim aliased by build-model for Node
-model-lab/            offline harness — pull-data, backtest, train-logreg, score-offline
+  fetch-slate.mjs       the pipeline — MLB Stats API + Savant + weather → daily.json
+  build-model.mjs       esbuild bundle of the engine → server/.build/model.mjs
+  reconcile.mjs         calibration loop (reconcile predictions vs outcomes)
+  models/               ensemble stacker + ML rank model
+  statcast*.mjs         Statcast data fetchers (expected stats, recent barrels, velo trends)
+  catcherFraming.mjs    catcher framing data
+  fetch-zone-matchup.mjs  batter vs pitcher zone data
+ui/
+  src/components/       React board — Board, PitchersView, GamesView, WeatherView, …
+  src/lib/              pitchers.js (kBrain), vulnerability.js, data.js, badges.js, …
+model-lab/              offline harness — backtest, train, A/B rescore
 ```
 
-## The engine is the source of truth
-
-`src/sports/mlb/logic/ProbabilityEngine.js` → `scoreBatter(...)`. `build-model.mjs`
-bundles its full closure into a single Node file (`server/.build/model.mjs`) with
-the RN-only async-storage import aliased to a no-op. `fetch-slate.mjs` imports that
-bundle so scoring is identical everywhere. Edit the engine → re-run `build-model`
-→ everything downstream picks it up.
-
-## Live pipeline
-
-`npm run slate` hits live MLB Stats API + Baseball Savant — no keys, no secrets.
-It writes the scored slate to `dist/daily.json`. There's no odds integration and
-no R2 upload here (that lived in the HRSauce GitHub Action) — add your own publish
-step if you want to serve the snapshot to a UI.
-
-## Build on it
-
-- **Tune the rule engine** — edit `ProbabilityEngine.js`, `npm run lab:score`
-  re-scores a recorded corpus offline, `npm run lab:backtest` compares metrics.
-- **Train a learned model** — `npm run lab:train` fits a model on the logged
-  feature vectors; graduate it into `server/models/`.
-- **New UI** — `fetch-slate.mjs` produces `dist/daily.json` (the scored slate);
-  point any front-end at that shape. See `model-lab/data/daily-*.json` for an
-  example payload. A ready-made front-end lives in [`ui/`](ui/README.md) — a
-  Vite + React "model board" that reads `dist/daily.json` directly
-  (`cd ui && npm install && npm run dev`).
-
-## Capturing inputs (held-out counterfactual re-scoring)
-
-`daily.json` stores model **outputs** (the final score/grade), not the inputs
-that produced them — so you can't subtract a term (e.g. the old "Due" bonus)
-from a historical row and re-score it. To do *true* held-out counterfactuals,
-the slate freezes the exact `scoreBatter()` argument list for every batter:
+## Local setup
 
 ```bash
-npm run slate        # writes dist/daily.json + dist/inputs-<date>.json
-npm run lab:score    # re-scores that corpus with the CURRENT engine, offline
+npm install              # just esbuild (server)
+npm run build-model      # bundle engine → server/.build/model.mjs
+npm run slate            # full live pipeline — no API keys needed
+                         # writes dist/daily.json
+
+cd ui && npm install && npm run dev   # React board at localhost:5173
 ```
 
-`dist/inputs-<date>.json` is an array of `{ id, name, gamePk, args:[…] }`, where
-`args` is the 27-argument bundle spread straight back into `scoreBatter()`.
-`lab:score` reads `dist/` (freshest local run) **and** `model-lab/data/` (pulled
-history), bundles the engine, and re-scores every record with zero network — so
-the fork loop is: edit `ProbabilityEngine.js` → `npm run lab:score` → diff scores.
+## HR Brain
 
-To build a **multi-day** held-out set, accumulate the dated files in
-`model-lab/data/` (they're gitignored and persist locally): copy each run's
-`dist/inputs-<date>.json` there, or publish the file next to `daily.json` and
-pull it. Joining `inputs-<date>.json` (by `id`/`gamePk`) to the reconciled
-outcomes in `backtest-log.json` is what lets you compute a real AUC/Brier delta
-for any engine change.
+`src/sports/mlb/logic/ProbabilityEngine.js → scoreBatter()` scores each batter 0–100 for HR probability. The engine is bundled by `build-model.mjs` so the scoring is identical in the pipeline and offline.
 
-## ⏳ Pending validation — retro-check by ~2026-06-17
+**Key inputs per batter:**
+- Season HR/9 of opposing starter (park-adjusted via `pitcherVulnerability`)
+- Batter Statcast contact quality (barrel %, exit velo, launch angle, blast rate)
+- Park × weather × handedness HR factor
+- Home-plate umpire HR factor
+- Platoon splits (vs LHP/RHP)
+- Recent form signals (hot bat, HR streak, due signal)
+- Career H2H vs this pitcher
+- Zone matchup enrichment (batter SLG vs pitch types the starter throws)
+- ML ensemble stacker (blended with rule model when out-of-sample AUC > rule model)
 
-Three model changes shipped (2026-06-03) on **within-grade audit evidence**
-(`npm run lab:audit`), but only the first has a clean outcome-validated history:
+**Grades:** PRIME (top 12% of playable batters) · STRONG · LEAN · SKIP
 
-| change | evidence | status |
-|---|---|---|
-| **Due bonus removed** (`dueBonus`/`dueAndHotBonus` → 0) | due bats homer LESS; PRIME 32% vs 46% for grademates | falsified on 11d/2.6k rows ✓ |
-| **`hot` up-weight** (cap 15→20, slope 200→240) | +17.6 within STRONG, +16.2 SKIP, +8.6 LEAN | **needs held-out re-score** |
-| **`homeEdge` up-weight** (tiers 5→7, 3→5) | +8.4 PRIME, +8.0 STRONG | **needs held-out re-score** |
+**Day Rating (1–5★):** Pitching 45% + Environment 30% + Supply 25%, computed from pre-cap PRIME count to correctly reflect raw slate quality.
 
-The two up-weights shipped early on the same standard that justified killing Due,
-but were **not** confirmed against outcomes (the inputs corpus started logging
-2026-06-03, so only 1 day existed). **To-do once ~2 weeks of `dist/inputs-*.json`
-have accrued:**
+## K Brain
 
-1. Pull/accumulate the dated input files into `model-lab/data/`.
-2. Join them (by `id`/`gamePk`) to reconciled outcomes in `backtest-log.json`.
-3. Re-score baseline vs. up-weighted engine and compare real **AUC/Brier**
-   (extend `model-lab/ab-rescore.mjs`, which already A/Bs two bundles on frozen
-   inputs — add the outcome join).
-4. If the up-weights beat baseline → keep. If not → revert (one commit each);
-   the prototype also lives isolated on branch `claude/hot-home-upweight`.
+Poisson-based strikeout projection per starter. Lives in `server/fetch-slate.mjs` (server-side pre-computation) and `ui/src/lib/pitchers.js` (client mirror).
 
-`npm run lab:audit` should also be re-run as days accrue to re-police every
-signal (it's what caught Due, and currently flags `cold` as possibly too weak
-and `dayEdge`/`launchPad` as noisy).
+**Model steps:**
 
-Originated from HRSauce; this copy is standalone and has no git history, no
-remote, no commits required.
+| Step | Signal | Detail |
+|------|--------|--------|
+| A | Per-batter log-odds matchup | `matchupOdds = (pitcherOdds × batterOdds) / leagueOdds` per lineup batter; pitcher splits < 150 BF regressed toward season rate |
+| B | Recent form blend | 55% log-odds splits + 45% last-6-start K/BF average |
+| C | SwStr% (preferred) or Whiff% | SwStr% (whiffs/pitches, league avg 11%) at 0.30 coefficient; Whiff% fallback at 0.25 |
+| D | Pitch-mix boost | Per-pitch whiff lift coefficients (slider/sweeper/curve/change/splitter), only when miss metric unavailable |
+| E | Pitch-volume BF model | `expBF = projectedPitches / P-per-BF` from last-6-start pitch counts; falls back to mean IP |
+| F | Vegas proxy | Elite-contact lineup (opp K% < 18.5%) → trim pitch volume −5% for earlier-hook risk |
+| G | TTTO penalty | BF beyond 18 (3rd time through order) → −12% K rate, applied proportionally |
+| H | Environmental multipliers | Temp (`1 + (°F − 72) × 0.003`), umpire K factor, park K factor |
+
+**Output:** λ (Poisson mean), P(K > line) at 3.5–10.5, 10th–90th percentile range, trend (↑/↓/→), confidence (high/med/low).
+
+**K Brain UI features:**
+- Filter by pitcher/team search, min projected K (4.5 / 5.5 / 6.5 / 7.5+), confidence, sort
+- Enter book line → see your edge instantly
+- TTTO, Vegas trim, temp, umpire, park K chips
+- H2H K matchup table per pitcher (career K% vs this arm, delta vs season rate, ≥5 AB)
+- Live K badge for in-progress games
+- K-prop parlay combos (2-leg / 3-leg)
+
+## Pitcher Vulnerability
+
+0–100 score derived from HR/9, K/9, barrel %, exit velo, hard-hit %, ERA, fatigue, recent form, and xStats regression. Two-step park adjustment: strips out the pitcher's home-park bias, then applies today's game-park factor. UI label: TOUGH / NEUTRAL / SHAKY / VULNERABLE.
+
+## Static data
+
+| File | Content |
+|------|---------|
+| `src/sports/mlb/data/stadiums.json` | Park HR factor, L/R splits, K factor per stadium |
+| `src/sports/mlb/data/umpire-factors.json` | HR factor + K factor for 22+ umpires |
+
+## Calibration pipeline
+
+`reconcile.mjs` runs nightly alongside the slate:
+- Joins yesterday's predictions to MLB box-score outcomes
+- Computes badge/grade lift multipliers via rolling 30-day backtest log
+- Fits an isotonic calibration table (score → observed HR rate)
+- Trains a logistic ensemble stacker when holdout AUC > rule model
+
+## Pending validation
+
+Two signal up-weights shipped (2026-06-03) without full held-out outcome confirmation:
+
+| Change | Status |
+|--------|--------|
+| `hot` up-weight (cap 15→20, slope 200→240) | needs held-out re-score once 2wk inputs accrue |
+| `homeEdge` up-weight (5→7, 3→5) | needs held-out re-score once 2wk inputs accrue |
+
+To validate: `npm run lab:pull` → accumulate `dist/inputs-<date>.json` in `model-lab/data/` → `npm run lab:backtest` to compare AUC/Brier baseline vs up-weighted.
