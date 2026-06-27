@@ -253,7 +253,7 @@ export function kBrain(pitcher, targets, { weather, umpire } = {}) {
 
   return { k: lambda, lo, hi, expIP, ipSD, oppK, lambda, probs, trend, conf, boost, splitKRate,
            swStrPct: swStrPct ?? null, whiffPct: whiffPct ?? null,
-           tempAdj: tAdj, umpireAdj: uAdj, parkKAdj: pAdj, tttoPenalty,
+           tempAdj: tAdj, umpireAdj: uAdj, parkKAdj: pAdj, tttoPenalty, vegasTrim,
            tempF: weather?.tempF ?? null }
 }
 

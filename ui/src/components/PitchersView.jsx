@@ -135,36 +135,95 @@ const TREND_COLOR = { up: 'var(--strong)', down: 'var(--bad)', flat: 'var(--text
 const CONF_COLOR = { high: 'var(--strong)', med: 'var(--accent)', low: 'var(--text-faint)' }
 
 function KBrainView({ pitchers, liveKsByPitcher = {} }) {
-  // Per-pitcher line input: pitcherId → user-entered sportsbook line
   const [lines, setLines] = useState({})
+  const [search, setSearch] = useState('')
+  const [minK, setMinK] = useState(0)
+  const [confFilter, setConfFilter] = useState('all')
+  const [sortBy, setSortBy] = useState('k')
   const [kLog, setKLog] = useState(null)
+
   useEffect(() => {
     fetch(`${import.meta.env.BASE_URL}data/backtest-log.json`, { cache: 'no-store' })
       .then(r => r.ok ? r.json() : null).then(d => d && setKLog(d)).catch(() => {})
   }, [])
-  const arms = [...pitchers]
-    .filter((e) => e.estK && Number.isFinite(e.estK.lambda))
-    .sort((a, b) => (b.estK.lambda - a.estK.lambda))
 
-  if (!arms.length) {
+  const arms = useMemo(() => {
+    let pool = pitchers.filter((e) => e.estK && Number.isFinite(e.estK.lambda))
+    if (search.trim()) {
+      const q = search.trim().toLowerCase()
+      pool = pool.filter((e) =>
+        e.pitcher.name?.toLowerCase().includes(q) ||
+        (e.targets[0]?.team || '').toLowerCase().includes(q)
+      )
+    }
+    if (minK > 0) pool = pool.filter((e) => e.estK.k >= minK)
+    if (confFilter !== 'all') pool = pool.filter((e) => e.estK.conf === confFilter)
+    return [...pool].sort(sortBy === 'time'
+      ? (a, b) => (a.game?.gameDate || '').localeCompare(b.game?.gameDate || '') || b.estK.lambda - a.estK.lambda
+      : (a, b) => b.estK.lambda - a.estK.lambda
+    )
+  }, [pitchers, search, minK, confFilter, sortBy])
+
+  const filterBtnStyle = (active) => ({
+    padding: '3px 10px', borderRadius: '6px', fontSize: '11px', cursor: 'pointer',
+    border: `1px solid ${active ? 'var(--accent)' : 'rgba(255,255,255,0.1)'}`,
+    background: active ? 'rgba(99,102,241,0.18)' : 'rgba(255,255,255,0.04)',
+    color: active ? '#fff' : 'var(--text-faint)', fontWeight: active ? '700' : '400',
+  })
+
+  if (!pitchers.filter(e => e.estK).length) {
     return <div className="empty-note" style={{ padding: '48px', textAlign: 'center', color: 'var(--text-faint)' }}>No K estimates available — missing recent start data.</div>
   }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-      <div style={{ fontSize: '11px', color: 'var(--text-faint)', marginBottom: '4px' }}>
-        Poisson K distribution per start. Enter the sportsbook's line to see implied edge.
+      {/* Filter bar */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '10px 12px', background: 'rgba(16,24,48,0.4)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '10px' }}>
+        {/* Search */}
+        <input
+          type="text"
+          placeholder="Search pitcher or team…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          style={{ width: '100%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '5px 10px', color: '#fff', fontSize: '12px', boxSizing: 'border-box' }}
+        />
+        {/* Filter chips row */}
+        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+          <span style={{ fontSize: '10px', color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', marginRight: '2px' }}>Min K</span>
+          {[0, 4.5, 5.5, 6.5, 7.5].map((v) => (
+            <button key={v} style={filterBtnStyle(minK === v)} onClick={() => setMinK(v)}>
+              {v === 0 ? 'All' : `${v}+`}
+            </button>
+          ))}
+          <span style={{ fontSize: '10px', color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 2px 0 8px' }}>Conf</span>
+          {['all', 'high', 'med'].map((v) => (
+            <button key={v} style={filterBtnStyle(confFilter === v)} onClick={() => setConfFilter(v)}>
+              {v === 'all' ? 'All' : v.charAt(0).toUpperCase() + v.slice(1)}
+            </button>
+          ))}
+          <span style={{ fontSize: '10px', color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 2px 0 8px' }}>Sort</span>
+          <button style={filterBtnStyle(sortBy === 'k')} onClick={() => setSortBy('k')}>Est K</button>
+          <button style={filterBtnStyle(sortBy === 'time')} onClick={() => setSortBy('time')}>Game Time</button>
+        </div>
+        {/* Result count */}
+        <div style={{ fontSize: '10px', color: 'var(--text-faint)' }}>
+          {arms.length} pitcher{arms.length !== 1 ? 's' : ''} · Poisson K distribution · enter the book line to see edge
+        </div>
       </div>
+
+      {arms.length === 0 && (
+        <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-faint)', fontSize: '13px' }}>
+          No pitchers match those filters.
+        </div>
+      )}
+
       {arms.map((e) => {
         const ek = e.estK
         const oppTeam = e.targets[0]?.team || '?'
         const myLine = lines[e.key]
         const myLineNum = myLine !== undefined && myLine !== '' ? parseFloat(myLine) : null
         const myProb = myLineNum != null && Number.isFinite(myLineNum) ? kOverProb(ek.lambda, myLineNum) : null
-
-        // Show ALL K lines; skip only those with < 3% probability (not worth displaying).
         const showLines = K_LINES.filter((l) => (ek.probs[l] ?? 0) >= 0.03)
-
         const liveK = liveKsByPitcher[e.key]
 
         return (
@@ -179,45 +238,50 @@ function KBrainView({ pitchers, liveKsByPitcher = {} }) {
                   {e.game?.gameDate && <span> · {gameTime(e.game.gameDate)}</span>}
                 </div>
               </div>
-              {/* Live K count (in-progress games) */}
               {liveK && (
                 <div style={{ textAlign: 'center', flexShrink: 0, background: 'rgba(99,220,99,0.12)', border: '1px solid rgba(99,220,99,0.25)', borderRadius: '8px', padding: '4px 10px' }}>
                   <div style={{ fontSize: '20px', fontWeight: '900', color: 'var(--strong)', lineHeight: 1 }}>{liveK.ks}K</div>
                   <div style={{ fontSize: '9px', color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>live{liveK.ip != null ? ` · ${liveK.ip} IP` : ''}</div>
                 </div>
               )}
-              {/* Est K badge */}
               <div style={{ textAlign: 'right', flexShrink: 0 }}>
                 <div style={{ fontSize: '22px', fontWeight: '900', color: '#fff', lineHeight: 1 }}>{ek.k.toFixed(1)}</div>
                 <div style={{ fontSize: '10px', color: 'var(--text-faint)' }}>est K ({ek.lo}–{ek.hi})</div>
               </div>
-              {/* Trend + conf */}
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', flexShrink: 0 }}>
                 <span style={{ fontSize: '16px', color: TREND_COLOR[ek.trend] }}>{TREND_ICON[ek.trend]}</span>
                 <span style={{ fontSize: '9px', color: CONF_COLOR[ek.conf], textTransform: 'uppercase', letterSpacing: '0.04em' }}>{ek.conf}</span>
               </div>
             </div>
 
-            {/* Environment factors */}
-            {(ek.tempAdj != null || ek.umpireAdj != null || ek.parkKAdj != null) && (
-              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '8px' }}>
-                {ek.tempF != null && (
-                  <span style={{ fontSize: '10px', padding: '2px 7px', borderRadius: '4px', background: 'rgba(255,255,255,0.05)', color: ek.tempAdj < 0.97 ? 'var(--bad)' : ek.tempAdj > 1.02 ? 'var(--strong)' : 'var(--text-faint)' }}>
-                    {Math.round(ek.tempF)}°F {ek.tempAdj < 0.97 ? '❄ cold suppressed' : ek.tempAdj > 1.02 ? '☀ warm boost' : ''}
-                  </span>
-                )}
-                {ek.umpireAdj != null && ek.umpireAdj !== 1 && (
-                  <span style={{ fontSize: '10px', padding: '2px 7px', borderRadius: '4px', background: 'rgba(255,255,255,0.05)', color: ek.umpireAdj > 1.01 ? 'var(--strong)' : 'var(--bad)' }}>
-                    UMP {ek.umpireAdj > 1.01 ? '+ K zone' : '− K zone'}
-                  </span>
-                )}
-                {ek.parkKAdj != null && ek.parkKAdj !== 1 && (
-                  <span style={{ fontSize: '10px', padding: '2px 7px', borderRadius: '4px', background: 'rgba(255,255,255,0.05)', color: ek.parkKAdj < 0.97 ? 'var(--bad)' : ek.parkKAdj > 1.02 ? 'var(--strong)' : 'var(--text-faint)' }}>
-                    park {ek.parkKAdj > 1 ? `+${((ek.parkKAdj - 1) * 100).toFixed(0)}% K` : `${((ek.parkKAdj - 1) * 100).toFixed(0)}% K`}
-                  </span>
-                )}
-              </div>
-            )}
+            {/* Environment + model adjustment chips */}
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '8px' }}>
+              {ek.tempF != null && (
+                <span style={{ fontSize: '10px', padding: '2px 7px', borderRadius: '4px', background: 'rgba(255,255,255,0.05)', color: ek.tempAdj < 0.97 ? 'var(--bad)' : ek.tempAdj > 1.02 ? 'var(--strong)' : 'var(--text-faint)' }}>
+                  {Math.round(ek.tempF)}°F{ek.tempAdj < 0.97 ? ' ❄ cold' : ek.tempAdj > 1.02 ? ' ☀ warm' : ''}
+                </span>
+              )}
+              {ek.umpireAdj != null && ek.umpireAdj !== 1 && (
+                <span style={{ fontSize: '10px', padding: '2px 7px', borderRadius: '4px', background: 'rgba(255,255,255,0.05)', color: ek.umpireAdj > 1.01 ? 'var(--strong)' : 'var(--bad)' }}>
+                  UMP {ek.umpireAdj > 1.01 ? '+ K zone' : '− K zone'}
+                </span>
+              )}
+              {ek.parkKAdj != null && ek.parkKAdj !== 1 && (
+                <span style={{ fontSize: '10px', padding: '2px 7px', borderRadius: '4px', background: 'rgba(255,255,255,0.05)', color: ek.parkKAdj < 0.97 ? 'var(--bad)' : ek.parkKAdj > 1.02 ? 'var(--strong)' : 'var(--text-faint)' }}>
+                  park {ek.parkKAdj > 1 ? `+${((ek.parkKAdj - 1) * 100).toFixed(0)}%` : `${((ek.parkKAdj - 1) * 100).toFixed(0)}%`} K
+                </span>
+              )}
+              {ek.tttoPenalty != null && ek.tttoPenalty < 0.97 && (
+                <span style={{ fontSize: '10px', padding: '2px 7px', borderRadius: '4px', background: 'rgba(255,255,255,0.05)', color: 'var(--bad)' }} title="Third-time-through-order K decay">
+                  TTTO −{((1 - ek.tttoPenalty) * 100).toFixed(0)}%
+                </span>
+              )}
+              {ek.vegasTrim != null && ek.vegasTrim < 1 && (
+                <span style={{ fontSize: '10px', padding: '2px 7px', borderRadius: '4px', background: 'rgba(255,255,255,0.05)', color: 'var(--bad)' }} title="Elite-contact lineup → earlier hook risk">
+                  lineup pressure −{((1 - ek.vegasTrim) * 100).toFixed(0)}%
+                </span>
+              )}
+            </div>
 
             {/* K-over probability bars */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginBottom: '10px' }}>
@@ -225,7 +289,6 @@ function KBrainView({ pitchers, liveKsByPitcher = {} }) {
                 const p = ek.probs[line]
                 if (p == null) return null
                 const pct100 = p * 100
-                // Colour: green ≥60%, yellow 40–59%, red <40%
                 const barColor = pct100 >= 60 ? 'var(--strong)' : pct100 >= 40 ? '#f59e0b' : 'var(--bad)'
                 return (
                   <div key={line} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px' }}>

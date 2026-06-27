@@ -451,7 +451,7 @@ function computeKDist(pitcher, targets, { weather, umpire, parkFactorK } = {}) {
   const lo = Math.max(0, _ssFindQuantile(lambda, 0.10));
   const hi = _ssFindQuantile(lambda, 0.90);
 
-  return { k: lambda, lo, hi, lambda, probs, tempAdj, umpireAdj, parkKAdj: pAdj, tempF: weather?.tempF ?? null, tttoPenalty };
+  return { k: lambda, lo, hi, lambda, probs, tempAdj, umpireAdj, parkKAdj: pAdj, tempF: weather?.tempF ?? null, tttoPenalty, vegasTrim };
 }
 
 // Intraday board history — append a compact snapshot of TODAY's canonical combos
