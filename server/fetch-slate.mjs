@@ -505,8 +505,11 @@ function computeDayRating(scoredBatters, games) {
 
   // Pitching (45%): the biggest lever — homer-prone starters. Share with
   // HR/9 ≥ 1.3, blended with the average HR/9 of today's starters.
+  // Require ≥ 20 IP to prevent thin-sample call-ups (0 HR in 5 IP = 0.00 HR/9)
+  // from artificially suppressing the average on normal days.
+  const MIN_IP = 20;
   const arms = [...new Map(
-    rows.filter((b) => b.pitcher?.id != null && Number.isFinite(b.pitcher?.season?.hrPer9))
+    rows.filter((b) => b.pitcher?.id != null && Number.isFinite(b.pitcher?.season?.hrPer9) && (b.pitcher?.season?.ip ?? 0) >= MIN_IP)
         .map((b) => [b.pitcher.id, b.pitcher.season.hrPer9]),
   ).values()];
   const softShare = arms.length ? arms.filter((h) => h >= 1.3).length / arms.length : 0;
