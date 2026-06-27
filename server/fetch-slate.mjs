@@ -3810,8 +3810,6 @@ async function main() {
     }
     console.log(`[slate] live-context: tagged ${liveTagged} rows (${liveNearMisses} near-miss, ${livePullRisk} pull-risk games) in ${((Date.now() - liveStart) / 1000).toFixed(2)}s`);
   }
-  payload.liveKsByPitcher = liveKsByPitcher;
-
   // 8.7) For TODAY's Final games, fetch box scores to determine which
   // batters actually homered. The UI uses this to show an "HR ✓" indicator
   // next to players on completed game cards so users can see results at a
@@ -4124,6 +4122,10 @@ async function main() {
     // each entry is ~6 KB → ~350 KB worst case). Empty array when no
     // batter tripped — that's the goal state.
     _nanDebug: nanDebug.slice(0, 100),
+
+    // Live K counts per pitcher, keyed by `${pitcherId}-${gamePk}`.
+    // { ks: number, ip: number|null } — populated for in-progress games.
+    liveKsByPitcher,
   };
 
   // ─── Server-side K-distribution pre-computation ──────────────────────────
