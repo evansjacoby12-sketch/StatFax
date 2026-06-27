@@ -21,9 +21,11 @@ export function attackSideFor(pitcher) {
   return null
 }
 
-const LEAGUE_K_PCT = 0.22
-const BF_PER_IP = 4.3
+const LEAGUE_K_PCT   = 0.22
+const BF_PER_IP      = 4.3
 const LEAGUE_WHIFF_PCT = 24.5
+const LEAGUE_SWSTR_PCT = 11.0  // SwStr% league avg (swinging-strikes / total pitches)
+const STAB_BF          = 150   // regression threshold for pitcher platoon splits
 
 // Poisson CDF — P(X ≤ k) for X ~ Poisson(lambda). Used to compute K-over
 // probabilities without any lookup tables. Fast for k ≤ 20.
@@ -86,23 +88,47 @@ function umpireKAdj(umpire) {
 
 export function kBrain(pitcher, targets, { weather, umpire } = {}) {
   const s = pitcher?.season || {}
-  // ── Step A: Base K rate from splits (lineup-composition-weighted) ──────────
+
+  // Season K rate — anchor for stabilization and fallback
+  let seasonKRate = s.bf > 0 && Number.isFinite(s.k) ? s.k / s.bf
+    : Number.isFinite(s.kPer9) ? (s.kPer9 / 9) / BF_PER_IP
+    : null
+
+  // ── Step A: Per-batter log-odds matchup with split stabilization ──────────
+  // Log-odds formula: matchupOdds = (pitcherOdds × batterOdds) / leagueOdds.
+  // Pitcher splits < STAB_BF BF vs a hand are regressed toward season rate
+  // to prevent early-season small-sample noise from distorting the projection.
   const vl = pitcher?.splits?.vl
   const vr = pitcher?.splits?.vr
   const vlKRate = (vl?.kPct != null && Number.isFinite(vl.kPct)) ? vl.kPct / 100 : null
   const vrKRate = (vr?.kPct != null && Number.isFinite(vr.kPct)) ? vr.kPct / 100 : null
+
   let splitKRate = null
-  if (vlKRate != null && vrKRate != null) {
-    const lhbCount = (targets || []).filter((b) => effSide(b.batSide, pitcher?.hand) === 'L').length
-    const rhbCount = (targets || []).filter((b) => effSide(b.batSide, pitcher?.hand) === 'R').length
-    const totalHanded = lhbCount + rhbCount || 1
-    splitKRate = (vlKRate * lhbCount + vrKRate * rhbCount) / totalHanded
+  if (seasonKRate != null && (vlKRate != null || vrKRate != null)) {
+    const stabVl = vlKRate != null
+      ? (Number.isFinite(vl?.bf) && vl.bf < STAB_BF
+          ? (vlKRate * vl.bf + seasonKRate * STAB_BF) / (vl.bf + STAB_BF)
+          : vlKRate)
+      : seasonKRate
+    const stabVr = vrKRate != null
+      ? (Number.isFinite(vr?.bf) && vr.bf < STAB_BF
+          ? (vrKRate * vr.bf + seasonKRate * STAB_BF) / (vr.bf + STAB_BF)
+          : vrKRate)
+      : seasonKRate
+
+    const leagueOdds = LEAGUE_K_PCT / (1 - LEAGUE_K_PCT)
+    const perBatterK = (targets || []).map((b) => {
+      const side = effSide(b.batSide, pitcher?.hand)
+      const pK   = Math.min(0.99, side === 'L' ? stabVl : stabVr)
+      const ss   = b.season
+      const pa   = (ss?.ab || 0) + (ss?.bb || 0)
+      const bK   = Math.min(0.99, pa > 0 ? (ss?.k || 0) / pa : LEAGUE_K_PCT)
+      const matchupOdds = (pK / (1 - pK)) * (bK / (1 - bK)) / leagueOdds
+      return matchupOdds / (1 + matchupOdds)
+    })
+    if (perBatterK.length) splitKRate = perBatterK.reduce((a, b) => a + b, 0) / perBatterK.length
   }
 
-  // Season fallback.
-  let seasonKRate = s.bf > 0 && Number.isFinite(s.k) ? s.k / s.bf
-    : Number.isFinite(s.kPer9) ? (s.kPer9 / 9) / BF_PER_IP
-    : null
   if (seasonKRate == null && splitKRate == null) return null
   if (seasonKRate == null) seasonKRate = splitKRate
 
@@ -111,7 +137,6 @@ export function kBrain(pitcher, targets, { weather, umpire } = {}) {
   let recentKRate = null
   const recentStarts = (rf?.recentStarts || []).filter((x) => Number.isFinite(x.ip) && x.ip > 0)
   if (recentStarts.length >= 2) {
-    // Per-start K/BF from game logs — most accurate recent signal.
     const kbf = recentStarts.slice(0, 6).map((x) => {
       const bf = x.bf ?? (x.ip * BF_PER_IP)
       return bf > 0 && Number.isFinite(x.k) ? x.k / bf : null
@@ -123,62 +148,82 @@ export function kBrain(pitcher, targets, { weather, umpire } = {}) {
 
   let baseKRate
   if (splitKRate != null) {
-    baseKRate = recentKRate != null
-      ? splitKRate * 0.55 + recentKRate * 0.45
-      : splitKRate
+    baseKRate = recentKRate != null ? splitKRate * 0.55 + recentKRate * 0.45 : splitKRate
   } else {
-    baseKRate = recentKRate != null
-      ? seasonKRate * 0.60 + recentKRate * 0.40
-      : seasonKRate
+    baseKRate = recentKRate != null ? seasonKRate * 0.60 + recentKRate * 0.40 : seasonKRate
   }
 
-  // ── Step C: Whiff% adjustment (Statcast) ───────────────────────────────────
+  // ── Step C: SwStr% (preferred) or Whiff% ─────────────────────────────────
+  // SwStr% (swinging-strikes / total pitches) correlates more tightly to raw
+  // K% than Whiff% (swinging-strikes / swings). Use whiff% as fallback.
+  const swStrPct = pitcher?.savant?.swStrPct
   const whiffPct = pitcher?.savant?.whiffPct
   let kRate = baseKRate
-  if (whiffPct != null && Number.isFinite(whiffPct)) {
-    const whiffRelative = (whiffPct - LEAGUE_WHIFF_PCT) / LEAGUE_WHIFF_PCT
-    kRate = baseKRate * (1 + whiffRelative * 0.25)
+  if (swStrPct != null && Number.isFinite(swStrPct)) {
+    kRate = baseKRate * (1 + ((swStrPct - LEAGUE_SWSTR_PCT) / LEAGUE_SWSTR_PCT) * 0.30)
+  } else if (whiffPct != null && Number.isFinite(whiffPct)) {
+    kRate = baseKRate * (1 + ((whiffPct - LEAGUE_WHIFF_PCT) / LEAGUE_WHIFF_PCT) * 0.25)
   }
   kRate = Math.min(0.45, kRate)
 
-  // ── Step D: Pitch-mix boost only when whiffPct is unavailable ─────────────
-  const boost = (whiffPct != null && Number.isFinite(whiffPct))
-    ? 0
-    : pitchMixKBoost(pitcher?.pitchMix)
+  // ── Step D: Pitch-mix boost (only when SwStr%/Whiff% unavailable) ─────────
+  const hasMissMetric = (swStrPct != null && Number.isFinite(swStrPct)) || (whiffPct != null && Number.isFinite(whiffPct))
+  const boost = hasMissMetric ? 0 : pitchMixKBoost(pitcher?.pitchMix)
   const adjustedKRate = kRate + boost
 
-  // Expected IP: mean of recent starts (trimmed to 6), with variance for the
-  // confidence interval. Falls back to season avg then a league-average 5.3.
-  const ipVals = recentStarts.map((x) => x.ip).filter(Number.isFinite).slice(0, 6)
-  let expIP, ipSD
-  if (ipVals.length >= 2) {
-    expIP = ipVals.reduce((a, b) => a + b, 0) / ipVals.length
-    const variance = ipVals.reduce((a, b) => a + (b - expIP) ** 2, 0) / ipVals.length
-    ipSD = Math.sqrt(variance)
-  } else {
-    expIP = Number.isFinite(rf?.ip) && rf?.games > 0 ? rf.ip / rf.games : 5.3
-    ipSD = 1.2 // default uncertainty when we don't have game logs
-  }
-  expIP = Math.max(3.5, Math.min(7.5, expIP))
-  const expBF = expIP * BF_PER_IP
-
-  // Opponent adjustment: compare this lineup's K rate to league average.
+  // ── Opponent K adjustment ─────────────────────────────────────────────────
+  // Computed before expBF — used by Vegas proxy below.
   const oppKs = (targets || []).map((b) => {
     const ss = b.season
     if (!ss || !(ss.ab > 0)) return null
     const pa = (ss.ab || 0) + (ss.bb || 0)
     return pa > 0 ? (ss.k || 0) / pa : null
   }).filter((v) => v != null)
-  const oppK = oppKs.length ? oppKs.reduce((a, b) => a + b, 0) / oppKs.length : LEAGUE_K_PCT
+  const oppK   = oppKs.length ? oppKs.reduce((a, b) => a + b, 0) / oppKs.length : LEAGUE_K_PCT
   const oppAdj = Math.max(0.82, Math.min(1.22, oppK / LEAGUE_K_PCT))
 
-  // λ = mean K count this start (Poisson parameter).
+  // ── Expected BF (pitch-volume model with Vegas proxy) ─────────────────────
+  // Prefer pitch-count-based volume when recentStarts carry numberOfPitches.
+  // Vegas proxy: elite-contact lineup (oppK < 0.185) → earlier hook → −5%.
+  const vegasTrim = oppK < 0.185 ? 0.95 : 1.0
+  const pitchVals = recentStarts.slice(0, 6).map((x) => x.pitches).filter((v) => Number.isFinite(v) && v > 50)
+  const bfVals    = recentStarts.slice(0, 6).map((x) => x.bf ?? (Number.isFinite(x.ip) ? x.ip * BF_PER_IP : null)).filter(Number.isFinite)
+  let expIP, ipSD, expBF
+  if (pitchVals.length >= 2 && bfVals.length >= 2) {
+    const avgPitches = pitchVals.reduce((a, b) => a + b, 0) / pitchVals.length
+    const avgBF      = bfVals.reduce((a, b) => a + b, 0) / bfVals.length
+    const pPerBF     = Math.max(3.5, Math.min(4.5, avgPitches / avgBF))
+    expBF  = Math.max(3.5 * BF_PER_IP, Math.min(7.5 * BF_PER_IP, (avgPitches * vegasTrim) / pPerBF))
+    expIP  = expBF / BF_PER_IP
+    ipSD   = 0.8
+  } else {
+    const ipVals = recentStarts.map((x) => x.ip).filter(Number.isFinite).slice(0, 6)
+    if (ipVals.length >= 2) {
+      expIP = ipVals.reduce((a, b) => a + b, 0) / ipVals.length
+      const variance = ipVals.reduce((a, b) => a + (b - expIP) ** 2, 0) / ipVals.length
+      ipSD = Math.sqrt(variance)
+    } else {
+      expIP = Number.isFinite(rf?.ip) && rf?.games > 0 ? rf.ip / rf.games : 5.3
+      ipSD  = 1.2
+    }
+    expIP = Math.max(3.5, Math.min(7.5, expIP))
+    expBF = expIP * BF_PER_IP * vegasTrim
+    expBF = Math.max(3.5 * BF_PER_IP, Math.min(7.5 * BF_PER_IP, expBF))
+  }
+
+  // ── TTTO penalty (Third Time Through the Order) ────────────────────────────
+  // K rates decay ~12% for batters seeing the starter a 3rd time (BF 19+).
+  // Applied proportionally: fraction of outing beyond BF 18 × 0.12 decay.
+  const tttoBF      = Math.max(0, expBF - 18)
+  const tttoPenalty = expBF > 0 ? (1 - tttoBF * 0.12 / expBF) : 1.0
+
+  // ── Environmental multipliers ──────────────────────────────────────────────
   const tAdj = tempAdj(weather)
   const uAdj = umpireKAdj(umpire)
-  // Park K factor: pull from pitcher block (set by server) or default to 1.
   const rawPKAdj = pitcher?.gameParkKFactor
   const pAdj = Number.isFinite(rawPKAdj) && rawPKAdj > 0 ? rawPKAdj : 1.0
-  const lambda = expBF * adjustedKRate * oppAdj * tAdj * uAdj * pAdj
+
+  const lambda = expBF * adjustedKRate * oppAdj * tAdj * uAdj * pAdj * tttoPenalty
 
   // P(K ≥ n) at every sportsbook threshold.
   const probs = {}
@@ -199,17 +244,17 @@ export function kBrain(pitcher, targets, { weather, umpire } = {}) {
     }
   }
 
-  // Confidence flag.
   const conf = recentStarts.length >= 4 && s.bf >= 100 ? 'high'
     : recentStarts.length >= 2 || s.bf >= 50 ? 'med'
     : 'low'
 
-  const est = lambda
-  // lo/hi = 10th–90th percentile via Poisson quantile (simple binary search).
   const lo = Math.max(0, findPoiQuantile(lambda, 0.10))
   const hi = findPoiQuantile(lambda, 0.90)
 
-  return { k: est, lo, hi, expIP, ipSD, oppK, lambda, probs, trend, conf, boost, splitKRate, whiffPct: whiffPct ?? null, tempAdj: tAdj, umpireAdj: uAdj, parkKAdj: pAdj, tempF: weather?.tempF ?? null }
+  return { k: lambda, lo, hi, expIP, ipSD, oppK, lambda, probs, trend, conf, boost, splitKRate,
+           swStrPct: swStrPct ?? null, whiffPct: whiffPct ?? null,
+           tempAdj: tAdj, umpireAdj: uAdj, parkKAdj: pAdj, tttoPenalty,
+           tempF: weather?.tempF ?? null }
 }
 
 // Binary search for the smallest k s.t. P(X ≤ k) ≥ p.

@@ -261,6 +261,8 @@ import {
 const _SS_LEAGUE_K_PCT   = 0.22;
 const _SS_BF_PER_IP      = 4.3;
 const _SS_LEAGUE_WHIFF   = 24.5;
+const _SS_LEAGUE_SWSTR   = 11.0;  // SwStr% league avg (swinging-strikes / total pitches)
+const _SS_STAB_BF        = 150;   // regression threshold for pitcher platoon splits
 const _SS_K_LINES        = [3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5, 10.5];
 
 function _ssEffSide(batSide, pitcherHand) {
@@ -315,25 +317,52 @@ function _ssUmpireKAdj(umpire) {
 function computeKDist(pitcher, targets, { weather, umpire, parkFactorK } = {}) {
   const s = pitcher?.season || {};
 
-  // Step A: splits-weighted base rate
+  // Season K rate — anchor for stabilization and fallback
+  let seasonKRate = s.bf > 0 && Number.isFinite(s.k) ? s.k / s.bf
+    : Number.isFinite(s.kPer9) ? (s.kPer9 / 9) / _SS_BF_PER_IP
+    : null;
+
+  // ── Step A: Per-batter log-odds matchup with split stabilization ──────────
+  // For each batter, combines pitcher platoon K rate with batter's own K rate
+  // via the odds-ratio formula, dividing out league-average double-counting.
+  // Pitcher splits < _SS_STAB_BF BF against that hand are regressed toward
+  // their season rate to prevent small-sample volatility from distorting the
+  // projection early in the year.
   const vl = pitcher?.splits?.vl;
   const vr = pitcher?.splits?.vr;
   const vlKRate = (vl?.kPct != null && Number.isFinite(vl.kPct)) ? vl.kPct / 100 : null;
   const vrKRate = (vr?.kPct != null && Number.isFinite(vr.kPct)) ? vr.kPct / 100 : null;
+
   let splitKRate = null;
-  if (vlKRate != null && vrKRate != null) {
-    const lhbCount = (targets || []).filter(b => _ssEffSide(b.batSide, pitcher?.hand) === 'L').length;
-    const rhbCount = (targets || []).filter(b => _ssEffSide(b.batSide, pitcher?.hand) === 'R').length;
-    const totalHanded = lhbCount + rhbCount || 1;
-    splitKRate = (vlKRate * lhbCount + vrKRate * rhbCount) / totalHanded;
+  if (seasonKRate != null && (vlKRate != null || vrKRate != null)) {
+    const stabVl = vlKRate != null
+      ? (Number.isFinite(vl?.bf) && vl.bf < _SS_STAB_BF
+          ? (vlKRate * vl.bf + seasonKRate * _SS_STAB_BF) / (vl.bf + _SS_STAB_BF)
+          : vlKRate)
+      : seasonKRate;
+    const stabVr = vrKRate != null
+      ? (Number.isFinite(vr?.bf) && vr.bf < _SS_STAB_BF
+          ? (vrKRate * vr.bf + seasonKRate * _SS_STAB_BF) / (vr.bf + _SS_STAB_BF)
+          : vrKRate)
+      : seasonKRate;
+
+    const leagueOdds = _SS_LEAGUE_K_PCT / (1 - _SS_LEAGUE_K_PCT);
+    const perBatterK = (targets || []).map(b => {
+      const side = _ssEffSide(b.batSide, pitcher?.hand);
+      const pK   = Math.min(0.99, side === 'L' ? stabVl : stabVr);
+      const ss   = b.season;
+      const pa   = (ss?.ab || 0) + (ss?.bb || 0);
+      const bK   = Math.min(0.99, pa > 0 ? (ss?.k || 0) / pa : _SS_LEAGUE_K_PCT);
+      const matchupOdds = (pK / (1 - pK)) * (bK / (1 - bK)) / leagueOdds;
+      return matchupOdds / (1 + matchupOdds);
+    });
+    if (perBatterK.length) splitKRate = perBatterK.reduce((a, b) => a + b, 0) / perBatterK.length;
   }
-  let seasonKRate = s.bf > 0 && Number.isFinite(s.k) ? s.k / s.bf
-    : Number.isFinite(s.kPer9) ? (s.kPer9 / 9) / _SS_BF_PER_IP
-    : null;
+
   if (seasonKRate == null && splitKRate == null) return null;
   if (seasonKRate == null) seasonKRate = splitKRate;
 
-  // Step B: recent form blend
+  // ── Step B: Recent form blend ──────────────────────────────────────────────
   const rf = pitcher?.recentForm;
   let recentKRate = null;
   const recentStarts = (rf?.recentStarts || []).filter(x => Number.isFinite(x.ip) && x.ip > 0);
@@ -353,51 +382,76 @@ function computeKDist(pitcher, targets, { weather, umpire, parkFactorK } = {}) {
     baseKRate = recentKRate != null ? seasonKRate * 0.60 + recentKRate * 0.40 : seasonKRate;
   }
 
-  // Step C: whiff% adjustment
+  // ── Step C: SwStr% (preferred) or Whiff% ─────────────────────────────────
+  // SwStr% (swinging-strikes / total pitches) correlates more tightly to raw
+  // K% than Whiff% (swinging-strikes / swings) because it naturally penalizes
+  // pitchers who get called strikes but few actual misses. Use whiff% as fallback.
+  const swStrPct = pitcher?.savant?.swStrPct;
   const whiffPct = pitcher?.savant?.whiffPct;
   let kRate = baseKRate;
-  if (whiffPct != null && Number.isFinite(whiffPct)) {
-    const whiffRelative = (whiffPct - _SS_LEAGUE_WHIFF) / _SS_LEAGUE_WHIFF;
-    kRate = baseKRate * (1 + whiffRelative * 0.25);
+  if (swStrPct != null && Number.isFinite(swStrPct)) {
+    kRate = baseKRate * (1 + ((swStrPct - _SS_LEAGUE_SWSTR) / _SS_LEAGUE_SWSTR) * 0.30);
+  } else if (whiffPct != null && Number.isFinite(whiffPct)) {
+    kRate = baseKRate * (1 + ((whiffPct - _SS_LEAGUE_WHIFF) / _SS_LEAGUE_WHIFF) * 0.25);
   }
   kRate = Math.min(0.45, kRate);
 
-  // Step D: pitch-mix boost only when whiffPct unavailable
-  const boost = (whiffPct != null && Number.isFinite(whiffPct))
-    ? 0 : _ssPitchMixKBoost(pitcher?.pitchMix);
+  // ── Step D: Pitch-mix boost (only when SwStr%/Whiff% unavailable) ─────────
+  const hasMissMetric = (swStrPct != null && Number.isFinite(swStrPct)) || (whiffPct != null && Number.isFinite(whiffPct));
+  const boost = hasMissMetric ? 0 : _ssPitchMixKBoost(pitcher?.pitchMix);
   const adjustedKRate = kRate + boost;
 
-  // Expected IP
-  const ipVals = recentStarts.map(x => x.ip).filter(Number.isFinite).slice(0, 6);
-  let expIP;
-  if (ipVals.length >= 2) {
-    expIP = ipVals.reduce((a, b) => a + b, 0) / ipVals.length;
-  } else {
-    expIP = Number.isFinite(rf?.ip) && rf?.games > 0 ? rf.ip / rf.games : 5.3;
-  }
-  expIP = Math.max(3.5, Math.min(7.5, expIP));
-  const expBF = expIP * _SS_BF_PER_IP;
-
-  // Opponent adjustment
+  // ── Opponent K adjustment ─────────────────────────────────────────────────
+  // Computed before expBF — needed for Vegas proxy below.
   const oppKs = (targets || []).map(b => {
     const ss = b.season;
     if (!ss || !(ss.ab > 0)) return null;
     const pa = (ss.ab || 0) + (ss.bb || 0);
     return pa > 0 ? (ss.k || 0) / pa : null;
   }).filter(v => v != null);
-  const oppK = oppKs.length ? oppKs.reduce((a, b) => a + b, 0) / oppKs.length : _SS_LEAGUE_K_PCT;
+  const oppK   = oppKs.length ? oppKs.reduce((a, b) => a + b, 0) / oppKs.length : _SS_LEAGUE_K_PCT;
   const oppAdj = Math.max(0.82, Math.min(1.22, oppK / _SS_LEAGUE_K_PCT));
 
-  const tempAdj    = _ssTempAdj(weather);
-  const umpireAdj  = _ssUmpireKAdj(umpire);
-  const pAdj       = Number.isFinite(parkFactorK) && parkFactorK > 0 ? parkFactorK : 1.0;
-  const lambda = expBF * adjustedKRate * oppAdj * tempAdj * umpireAdj * pAdj;
+  // ── Expected BF (pitch-volume model with Vegas proxy) ─────────────────────
+  // When per-start pitch counts are available (numberOfPitches in game logs),
+  // use Projected Pitches ÷ P/BF for a more accurate volume estimate than
+  // raw IP. Vegas proxy: elite-contact lineup (oppK < 0.185, analogous to
+  // implied runs > 4.5) faces more hard contact → pitcher pulled earlier → −5%.
+  const vegasTrim  = oppK < 0.185 ? 0.95 : 1.0;
+  const pitchVals  = recentStarts.slice(0, 6).map(x => x.pitches).filter(v => Number.isFinite(v) && v > 50);
+  const bfVals     = recentStarts.slice(0, 6).map(x => x.bf ?? (Number.isFinite(x.ip) ? x.ip * _SS_BF_PER_IP : null)).filter(Number.isFinite);
+  let expBF;
+  if (pitchVals.length >= 2 && bfVals.length >= 2) {
+    const avgPitches = pitchVals.reduce((a, b) => a + b, 0) / pitchVals.length;
+    const avgBF      = bfVals.reduce((a, b) => a + b, 0) / bfVals.length;
+    const pPerBF     = Math.max(3.5, Math.min(4.5, avgPitches / avgBF));
+    expBF = Math.max(3.5 * _SS_BF_PER_IP, Math.min(7.5 * _SS_BF_PER_IP, (avgPitches * vegasTrim) / pPerBF));
+  } else {
+    const ipVals = recentStarts.map(x => x.ip).filter(Number.isFinite).slice(0, 6);
+    const expIP  = ipVals.length >= 2
+      ? ipVals.reduce((a, b) => a + b, 0) / ipVals.length
+      : (Number.isFinite(rf?.ip) && rf?.games > 0 ? rf.ip / rf.games : 5.3);
+    expBF = Math.max(3.5 * _SS_BF_PER_IP, Math.min(7.5 * _SS_BF_PER_IP, expIP * _SS_BF_PER_IP * vegasTrim));
+  }
+
+  // ── TTTO penalty (Third Time Through the Order) ────────────────────────────
+  // K rates decay ~12% for batters facing a starter the 3rd time through the
+  // lineup (BF 19+). Applied proportionally across the projected outing.
+  const tttoBF      = Math.max(0, expBF - 18);
+  const tttoPenalty = expBF > 0 ? (1 - tttoBF * 0.12 / expBF) : 1.0;
+
+  // ── Environmental multipliers ──────────────────────────────────────────────
+  const tempAdj   = _ssTempAdj(weather);
+  const umpireAdj = _ssUmpireKAdj(umpire);
+  const pAdj      = Number.isFinite(parkFactorK) && parkFactorK > 0 ? parkFactorK : 1.0;
+
+  const lambda = expBF * adjustedKRate * oppAdj * tempAdj * umpireAdj * pAdj * tttoPenalty;
   const probs = {};
   for (const line of _SS_K_LINES) probs[line] = _ssKOverProb(lambda, line);
   const lo = Math.max(0, _ssFindQuantile(lambda, 0.10));
   const hi = _ssFindQuantile(lambda, 0.90);
 
-  return { k: lambda, lo, hi, lambda, probs, tempAdj, umpireAdj, parkKAdj: pAdj, tempF: weather?.tempF ?? null };
+  return { k: lambda, lo, hi, lambda, probs, tempAdj, umpireAdj, parkKAdj: pAdj, tempF: weather?.tempF ?? null, tttoPenalty };
 }
 
 // Intraday board history — append a compact snapshot of TODAY's canonical combos
@@ -1180,6 +1234,7 @@ async function fetchPitcherRecentForm(pitcherId) {
         bb:     Number.isFinite(parseInt(stat.baseOnBalls, 10))  ? parseInt(stat.baseOnBalls, 10)  : null,
         k:      Number.isFinite(parseInt(stat.strikeOuts, 10))   ? parseInt(stat.strikeOuts, 10)   : null,
         hr:     Number.isFinite(parseInt(stat.homeRuns, 10))     ? parseInt(stat.homeRuns, 10)     : null,
+        pitches: Number.isFinite(parseInt(stat.numberOfPitches, 10)) ? parseInt(stat.numberOfPitches, 10) : null,
         era:    (Number.isFinite(gameIp) && gameIp > 0 && Number.isFinite(gameEr))
                   ? (gameEr * 9) / gameIp
                   : null,
@@ -1500,6 +1555,7 @@ async function fetchSavantPitcherStats(year = SEASON) {
           barrelPctAllowed:  pf(p.brl_pa),
           exitVeloAgainst:   pf(p.avg_hit_speed),
           whiffPct:          pf(p.whiff_percent),
+          swStrPct:          pf(p.swstr_pct) ?? pf(p.swing_miss_pct) ?? null,
           zonePct:           pf(p.zone_percent),
           heartPct:          pf(p.meatball_percent) ?? pf(p.heart_percent),
           outZonePct:        pf(p.out_zone_percent),
@@ -1535,6 +1591,7 @@ async function fetchSavantPitcherStats(year = SEASON) {
                          : null,
         exitVeloAgainst:   pf(p.avg_hit_speed),
         whiffPct:          pf(p.whiff_percent) ?? null,
+        swStrPct:          pf(p.swstr_pct) ?? pf(p.swing_miss_pct) ?? null,
         zonePct:           pf(p.zone_percent)  ?? null,
         heartPct:          pf(p.meatball_percent) ?? pf(p.heart_percent) ?? null,
         outZonePct:        pf(p.out_zone_percent) ?? null,
