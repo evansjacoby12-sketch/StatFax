@@ -140,6 +140,7 @@ function KBrainView({ pitchers, liveKsByPitcher = {} }) {
   const [minK, setMinK] = useState(0)
   const [confFilter, setConfFilter] = useState('all')
   const [sortBy, setSortBy] = useState('k')
+  const [h2hOpen, setH2hOpen] = useState({})
   const [kLog, setKLog] = useState(null)
 
   useEffect(() => {
@@ -326,6 +327,13 @@ function KBrainView({ pitchers, liveKsByPitcher = {} }) {
                 </span>
               )}
             </div>
+
+            {/* H2H K matchup */}
+            <KBrainH2H
+              targets={e.targets}
+              open={!!h2hOpen[e.key]}
+              onToggle={() => setH2hOpen((prev) => ({ ...prev, [e.key]: !prev[e.key] }))}
+            />
           </div>
         )
       })}
@@ -380,6 +388,99 @@ function KBrainView({ pitchers, liveKsByPitcher = {} }) {
           </div>
         )
       })()}
+    </div>
+  )
+}
+
+// ─── H2H K matchup table for K Brain ─────────────────────────────────────────
+// Shows each opposing batter's career K rate vs this specific pitcher,
+// relative to their season average. Requires h2h.ab >= 5 for a meaningful
+// sample. Sorted by H2H K% so the most K-prone matchups surface first.
+function KBrainH2H({ targets, open, onToggle }) {
+  const rows = useMemo(() => {
+    const seen = new Set()
+    return (targets || [])
+      .filter((b) => {
+        if (!b.playerId || seen.has(b.playerId)) return false
+        seen.add(b.playerId)
+        return b.h2h && b.h2h.ab >= 5 && Number.isFinite(b.h2h.k)
+      })
+      .map((b) => {
+        const h2hKPct  = b.h2h.k / b.h2h.ab
+        const ss       = b.season
+        const pa       = (ss?.ab || 0) + (ss?.bb || 0)
+        const seasonKPct = pa > 0 ? (ss?.k || 0) / pa : null
+        const delta    = seasonKPct != null ? h2hKPct - seasonKPct : null
+        return { b, h2hKPct, seasonKPct, delta }
+      })
+      .sort((a, b) => b.h2hKPct - a.h2hKPct)
+  }, [targets])
+
+  if (!rows.length) return null
+
+  const highK  = rows.filter((r) => r.h2hKPct >= 0.30).length
+  const lowK   = rows.filter((r) => r.h2hKPct <= 0.12).length
+
+  return (
+    <div style={{ marginTop: '10px', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '10px' }}>
+      <button
+        onClick={onToggle}
+        style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', padding: '0', cursor: 'pointer', width: '100%', textAlign: 'left' }}
+      >
+        <Icon name="BookOpen" size={11} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+        <span style={{ fontSize: '11px', fontWeight: '700', color: open ? '#fff' : 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          H2H K rates
+        </span>
+        <span style={{ fontSize: '10px', color: 'var(--text-faint)', fontWeight: '400' }}>
+          · {rows.length} batters
+          {highK > 0 && <span style={{ color: 'var(--bad)', marginLeft: '4px' }}>{highK} K-prone</span>}
+          {lowK  > 0 && <span style={{ color: 'var(--strong)', marginLeft: '4px' }}>{lowK} K-resistant</span>}
+        </span>
+        <Icon name={open ? 'ChevronUp' : 'ChevronDown'} size={11} style={{ marginLeft: 'auto', color: 'var(--text-faint)' }} />
+      </button>
+
+      {open && (
+        <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '3px' }}>
+          {/* Column headers */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 40px 40px 44px 52px', gap: '4px', fontSize: '9px', color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.04em', padding: '0 4px', marginBottom: '2px' }}>
+            <span>Batter</span>
+            <span style={{ textAlign: 'right' }}>AB</span>
+            <span style={{ textAlign: 'right' }}>K</span>
+            <span style={{ textAlign: 'right' }}>H2H K%</span>
+            <span style={{ textAlign: 'right' }}>vs szn</span>
+          </div>
+          {rows.map(({ b, h2hKPct, delta }) => {
+            const kColor = h2hKPct >= 0.30 ? 'var(--bad)'
+                         : h2hKPct <= 0.12 ? 'var(--strong)'
+                         : '#fff'
+            const deltaStr = delta != null
+              ? (delta > 0 ? `+${(delta * 100).toFixed(0)}%` : `${(delta * 100).toFixed(0)}%`)
+              : '—'
+            const deltaColor = delta == null ? 'var(--text-faint)'
+                             : delta > 0.05 ? 'var(--bad)'
+                             : delta < -0.05 ? 'var(--strong)'
+                             : 'var(--text-faint)'
+            return (
+              <div
+                key={b.playerId}
+                style={{ display: 'grid', gridTemplateColumns: '1fr 40px 40px 44px 52px', gap: '4px', fontSize: '11px', padding: '4px', borderRadius: '6px', background: 'rgba(255,255,255,0.03)', alignItems: 'center' }}
+              >
+                <span style={{ fontWeight: '600', color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {b.name}
+                  {b.battingOrder ? <span style={{ fontSize: '9px', color: 'var(--text-faint)', marginLeft: '4px' }}>#{b.battingOrder}</span> : null}
+                </span>
+                <span className="mono" style={{ textAlign: 'right', color: 'var(--text-faint)' }}>{b.h2h.ab}</span>
+                <span className="mono" style={{ textAlign: 'right', color: 'var(--text-faint)' }}>{b.h2h.k}</span>
+                <span className="mono" style={{ textAlign: 'right', fontWeight: '700', color: kColor }}>{(h2hKPct * 100).toFixed(0)}%</span>
+                <span className="mono" style={{ textAlign: 'right', fontSize: '10px', color: deltaColor }}>{deltaStr}</span>
+              </div>
+            )
+          })}
+          <div style={{ fontSize: '9px', color: 'var(--text-faint)', marginTop: '4px', paddingLeft: '4px' }}>
+            H2H K% vs season PA K rate · min 5 AB · sorted high→low
+          </div>
+        </div>
+      )}
     </div>
   )
 }
