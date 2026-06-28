@@ -11,6 +11,46 @@ import * as store from '../lib/storage.js'
 
 const GRADE_COLOR = { S: '#f5a623', A: '#10b981', B: '#3b82f6', C: '#94a3b8', D: '#64748b' }
 const SIZES = [2, 3, 4]
+const QB_SIZES = [2, 3, 4, 5, 6, 7]
+
+// ── Quick Build strategies ────────────────────────────────────────────────────
+const QB_STRATEGIES = {
+  balanced: {
+    label: 'Balanced', icon: 'Scale3d',
+    desc: 'Score + barrel + form',
+    rank: b => 0.5 * ((b.score ?? 0) / 100) + 0.25 * Math.min((b.barrelPctBBE ?? b.barrelPct ?? 0) / 25, 1) + 0.25 * ((b.heatIndex ?? 0) / 100),
+    require: null,
+  },
+  sleepers: {
+    label: 'Sleepers', icon: 'Flame',
+    desc: 'Hot form, under the radar',
+    rank: b => b.heatIndex ?? 0,
+    require: b => b.hot === true || (b.heatIndex ?? 0) >= 58,
+  },
+  longshots: {
+    label: 'Longshots', icon: 'Rocket',
+    desc: 'Big matchups, bigger odds',
+    rank: b => (b.score ?? 0) * (b.pitcher?.season?.hrPer9 ?? 0),
+    require: b => Number.isFinite(b.pitcher?.season?.hrPer9) && b.pitcher.season.hrPer9 >= 1.3,
+  },
+}
+
+function isDayGame(game) {
+  if (!game?.gameDate) return false
+  return new Date(game.gameDate).getUTCHours() < 21  // before 5 pm ET (EDT = UTC-4)
+}
+
+function filterSameWindow(pool) {
+  if (pool.length < 2) return pool
+  const WINDOW_MS = 2.5 * 60 * 60 * 1000
+  const timed = pool.map(b => ({ b, t: b.game?.gameDate ? new Date(b.game.gameDate).getTime() : Infinity }))
+  const best = timed.reduce((best, { t }) => {
+    if (!isFinite(t)) return best
+    const w = timed.filter(({ t: t2 }) => t2 >= t && t2 <= t + WINDOW_MS).map(({ b }) => b)
+    return w.length > best.length ? w : best
+  }, [])
+  return best.length >= 2 ? best : pool
+}
 
 // Compact American odds, "—" when unpriced.
 const od = (a) => (Number.isFinite(a) ? american(a) : '—')
@@ -140,6 +180,38 @@ export default function ParlayBuilder({ batters, legs, slipSet, onToggle, onRemo
   const [autoSize, setAutoSize] = useState(3)
   const [saved, setSaved] = useState(() => store.load('savedSlips', []))
   const [toast, setToast] = useState(null)
+
+  // Quick Build state
+  const [qbStrat, setQbStrat] = useState('balanced')
+  const [qbLegs, setQbLegs] = useState(3)
+  const [qbConfirmed, setQbConfirmed] = useState(false)
+  const [qbNoDayGame, setQbNoDayGame] = useState(false)
+  const [qbSameWindow, setQbSameWindow] = useState(false)
+  const [qbBuilt, setQbBuilt] = useState(null) // array of picked batters
+
+  const runQuickBuild = () => {
+    const strat = QB_STRATEGIES[qbStrat]
+    let pool = (batters || []).filter(b => {
+      if (b.game?.isFinal || b.game?.isLive) return false
+      if ((b.grade?.label || 'SKIP') === 'SKIP') return false
+      if (!Number.isFinite(b.hrProbability)) return false
+      if (qbConfirmed && !b.lineupConfirmed) return false
+      if (qbNoDayGame && isDayGame(b.game)) return false
+      if (strat.require && !strat.require(b)) return false
+      return true
+    })
+    if (qbSameWindow) pool = filterSameWindow(pool)
+    pool = [...pool].sort((a, b) => strat.rank(b) - strat.rank(a))
+    const usedGames = new Set()
+    const picked = []
+    for (const b of pool) {
+      if (picked.length >= qbLegs) break
+      if (usedGames.has(b.gamePk)) continue
+      usedGames.add(b.gamePk)
+      picked.push(b)
+    }
+    setQbBuilt(picked.length >= 2 ? picked : [])
+  }
 
   const p = useMemo(() => buildParlay(legs, { correlate }), [legs, correlate])
   const perLegById = useMemo(() => new Map(p.perLeg.map((l) => [l.id, l])), [p])
@@ -299,6 +371,117 @@ export default function ParlayBuilder({ batters, legs, slipSet, onToggle, onRemo
 
         {tab === 'build' && (
           <>
+            {/* ── Quick Build ─────────────────────────────────────────── */}
+            <div style={{ background: 'rgba(0,216,246,0.04)', border: '1px solid rgba(0,216,246,0.12)', borderRadius: '14px', padding: '14px', marginBottom: '16px' }}>
+              {/* Strategy */}
+              <div style={{ fontSize: '9px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-faint)', marginBottom: '7px' }}>Strategy</div>
+              <div style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
+                {Object.entries(QB_STRATEGIES).map(([key, s]) => {
+                  const active = qbStrat === key
+                  return (
+                    <button key={key} onClick={() => { setQbStrat(key); setQbBuilt(null) }}
+                      title={s.desc}
+                      style={{ flex: 1, fontSize: '11px', fontWeight: '800', padding: '7px 4px', borderRadius: '9px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', color: active ? '#fff' : 'var(--text-dim)', background: active ? 'rgba(0,216,246,0.14)' : 'rgba(255,255,255,0.03)', border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}` }}>
+                      <Icon name={s.icon} size={14} style={{ color: active ? 'var(--accent)' : 'var(--text-faint)' }} />
+                      {s.label}
+                    </button>
+                  )
+                })}
+              </div>
+
+              {/* Legs */}
+              <div style={{ fontSize: '9px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-faint)', marginBottom: '7px' }}>Legs</div>
+              <div style={{ display: 'flex', gap: '5px', marginBottom: '12px' }}>
+                {QB_SIZES.map(s => {
+                  const active = qbLegs === s
+                  return (
+                    <button key={s} onClick={() => { setQbLegs(s); setQbBuilt(null) }}
+                      style={{ flex: 1, fontSize: '12px', fontWeight: '800', padding: '6px 0', borderRadius: '8px', color: active ? '#fff' : 'var(--text-dim)', background: active ? 'rgba(0,216,246,0.14)' : 'rgba(255,255,255,0.03)', border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}` }}>
+                      {s}
+                    </button>
+                  )
+                })}
+              </div>
+
+              {/* Filters */}
+              <div style={{ fontSize: '9px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-faint)', marginBottom: '7px' }}>Filters</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '14px' }}>
+                {[
+                  ['qbConfirmed',  qbConfirmed,  () => { setQbConfirmed(v => !v); setQbBuilt(null) }, 'Confirmed only'],
+                  ['qbNoDayGame',  qbNoDayGame,  () => { setQbNoDayGame(v => !v); setQbBuilt(null) }, 'Avoid day games'],
+                  ['qbSameWindow', qbSameWindow, () => { setQbSameWindow(v => !v); setQbBuilt(null) }, 'Same window'],
+                ].map(([key, val, toggle, label]) => (
+                  <button key={key} onClick={toggle}
+                    style={{ fontSize: '11px', fontWeight: '700', padding: '5px 10px', borderRadius: '7px', display: 'inline-flex', alignItems: 'center', gap: '5px', color: val ? 'var(--accent)' : 'var(--text-dim)', background: val ? 'rgba(0,216,246,0.1)' : 'rgba(255,255,255,0.03)', border: `1px solid ${val ? 'var(--accent)' : 'var(--border)'}` }}>
+                    <Icon name={val ? 'CheckSquare' : 'Square'} size={12} />{label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Build button */}
+              <button onClick={runQuickBuild}
+                style={{ width: '100%', padding: '11px', borderRadius: '10px', fontSize: '13px', fontWeight: '800', color: '#001a22', background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px' }}>
+                <Icon name="Zap" size={15} />
+                Build {qbLegs}-leg {QB_STRATEGIES[qbStrat].label} Parlay
+              </button>
+            </div>
+
+            {/* Quick build result */}
+            {qbBuilt !== null && (
+              <div style={{ marginBottom: '16px' }}>
+                {qbBuilt.length >= 2 ? (() => {
+                  const qbP = buildParlay(qbBuilt, { correlate: false })
+                  const qbColor = qbP.grade ? GRADE_COLOR[qbP.grade.letter] : 'var(--text-faint)'
+                  return (
+                    <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', overflow: 'hidden' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                        <Icon name="Zap" size={13} style={{ color: 'var(--accent)' }} />
+                        <span style={{ fontSize: '12px', fontWeight: '800', color: '#fff', flex: 1 }}>{qbBuilt.length}-leg · {QB_STRATEGIES[qbStrat].label}</span>
+                        {qbP.grade && <span style={{ color: qbColor, border: `1px solid ${hexA(qbColor, 0.4)}`, borderRadius: '5px', padding: '0 6px', fontSize: '10px', fontWeight: '800' }}>{qbP.grade.letter}</span>}
+                        <span className="mono" style={{ fontSize: '11px', color: 'var(--accent)' }}>{pct(qbP.modelAllHit, qbP.modelAllHit < 0.01 ? 2 : 1)}</span>
+                        {qbP.american != null && <span className="mono" style={{ fontSize: '11px', color: '#fff', fontWeight: '700' }}>{od(qbP.american)}</span>}
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
+                        {qbBuilt.map((b, i) => (
+                          <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', borderBottom: i < qbBuilt.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
+                            <span style={{ background: hexA(gradeColor(b.grade?.label), 0.7), width: '5px', height: '5px', borderRadius: '50%', flex: 'none' }} />
+                            <span style={{ flex: 1, minWidth: 0 }}>
+                              <span style={{ fontSize: '12px', fontWeight: '600', color: '#fff', display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.name}</span>
+                              <span style={{ fontSize: '10px', color: 'var(--text-faint)' }}>{b.team}{b.opponent?.abbr ? ` vs ${b.opponent.abbr}` : ''}</span>
+                            </span>
+                            <GradeChip grade={b.grade} size="sm" score={b.score} />
+                            <span className="mono" style={{ fontSize: '11px', color: 'var(--text-dim)', width: '40px', textAlign: 'right' }}>{pct(b.hrProbability, 1)}</span>
+                            <span className="mono" style={{ fontSize: '11px', color: '#fff', width: '44px', textAlign: 'right' }}>{od(b.odds?.best?.american)}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px', padding: '10px 12px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                        <button onClick={() => { onReplace(qbBuilt.map(b => b.id)); setTab('legs') }}
+                          style={{ flex: 1, padding: '8px', borderRadius: '8px', fontSize: '12px', fontWeight: '800', color: '#001a22', background: 'var(--accent)' }}>
+                          Load into Slip
+                        </button>
+                        <button onClick={runQuickBuild}
+                          title="Re-run with the same settings"
+                          style={{ padding: '8px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: '700', color: 'var(--accent)', border: '1px solid var(--accent)', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                          <Icon name="RefreshCw" size={13} />
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })() : (
+                  <div className="dim" style={{ fontSize: '12px', padding: '14px', textAlign: 'center', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '10px' }}>
+                    Not enough eligible bats for a {qbLegs}-leg {QB_STRATEGIES[qbStrat].label} parlay with these filters.
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── Existing combo suggestions (divider) ─────────────────── */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+              <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.06)' }} />
+              <span style={{ fontSize: '10px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-faint)' }}>More options</span>
+              <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.06)' }} />
+            </div>
             <div className="pb-build-sizes" style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
               {SIZES.map((s) => (
                 <button key={s} onClick={() => setAutoSize(s)} style={{ flex: 1, fontSize: '12px', fontWeight: '700', padding: '7px', borderRadius: '8px', color: autoSize === s ? '#fff' : 'var(--text-dim)', background: autoSize === s ? 'var(--hover)' : 'transparent', border: `1px solid ${autoSize === s ? 'var(--accent)' : 'var(--border)'}` }}>{s}-leg</button>
