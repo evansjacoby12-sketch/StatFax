@@ -7,7 +7,7 @@ import { pct, rate, num, signedPct, american, decimalToAmerican, ordinal } from 
 import { bookLabel } from '../lib/data.js'
 import { compass, skyLabel } from '../lib/weather.js'
 import { interpretWind } from '../lib/wind.js'
-import { playerHeadshot } from '../lib/teams.js'
+import { playerHeadshot, teamAbbr } from '../lib/teams.js'
 import { toolGrades, heatBreakdown, scoutVerdict, gradeLabel, hrSetup } from '../lib/scout.js'
 import { blastOf, blastVsHandOf } from '../lib/groups.js'
 import { estimatedKs } from '../lib/pitchers.js'
@@ -70,13 +70,17 @@ function useGameLog(playerId, enabled) {
     if (!playerId || !enabled) return
     setLoading(true)
     const yr = new Date().getFullYear()
-    fetch(`https://statsapi.mlb.com/api/v1/people/${playerId}/stats?stats=gameLog&group=hitting&season=${yr}&sportId=1&limit=15`)
+    // No `limit` here: the API returns the season log date-ascending, so a
+    // server-side limit would give the FIRST N games. Take the last 15
+    // client-side and show them newest-first.
+    fetch(`https://statsapi.mlb.com/api/v1/people/${playerId}/stats?stats=gameLog&group=hitting&season=${yr}&sportId=1`)
       .then(r => r.json())
       .then(data => {
         const splits = data?.stats?.[0]?.splits || []
-        setLog(splits.map(s => ({
+        const recent = splits.slice(-15).reverse()
+        setLog(recent.map(s => ({
           date: s.date,
-          opp: s.opponent?.abbreviation || '?',
+          opp: s.opponent?.abbreviation || teamAbbr(s.opponent?.id) || s.opponent?.name || '?',
           isHome: s.isHome,
           ab: s.stat?.atBats ?? 0,
           h: s.stat?.hits ?? 0,
@@ -153,25 +157,13 @@ const TABS = [
 
 function TabBar({ active, onChange }) {
   return (
-    <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.06)', overflowX: 'auto', scrollbarWidth: 'none', flexShrink: 0, padding: '0 16px' }}>
+    <div className="drawer-tabs">
       {TABS.map(t => (
-        <button key={t.id} onClick={() => onChange(t.id)} style={{
-          padding: '10px 14px',
-          fontSize: '11px',
-          fontWeight: '700',
-          textTransform: 'uppercase',
-          letterSpacing: '0.06em',
-          color: active === t.id ? '#fff' : 'var(--text-faint)',
-          background: 'none',
-          borderTop: 'none',
-          borderLeft: 'none',
-          borderRight: 'none',
-          borderBottom: active === t.id ? '2px solid var(--accent)' : '2px solid transparent',
-          whiteSpace: 'nowrap',
-          cursor: 'pointer',
-          marginBottom: '-1px',
-          transition: 'color 0.15s',
-        }}>{t.label}</button>
+        <button
+          key={t.id}
+          className={`drawer-tab ${active === t.id ? 'active' : ''}`}
+          onClick={() => onChange(t.id)}
+        >{t.label}</button>
       ))}
     </div>
   )
@@ -521,7 +513,7 @@ function DrawerHeader({ b, color, onClose, watched, inSlip, onToggleWatch, onTog
           style={{ borderColor: hexA(color, 0.4), borderWidth: '2px', borderStyle: 'solid', borderRadius: '12px', width: '72px', height: '72px', background: 'var(--card-2)', objectFit: 'cover', flexShrink: 0 }}
         />
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '4px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '4px', paddingRight: '40px' }}>
             <h2 className={liveMode && b.liveContext?.isHRThisGame ? 'hr-glow' : ''} style={{ fontFamily: 'var(--display)', fontSize: '21px', fontWeight: '800', color: '#fff', letterSpacing: '-0.02em' }}>{b.name}</h2>
             <span style={{ fontSize: '10px', fontFamily: 'var(--mono)', background: 'rgba(255,255,255,0.05)', padding: '1px 6px', borderRadius: '4px', color: 'var(--text-dim)', border: '1px solid rgba(255,255,255,0.08)' }}>{b.batSide}HB</span>
             <GradeChip grade={b.grade} size="lg" />

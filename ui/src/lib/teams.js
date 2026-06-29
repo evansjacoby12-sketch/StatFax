@@ -38,6 +38,20 @@ export function teamColor(teamId) {
   return TEAM_COLORS[teamId] || '#5b6b80'
 }
 
+// MLB Stats API team id → standard abbreviation. The gameLog/feed endpoints
+// return opponent as { id, name, link } with no abbreviation, so map it here.
+export const TEAM_ABBR = {
+  108: 'LAA', 109: 'ARI', 110: 'BAL', 111: 'BOS', 112: 'CHC', 113: 'CIN',
+  114: 'CLE', 115: 'COL', 116: 'DET', 117: 'HOU', 118: 'KC',  119: 'LAD',
+  120: 'WSH', 121: 'NYM', 133: 'ATH', 134: 'PIT', 135: 'SD',  136: 'SEA',
+  137: 'SF',  138: 'STL', 139: 'TB',  140: 'TEX', 141: 'TOR', 142: 'MIN',
+  143: 'PHI', 144: 'ATL', 145: 'CWS', 146: 'MIA', 147: 'NYY', 158: 'MIL',
+}
+
+export function teamAbbr(teamId) {
+  return TEAM_ABBR[teamId] || null
+}
+
 // Crisp scalable team logo (transparent SVG). Falls back gracefully if missing.
 export function teamLogo(teamId) {
   return teamId ? `https://www.mlbstatic.com/team-logos/${teamId}.svg` : null

@@ -1210,6 +1210,63 @@ button.th:focus-visible {
   top: 14px;
   right: 14px;
 }
+/* Tab bar: on desktop the 7 tabs flex to share the drawer width exactly so
+   none get cut off behind a scroll (min-width:0 + ellipsis is a safety net so
+   a tab can never overflow the row). On mobile we let them keep their natural
+   width and scroll horizontally instead of squeezing/clipping the labels. */
+.drawer-tabs {
+  display: flex;
+  flex-shrink: 0;
+  padding: 0 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.drawer-tab {
+  flex: 1 1 0;
+  min-width: 0;
+  /* Tight horizontal padding + no tracking so the two widest 8-char labels
+     (OVERVIEW, STATCAST) fit their ~66px flex cell at the 480px desktop width
+     without tripping the ellipsis. */
+  padding: 10px 2px;
+  margin-bottom: -1px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+  color: var(--text-faint);
+  cursor: pointer;
+  transition: color 0.15s;
+}
+.drawer-tab:hover {
+  color: var(--text-dim);
+}
+.drawer-tab.active {
+  color: #fff;
+  border-bottom-color: var(--accent);
+}
+/* Match the drawer's own bottom-sheet breakpoint (max-width:560px). Only once
+   the drawer is a full-width sheet do the tabs revert to natural width +
+   horizontal scroll; above this the 480px desktop panel keeps equal-share tabs. */
+@media (max-width: 560px) {
+  .drawer-tabs {
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .drawer-tabs::-webkit-scrollbar {
+    display: none;
+  }
+  .drawer-tab {
+    flex: 0 0 auto;
+    padding: 10px 13px;
+    letter-spacing: 0.05em;
+  }
+}
 .drawer-name-row {
   display: flex;
   align-items: center;
