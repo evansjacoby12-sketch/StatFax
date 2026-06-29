@@ -1238,12 +1238,64 @@ function StatcastSection({ b }) {
 
 function RollingWindows({ b }) {
   const rb = b.recentBarrelForBatter
-  if (!rb && !b.exitVelo && !b.hardHitPct) return null
+  const [enabled, setEnabled] = useState(false)
+  useEffect(() => { setEnabled(true) }, [])
+  const { bips } = useSavantBIP(b.playerId, enabled)
+
+  const windows = useMemo(() => {
+    if (!bips?.length) return null
+    const today = new Date()
+    const cutoff = (days) => {
+      const d = new Date(today)
+      d.setDate(d.getDate() - days)
+      return d.toISOString().slice(0, 10)
+    }
+    const summarize = (evts) => {
+      if (!evts.length) return null
+      const withEV = evts.filter(e => e.ev != null && e.ev > 0)
+      const avgEV = withEV.length ? withEV.reduce((s, e) => s + e.ev, 0) / withEV.length : null
+      const hh = withEV.length ? withEV.filter(e => e.ev >= 95).length / withEV.length * 100 : null
+      return { n: evts.length, avgEV, hh }
+    }
+    const c7 = cutoff(7), c14 = cutoff(14), c30 = cutoff(30)
+    return {
+      l7:  summarize(bips.filter(e => e.date >= c7)),
+      l14: summarize(bips.filter(e => e.date >= c14)),
+      l30: summarize(bips.filter(e => e.date >= c30)),
+    }
+  }, [bips])
+
   const rows = [
-    { label: 'Last 7d',  n: rb?.sevenDay?.bbe,     barrel: rb?.sevenDay?.pct,  ev: rb?.recentEV },
-    { label: 'Last 14d', n: rb?.fourteenDay?.bbe,   barrel: rb?.fourteenDay?.pct, ev: null },
-    { label: 'Season',   n: null,                    barrel: b.barrelPctBBE ?? b.barrelPct, ev: b.exitVelo, hh: b.hardHitPct },
-  ].filter(r => r.barrel != null || r.ev != null)
+    {
+      label: 'Last 7d',
+      n: windows?.l7?.n ?? rb?.sevenDay?.bbe,
+      barrel: rb?.sevenDay?.pct,
+      ev: windows?.l7?.avgEV ?? rb?.recentEV,
+      hh: windows?.l7?.hh,
+    },
+    {
+      label: 'Last 14d',
+      n: windows?.l14?.n ?? rb?.fourteenDay?.bbe,
+      barrel: rb?.fourteenDay?.pct,
+      ev: windows?.l14?.avgEV,
+      hh: windows?.l14?.hh,
+    },
+    {
+      label: 'Last 30d',
+      n: windows?.l30?.n,
+      barrel: null,
+      ev: windows?.l30?.avgEV,
+      hh: windows?.l30?.hh,
+    },
+    {
+      label: 'Season',
+      n: null,
+      barrel: b.barrelPctBBE ?? b.barrelPct,
+      ev: b.exitVelo,
+      hh: b.hardHitPct,
+    },
+  ].filter(r => r.barrel != null || r.ev != null || r.n != null || r.hh != null)
+
   if (!rows.length) return null
   return (
     <Section title="Rolling Windows" icon="TrendingUp">
@@ -1258,7 +1310,7 @@ function RollingWindows({ b }) {
             {rows.map((r, i) => (
               <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.02)', fontWeight: i === rows.length - 1 ? '400' : '600' }}>
                 <td style={{ padding: '7px 8px', color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>{r.label}</td>
-                <td style={{ padding: '7px 8px', textAlign: 'center', fontFamily: 'var(--mono)', color: 'var(--text-faint)' }}>{r.n ?? '—'}</td>
+                <td style={{ padding: '7px 8px', textAlign: 'center', fontFamily: 'var(--mono)', color: 'var(--text-faint)' }}>{r.n != null ? r.n : '—'}</td>
                 <td style={{ padding: '7px 8px', textAlign: 'center', fontFamily: 'var(--mono)', color: r.barrel != null && r.barrel >= 10 ? 'var(--strong)' : '#fff' }}>{r.barrel != null ? `${num(r.barrel, 1)}%` : '—'}</td>
                 <td style={{ padding: '7px 8px', textAlign: 'center', fontFamily: 'var(--mono)', color: r.ev != null && r.ev >= 92 ? 'var(--strong)' : '#fff' }}>{r.ev != null ? `${num(r.ev, 1)}` : '—'}</td>
                 <td style={{ padding: '7px 8px', textAlign: 'center', fontFamily: 'var(--mono)', color: r.hh != null && r.hh >= 40 ? 'var(--strong)' : r.hh != null ? '#fff' : 'var(--text-faint)' }}>{r.hh != null ? `${num(r.hh, 0)}%` : '—'}</td>
