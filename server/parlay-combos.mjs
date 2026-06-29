@@ -26,7 +26,7 @@
  * engine's canonical row) plus the grading/scorecard that's server-only.
  */
 
-import { heatIndex } from '../ui/src/lib/scout.js';
+import { heatIndex, pitchMixScore } from '../ui/src/lib/scout.js';
 import {
   buildCombos,
   barrelOf,
@@ -34,6 +34,10 @@ import {
   blastRate,
   allHitProb,
   SIZES,
+  pitchEdgeOf,
+  zoneEdgeOf,
+  hrPlatoonEdgeOf,
+  flyBallMatchupOf,
 } from '../ui/src/lib/combo-engine.js';
 
 /**
@@ -85,6 +89,12 @@ export function comboRowFromSnapshot(row) {
     awayEdge:      row.awayEdge === true,
     bullpenLegend: row.bullpenLegend === true,
     barrelKing:    Number.isFinite(barrel) && barrel >= 13,
+    // Matchup edge signals for the Edge Stack strategy.
+    pitchEdge:      pitchEdgeOf(row),
+    zoneEdge:       zoneEdgeOf(row),
+    pitchMixEdge:   (pitchMixScore(row) ?? 0) >= 7,
+    hrPlatoonEdge:  hrPlatoonEdgeOf(row),
+    flyBallMatchup: flyBallMatchupOf(row),
   };
 }
 

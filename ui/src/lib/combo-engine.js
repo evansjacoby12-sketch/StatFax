@@ -57,6 +57,28 @@ export function blastRate(raw) {
   return Number.isFinite(t.blastPerContact) ? t.blastPerContact : null
 }
 
+// ── Matchup edge derivations — shared by both adapters ──────────────────────
+// These pull raw per-batter fields into the booleans that both toComboRow
+// (client) and comboRowFromSnapshot (server) attach to the canonical row.
+// Keeping them here means a single code path defines the signal on both sides.
+export const pitchEdgeOf     = (raw) => raw?.primaryPitchEdge?.passes === true
+export const zoneEdgeOf      = (raw) => (raw?.zoneMatchup?.matchedZones?.length ?? 0) >= 2
+export const flyBallMatchupOf = (raw) =>
+  (raw?.pitcher?.season?.ip ?? 0) >= 30 && (raw?.pitcher?.season?.goAo ?? 99) <= 0.92
+export function hrPlatoonEdgeOf(raw) {
+  const sp = raw?.pitcher?.splits
+  if (!sp) return false
+  const phand = raw?.pitcher?.hand
+  const effSide = raw?.batSide === 'S' ? (phand === 'L' ? 'R' : 'L') : raw?.batSide
+  const onSide  = effSide === 'L' ? sp.vl : sp.vr
+  const offSide = effSide === 'L' ? sp.vr : sp.vl
+  if (!onSide || !offSide) return false
+  if ((onSide.ip ?? 0) < 12 || (offSide.ip ?? 0) < 12) return false
+  const on = onSide.hrPer9, off = offSide.hrPer9
+  if (!Number.isFinite(on) || on < 1.2) return false
+  return off > 0 ? on >= 1.3 * off : true
+}
+
 // ── Signal Stack ────────────────────────────────────────────────────────────
 // Proven HR signals weighted by the badge audit's within-grade lift (hot &
 // barrelKing carry the most; road edge the least). "due" is excluded — it's the
@@ -64,6 +86,13 @@ export function blastRate(raw) {
 export const STACK_SIGNALS = { hot: 3, barrelKing: 2, homeEdge: 2, bullpenLegend: 2, awayEdge: 1.5 }
 export const signalScore = (b) => Object.entries(STACK_SIGNALS).reduce((s, [k, w]) => s + (b[k] ? w : 0), 0)
 export const signalCount = (b) => Object.keys(STACK_SIGNALS).reduce((n, k) => n + (b[k] ? 1 : 0), 0)
+
+// ── Matchup Edge count ───────────────────────────────────────────────────────
+// Counts how many pitch/zone/platoon/park matchup signals fire for a leg. The
+// `edge` strategy gates on ≥2 and ranks primarily on count (more convergent
+// signals = stronger leg), with model score as a tiebreaker inside the comparator.
+export const EDGE_SIGNALS = ['pitchEdge', 'zoneEdge', 'pitchMixEdge', 'hrPlatoonEdge', 'flyBallMatchup']
+export const edgeCount = (b) => EDGE_SIGNALS.reduce((n, k) => n + (b[k] ? 1 : 0), 0)
 
 const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x))
 const norm01 = (v, hi) => clamp((v ?? 0) / hi, 0, 1)
@@ -103,6 +132,11 @@ export const STRATEGIES = [
   { key: 'power',   rank: powerRank,                                   require: (b) => Number.isFinite(b.barrel) && b.barrel >= 11 },
   { key: 'matchup', rank: (b) => (b.score ?? 0) * (b.pitcherHr9 ?? 0), require: (b) => Number.isFinite(b.pitcherHr9) && b.pitcherHr9 >= 1.3 },
   { key: 'park',    rank: (b) => (b.score ?? 0) * (b.air ?? 0),        require: (b) => Number.isFinite(b.air) && b.air >= 1.08 },
+  // Edge Stack — legs where ≥2 distinct matchup signals converge (pitch type,
+  // zone, arsenal, platoon, fly-ball environment). Count is the primary rank;
+  // model score breaks ties inside makeLegCmp. Orthogonal to `stack`, which
+  // surfaces form-based signals (hot/barrel/home/bullpen) from the badge audit.
+  { key: 'edge',    rank: edgeCount,                                   require: (b) => edgeCount(b) >= 2 },
 ]
 
 // Letter grade from a combo's average leg score (the shared S/A/B/C/D ladder).
