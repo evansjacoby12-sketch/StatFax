@@ -90,7 +90,7 @@ export default function App() {
   const [showDayRating, setShowDayRating] = useState(() => store.load('showDayRating', true))
   const [comboConf, setComboConf] = useState(() => store.load('comboConf', 'off')) // 'off' | 'stars' | 'percent'
   const [favorConsistency, setFavorConsistency] = useState(() => store.load('favorConsistency', false))
-  const [splitProjected, setSplitProjected] = useState(() => store.load('splitProjected', true))
+  const [splitProjected, setSplitProjected] = useState(() => store.load('splitProjected', false))
   const [watchlist, setWatchlist] = useState(() => new Set(store.load('watchlist', [])))
   const [slipIds, setSlipIds] = useState(() => store.load('slip', []))
   const [autoRefresh, setAutoRefresh] = useState(() => store.load('autoRefresh', false))

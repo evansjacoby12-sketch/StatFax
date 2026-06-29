@@ -27,7 +27,7 @@ export default function BatterTable({
   onToggleWatch,
   onToggleSlip,
   onOpenPitcher,
-  splitProjected = true,
+  splitProjected = false,
 }) {
   const [projOpen, setProjOpen] = useState(true)
   const HeadCol = ({ k, children, className, title }) => {
