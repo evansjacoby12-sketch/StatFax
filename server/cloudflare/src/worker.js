@@ -245,6 +245,8 @@ async function handleSavantBip(request, env) {
   if (!/^\d{1,9}$/.test(playerId)) return jsonResponse({ error: 'invalid playerId' }, 400, env);
   if (!/^\d{4}$/.test(season))    return jsonResponse({ error: 'invalid season' },   400, env);
 
+  // No group_by — individual event rows with hc_x/hc_y coordinates.
+  // group_by=name returns aggregated stats (no coordinate columns).
   const savantUrl = [
     'https://baseballsavant.mlb.com/statcast_search/csv',
     '?hfGT=R%7C',
@@ -252,8 +254,7 @@ async function handleSavantBip(request, env) {
     '&player_type=batter',
     `&batters_lookup%5B%5D=${playerId}`,
     '&min_pitches=0&min_results=0',
-    '&group_by=name',
-    '&sort_col=pitches&player_event_sort=api_h_launch_speed&sort_order=desc',
+    '&sort_col=game_date&sort_order=desc',
     '&min_pas=0&type=details',
     '&hfBBT=ground_ball%7Cline_drive%7Cfly_ball%7Cpopup%7C',
   ].join('');
