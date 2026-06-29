@@ -17,8 +17,8 @@
 
   /* ---- Text: Crisp, high-contrast typography ---- */
   --text: #f8fafc;
-  --text-dim: #94a3b8;
-  --text-faint: #475569;
+  --text-dim: #cbd5e1;
+  --text-faint: #94a3b8;
 
   /* ---- Brand & Accent Colors ---- */
   --prime: #f5a623;    /* Amber */
@@ -136,6 +136,15 @@ button {
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+button:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 a {
   color: var(--blue);
   text-decoration: none;
@@ -149,7 +158,6 @@ a:hover {
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
-  border-radius: var(--radius-sm);
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -151,13 +151,14 @@
   gap: 9px;
   padding: 6px 11px;
   border-radius: 10px;
-  border: 1px solid var(--border);
-  background: var(--card);
+  border: 1px solid rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.04);
   color: var(--text-dim);
   transition: border-color 0.2s, background 0.2s;
 }
 .metric-pill:hover {
-  border-color: #2f3c52;
+  border-color: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.07);
   background: var(--card-2);
 }
 .metric-pill-stack {
@@ -204,17 +205,21 @@
   display: grid;
   place-items: center;
   border-radius: 9px;
-  border: 1px solid var(--border);
-  background: var(--card);
+  border: 1px solid rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.04);
   color: var(--text-dim);
   transition: color 0.2s, border-color 0.2s, transform 0.2s;
 }
 .icon-btn:hover {
   color: var(--text);
-  border-color: #2f3c52;
+  border-color: rgba(255, 255, 255, 0.08);
 }
 .icon-btn:active {
   transform: scale(0.94);
+}
+.icon-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 /* ============ Filters ============ */
@@ -244,13 +249,15 @@
   min-width: 250px;
   flex: 0 1 320px;
   border-radius: 10px;
-  border: 1px solid var(--border);
-  background: var(--card);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.04);
   color: var(--text-dim);
-  transition: border-color 0.2s;
+  transition: border-color 0.2s, background 0.2s;
 }
 .search:focus-within {
-  border-color: var(--prime);
+  border-color: var(--accent);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
 }
 .search input {
   border: none;
@@ -286,20 +293,31 @@
   height: 38px;
   padding: 0 11px;
   border-radius: 10px;
-  border: 1px solid var(--border);
-  background: var(--card);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.04);
   color: var(--text-faint);
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.03em;
-  transition: all 0.18s;
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
 }
 .grade-pill:hover {
-  color: var(--text-dim);
-  border-color: #2f3c52;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.12);
+  transform: translateY(-1px);
+}
+.grade-pill:active {
+  transform: translateY(0) scale(0.97);
+}
+.grade-pill:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 .grade-pill.on {
   color: var(--text);
+  font-weight: 700;
 }
 .grade-pill-dot {
   width: 8px;
@@ -326,9 +344,23 @@
   height: 38px;
   padding: 0 10px;
   border-radius: 10px;
-  border: 1px solid var(--border);
-  background: var(--card);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.04);
   color: var(--text-dim);
+  transition: all 0.2s;
+}
+.select-wrap:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+.select-wrap.open,
+.select-wrap:focus-within {
+  border-color: var(--accent);
+  background: rgba(255, 255, 255, 0.08);
+}
+.select-wrap:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 .select-wrap select {
   border: none;
@@ -412,10 +444,16 @@
   font-family: inherit;
   text-align: left;
   white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.15s ease;
 }
 .sel-opt:hover {
   background: var(--hover);
   color: var(--text);
+  transform: translateX(2px);
+}
+.sel-opt:active {
+  transform: translateX(0) scale(0.98);
 }
 .sel-opt.on {
   color: var(--prime);
@@ -429,8 +467,8 @@
   height: 38px;
   padding: 0 13px;
   border-radius: 10px;
-  border: 1px solid var(--border);
-  background: var(--card);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.04);
   color: var(--text-dim);
   font-size: 13px;
   font-weight: 600;
@@ -438,12 +476,21 @@
 }
 .toggle-btn:hover {
   color: var(--text);
-  border-color: #2f3c52;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+.toggle-btn:active {
+  transform: scale(0.97);
+}
+.toggle-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 .toggle-btn.on {
   color: var(--prime);
   border-color: color-mix(in srgb, var(--prime) 45%, transparent);
   background: rgba(245, 158, 11, 0.1);
+  font-weight: 700;
 }
 /* Explanation-level toggle (ELI5 ↔ ELI15) — always-active blue chrome, since
    it's never "off", it just switches wording depth across the whole site. */
@@ -486,25 +533,36 @@
   height: 28px;
   padding: 0 12px;
   border-radius: 99px;
-  border: 1px solid var(--border-soft);
-  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.02);
   color: var(--text-faint);
   font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
   flex: none;
-  transition: all 0.18s;
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
 }
 .badge-toggle > svg {
   flex: none;
 }
 .badge-toggle:hover {
-  color: var(--text-dim);
+  color: var(--text);
   border-color: var(--border);
+  background: rgba(255, 255, 255, 0.03);
+  transform: translateY(-1px);
+}
+.badge-toggle:active {
+  transform: translateY(0) scale(0.97);
+}
+.badge-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 .badge-toggle.on {
   color: var(--text);
   background: var(--card);
+  font-weight: 600;
 }
 .badge-toggle-n {
   font-size: 10px;
@@ -514,10 +572,8 @@
 /* ============ Board ============ */
 .board {
   margin-top: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 16px;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.02) 0%, rgba(255, 255, 255, 0.01) 100%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.01) 0%, rgba(255, 255, 255, 0.005) 100%);
   /* `clip` (not `hidden`) clips the rounded corners WITHOUT creating a scroll
      container — `overflow: hidden` here breaks the sticky .board-head, dropping
      the column header mid-list on top of rows. Same fix as .main's overflow-x. */
@@ -537,7 +593,7 @@
   z-index: 10;
   height: 38px;
   background: var(--panel);
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--border-soft);
   border-radius: var(--radius) var(--radius) 0 0;
 }
 /* When the filters panel is open, .topbar drops to position:static and scrolls
@@ -565,9 +621,17 @@
 }
 button.th {
   cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  transition: color 0.2s, background 0.2s;
 }
 button.th:hover {
-  color: var(--text-dim);
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.05);
+}
+button.th:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 .th.active {
   color: var(--prime);
@@ -619,7 +683,6 @@ button.th:hover {
 }
 .board-row {
   min-height: 68px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
   cursor: pointer;
   position: relative;
   isolation: isolate;
@@ -637,27 +700,33 @@ button.th:hover {
   opacity: 0;
   transition: opacity 0.15s;
   z-index: 1;
-  border-radius: 0 2px 2px 0;
+  border-radius: 2px 0 0 2px;
 }
 .board-row:hover {
   background: linear-gradient(90deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.04));
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
+.board-row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
 .board-row:hover::before,
 .board-row.selected::before {
   opacity: 1;
 }
 .board-row.selected {
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
+  box-shadow: inset 0 0 0 1px rgba(0, 216, 246, 0.2);
 }
 /* Finished games: grayed out + desaturated (still clickable for results). */
 .board-row.final {
-  opacity: 0.45;
-  filter: grayscale(0.5);
+  opacity: 0.50;
+  filter: grayscale(0.6);
 }
 .board-row.final:hover {
-  opacity: 0.7;
+  opacity: 0.75;
+  filter: grayscale(0.4);
 }
 .board-row:last-child {
   border-bottom: none;
@@ -741,11 +810,12 @@ button.th:hover {
 }
 .bathand {
   font-size: 10px;
-  color: var(--text-faint);
-  border: 1px solid var(--border);
+  color: var(--text-dim);
+  background: rgba(255, 255, 255, 0.04);
   border-radius: 4px;
-  padding: 0 3px;
+  padding: 2px 5px;
   font-family: var(--mono);
+  font-weight: 600;
 }
 .order-pill {
   font-size: 10px;
@@ -1029,20 +1099,23 @@ button.th:hover {
   height: 28px;
   display: grid;
   place-items: center;
-  border: 1px solid rgba(255, 255, 255, 0.1);
   background: rgba(255, 255, 255, 0.04);
   border-radius: 8px;
   color: rgba(255, 255, 255, 0.4);
-  transition: all 0.15s ease;
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
 }
 .act-btn:hover {
   background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(255, 255, 255, 0.2);
   color: rgba(255, 255, 255, 0.7);
   transform: translateY(-1px);
 }
 .act-btn:active {
   transform: translateY(0) scale(0.88);
+}
+.act-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 .act-btn.star.on {
   color: #ffd60a;
@@ -1129,7 +1202,7 @@ button.th:hover {
 .drawer-head {
   position: relative;
   padding: 20px 22px 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.02) 0%, transparent 100%);
 }
 .drawer-close {
@@ -1153,10 +1226,11 @@ button.th:hover {
 .bathand-lg {
   font-size: 11px;
   color: var(--text-dim);
-  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
   border-radius: 5px;
-  padding: 1px 5px;
+  padding: 2px 6px;
   font-family: var(--mono);
+  font-weight: 600;
 }
 .drawer-sub {
   margin-top: 7px;
@@ -1206,20 +1280,17 @@ button.th:hover {
   margin-bottom: 22px;
 }
 .hero-main {
-  border: 1px solid;
   border-radius: 16px;
   padding: 18px 20px;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.01) 100%);
-  backdrop-filter: blur(2px);
+  background: rgba(255, 255, 255, 0.03);
   transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
 }
 .hero-main:hover {
   transform: translateY(-2px);
-  border-color: rgba(245, 158, 11, 0.3);
-  box-shadow: 0 8px 24px rgba(245, 158, 11, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.06);
 }
 .hero-main-label {
   font-size: 9px;
@@ -1254,13 +1325,11 @@ button.th:hover {
   gap: 4px;
   padding: 12px;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.02);
   transition: all 0.2s ease;
 }
 .kv:hover {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
 }
 .kv-k {
   font-size: 8px;
@@ -1328,20 +1397,17 @@ button.th:hover {
   color: rgba(255, 255, 255, 0.8);
   padding: 12px 14px;
   border-radius: 12px;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.01) 100%);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
   transition: all 0.2s ease;
 }
 .eli5-item:hover {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.07) 0%, rgba(255, 255, 255, 0.03) 100%);
-  border-color: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.05);
 }
 .eli5-item.tone-bad {
-  background: rgba(255, 92, 92, 0.12);
-  border-color: rgba(255, 92, 92, 0.3);
+  background: rgba(239, 68, 68, 0.08);
 }
 .eli5-item.tone-bad:hover {
-  background: rgba(255, 92, 92, 0.15);
+  background: rgba(239, 68, 68, 0.12);
 }
 .eli5-icon {
   flex-shrink: 0;
@@ -1405,15 +1471,13 @@ button.th:hover {
   gap: 11px;
 }
 .cell {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.01) 100%);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
   border-radius: 12px;
   padding: 12px 11px;
   transition: all 0.2s ease;
 }
 .cell:hover {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.03) 100%);
-  border-color: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.06);
   transform: translateY(-1px);
 }
 .cell-k {
@@ -1446,12 +1510,10 @@ button.th:hover {
   padding: 10px 12px;
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 .note.good {
   color: #20d74b;
-  background: rgba(32, 215, 75, 0.12);
-  border-color: rgba(32, 215, 75, 0.3);
+  background: rgba(32, 215, 75, 0.08);
 }
 .note svg {
   flex-shrink: 0;
@@ -1468,17 +1530,15 @@ button.th:hover {
   gap: 10px;
   width: 100%;
   padding: 12px 14px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 12px;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.01) 100%);
+  background: rgba(255, 255, 255, 0.02);
   color: inherit;
   text-align: left;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 .pitcher-link:hover {
-  border-color: rgba(245, 158, 11, 0.4);
-  background: linear-gradient(135deg, rgba(245, 158, 11, 0.12), rgba(245, 158, 11, 0.06));
+  background: rgba(245, 158, 11, 0.08);
   transform: translateY(-1px);
 }
 .pitcher-link-cta {
@@ -1511,8 +1571,7 @@ button.th:hover {
   margin-top: 13px;
   padding: 12px 14px;
   border-radius: 12px;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.01) 100%);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
 }
 .split-label {
   font-size: 10px;
@@ -1563,7 +1622,6 @@ button.th:hover {
 
 /* odds */
 .odds-table {
-  border: 1px solid var(--border-soft);
   border-radius: 9px;
   overflow: hidden;
 }
@@ -1574,10 +1632,9 @@ button.th:hover {
   align-items: center;
   padding: 9px 12px;
   font-size: 13px;
-  border-bottom: 1px solid var(--border-soft);
 }
-.odds-row:last-child {
-  border-bottom: none;
+.odds-row:nth-child(even) {
+  background: rgba(255, 255, 255, 0.02);
 }
 .odds-row span:nth-child(2),
 .odds-row span:nth-child(3),
@@ -1589,7 +1646,8 @@ button.th:hover {
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--text-faint);
-  background: var(--card);
+  background: rgba(255, 255, 255, 0.02);
+  font-weight: 700;
 }
 .odds-book {
   font-weight: 600;
@@ -1631,6 +1689,20 @@ button.th:hover {
   flex-shrink: 0;
 }
 
+/* ============ Modal backdrop ============ */
+.modal-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 39;
+  background: rgba(2, 4, 8, 0.6);
+  animation: fadeIn 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+}
+
 /* ============ Model modal ============ */
 .modal {
   position: fixed;
@@ -1642,10 +1714,10 @@ button.th:hover {
   max-width: 94vw;
   max-height: 88vh;
   overflow-y: auto;
-  background: var(--panel);
-  border: 1px solid var(--border);
+  background: linear-gradient(135deg, rgba(10, 16, 32, 0.95) 0%, rgba(5, 10, 20, 0.98) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 16px;
-  box-shadow: var(--shadow-lg);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.1);
   padding: 24px 26px;
   animation: pop 0.22s cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -1675,8 +1747,7 @@ button.th:hover {
 .kpi {
   flex: 1;
   min-width: 150px;
-  background: var(--card);
-  border: 1px solid var(--border-soft);
+  background: rgba(255, 255, 255, 0.02);
   border-radius: 11px;
   padding: 13px 15px;
 }
@@ -1721,8 +1792,7 @@ button.th:hover {
 .reliability {
   width: 100%;
   height: auto;
-  background: var(--card);
-  border: 1px solid var(--border-soft);
+  background: rgba(255, 255, 255, 0.02);
   border-radius: 11px;
 }
 .reliability .grid {
@@ -2057,8 +2127,8 @@ button.th:hover {
 .slip-panel {
   margin-bottom: 10px;
   border-radius: 14px;
-  border: 1px solid var(--border);
-  background: var(--panel);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.02);
   box-shadow: var(--shadow-lg);
   overflow: hidden;
   animation: slipUp 0.2s cubic-bezier(0.22, 1, 0.36, 1);
@@ -2228,16 +2298,15 @@ button.th:hover {
   align-items: center;
   gap: 14px;
   padding: 12px;
-  border: 1px solid var(--border-soft);
   border-radius: 11px;
-  background: var(--card);
+  background: rgba(255, 255, 255, 0.02);
 }
 .wind-dial {
   flex-shrink: 0;
 }
 .wd-ring {
-  fill: rgba(255, 255, 255, 0.015);
-  stroke: var(--border);
+  fill: rgba(255, 255, 255, 0.01);
+  stroke: rgba(255, 255, 255, 0.04);
   stroke-width: 1.5;
 }
 .wd-n {
@@ -2305,8 +2374,8 @@ button.th:hover {
 /* ============ View toggle ============ */
 .view-toggle {
   display: flex;
-  background: var(--card);
-  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.03);
   border-radius: 10px;
   padding: 3px;
   gap: 2px;
@@ -2337,11 +2406,11 @@ button.th:hover {
 .games-controls { display: flex; align-items: center; gap: 7px; margin-bottom: 12px; }
 .games-controls-k { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
 .xcard {
-  border: 1px solid var(--border);
+  border: 1px solid rgba(255, 255, 255, 0.03);
   border-radius: 16px;
-  background: var(--card);
+  background: rgba(255, 255, 255, 0.02);
   overflow: hidden;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
 }
 .xc-head {
   display: flex;
@@ -2400,9 +2469,9 @@ button.th:hover {
   margin-top: 14px;
 }
 .game-card {
-  border: 1px solid var(--border-soft);
+  border: 1px solid rgba(255, 255, 255, 0.03);
   border-radius: var(--radius);
-  background: var(--card);
+  background: rgba(255, 255, 255, 0.02);
   overflow: hidden;
 }
 .gc-head {
@@ -2411,7 +2480,7 @@ button.th:hover {
   align-items: center;
   gap: 12px;
   padding: 12px 16px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.02);
 }
 .gc-team {
   display: flex;
@@ -2704,8 +2773,8 @@ button.th:hover {
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  border: 1px solid var(--border);
-  background: color-mix(in srgb, var(--card) 92%, transparent);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  background: color-mix(in srgb, rgba(255, 255, 255, 0.03) 92%, transparent);
   backdrop-filter: blur(8px);
   color: var(--text);
   display: grid;
@@ -2715,8 +2784,8 @@ button.th:hover {
   animation: fade 0.2s;
 }
 .back-to-top:hover {
-  background: var(--card-2);
-  border-color: #2f3c52;
+  background: color-mix(in srgb, rgba(255, 255, 255, 0.06) 92%, transparent);
+  border-color: rgba(255, 255, 255, 0.08);
   transform: translateY(-2px);
 }
 .back-to-top:active {
@@ -2860,8 +2929,8 @@ button.th:hover {
   font-size: 11px;
   font-weight: 600;
   color: var(--text-dim);
-  background: var(--card-2);
-  border: 1px solid var(--border-soft);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.03);
   border-radius: 6px;
   padding: 2px 8px;
   white-space: nowrap;
@@ -3421,8 +3490,8 @@ button.th:hover {
   gap: 12px;
 }
 .results-kpi {
-  background: var(--card);
-  border: 1px solid var(--border-soft);
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.03);
   border-radius: 12px;
   padding: 14px 16px;
 }
@@ -3447,8 +3516,8 @@ button.th:hover {
   gap: 16px;
 }
 .results-card {
-  background: var(--card);
-  border: 1px solid var(--border-soft);
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.03);
   border-radius: 12px;
   padding: 16px 18px;
 }
@@ -3511,8 +3580,8 @@ button.th:hover {
   font-size: 13px;
   line-height: 1.6;
   color: rgba(255, 255, 255, 0.85);
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.01) 100%);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.03);
   border-radius: 12px;
   padding: 12px 14px;
   margin-bottom: 12px;
@@ -3596,7 +3665,7 @@ button.th:hover {
 
 .heat-breakdown {
   margin-top: 12px;
-  border: 1px solid var(--border-soft);
+  border: 1px solid rgba(255, 255, 255, 0.03);
   border-radius: 9px;
   overflow: hidden;
   animation: fade 0.18s ease;
@@ -3607,7 +3676,7 @@ button.th:hover {
   align-items: flex-start;
   gap: 10px;
   padding: 8px 11px;
-  border-bottom: 1px solid var(--border-soft);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.02);
   font-size: 12.5px;
 }
 .heat-bd-row:last-child {
