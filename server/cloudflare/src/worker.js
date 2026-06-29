@@ -245,13 +245,14 @@ async function handleSavantBip(request, env) {
   if (!/^\d{1,9}$/.test(playerId)) return jsonResponse({ error: 'invalid playerId' }, 400, env);
   if (!/^\d{4}$/.test(season))    return jsonResponse({ error: 'invalid season' },   400, env);
 
+  // all=true required; season param is hfSea (not hfSe).
   // No group_by — individual event rows with hc_x/hc_y coordinates.
   // No hfBBT filter — fetch all events, filter to BIP client-side.
-  // (hfBBT can silently return an empty dataset on some Savant responses.)
   const savantUrl = [
     'https://baseballsavant.mlb.com/statcast_search/csv',
-    '?hfGT=R%7C',
-    `&hfSe=${season}%7C`,
+    '?all=true',
+    '&hfGT=R%7C',
+    `&hfSea=${season}%7C`,
     '&player_type=batter',
     `&batters_lookup%5B%5D=${playerId}`,
     '&min_pitches=0&min_results=0',
