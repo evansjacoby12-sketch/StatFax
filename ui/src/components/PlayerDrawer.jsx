@@ -936,33 +936,24 @@ function PitcherSection({ b, batters, onOpenPitcher }) {
 // ZoneTeaser
 // ---------------------------------------------------------------------------
 
-const ZMINI_MAP25 = [
-  [9],[9],[9,10],[10],[10],
-  [9],[0],[1],[2],[10],
-  [9,11],[3],[4],[5],[10,12],
-  [11],[6],[7],[8],[12],
-  [11],[11],[11,12],[12],[12],
-]
-const avgN = a => a.length ? a.reduce((s, x) => s + x, 0) / a.length : null
-
 function zoneHeat(t) {
   if (t == null || Number.isNaN(t)) return 'var(--card-2)'
   return `hsl(${220 - 180 * t} ${45 + 35 * t}% ${18 + 22 * t}%)`
 }
 
+// Always renders the 9 inner strike-zone cells (indices 0–8) as a 3×3 grid.
+// Chase zones (9–12) are intentionally excluded for clarity.
 function MiniGrid({ grid, metric, matched }) {
-  const vals = grid.map(c => c?.[metric]).filter(v => Number.isFinite(v))
-  const min = vals.length ? Math.min(...vals) : 0, max = vals.length ? Math.max(...vals) : 1
-  const is13 = grid.length >= 13
-  const cells = is13
-    ? ZMINI_MAP25.map(src => ({ v: avgN(src.map(j => grid[j]?.[metric]).filter(x => Number.isFinite(x))), chase: src.every(j => j >= 9), matched: src.some(j => matched?.includes(j)) }))
-    : grid.map((c, i) => ({ v: c?.[metric], chase: false, matched: matched?.includes(i) }))
-  const cols = is13 ? 5 : Math.max(1, Math.ceil(Math.sqrt(grid.length)))
+  const inner = grid.slice(0, 9)
+  const vals = inner.map(c => c?.[metric]).filter(v => Number.isFinite(v))
+  const min = vals.length ? Math.min(...vals) : 0
+  const max = vals.length ? Math.max(...vals) : 1
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, 1fr)`, gridTemplateRows: `repeat(${cols}, 1fr)`, gap: '2px', width: '80px', height: '80px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', padding: '2px', borderRadius: '6px' }}>
-      {cells.map((c, i) => {
-        const t = Number.isFinite(c.v) && max > min ? (c.v - min) / (max - min) : null
-        return <span key={i} style={{ background: zoneHeat(t), borderRadius: '2px', border: c.matched ? '1px solid var(--accent)' : 'none', opacity: c.chase ? 0.85 : 1 }} />
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gridTemplateRows: 'repeat(3, 1fr)', gap: '2px', width: '72px', height: '72px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', padding: '2px', borderRadius: '6px' }}>
+      {inner.map((c, i) => {
+        const v = c?.[metric]
+        const t = Number.isFinite(v) && max > min ? (v - min) / (max - min) : null
+        return <span key={i} style={{ background: zoneHeat(t), borderRadius: '2px', border: matched?.includes(i) ? '1px solid var(--accent)' : 'none' }} />
       })}
     </div>
   )
