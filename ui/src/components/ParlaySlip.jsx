@@ -40,6 +40,9 @@ export default function ParlaySlip({ legs, onRemove, onClear, onSelect, onOpenBu
       ? legs.slice().sort((a, b) => (a.hrProbability ?? 1) - (b.hrProbability ?? 1) || (a.score ?? 0) - (b.score ?? 0) || String(a.id).localeCompare(String(b.id)))[0]
       : null
   const weakId = weak?.id
+  // Legs whose lineup isn't posted yet — they can still be scratched or dropped
+  // out of a run-producing slot, so the whole parlay can change before lock.
+  const unconfirmed = legs.filter((b) => b.lineupConfirmed !== true)
 
   return (
     <div className={`slip ${open ? 'open' : ''}`} style={{
@@ -94,6 +97,12 @@ export default function ParlaySlip({ legs, onRemove, onClear, onSelect, onOpenBu
               <span className="slip-weak-note" style={{ display: 'flex', marginTop: '6px', color: 'var(--b-hot)', alignItems: 'center', gap: '4px', fontSize: '11px' }}>
                 <Icon name="TriangleAlert" size={11} />
                 <span>Weak link: <b>{weak.name}</b> ({pct(weak.hrProbability, 2)})</span>
+              </span>
+            )}
+            {unconfirmed.length > 0 && (
+              <span className="slip-prov-note" style={{ display: 'flex', marginTop: '6px', color: 'var(--prime)', alignItems: 'center', gap: '4px', fontSize: '11px' }}>
+                <Icon name="Clock" size={11} />
+                <span>{unconfirmed.length} {unconfirmed.length === 1 ? 'leg' : 'legs'} on unposted lineups — can still change before first pitch</span>
               </span>
             )}
           </div>
@@ -163,6 +172,11 @@ export default function ParlaySlip({ legs, onRemove, onClear, onSelect, onOpenBu
                       tag are fixed-size so they can't squeeze the name to nothing. */}
                   <span className="slip-leg-name" style={{ flex: '1 1 auto', minWidth: 0, fontSize: '12px', fontWeight: '600', color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.name}</span>
                   <span className="slip-leg-team" style={{ flexShrink: 0, fontSize: '10px', color: 'var(--text-faint)' }}>{b.team}</span>
+                  {b.lineupConfirmed !== true && (
+                    <span className="slip-leg-prov" title="Lineup not posted — this leg can still change" style={{ flexShrink: 0, color: 'var(--prime)', display: 'inline-flex' }}>
+                      <Icon name="Clock" size={10} />
+                    </span>
+                  )}
                   {b.id === weakId && (
                     <span className="slip-weak-tag" title="Weakest leg" style={{ flexShrink: 0, fontSize: '9px', background: 'rgba(249,115,22,0.08)', color: 'var(--b-hot)', borderRadius: '4px', padding: '1px 4px', display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
                       <Icon name="TriangleAlert" size={8} /> weak
@@ -205,6 +219,11 @@ export default function ParlaySlip({ legs, onRemove, onClear, onSelect, onOpenBu
             placeItems: 'center'
           }}>{p.n}</span>
           <span className="slip-bar-label" style={{ fontSize: '13px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Parlay Slip</span>
+          {unconfirmed.length > 0 && (
+            <span className="slip-bar-prov" title={`${unconfirmed.length} leg(s) on unposted lineups — can still change`} style={{ display: 'inline-flex', alignItems: 'center', gap: '2px', color: 'var(--prime)', fontSize: '10px', fontWeight: '800' }}>
+              <Icon name="Clock" size={11} /> {unconfirmed.length}
+            </span>
+          )}
           {pg && (
             <span className="slip-bar-grade" style={{ 
               color: gColor, 

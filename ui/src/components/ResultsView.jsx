@@ -5,6 +5,7 @@ import { GRADE_ORDER, gradeColor } from '../lib/badges.js'
 import { GradeChip } from './atoms.jsx'
 import { playerHeadshot } from '../lib/teams.js'
 import { hexA } from './atoms.jsx'
+import CombosView from './CombosView.jsx'
 
 function computeAuc(rows) {
   const y = rows.map((r) => (r.homered ? 1 : 0))
@@ -24,7 +25,40 @@ function computeAuc(rows) {
   return (rankSum - (nPos * (nPos + 1)) / 2) / (nPos * nNeg)
 }
 
-export default function ResultsView({ meta }) {
+const RESULTS_TABS = [
+  { id: 'model', label: 'Model', icon: 'Activity' },
+  { id: 'combos', label: 'Combos', icon: 'Layers' },
+]
+
+// Results hub: the model track record and the parlay-combo record share one tab
+// now (combos was folded back in here), switched by a sub-toggle.
+export default function ResultsView({ meta, batters, onSelect, favorConsistency = false, initialTab = 'model' }) {
+  const [tab, setTab] = useState(initialTab)
+  return (
+    <div className="results-wrap">
+      <div className="results-subnav" style={{ display: 'flex', gap: '6px', marginBottom: '20px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        {RESULTS_TABS.map((t) => (
+          <button key={t.id} onClick={() => setTab(t.id)} aria-pressed={tab === t.id} style={{
+            display: 'inline-flex', alignItems: 'center', gap: '5px',
+            padding: '8px 14px', fontSize: '12px', fontWeight: '700',
+            textTransform: 'uppercase', letterSpacing: '0.04em',
+            background: 'none', border: 'none', cursor: 'pointer',
+            color: tab === t.id ? '#fff' : 'var(--text-faint)',
+            borderBottom: tab === t.id ? '2px solid var(--accent)' : '2px solid transparent',
+            marginBottom: '-1px',
+          }}>
+            <Icon name={t.icon} size={13} /> {t.label}
+          </button>
+        ))}
+      </div>
+      {tab === 'combos'
+        ? <CombosView batters={batters} onSelect={onSelect} favorConsistency={favorConsistency} />
+        : <ModelResults meta={meta} />}
+    </div>
+  )
+}
+
+function ModelResults({ meta }) {
   const [log, setLog] = useState(null)
   const [err, setErr] = useState(null)
   const [hrDay, setHrDay] = useState(null)

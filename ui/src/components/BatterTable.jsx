@@ -1,5 +1,19 @@
+import { useState } from 'react'
 import BatterRow from './BatterRow.jsx'
 import Icon from './Icon.jsx'
+
+// Divider between the confirmed-lineup plays and the projected (roster-fallback)
+// bats. Collapsible because pre-lineup the projected group is the whole roster.
+function ProjectedDivider({ count, open, onToggle }) {
+  return (
+    <button className="board-proj-divider" onClick={onToggle} aria-expanded={open} type="button">
+      <Icon name="Clock" size={13} />
+      <span>Projected · lineups not posted</span>
+      <span className="proj-count">{count}</span>
+      <Icon name={open ? 'ChevronDown' : 'ChevronRight'} size={15} style={{ marginLeft: 'auto' }} />
+    </button>
+  )
+}
 
 export default function BatterTable({
   batters,
@@ -14,6 +28,7 @@ export default function BatterTable({
   onToggleSlip,
   onOpenPitcher,
 }) {
+  const [projOpen, setProjOpen] = useState(true)
   const HeadCol = ({ k, children, className, title }) => {
     const active = sort === k
     return (
@@ -78,12 +93,15 @@ export default function BatterTable({
             <Icon name="Search" size={32} />
             <p style={{ fontSize: '14px', fontWeight: '500' }}>No batters match these filters.</p>
           </div>
-        ) : (
-          batters.map((b, i) => (
+        ) : (() => {
+          // batters arrive confirmed-first (App.jsx sort), so all confirmed bats
+          // are one contiguous block at the top; the rest are projected.
+          const firstProj = batters.findIndex((b) => !b.lineupConfirmed)
+          const renderRow = (b, rank) => (
             <BatterRow
               key={b.id}
               batter={b}
-              rank={i + 1}
+              rank={rank}
               onSelect={onSelect}
               selected={selectedId === b.id}
               watched={watchlist.has(b.id)}
@@ -92,8 +110,16 @@ export default function BatterTable({
               onToggleSlip={onToggleSlip}
               onOpenPitcher={onOpenPitcher}
             />
-          ))
-        )}
+          )
+          if (firstProj === -1) return batters.map((b, i) => renderRow(b, i + 1))
+          return (
+            <>
+              {batters.slice(0, firstProj).map((b, i) => renderRow(b, i + 1))}
+              <ProjectedDivider count={batters.length - firstProj} open={projOpen} onToggle={() => setProjOpen((o) => !o)} />
+              {projOpen && batters.slice(firstProj).map((b, i) => renderRow(b, firstProj + i + 1))}
+            </>
+          )
+        })()}
       </div>
     </div>
   )

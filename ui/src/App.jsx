@@ -18,7 +18,6 @@ import SameGameView from './components/SameGameView.jsx'
 import CheatSheet from './components/CheatSheet.jsx'
 import BacktestView from './components/BacktestView.jsx'
 import ResultsView from './components/ResultsView.jsx'
-import CombosView from './components/CombosView.jsx'
 import PlayerDrawer from './components/PlayerDrawer.jsx'
 import ZoneView from './components/ZoneView.jsx'
 import ParlaySlip from './components/ParlaySlip.jsx'
@@ -333,6 +332,13 @@ export default function App() {
       (b.expectedHRs ?? 0) - (a.expectedHRs ?? 0) ||
       (a.name || '').localeCompare(b.name || '')
     rows = rows.slice().sort((a, b) => {
+      // Confirmed lineups always rank above projected (roster-fallback) bats,
+      // independent of the chosen sort/direction. A late lineup post can then
+      // never let a projected bat leapfrog a confirmed play — the pre-lineup
+      // churn is contained to the projected group below the board divider.
+      const ca = a.lineupConfirmed ? 0 : 1
+      const cb = b.lineupConfirmed ? 0 : 1
+      if (ca !== cb) return ca - cb
       const va = get(a)
       const vb = get(b)
       // nulls always last
@@ -451,10 +457,14 @@ export default function App() {
       </div>
 
       <main className="main">
-        {view === 'results' ? (
-          <ResultsView meta={data.meta} />
-        ) : view === 'combos' ? (
-          <CombosView batters={all} onSelect={(b) => setSelectedId(b.id)} favorConsistency={favorConsistency} />
+        {view === 'results' || view === 'combos' ? (
+          <ResultsView
+            meta={data.meta}
+            batters={all}
+            onSelect={(b) => setSelectedId(b.id)}
+            favorConsistency={favorConsistency}
+            initialTab={view === 'combos' ? 'combos' : 'model'}
+          />
         ) : view === 'pitchers' ? (
           <PitchersView
             batters={all}
@@ -546,13 +556,12 @@ export default function App() {
           { id: 'board', label: 'Board', icon: 'List' },
           { id: 'games', label: 'Games', icon: 'LayoutGrid' },
           { id: 'pitchers', label: 'Pitchers', icon: 'Crosshair' },
-          { id: 'combos', label: 'Combos', icon: 'Layers' },
           { id: 'weather', label: 'Weather', icon: 'Wind' },
           { id: 'results', label: 'Results', icon: 'Activity' }
         ].map((tab) => (
           <button
             key={tab.id}
-            className={`bottom-nav-btn ${view === tab.id ? 'active' : ''}`}
+            className={`bottom-nav-btn ${view === tab.id || (tab.id === 'results' && view === 'combos') ? 'active' : ''}`}
             onClick={() => setView(tab.id)}
           >
             <Icon name={tab.icon} size={20} />

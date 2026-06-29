@@ -684,6 +684,36 @@ button.th:focus-visible {
   display: flex;
   flex-direction: column;
 }
+/* Section divider between confirmed-lineup plays and the projected roster bats.
+   Amber = "not final" so it reads as a soft warning, and it's a button (collapses
+   the projected group, which pre-lineup is the whole roster). */
+.board-proj-divider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 16px;
+  background: rgba(245, 166, 35, 0.06);
+  border: none;
+  border-top: 1px solid rgba(245, 166, 35, 0.20);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  color: var(--prime);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s;
+}
+.board-proj-divider:hover { background: rgba(245, 166, 35, 0.10); }
+.board-proj-divider .proj-count {
+  background: rgba(245, 166, 35, 0.16);
+  padding: 1px 8px;
+  border-radius: 99px;
+  font-size: 10px;
+  font-weight: 800;
+}
 .board-row {
   min-height: 68px;
   cursor: pointer;

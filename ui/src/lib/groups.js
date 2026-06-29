@@ -153,6 +153,10 @@ function toComboRow(b) {
 function makeGroup({ strategy, size, legs: rows }) {
   const legs = rows.map((r) => r.ref)
   const meta = STRAT_META[strategy] || { label: strategy, icon: 'Layers', desc: '' }
+  // How many legs sit on an unconfirmed (projected/roster) lineup — those bats
+  // could be benched or hit out of a run-producing slot. Display-only flag; the
+  // engine still builds + grades the combo identically (combos are lineup-blind).
+  const projectedLegs = legs.filter((b) => b.lineupConfirmed !== true).length
   const avgScore = legs.reduce((s, b) => s + (b.score ?? 0), 0) / legs.length
   const allHit = allHitProb(legs.map((b) => b.hrProbability))
   // Market math (de-juiced) — combined price, betting EV, and the de-vigged
@@ -170,6 +174,7 @@ function makeGroup({ strategy, size, legs: rows }) {
     grade: gradeFor(avgScore),
     avgScore,
     allHit,
+    projectedLegs,
     legs,
     american: market.american,
     ev: market.ev, // betting EV per $1 (modelAllHit × decimal − 1) — the value sort key
