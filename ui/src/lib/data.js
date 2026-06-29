@@ -158,9 +158,9 @@ export async function loadSlate() {
       // Boolean signal: the opposing starter gives up notably more HR to this
       // batter's side than the other (RudeBets' "vs LHB/RHB"). Computed below.
       hrPlatoonEdge: hasHrPlatoonEdge(b),
-      // Boolean signal: strong zone matchup — batter's ISO in the pitcher's
-      // most-used zones rates 7+/10, or server flagged ZONE_MASTER.
-      zoneEdge: (b.zoneMatchup?.zoneRating ?? 0) >= 7 || b.zoneMatchup?.badge === 'ZONE_MASTER',
+      // Boolean signal: 2+ matched zones (batter hot cell overlaps pitcher's
+      // above-average frequency cell). Mirrors the ZONE_MASTER badge threshold.
+      zoneEdge: (b.zoneMatchup?.matchedZones?.length ?? 0) >= 2,
       // Boolean signal: favorable pitch-type matchup — batter's weighted SLG
       // advantage across the pitcher's arsenal scores 7+/10 (5 = neutral).
       pitchMixEdge: (pitchMixScore(b) ?? 0) >= 7,

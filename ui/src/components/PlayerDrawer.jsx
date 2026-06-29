@@ -1295,6 +1295,18 @@ function StatcastSection({ b }) {
   )
 }
 
+// Statcast barrel: EV ≥ 98 mph AND LA in a range that widens with EV.
+// Sweet spot is LA 25-31° at 98 mph; each mph above 98 extends ±1° to the
+// range, bottoming out at LA 8° and topping at LA 50°. This matches the
+// publicly documented Statcast barrel formula without a full lookup table.
+function isBarrel(ev, la) {
+  if (!Number.isFinite(ev) || !Number.isFinite(la) || ev < 98) return false
+  const laR = Math.round(la)
+  if (laR < 8 || laR > 50) return false
+  const dist = Math.max(0, 25 - laR, laR - 31)
+  return ev >= 98 + dist
+}
+
 function RollingWindows({ b }) {
   const rb = b.recentBarrelForBatter
   const [enabled, setEnabled] = useState(false)
@@ -1314,7 +1326,9 @@ function RollingWindows({ b }) {
       const withEV = evts.filter(e => e.ev != null && e.ev > 0)
       const avgEV = withEV.length ? withEV.reduce((s, e) => s + e.ev, 0) / withEV.length : null
       const hh = withEV.length ? withEV.filter(e => e.ev >= 95).length / withEV.length * 100 : null
-      return { n: evts.length, avgEV, hh }
+      const barrelN = withEV.filter(e => isBarrel(e.ev, e.la)).length
+      const barrelPct = withEV.length ? barrelN / withEV.length * 100 : null
+      return { n: evts.length, avgEV, hh, barrelPct }
     }
     const c7 = cutoff(7), c14 = cutoff(14), c30 = cutoff(30)
     return {
@@ -1328,21 +1342,21 @@ function RollingWindows({ b }) {
     {
       label: 'Last 7d',
       n: windows?.l7?.n ?? rb?.sevenDay?.bbe,
-      barrel: rb?.sevenDay?.pct,
+      barrel: windows?.l7?.barrelPct ?? rb?.sevenDay?.pct,
       ev: windows?.l7?.avgEV ?? rb?.recentEV,
       hh: windows?.l7?.hh,
     },
     {
       label: 'Last 14d',
       n: windows?.l14?.n ?? rb?.fourteenDay?.bbe,
-      barrel: rb?.fourteenDay?.pct,
+      barrel: windows?.l14?.barrelPct ?? rb?.fourteenDay?.pct,
       ev: windows?.l14?.avgEV,
       hh: windows?.l14?.hh,
     },
     {
       label: 'Last 30d',
       n: windows?.l30?.n,
-      barrel: null,
+      barrel: windows?.l30?.barrelPct ?? null,
       ev: windows?.l30?.avgEV,
       hh: windows?.l30?.hh,
     },
