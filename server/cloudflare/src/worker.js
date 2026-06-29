@@ -246,7 +246,8 @@ async function handleSavantBip(request, env) {
   if (!/^\d{4}$/.test(season))    return jsonResponse({ error: 'invalid season' },   400, env);
 
   // No group_by — individual event rows with hc_x/hc_y coordinates.
-  // group_by=name returns aggregated stats (no coordinate columns).
+  // No hfBBT filter — fetch all events, filter to BIP client-side.
+  // (hfBBT can silently return an empty dataset on some Savant responses.)
   const savantUrl = [
     'https://baseballsavant.mlb.com/statcast_search/csv',
     '?hfGT=R%7C',
@@ -256,8 +257,9 @@ async function handleSavantBip(request, env) {
     '&min_pitches=0&min_results=0',
     '&sort_col=game_date&sort_order=desc',
     '&min_pas=0&type=details',
-    '&hfBBT=ground_ball%7Cline_drive%7Cfly_ball%7Cpopup%7C',
   ].join('');
+
+  const debug = url.searchParams.get('debug') === '1';
 
   let csv;
   try {
@@ -276,13 +278,20 @@ async function handleSavantBip(request, env) {
     return jsonResponse({ error: 'savant unreachable', detail: String(e).slice(0, 200) }, 502, env);
   }
 
+  if (debug) {
+    return new Response(csv.slice(0, 2000), { headers: { 'Content-Type': 'text/plain', ...corsHeaders(env) } });
+  }
+
   const trimmed = csv.replace(/^﻿/, '').trimStart();
   if (trimmed.startsWith('<') || trimmed.startsWith('{')) {
     return jsonResponse({ error: 'savant challenge', preview: trimmed.slice(0, 120) }, 503, env);
   }
 
-  const bips = parseBipCsv(csv);
-  return jsonResponse({ bips, count: bips.length }, 200, env);
+  // Filter to batted-ball events (those with hc_x/hc_y) after parsing.
+  // Strikeouts, walks, HBP have null coordinates and are dropped in parseBipCsv.
+  const all = parseBipCsv(csv);
+  const bips = all.filter(b => b.bbType !== '');
+  return jsonResponse({ bips, count: bips.length, total: all.length }, 200, env);
 }
 
 function parseBipCsv(csv) {
