@@ -235,7 +235,7 @@ export default function ResultsView({ meta }) {
         </h3>
         <div className="daily-table" style={{ display: 'flex', flexDirection: 'column', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '8px', overflow: 'hidden' }}>
           <div className="daily-row daily-th" style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', padding: '6px 10px', background: 'rgba(255,255,255,0.03)', fontSize: '10px', fontWeight: '700', color: 'var(--text-faint)', textTransform: 'uppercase' }}>
-            <span>Date</span><span>Picks</span><span>HR</span><span>Hit%</span><span>Top tier</span><span>Top hit%</span>
+            <span>Date</span><span>Picks</span><span>HR</span><span>Hit%</span><span>Tier</span><span>T-hit%</span>
           </div>
           {daily.map((d) => (
             <div className="daily-row" key={d.date} style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', padding: '8px 10px', borderBottom: '1px solid rgba(255,255,255,0.02)', fontSize: '12px' }}>

@@ -132,11 +132,11 @@ export function primeFromPriorCache(prior, { ttlMs = DEFAULT_CACHE_TTL_MS } = {}
     // new fields. Whenever the cell shape changes in fetch*Zones, add
     // a new presence check here to invalidate stale caches.
     //
-    // Batter expansion: old cells had {iso, count, hrCount}; new cells
-    // also carry {slg, avg, obp, ops, ev}.
+    // Batter expansion: old cells had {iso, count, hrCount}; current cells
+    // also carry {slg, avg, obp, ops, ev, hardHitPct, barrelPct, xwoba}.
     //
-    // Pitcher expansion: old cells had {freq, count, hrCount}; new
-    // cells also carry {whiffPct, hardHitPct, xwoba, contacts}.
+    // Pitcher expansion: old cells had {freq, count, hrCount}; current
+    // cells also carry {whiffPct, hardHitPct, barrelPct, ev, xwoba, contacts}.
     //
     // Using `'KEY' in firstCell` rather than `firstCell.KEY != null`
     // because new-shape cells can legitimately have KEY = null for
@@ -149,14 +149,18 @@ export function primeFromPriorCache(prior, { ttlMs = DEFAULT_CACHE_TTL_MS } = {}
     }
     if (key.startsWith('batter-')) {
       const firstCell = entry.value?.grid?.[0];
-      if (firstCell && 'iso' in firstCell && !('slg' in firstCell)) {
+      // barrelPct is the newest batter field (HH%/barrel%/xwOBA expansion);
+      // an iso-bearing cell without it is a pre-expansion shape → refetch.
+      if (firstCell && 'iso' in firstCell && !('barrelPct' in firstCell)) {
         skippedShape++;
         continue;
       }
     }
     if (key.startsWith('pitcher-')) {
       const firstCell = entry.value?.grid?.[0];
-      if (firstCell && 'freq' in firstCell && !('whiffPct' in firstCell)) {
+      // slg (batting line allowed) is the newest pitcher field; a freq-bearing
+      // cell without it is a pre-expansion shape → refetch.
+      if (firstCell && 'freq' in firstCell && !('slg' in firstCell)) {
         skippedShape++;
         continue;
       }
@@ -269,6 +273,7 @@ export async function fetchBatterZones(batterId, { vsHand = 'R', season = SEASON
     // yet, e.g., a new call-up).
     const grid = new Array(ZONE_N).fill(null).map(() => ({
       iso: null, slg: null, avg: null, obp: null, ops: null, ev: null,
+      hardHitPct: null, barrelPct: null, xwoba: null,
       count: 0, hrCount: 0,
     }));
 
@@ -283,6 +288,8 @@ export async function fetchBatterZones(batterId, { vsHand = 'R', season = SEASON
       const iso    = (Number.isFinite(slgVal) && Number.isFinite(avgVal))
                        ? +(slgVal - avgVal).toFixed(3)
                        : null;
+      const evN = countsData?.evCount?.[i] || 0;
+      const xwN = countsData?.xwCount?.[i] || 0;
       grid[i] = {
         iso,
         slg:     slgVal,
@@ -290,6 +297,9 @@ export async function fetchBatterZones(batterId, { vsHand = 'R', season = SEASON
         obp:     obpVal,
         ops:     opsVal,
         ev:      evVal,
+        hardHitPct: evN > 0 ? +(countsData.hardHits[i] / evN).toFixed(4) : null,
+        barrelPct:  evN > 0 ? +(countsData.barrels[i]  / evN).toFixed(4) : null,
+        xwoba:      xwN > 0 ? +(countsData.xwSum[i]     / xwN).toFixed(3) : null,
         count:   countsData?.counts?.[i] || 0,
         hrCount: countsData?.hrs?.[i]    || 0,
       };
@@ -369,6 +379,16 @@ async function fetchBatterZoneCounts(batterId, { vsHand = 'R', season = SEASON }
 
     const counts = new Array(ZONE_N).fill(0);
     const hrs    = new Array(ZONE_N).fill(0);
+    // Quality-of-contact accumulators (per zone), all derived from the same
+    // batted-ball rows we already fetched — so HH%, barrel% and xwOBA cost no
+    // extra request. Denominator for the rates is evCount (batted balls with a
+    // tracked launch speed), not `counts` (which includes the odd strikeout row).
+    const hardHits = new Array(ZONE_N).fill(0);
+    const barrels  = new Array(ZONE_N).fill(0);
+    const evSum    = new Array(ZONE_N).fill(0);
+    const evCount  = new Array(ZONE_N).fill(0);
+    const xwSum    = new Array(ZONE_N).fill(0);
+    const xwCount  = new Array(ZONE_N).fill(0);
     let totalBip = 0;
 
     for (const r of rows) {
@@ -381,9 +401,20 @@ async function fetchBatterZoneCounts(batterId, { vsHand = 'R', season = SEASON }
       counts[idx]++;
       totalBip++;
       if (r.events === 'home_run') hrs[idx]++;
+
+      const ev = parseFloat(r.launch_speed);
+      if (Number.isFinite(ev)) {
+        evSum[idx] += ev;
+        evCount[idx]++;
+        if (ev >= 95) hardHits[idx]++;
+      }
+      // Statcast classifies each batted ball; launch_speed_angle bucket 6 = Barrel.
+      if (parseInt(r.launch_speed_angle, 10) === 6) barrels[idx]++;
+      const xw = parseFloat(r.estimated_woba_using_speedangle);
+      if (Number.isFinite(xw)) { xwSum[idx] += xw; xwCount[idx]++; }
     }
 
-    return { counts, hrs, totalBip };
+    return { counts, hrs, totalBip, hardHits, barrels, evSum, evCount, xwSum, xwCount };
   } catch {
     return null;
   }
@@ -459,8 +490,23 @@ export async function fetchPitcherZones(pitcherId, { vsHand = 'R', season = SEAS
     const stats = new Array(ZONE_N).fill(null).map(() => ({
       pitches: 0, hrs: 0, swings: 0, whiffs: 0,
       contacts: 0, hardHits: 0, xwobaSum: 0, xwobaCount: 0,
+      evSum: 0, barrels: 0,
+      // Batting line allowed, attributed to the zone of the PA-ending pitch.
+      // These are intentionally sparse per cell (a pitcher allows few batted
+      // balls per zone) — the client flags them as small-sample.
+      ab: 0, hits: 0, tb: 0,
     }));
     let total = 0;
+
+    // PA outcome → total bases (for SLG). Any other AB-ending outcome counts
+    // toward AB only (AVG/SLG denominator). Walks/HBP/sacs are NOT at-bats and
+    // are intentionally absent from both maps.
+    const HIT_TB = { single: 1, double: 2, triple: 3, home_run: 4 };
+    const OUT_AB = new Set([
+      'strikeout', 'strikeout_double_play', 'field_out', 'force_out',
+      'grounded_into_double_play', 'double_play', 'triple_play',
+      'fielders_choice', 'fielders_choice_out', 'field_error',
+    ]);
 
     // Savant `description` values that count as the batter SWUNG. Anything
     // resulting in a batted-ball event counts too (a hit/out IS a swing).
@@ -484,6 +530,14 @@ export async function fetchPitcherZones(pitcherId, { vsHand = 'R', season = SEAS
 
       if (r.events === 'home_run') s.hrs++;
 
+      // Batting line allowed (AVG/SLG/ISO). `events` is only set on the final
+      // pitch of a PA, so each PA is counted once, in that pitch's zone.
+      if (r.events && HIT_TB[r.events] != null) {
+        s.hits++; s.tb += HIT_TB[r.events]; s.ab++;
+      } else if (r.events && OUT_AB.has(r.events)) {
+        s.ab++;
+      }
+
       const desc = r.description || '';
       const hasEvent = r.events && r.events !== '' && r.events !== 'null';
       if (SWING_DESCS.has(desc) || hasEvent) s.swings++;
@@ -498,8 +552,11 @@ export async function fetchPitcherZones(pitcherId, { vsHand = 'R', season = SEAS
         const ev = parseFloat(r.launch_speed);
         if (Number.isFinite(ev)) {
           s.contacts++;
+          s.evSum += ev;
           if (ev >= 95) s.hardHits++;
         }
+        // Statcast barrel bucket (launch_speed_angle === 6).
+        if (parseInt(r.launch_speed_angle, 10) === 6) s.barrels++;
         const xw = parseFloat(r.estimated_woba_using_speedangle);
         if (Number.isFinite(xw)) {
           s.xwobaSum   += xw;
@@ -514,7 +571,14 @@ export async function fetchPitcherZones(pitcherId, { vsHand = 'R', season = SEAS
       hrCount:    s.hrs,
       whiffPct:   s.swings   > 0 ? +(s.whiffs   / s.swings).toFixed(4)   : null,
       hardHitPct: s.contacts > 0 ? +(s.hardHits / s.contacts).toFixed(4) : null,
+      barrelPct:  s.contacts > 0 ? +(s.barrels  / s.contacts).toFixed(4) : null,
+      ev:         s.contacts > 0 ? +(s.evSum    / s.contacts).toFixed(1) : null,
       xwoba:      s.xwobaCount > 0 ? +(s.xwobaSum / s.xwobaCount).toFixed(3) : null,
+      // Batting line allowed — sparse per zone; client flags small samples.
+      avg:        s.ab > 0 ? +(s.hits / s.ab).toFixed(3) : null,
+      slg:        s.ab > 0 ? +(s.tb / s.ab).toFixed(3) : null,
+      iso:        s.ab > 0 ? +((s.tb - s.hits) / s.ab).toFixed(3) : null,
+      abAllowed:  s.ab,
       contacts:   s.contacts,
     }));
 

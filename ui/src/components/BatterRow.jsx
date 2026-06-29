@@ -223,7 +223,7 @@ export default function BatterRow({
 
           <div className="col-prob">
             <ProbRing value={b.hrProbability} color={color} />
-            <span className="prob-num-mobile mono" style={{ color, fontWeight: '700' }}>
+            <span className="prob-num-mobile mono" style={{ color: g === 'SKIP' ? 'var(--text-dim)' : color, fontWeight: '700' }}>
               {pct(b.hrProbability, 1)}
             </span>
           </div>

@@ -8,6 +8,9 @@
      the iOS home-screen PWA. */
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  /* Trap rubber-band overscroll here so it can't chain to the locked body and
+     jitter the fixed bottom-nav / slip on iOS. */
+  overscroll-behavior: none;
 }
 .main {
   flex: 1;
@@ -688,6 +691,9 @@ button.th:focus-visible {
   isolation: isolate;
   transition: all 0.2s cubic-bezier(0.22, 1, 0.36, 1);
   text-align: left;
+  /* Vertical breathing room so the multi-line content doesn't kiss the
+     row separators (the shared .board-head/.board-row rule sets 0 16px). */
+  padding: 12px 16px;
 }
 .board-row::before {
   content: '';
@@ -738,6 +744,14 @@ button.th:focus-visible {
    Edge pills sit behind the row at opacity 0 and fade in as you swipe. */
 .board-swipe {
   position: relative;
+  /* Clear separator between players. Lives on the swipe wrapper (the stable
+     list item) rather than .board-row — every .board-row is the last child of
+     its own .board-swipe, so a :last-child rule on the row would hit them all.
+     The row itself translates on hover/swipe; the wrapper border stays put. */
+  border-bottom: 1px solid var(--border);
+}
+.board-body > .board-swipe:last-child {
+  border-bottom: none;
 }
 .board-swipe-actions {
   position: absolute;
@@ -4841,6 +4855,67 @@ button.th:focus-visible {
 .zc-v { font-size: 14px; font-weight: 700; color: #fff; }
 .zc-n { font-size: 9px; color: rgba(255, 255, 255, 0.5); }
 
+/* ---- Reimagined 3×3 strike-zone attack map (z3-) ---- */
+.z3-seg {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-soft);
+  border-radius: 9px;
+}
+.z3-seg-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 11px;
+  border-radius: 7px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-faint);
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s, box-shadow 0.15s;
+}
+.z3-seg-btn:hover { color: var(--text-dim); }
+.z3-seg-btn.on {
+  color: #061016;
+  background: var(--accent);
+  box-shadow: 0 2px 10px rgba(0, 216, 246, 0.3);
+}
+.z3-cell {
+  transition: transform 0.12s ease, box-shadow 0.2s ease;
+}
+.z3-cell:hover {
+  transform: scale(1.05);
+  z-index: 2;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+}
+.z3-cell.matched {
+  outline: 2px solid var(--prime);
+  outline-offset: -2px;
+  animation: z3pulse 2.6s ease-in-out infinite;
+}
+@keyframes z3pulse {
+  0%, 100% { box-shadow: 0 0 0 1px var(--prime), 0 0 7px rgba(245, 158, 11, 0.35); }
+  50%      { box-shadow: 0 0 0 1px var(--prime), 0 0 15px rgba(245, 158, 11, 0.6); }
+}
+.z3-flame {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  color: var(--prime);
+  filter: drop-shadow(0 0 3px rgba(245, 158, 11, 0.7));
+  display: inline-flex;
+}
+@media (prefers-reduced-motion: reduce) {
+  .z3-cell.matched { animation: none; box-shadow: 0 0 0 1px var(--prime), 0 0 10px rgba(245, 158, 11, 0.4); }
+}
+@media (max-width: 720px) {
+  .z3-wrap { grid-template-columns: 1fr !important; }
+}
+
 .zone-legend {
   display: flex;
   align-items: center;
@@ -7357,6 +7432,53 @@ button.th:focus-visible {
   .grp-strategy {
     font-size: 13.5px !important;
   }
+}
+
+/* ============ Mobile polish pass (audit-driven) ============ */
+/* Full-height screens use dvh + safe-area so content clears the notch / home
+   indicator instead of clipping under it. */
+.screen-center {
+  min-height: 100dvh;
+  padding: calc(20px + env(safe-area-inset-top, 0px)) 20px calc(20px + env(safe-area-inset-bottom, 0px));
+}
+.crash {
+  min-height: 100dvh;
+  padding: calc(20px + env(safe-area-inset-top, 0px)) 20px calc(20px + env(safe-area-inset-bottom, 0px));
+}
+@media (max-width: 560px) {
+  /* 16px form fields stop iOS from zoom-on-focus, which detaches the sticky
+     topbar / fixed bottom chrome. */
+  .search input,
+  .sel-btn,
+  .select-wrap select { font-size: 16px; }
+  /* Row-action tap targets were 26–28px — below the 32px touch floor. */
+  .col-actions { width: 36px !important; }
+  .col-actions .act-btn { width: 34px !important; height: 34px !important; }
+  /* The quickstats chip line duplicates the big HR% and crowds the row. */
+  .batter-quickstats { display: none !important; }
+  /* Track-record table: tighten so the 6 columns fit a 360px row. */
+  .daily-row { column-gap: 4px; padding: 8px; }
+  .daily-th { font-size: 9px; }
+  /* Lift sub-10px content labels to the legibility floor. */
+  .kv-k, .mini-k, .cell-k, .zrb-cap,
+  .hero-main-label, .cell-unit { font-size: 10px; color: rgba(255, 255, 255, 0.62); }
+  /* Pick-of-the-Day actions: the inline desktop corner-absolute placement
+     covers the wrapped checklist on a narrow card — flow them instead. */
+  .potd-actions {
+    position: static !important;
+    bottom: auto !important;
+    right: auto !important;
+    justify-content: flex-end;
+    margin-top: 8px;
+  }
+  /* Game-of-the-Day card: tighten the inline desktop padding/margin on phones. */
+  .god-card {
+    padding: 13px 15px !important;
+    margin-bottom: 16px !important;
+  }
+  /* Combo result rows: let the legs wrap onto their own full-width line
+     instead of being squeezed beside the fixed strat/size columns. */
+  .combo-res-legs { flex: 1 1 100% !important; }
 }
 
 

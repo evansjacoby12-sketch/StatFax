@@ -112,7 +112,7 @@ export default function PitchersView({ batters, kDistByPitcher = {}, liveKsByPit
       ) : view === 'preview' ? (
         <PitcherPreview pitchers={grouped} onSelect={onSelect} />
       ) : (
-        <div className="pitchers" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: '20px' }}>
+        <div className="pitchers" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(420px, 100%), 1fr))', gap: '20px' }}>
           {pitchers.map((e) => (
             <PitcherCard
               key={e.key}

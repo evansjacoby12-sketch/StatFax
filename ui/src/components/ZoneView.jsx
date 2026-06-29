@@ -1,6 +1,5 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import Icon from './Icon.jsx'
-import { GradeChip } from './atoms.jsx'
 import { pct, num, rate } from '../lib/format.js'
 import { gradeColor } from '../lib/badges.js'
 import { hexA } from './atoms.jsx'
@@ -10,21 +9,32 @@ const p0 = (v) => (v == null || Number.isNaN(v) ? '—' : pct(v, 0))
 const n1 = (v) => (v == null || Number.isNaN(v) ? '—' : num(v, 1))
 const i0 = (v) => (v == null || Number.isNaN(v) ? '—' : String(Math.round(v)))
 
+// Order mirrors the requested spec. Capability-gating (hasMetric, below) hides
+// any metric the loaded grid doesn't carry yet, so this list can run ahead of
+// the server data — new chips light up automatically once a zone refetch lands.
 const BATTER_METRICS = [
   { key: 'iso', label: 'ISO', fmt: r3 },
   { key: 'slg', label: 'SLG', fmt: r3 },
-  { key: 'ops', label: 'OPS', fmt: r3 },
   { key: 'avg', label: 'AVG', fmt: r3 },
+  { key: 'xwoba', label: 'wOBA', fmt: r3 },
+  { key: 'hardHitPct', label: 'HH%', fmt: p0 },
+  { key: 'barrelPct', label: 'BRL', fmt: p0 },
   { key: 'ev', label: 'EV', fmt: n1 },
-  { key: 'hrCount', label: 'HR', fmt: i0 },
 ]
 const PITCHER_METRICS = [
-  { key: 'freq', label: 'Usage', fmt: p0 },
-  { key: 'xwoba', label: 'xwOBA', fmt: r3 },
-  { key: 'hardHitPct', label: 'Hard%', fmt: p0 },
-  { key: 'whiffPct', label: 'Whiff%', fmt: p0 },
-  { key: 'hrCount', label: 'HR', fmt: i0 },
+  { key: 'freq', label: 'Location', fmt: p0 },
+  { key: 'iso', label: 'ISO', fmt: r3 },
+  { key: 'slg', label: 'SLG', fmt: r3 },
+  { key: 'avg', label: 'AVG', fmt: r3 },
+  { key: 'xwoba', label: 'wOBA', fmt: r3 },
+  { key: 'hardHitPct', label: 'HH%', fmt: p0 },
+  { key: 'barrelPct', label: 'BRL', fmt: p0 },
+  { key: 'ev', label: 'EV', fmt: n1 },
+  { key: 'whiffPct', label: 'Whiff', fmt: p0 },
 ]
+// Pitcher batting-line metrics are sparse per zone (few batted balls allowed),
+// so we surface a small-sample caveat when one of them is the active lens.
+const PITCHER_SPARSE = new Set(['iso', 'slg', 'avg'])
 
 const PITCHES = [
   { code: 'ff', label: '4-Seam', bucket: 'fastball' },
@@ -43,90 +53,44 @@ const PITCH_FILTERS = [
   { key: 'offspeed', label: 'Offspeed' },
 ]
 
+// Catcher's view, top-row = up in the zone. "Heart" = dead-center (1).
+const ZONE_NAMES = ['Up & Left', 'Up', 'Up & Right', 'Left', 'Heart', 'Right', 'Low & Left', 'Low', 'Low & Right']
+
+// Cool→hot ramp tuned for the dark theme: muted blue (cold) → red-orange (hot).
 function heatColor(t) {
-  if (t == null || Number.isNaN(t)) return 'var(--card-2)'
-  const h = 220 - 180 * t
-  const s = 45 + 35 * t
-  const l = 15 + 25 * t
+  if (t == null || Number.isNaN(t)) return 'rgba(148,163,184,0.05)'
+  const h = 220 - 208 * t
+  const s = 42 + 48 * t
+  const l = 15 + 31 * t
   return `hsl(${h} ${s}% ${l}%)`
 }
 
-// Map the 13 Statcast zones onto a full 5×5 grid (row-major). The center 3×3
-// holds in-zone indices 0–8 (zones 1–9); the outer ring is filled by the 4
-// chase indices 9–12 (zones 11–14: TL, TR, BL, BR). The four edge-midpoints
-// blend the two chase zones they sit between so the fill reads symmetric.
-const MAP25 = [
-  [9], [9], [9, 10], [10], [10],
-  [9], [0], [1], [2], [10],
-  [9, 11], [3], [4], [5], [10, 12],
-  [11], [6], [7], [8], [12],
-  [11], [11], [11, 12], [12], [12],
-]
-const avg = (arr) => (arr.length ? arr.reduce((s, x) => s + x, 0) / arr.length : null)
-
-function Heatmap({ grid, metric, fmt, matched }) {
-  const vals = grid.map((c) => c?.[metric]).filter((v) => Number.isFinite(v))
-  const min = vals.length ? Math.min(...vals) : 0
-  const max = vals.length ? Math.max(...vals) : 1
-  const is13 = grid.length >= 13
-  // 5×5 display cells from the 13-zone source (or the raw grid when it's a
-  // smaller 9-cell in-zone-only grid).
-  const cells = is13
-    ? MAP25.map((src) => {
-        const vs = src.map((j) => grid[j]?.[metric]).filter((v) => Number.isFinite(v))
-        const chase = src.every((j) => j >= 9)
-        return {
-          v: avg(vs),
-          count: chase ? null : (grid[src[0]]?.count ?? null),
-          chase,
-          matched: src.some((j) => matched?.includes(j)),
-        }
-      })
-    : grid.map((c, i) => ({ v: c?.[metric], count: c?.count ?? null, chase: false, matched: matched?.includes(i) }))
-  const cols = is13 ? 5 : Math.max(1, Math.ceil(Math.sqrt(grid.length)))
-  return (
-    <div className={`zone-grid ${is13 ? 'zone-grid-13' : ''}`} role="img" aria-label="Strike-zone heatmap" style={{
-      display: 'grid',
-      gridTemplateColumns: `repeat(${cols}, 1fr)`,
-      gridTemplateRows: `repeat(${cols}, 1fr)`,
-      gap: '4px',
-      background: 'rgba(0,0,0,0.2)',
-      border: '1px solid rgba(255,255,255,0.06)',
-      padding: '6px',
-      borderRadius: '12px',
-      aspectRatio: '1',
-      width: '100%',
-      maxWidth: '300px',
-      margin: '0 auto'
-    }}>
-      {cells.map((c, i) => {
-        const t = Number.isFinite(c.v) && max > min ? (c.v - min) / (max - min) : null
-        return (
-          <div
-            key={i}
-            className={`zone-cell ${c.matched ? 'matched' : ''} ${c.chase ? 'zone-chase' : ''}`}
-            style={{
-              background: heatColor(t),
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'center',
-              alignItems: 'center',
-              borderRadius: '6px',
-              position: 'relative',
-              border: c.matched ? '2px solid var(--accent)' : c.chase ? '1px dashed rgba(255,255,255,0.22)' : 'none',
-              boxShadow: c.matched ? '0 0 8px var(--accent-glow)' : 'none',
-              opacity: c.chase ? 0.9 : 1
-            }}
-            title={c.chase ? 'Chase zone (outside the strike zone)' : undefined}
-          >
-            <span className="zc-v mono" style={{ fontSize: '10px', fontWeight: '800', color: '#fff' }}>{fmt(c.v)}</span>
-            {c.count != null && c.count > 0 && <span className="zc-n mono" style={{ fontSize: '8px', color: 'var(--text-faint)', position: 'absolute', bottom: '2px', right: '4px' }}>{c.count}</span>}
-          </div>
-        )
-      })}
-    </div>
-  )
+// The strike zone is the first 9 cells of the source grid (zones 1–9), whether
+// the grid is the 13-zone (in-zone + chase) or a bare 9-cell shape.
+function inZone(grid) {
+  if (!Array.isArray(grid) || grid.length < 9) return null
+  return Array.from({ length: 9 }, (_, i) => grid[i] || null)
 }
+
+// Returns a min-max normalizer over the finite values (single-value → 0.5).
+function normalizer(vals) {
+  const fin = vals.filter((v) => Number.isFinite(v))
+  if (!fin.length) return () => null
+  const min = Math.min(...fin)
+  const max = Math.max(...fin)
+  return (v) => (!Number.isFinite(v) ? null : max > min ? (v - min) / (max - min) : 0.5)
+}
+
+// A metric is "available" only if at least one zone in the grid carries a real
+// value for it — lets the UI offer the full metric list but show only the lenses
+// the current data actually supports.
+const hasMetric = (grid, key) => Array.isArray(grid) && grid.some((c) => Number.isFinite(c?.[key]))
+
+const MODES = [
+  { key: 'attack', label: 'Attack', icon: 'Crosshair' },
+  { key: 'batter', label: 'Batter', icon: 'User' },
+  { key: 'pitcher', label: 'Pitcher', icon: 'Shield' },
+]
 
 function MetricChips({ metrics, value, onChange }) {
   return (
@@ -142,8 +106,8 @@ function MetricChips({ metrics, value, onChange }) {
             background: value === m.key ? 'var(--hover)' : 'transparent',
             color: value === m.key ? '#fff' : 'var(--text-faint)',
             fontSize: '10px',
-            padding: '2px 6px',
-            borderRadius: '4px'
+            padding: '2px 7px',
+            borderRadius: '5px',
           }}
         >
           {m.label}
@@ -153,7 +117,76 @@ function MetricChips({ metrics, value, onChange }) {
   )
 }
 
+// The framed 3×3 strike zone with a home-plate base for orientation.
+function ZoneStrike({ cells, mode, bFmt, pFmt }) {
+  return (
+    <div className="z3-frame" style={{ width: '100%', maxWidth: '320px', margin: '0 auto' }}>
+      <div className="z3-stage" style={{ position: 'relative', padding: '4px 4px 0' }}>
+        <div
+          className="z3-grid"
+          role="img"
+          aria-label="Strike-zone 3 by 3 attack map"
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, 1fr)',
+            gridTemplateRows: 'repeat(3, 1fr)',
+            gap: '5px',
+            aspectRatio: '1 / 1',
+            padding: '7px',
+            borderRadius: '14px',
+            background: 'rgba(0,0,0,0.28)',
+            border: '1px solid rgba(255,255,255,0.10)',
+            boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.03), 0 6px 18px rgba(0,0,0,0.35)',
+          }}
+        >
+          {cells.map((c) => {
+            const t = mode === 'attack' ? c.edgeT : mode === 'batter' ? c.bT : c.pT
+            const big = mode === 'attack' ? r3(c.iso) : mode === 'batter' ? bFmt(c.bVal) : pFmt(c.pVal)
+            const sub =
+              mode === 'attack'
+                ? c.usage != null ? p0(c.usage) : null
+                : c.count != null && c.count > 0 ? `${c.count}` : null
+            return (
+              <div
+                key={c.i}
+                className={`z3-cell ${c.matched ? 'matched' : ''}`}
+                title={`${c.name}${c.iso != null ? ` · ISO ${r3(c.iso)}` : ''}${c.usage != null ? ` · ${p0(c.usage)} usage` : ''}${c.count ? ` · ${c.count} BIP` : ''}`}
+                style={{
+                  position: 'relative',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '1px',
+                  borderRadius: '9px',
+                  background: heatColor(t),
+                  border: '1px solid rgba(255,255,255,0.06)',
+                  cursor: 'default',
+                }}
+              >
+                {c.matched && (
+                  <span className="z3-flame" aria-hidden="true">
+                    <Icon name="Flame" size={9} />
+                  </span>
+                )}
+                <span className="z3-val mono" style={{ fontSize: '14px', fontWeight: '800', color: '#fff', lineHeight: 1, textShadow: '0 1px 3px rgba(0,0,0,0.5)' }}>{big}</span>
+                {sub != null && <span className="z3-sub mono" style={{ fontSize: '8.5px', fontWeight: '600', color: 'rgba(255,255,255,0.62)', lineHeight: 1 }}>{mode === 'attack' ? sub : `${sub} BIP`}</span>}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+      {/* home plate */}
+      <svg viewBox="0 0 120 22" width="64" style={{ display: 'block', margin: '2px auto 0' }} aria-hidden="true">
+        <polygon points="10,2 110,2 110,11 60,20 10,11" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.22)" strokeWidth="1.5" />
+      </svg>
+      <div className="z3-view dim" style={{ textAlign: 'center', fontSize: '10px', color: 'var(--text-faint)', marginTop: '2px' }}>Catcher&apos;s view</div>
+    </div>
+  )
+}
+
 export default function ZoneView({ batter: b, onClose }) {
+  const [mode, setMode] = useState('attack')
   const [bMetric, setBMetric] = useState('iso')
   const [pMetric, setPMetric] = useState('freq')
   const [pitchFilter, setPitchFilter] = useState('all')
@@ -161,8 +194,64 @@ export default function ZoneView({ batter: b, onClose }) {
   const z = b?.zoneMatchup
   const color = gradeColor(b?.grade?.label || 'SKIP')
 
-  const bFmt = BATTER_METRICS.find((m) => m.key === bMetric)?.fmt || r3
-  const pFmt = PITCHER_METRICS.find((m) => m.key === pMetric)?.fmt || r3
+  // Only offer the metric lenses the loaded grids actually carry. If the
+  // selected metric isn't available (e.g. old cached zone data), fall back to
+  // the first available one so the map never goes blank.
+  const bMetricsAvail = BATTER_METRICS.filter((m) => hasMetric(z?.batter?.grid, m.key))
+  const pMetricsAvail = PITCHER_METRICS.filter((m) => hasMetric(z?.pitcher?.grid, m.key))
+  const bMetricEff = bMetricsAvail.some((m) => m.key === bMetric) ? bMetric : (bMetricsAvail[0]?.key || 'iso')
+  const pMetricEff = pMetricsAvail.some((m) => m.key === pMetric) ? pMetric : (pMetricsAvail[0]?.key || 'freq')
+  const bFmt = BATTER_METRICS.find((m) => m.key === bMetricEff)?.fmt || r3
+  const pFmt = PITCHER_METRICS.find((m) => m.key === pMetricEff)?.fmt || r3
+
+  // Zone Rating on the requested 1–5 scale (server emits 0–10).
+  const rating5 = z?.zoneRating != null ? Math.max(0, Math.min(5, Math.round((z.zoneRating / 2) * 10) / 10)) : null
+
+  // Build the 9-cell strike-zone model once: per-zone batter value, pitcher
+  // value, and a fused "edge" (where the batter does damage AND the pitcher
+  // lives) used as the default Attack heat.
+  const cells = useMemo(() => {
+    const bGrid = inZone(z?.batter?.grid)
+    const pGrid = inZone(z?.pitcher?.grid)
+    if (!bGrid && !pGrid) return null
+    const matched = new Set((z?.matchedZones || []).filter((i) => i >= 0 && i < 9))
+
+    const bSel = (bGrid || []).map((c) => c?.[bMetricEff])
+    const pSel = (pGrid || []).map((c) => c?.[pMetricEff])
+    const dmg = (bGrid || []).map((c) => c?.iso ?? c?.slg)
+    const use = (pGrid || []).map((c) => c?.freq ?? c?.xwoba)
+    const bN = normalizer(bSel)
+    const pN = normalizer(pSel)
+    const dmgN = normalizer(dmg)
+    const useN = normalizer(use)
+
+    const base = Array.from({ length: 9 }, (_, i) => {
+      const dt = dmgN(dmg[i])
+      const ut = useN(use[i])
+      return {
+        i,
+        name: ZONE_NAMES[i],
+        matched: matched.has(i),
+        bVal: bGrid?.[i]?.[bMetricEff],
+        pVal: pGrid?.[i]?.[pMetricEff],
+        iso: bGrid?.[i]?.iso ?? bGrid?.[i]?.slg ?? null,
+        usage: pGrid?.[i]?.freq ?? null,
+        count: bGrid?.[i]?.count ?? null,
+        bT: bN(bSel[i]),
+        pT: pN(pSel[i]),
+        edgeRaw: dt != null && ut != null ? dt * ut : null,
+      }
+    })
+    const edgeN = normalizer(base.map((c) => c.edgeRaw))
+    base.forEach((c) => { c.edgeT = edgeN(c.edgeRaw) })
+    return base
+  }, [z, bMetricEff, pMetricEff])
+
+  // Attack zones = matched in-zone cells, ranked by fused edge.
+  const attackZones = useMemo(
+    () => (cells || []).filter((c) => c.matched).sort((a, c) => (c.edgeT ?? 0) - (a.edgeT ?? 0)),
+    [cells],
+  )
 
   const arsenal = b?.arsenal || {}
   const mix = b?.pitchMix || {}
@@ -179,14 +268,28 @@ export default function ZoneView({ batter: b, onClose }) {
     .sort((a, c) => (c.usage ?? 0) - (a.usage ?? 0) || String(a.code).localeCompare(String(c.code)))
   const maxUsage = Math.max(1, ...pitchRows.map((p) => p.usage ?? 0))
 
+  const pHand = b?.pitcher?.hand ? `${b.pitcher.hand}HP` : null
+  const modeCaption =
+    mode === 'attack'
+      ? <>Where <b>{b?.name}</b> does damage <i>and</i> <b>{b?.pitcher?.name || 'the starter'}</b> lives — the brighter the cell, the bigger the edge. Flame = a confirmed attack zone.</>
+      : mode === 'batter'
+        ? <>Batter hot/cold zones — where <b>{b?.name}</b> ({b?.batSide}HB) does damage, by <b>{BATTER_METRICS.find((m) => m.key === bMetricEff)?.label}</b>. Small number = batted balls in that zone.</>
+        : <>Pitcher location — where <b>{b?.pitcher?.name || 'the starter'}</b>{pHand ? <> ({pHand})</> : null} works, by <b>{PITCHER_METRICS.find((m) => m.key === pMetricEff)?.label}</b>.{PITCHER_SPARSE.has(pMetricEff) && <span style={{ color: 'var(--prime)' }}> Small sample per zone — read as a tendency, not a number.</span>}</>
+
+  // Mode-aware heat scale: hot/cold for the batter, frequency for the pitcher.
+  const scaleLabel =
+    mode === 'batter' ? 'Cold → Hot'
+    : mode === 'pitcher' ? (pMetricEff === 'freq' ? 'Rare → Frequent' : 'Low → High')
+    : 'Edge: low → high'
+
   return (
     <div className="zone-page" role="dialog" aria-modal="true" aria-label={`${b?.name} zone matchup`} style={{
       position: 'fixed',
       inset: '0',
       zIndex: '150',
       background: 'var(--bg)',
-      padding: '20px',
-      overflowY: 'auto'
+      padding: 'calc(20px + env(safe-area-inset-top, 0px)) 20px calc(20px + env(safe-area-inset-bottom, 0px))',
+      overflowY: 'auto',
     }}>
       <header className="zone-head" style={{
         display: 'flex',
@@ -195,7 +298,8 @@ export default function ZoneView({ batter: b, onClose }) {
         maxWidth: '1000px',
         margin: '0 auto 20px',
         borderBottom: '1px solid rgba(255,255,255,0.06)',
-        paddingBottom: '14px'
+        paddingBottom: '14px',
+        gap: '12px',
       }}>
         <button className="zone-back" onClick={onClose} aria-label="Back" style={{
           display: 'inline-flex',
@@ -207,13 +311,14 @@ export default function ZoneView({ batter: b, onClose }) {
           border: '1px solid rgba(0, 216, 246, 0.25)',
           background: 'rgba(0, 216, 246, 0.05)',
           padding: '6px 14px',
-          borderRadius: '8px'
+          borderRadius: '8px',
+          flexShrink: 0,
         }}>
           <Icon name="ChevronLeft" size={16} />
           Back
         </button>
-        <div className="zone-title" style={{ flex: '1', minWidth: '0', marginLeft: '16px' }}>
-          <div className="zone-matchup-line" style={{ fontSize: '18px', fontWeight: '800', color: '#fff', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+        <div className="zone-title" style={{ flex: '1', minWidth: '0' }}>
+          <div className="zone-matchup-line" style={{ fontSize: '17px', fontWeight: '800', color: '#fff', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
             <span>{b?.name}</span>
             <span className="bathand" style={{ fontSize: '10px', fontFamily: 'var(--mono)', opacity: 0.6 }}>({b?.batSide})</span>
             <span style={{ fontSize: '12px', color: 'var(--text-faint)', fontWeight: '400' }}>vs</span>
@@ -226,8 +331,8 @@ export default function ZoneView({ batter: b, onClose }) {
           </div>
         </div>
         {z?.zoneRating != null && (
-          <div className="zone-rating-badge" style={{ 
-            borderColor: color, 
+          <div className="zone-rating-badge" style={{
+            borderColor: color,
             color,
             borderWidth: '1.5px',
             borderStyle: 'solid',
@@ -235,80 +340,126 @@ export default function ZoneView({ batter: b, onClose }) {
             padding: '4px 12px',
             textAlign: 'center',
             background: hexA(color, 0.06),
-            boxShadow: `0 0 10px ${hexA(color, 0.08)}`
+            boxShadow: `0 0 10px ${hexA(color, 0.08)}`,
+            flexShrink: 0,
           }}>
-            <span className="zrb-n mono" style={{ fontSize: '18px', fontWeight: '800', display: 'block' }}>{num(z.zoneRating, 1)}</span>
+            <span className="zrb-n mono" style={{ fontSize: '18px', fontWeight: '800', display: 'block' }}>{rating5}<span style={{ fontSize: '9px', opacity: 0.6 }}>/5</span></span>
             <span className="zrb-cap" style={{ fontSize: '7px', fontWeight: '700', letterSpacing: '0.08em', textTransform: 'uppercase' }}>ZONE</span>
           </div>
         )}
       </header>
 
       <div className="zone-body" style={{ maxWidth: '1000px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-        {!z ? (
+        {!z || !cells ? (
           <div className="empty-note" style={{ padding: '64px', textAlign: 'center', color: 'var(--text-faint)' }}>No zone data for this matchup yet.</div>
         ) : (
           <>
             <section className="zone-card" style={{
               background: 'rgba(16, 24, 48, 0.45)',
               border: '1px solid rgba(255,255,255,0.06)',
-              borderRadius: '12px',
-              padding: '20px'
+              borderRadius: '14px',
+              padding: '20px',
             }}>
-              <h3 className="zone-h3" style={{ fontSize: '13px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px', color: '#fff' }}>
-                <Icon name="Crosshair" size={14} style={{ color: 'var(--accent)' }} /> Heatmap Matchup
-              </h3>
-              <p className="zone-explain dim" style={{ fontSize: '12px', marginBottom: '20px', lineHeight: '1.4' }}>
-                Where <b>{b?.name}</b> hits (left) vs where <b>{b?.pitcher?.name || 'starter'}</b> throws (right), catcher&apos;s view. Cells highlighted in amber represent the <b>matched zones</b>. {z.matchedZones?.length || 0} matched zones → Zone Rating <b className="mono" style={{ color: 'var(--accent)' }}>{num(z.zoneRating, 1)}</b>.
-              </p>
-
-              <div className="zone-pair" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px', marginBottom: '16px' }}>
-                <div className="zone-side">
-                  <div className="zone-side-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                    <span className="zone-side-label" style={{ fontSize: '13px', fontWeight: '700', color: '#fff' }}>Batter Damage</span>
-                    <MetricChips metrics={BATTER_METRICS} value={bMetric} onChange={setBMetric} />
-                  </div>
-                  {z.batter?.grid ? (
-                    <Heatmap grid={z.batter.grid} metric={bMetric} fmt={bFmt} matched={z.matchedZones} />
-                  ) : (
-                    <div className="empty-note">No batter zone grid.</div>
-                  )}
-                </div>
-
-                <div className="zone-side">
-                  <div className="zone-side-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                    <span className="zone-side-label" style={{ fontSize: '13px', fontWeight: '700', color: '#fff' }}>Pitcher Location</span>
-                    <MetricChips metrics={PITCHER_METRICS} value={pMetric} onChange={setPMetric} />
-                  </div>
-                  {z.pitcher?.grid ? (
-                    <Heatmap grid={z.pitcher.grid} metric={pMetric} fmt={pFmt} matched={z.matchedZones} />
-                  ) : (
-                    <div className="empty-note">No pitcher zone grid.</div>
-                  )}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '8px' }}>
+                <h3 className="zone-h3" style={{ fontSize: '13px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px', color: '#fff' }}>
+                  <Icon name="Crosshair" size={14} style={{ color: 'var(--accent)' }} /> Strike-Zone Attack Map
+                </h3>
+                {/* segmented mode control */}
+                <div className="z3-seg" role="group" aria-label="Map mode">
+                  {MODES.map((m) => (
+                    <button
+                      key={m.key}
+                      className={`z3-seg-btn ${mode === m.key ? 'on' : ''}`}
+                      onClick={() => setMode(m.key)}
+                      aria-pressed={mode === m.key}
+                    >
+                      <Icon name={m.icon} size={11} /> {m.label}
+                    </button>
+                  ))}
                 </div>
               </div>
-              <div className="zone-legend dim" style={{ fontSize: '11px', display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center', justifyContent: 'center', borderTop: '1px solid rgba(255,255,255,0.03)', paddingTop: '12px' }}>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                  <span className="zl-swatch" style={{ background: heatColor(0.05), width: '12px', height: '12px', borderRadius: '3px' }} /> low
-                  <span className="zl-swatch" style={{ background: heatColor(0.95), width: '12px', height: '12px', borderRadius: '3px' }} /> high
-                </span>
-                <span className="zl-sep">·</span>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                  <span className="zl-ring" style={{ width: '10px', height: '10px', borderRadius: '2px', border: '1.5px solid var(--accent)' }} /> matched zone
-                </span>
-                <span className="zl-sep">·</span>
-                <span>small number = batted balls count</span>
+
+              <p className="zone-explain dim" style={{ fontSize: '12px', marginBottom: '16px', lineHeight: '1.45', minHeight: '34px' }}>
+                {modeCaption}
+              </p>
+
+              <div className="z3-wrap" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 320px) 1fr', gap: '22px', alignItems: 'start' }}>
+                <div>
+                  {(mode === 'batter' || mode === 'pitcher') && (
+                    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px' }}>
+                      {mode === 'batter'
+                        ? <MetricChips metrics={bMetricsAvail} value={bMetricEff} onChange={setBMetric} />
+                        : <MetricChips metrics={pMetricsAvail} value={pMetricEff} onChange={setPMetric} />}
+                    </div>
+                  )}
+                  <ZoneStrike cells={cells} mode={mode} bFmt={bFmt} pFmt={pFmt} />
+                </div>
+
+                <div className="z3-readout" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  <div className="z3-edge-head">
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                      <span className="mono" style={{ fontSize: '30px', fontWeight: '800', color: 'var(--accent)', lineHeight: 1 }}>{rating5}<span style={{ fontSize: '14px', color: 'var(--text-faint)', fontWeight: '700' }}>/5</span></span>
+                      <span style={{ fontSize: '11px', color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: '700' }}>Zone Rating</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: '4px', marginTop: '7px' }} aria-label={`Zone rating ${rating5} of 5`}>
+                      {[1, 2, 3, 4, 5].map((n) => (
+                        <span key={n} style={{ width: '11px', height: '11px', borderRadius: '50%', background: n <= Math.round(rating5 ?? 0) ? 'var(--accent)' : 'rgba(255,255,255,0.10)', boxShadow: n <= Math.round(rating5 ?? 0) ? '0 0 6px var(--accent-glow)' : 'none' }} />
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-faint)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <Icon name="Flame" size={12} style={{ color: 'var(--prime)' }} /> Attack zones {attackZones.length ? `(${attackZones.length})` : ''}
+                    </div>
+                    {attackZones.length ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        {attackZones.map((c) => (
+                          <div key={c.i} className="z3-attack-row" style={{
+                            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                            padding: '7px 10px', borderRadius: '8px',
+                            background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.18)',
+                          }}>
+                            <span style={{ fontSize: '12px', fontWeight: '700', color: '#fff' }}>{c.name}</span>
+                            <span className="mono" style={{ fontSize: '11px', color: 'var(--text-dim)', display: 'flex', gap: '10px' }}>
+                              <span title="Batter ISO in this zone" style={{ color: 'var(--prime)', fontWeight: '700' }}>{r3(c.iso)}</span>
+                              {c.usage != null && <span title="Pitcher usage to this zone">{p0(c.usage)}</span>}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="dim" style={{ fontSize: '12px', color: 'var(--text-faint)', margin: 0 }}>
+                        No standout overlap — this pitcher avoids {b?.name?.split(' ').slice(-1)[0] || 'his'} damage zones.
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="z3-legend dim" style={{ fontSize: '11px', display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '12px', color: 'var(--text-faint)' }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                      <span style={{ display: 'inline-flex', borderRadius: '3px', overflow: 'hidden' }}>
+                        {[0.05, 0.4, 0.7, 0.95].map((t) => <span key={t} style={{ width: '11px', height: '11px', background: heatColor(t), display: 'inline-block' }} />)}
+                      </span>
+                      {scaleLabel}
+                    </span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                      <span style={{ width: '11px', height: '11px', borderRadius: '3px', border: '1.5px solid var(--prime)', boxShadow: '0 0 6px rgba(245,158,11,0.5)' }} /> attack zone
+                    </span>
+                  </div>
+                </div>
               </div>
             </section>
 
             <section className="zone-card" style={{
               background: 'rgba(16, 24, 48, 0.45)',
               border: '1px solid rgba(255,255,255,0.06)',
-              borderRadius: '12px',
-              padding: '20px'
+              borderRadius: '14px',
+              padding: '20px',
             }}>
               <div className="zone-side-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
                 <h3 className="zone-h3" style={{ fontSize: '13px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px', color: '#fff' }}>
-                  <Icon name="Layers" size={14} style={{ color: 'var(--accent)' }} /> Pitch types breakdown
+                  <Icon name="Layers" size={14} style={{ color: 'var(--accent)' }} /> Pitch types
+                  {b?.pitcher?.name && <span style={{ fontSize: '11px', fontWeight: '600', textTransform: 'none', letterSpacing: 0, color: 'var(--text-faint)' }}>· {b.pitcher.name}{pHand ? ` (${pHand})` : ''}</span>}
                 </h3>
                 <div className="zone-metrics" role="group" aria-label="Filter pitch types">
                   {PITCH_FILTERS.map((f) => (
@@ -323,7 +474,7 @@ export default function ZoneView({ batter: b, onClose }) {
                         color: pitchFilter === f.key ? '#fff' : 'var(--text-faint)',
                         fontSize: '10px',
                         padding: '2px 8px',
-                        borderRadius: '4px'
+                        borderRadius: '4px',
                       }}
                     >
                       {f.label}
@@ -350,13 +501,13 @@ export default function ZoneView({ batter: b, onClose }) {
                         <span className="pitch-bar-track" style={{ flex: '1', height: '6px', background: 'rgba(255,255,255,0.05)', borderRadius: '99px', overflow: 'hidden' }}>
                           <span
                             className="pitch-bar-fill"
-                            style={{ 
+                            style={{
                               display: 'block',
                               height: '100%',
                               width: `${((p.usage ?? 0) / maxUsage) * 100}%`,
                               background: 'var(--accent)',
                               borderRadius: '99px',
-                              boxShadow: '0 0 6px var(--accent-glow)'
+                              boxShadow: '0 0 6px var(--accent-glow)',
                             }}
                           />
                         </span>
@@ -393,7 +544,7 @@ function Bucket({ label, usage, slg }) {
       padding: '10px 14px',
       display: 'flex',
       flexDirection: 'column',
-      gap: '4px'
+      gap: '4px',
     }}>
       <span className="zb-label dim" style={{ fontSize: '11px', color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</span>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>

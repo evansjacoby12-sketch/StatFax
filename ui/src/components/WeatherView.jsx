@@ -112,7 +112,7 @@ export default function WeatherView({ batters, onSelect, selectedId }) {
       </div>
 
       {games.length ? (
-        <div className="wx-games" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px' }}>
+        <div className="wx-games" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(320px, 100%), 1fr))', gap: '16px' }}>
           {games.map((g) => (
             <WeatherCard key={g.gamePk} g={g} onSelect={onSelect} selectedId={selectedId} />
           ))}

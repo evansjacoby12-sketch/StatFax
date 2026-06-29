@@ -461,29 +461,40 @@ function StatcastTrend({ bips }) {
   const maxEV = evVals.length ? Math.max(...evVals) : 105
   const rangeEV = Math.max(maxEV - minEV, 8)
 
+  const mid = Math.floor(games.length / 2)
   return (
     <Section title="Exit Velo Trend (per game)" icon="TrendingUp">
-      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 64, padding: '0 2px' }}>
+      {/* Bars all share one baseline — the date labels live in their own row
+          below, not inside each bar column (which used to make labelled bars
+          float higher than the rest). */}
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 72, padding: '0 1px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
         {games.map((g, i) => {
-          const h = g.avgEV != null ? Math.max(4, ((g.avgEV - minEV) / rangeEV) * 54 + 10) : 3
-          const clr = g.avgEV == null ? 'rgba(100,100,100,0.25)'
+          const h = g.avgEV != null ? Math.max(6, ((g.avgEV - minEV) / rangeEV) * 58 + 10) : 4
+          const clr = g.avgEV == null ? 'rgba(148,163,184,0.18)'
             : g.avgEV >= 95 ? 'var(--b-hot)'
             : g.avgEV >= 90 ? '#facc15'
-            : '#6b7280'
+            : '#64748b'
           return (
-            <div key={i} title={g.avgEV != null ? `${g.date}: ${g.avgEV.toFixed(1)} mph avg EV · ${g.bip} BIP` : g.date}
-              style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'default' }}>
-              <div style={{ width: '100%', height: h, background: clr, borderRadius: '2px 2px 0 0', minHeight: 2 }}/>
-              {i % 5 === 0 && (
-                <div style={{ fontSize: 8, color: 'var(--text-faint)', writingMode: 'vertical-rl', marginTop: 2, transform: 'rotate(180deg)', lineHeight: 1 }}>{g.date}</div>
-              )}
+            <div key={i} title={g.avgEV != null ? `${g.date}: ${g.avgEV.toFixed(1)} mph avg EV · ${g.bip} BIP` : `${g.date}: no tracked BIP`}
+              style={{ flex: 1, height: '100%', display: 'flex', alignItems: 'flex-end', cursor: 'default' }}>
+              <div style={{ width: '100%', height: h, background: clr, borderRadius: '3px 3px 0 0', minHeight: 3 }}/>
             </div>
           )
         })}
       </div>
-      <div style={{ display: 'flex', gap: 14, marginTop: 8, fontSize: 10, color: 'var(--text-faint)', justifyContent: 'center' }}>
-        <span>≥95 mph = <span style={{ color: 'var(--b-hot)' }}>hard hit</span></span>
-        <span>≥90 mph = <span style={{ color: '#facc15' }}>solid</span></span>
+      {/* Horizontal date axis: first · middle · last */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 5, fontSize: 9, color: 'var(--text-faint)', fontFamily: 'var(--mono)' }}>
+        <span>{games[0]?.date}</span>
+        {games.length > 2 && <span>{games[mid]?.date}</span>}
+        <span>{games[games.length - 1]?.date}</span>
+      </div>
+      <div style={{ display: 'flex', gap: 16, marginTop: 10, fontSize: 10, color: 'var(--text-faint)', justifyContent: 'center' }}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+          <span style={{ width: 8, height: 8, borderRadius: 2, background: 'var(--b-hot)' }} /> ≥95 hard hit
+        </span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+          <span style={{ width: 8, height: 8, borderRadius: 2, background: '#facc15' }} /> ≥90 solid
+        </span>
       </div>
     </Section>
   )

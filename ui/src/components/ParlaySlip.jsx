@@ -43,12 +43,10 @@ export default function ParlaySlip({ legs, onRemove, onClear, onSelect, onOpenBu
 
   return (
     <div className={`slip ${open ? 'open' : ''}`} style={{
-      position: 'fixed',
-      bottom: '20px',
-      right: '20px',
-      zIndex: '100',
-      width: '380px',
-      maxWidth: 'calc(100vw - 40px)',
+      /* Geometry (position/bottom/right/width/z-index) is owned by app.css —
+         base .slip for desktop, the @560 rules for the mobile bottom-sheet
+         placement above the nav. Inline geometry here used to override the
+         mobile rules and make the slip overlap the bottom-nav. */
       background: 'var(--glass-bg)',
       border: '1px solid rgba(255, 255, 255, 0.08)',
       boxShadow: 'var(--glass-shadow)',

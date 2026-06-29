@@ -50,6 +50,9 @@
   --radius: 16px;
   --radius-sm: 10px;
   --radius-lg: 24px;
+  /* Floating-chrome elevation. Consumed by drawers/modals/slip/back-to-top —
+     was referenced but never defined, so those surfaces rendered flat. */
+  --shadow-lg: 0 12px 40px -8px rgba(0, 0, 0, 0.7), 0 2px 8px rgba(0, 0, 0, 0.5);
   
   --mono: 'JetBrains Mono', monospace;
   --sans: 'Inter', sans-serif;
@@ -66,6 +69,9 @@
 
 html {
   -webkit-text-size-adjust: 100%;
+  /* Kill the grey/blue tap-flash on the OLED dark theme — the custom
+     :active scale feedback replaces it. */
+  -webkit-tap-highlight-color: transparent;
 }
 
 html,
