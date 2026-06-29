@@ -7,6 +7,7 @@ export default function Settings({
   autoRefresh, onToggleAuto,
   windowMode, onToggleWindows,
   showDayRating, onToggleDayRating,
+  splitProjected, onToggleSplit,
   comboConf, onSetComboConf,
   favorConsistency, onToggleConsistency,
   eliLevel, onSetEli,
@@ -29,6 +30,13 @@ export default function Settings({
           desc: 'Show the 1-5★ "should I bet HR props today?" gauge at the top of the board.',
           on: showDayRating,
           toggle: onToggleDayRating,
+        },
+        {
+          icon: 'List',
+          label: 'Lineup grouping',
+          desc: 'Keep confirmed-lineup plays on top and group not-yet-posted (projected) bats under a collapsible divider, so the board stops reshuffling before lineups drop. Off = one flat board ranked purely by your sort.',
+          on: splitProjected,
+          toggle: onToggleSplit,
         },
         {
           icon: 'Sparkles',

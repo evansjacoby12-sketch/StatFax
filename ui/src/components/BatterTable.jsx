@@ -27,6 +27,7 @@ export default function BatterTable({
   onToggleWatch,
   onToggleSlip,
   onOpenPitcher,
+  splitProjected = true,
 }) {
   const [projOpen, setProjOpen] = useState(true)
   const HeadCol = ({ k, children, className, title }) => {
@@ -95,8 +96,9 @@ export default function BatterTable({
           </div>
         ) : (() => {
           // batters arrive confirmed-first (App.jsx sort), so all confirmed bats
-          // are one contiguous block at the top; the rest are projected.
-          const firstProj = batters.findIndex((b) => !b.lineupConfirmed)
+          // are one contiguous block at the top; the rest are projected. When the
+          // split is toggled off, firstProj = -1 → one flat, undivided list.
+          const firstProj = splitProjected ? batters.findIndex((b) => !b.lineupConfirmed) : -1
           const renderRow = (b, rank) => (
             <BatterRow
               key={b.id}

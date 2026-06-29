@@ -90,6 +90,7 @@ export default function App() {
   const [showDayRating, setShowDayRating] = useState(() => store.load('showDayRating', true))
   const [comboConf, setComboConf] = useState(() => store.load('comboConf', 'off')) // 'off' | 'stars' | 'percent'
   const [favorConsistency, setFavorConsistency] = useState(() => store.load('favorConsistency', false))
+  const [splitProjected, setSplitProjected] = useState(() => store.load('splitProjected', true))
   const [watchlist, setWatchlist] = useState(() => new Set(store.load('watchlist', [])))
   const [slipIds, setSlipIds] = useState(() => store.load('slip', []))
   const [autoRefresh, setAutoRefresh] = useState(() => store.load('autoRefresh', false))
@@ -121,6 +122,7 @@ export default function App() {
   useEffect(() => store.save('showDayRating', showDayRating), [showDayRating])
   useEffect(() => store.save('comboConf', comboConf), [comboConf])
   useEffect(() => store.save('favorConsistency', favorConsistency), [favorConsistency])
+  useEffect(() => store.save('splitProjected', splitProjected), [splitProjected])
   useEffect(() => store.save('eliLevel', eliLevel), [eliLevel])
   useEffect(() => store.save('podDismissed', podDismissedId), [podDismissedId])
   useEffect(() => {
@@ -332,13 +334,16 @@ export default function App() {
       (b.expectedHRs ?? 0) - (a.expectedHRs ?? 0) ||
       (a.name || '').localeCompare(b.name || '')
     rows = rows.slice().sort((a, b) => {
-      // Confirmed lineups always rank above projected (roster-fallback) bats,
-      // independent of the chosen sort/direction. A late lineup post can then
-      // never let a projected bat leapfrog a confirmed play — the pre-lineup
-      // churn is contained to the projected group below the board divider.
-      const ca = a.lineupConfirmed ? 0 : 1
-      const cb = b.lineupConfirmed ? 0 : 1
-      if (ca !== cb) return ca - cb
+      // When the lineup split is on, confirmed lineups always rank above
+      // projected (roster-fallback) bats, independent of the chosen sort — a
+      // late lineup post can't let a projected bat leapfrog a confirmed play,
+      // so the pre-lineup churn stays in the projected group below the divider.
+      // Toggleable in Settings; off = one flat board ranked purely by the sort.
+      if (splitProjected) {
+        const ca = a.lineupConfirmed ? 0 : 1
+        const cb = b.lineupConfirmed ? 0 : 1
+        if (ca !== cb) return ca - cb
+      }
       const va = get(a)
       const vb = get(b)
       // nulls always last
@@ -351,7 +356,7 @@ export default function App() {
       return cmp !== 0 ? cmp : tiebreak(a, b)
     })
     return rows
-  }, [all, filters, watchlist])
+  }, [all, filters, watchlist, splitProjected])
 
   const selected = useMemo(
     () => (selectedId != null ? all.find((b) => b.id === selectedId) || null : null),
@@ -542,6 +547,7 @@ export default function App() {
               onToggleWatch={toggleWatch}
               onToggleSlip={toggleSlip}
               onOpenPitcher={openPitcher}
+              splitProjected={splitProjected}
             />
           </>
         )}
@@ -749,6 +755,8 @@ export default function App() {
           onSetEli={setEliLevel}
           favorConsistency={favorConsistency}
           onToggleConsistency={() => setFavorConsistency((v) => !v)}
+          splitProjected={splitProjected}
+          onToggleSplit={() => setSplitProjected((v) => !v)}
           onClose={() => setShowSettings(false)}
         />
       )}
