@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Icon from './Icon.jsx'
 import { GradeChip, BadgeRow, KV, hexA, ScoreRing } from './atoms.jsx'
@@ -82,6 +82,7 @@ function useGameLog(playerId, enabled) {
           date: s.date,
           opp: s.opponent?.abbreviation || teamAbbr(s.opponent?.id) || s.opponent?.name || '?',
           isHome: s.isHome,
+          gamePk: s.game?.gamePk ?? null,
           ab: s.stat?.atBats ?? 0,
           h: s.stat?.hits ?? 0,
           d: s.stat?.doubles ?? 0,
@@ -90,6 +91,8 @@ function useGameLog(playerId, enabled) {
           rbi: s.stat?.rbi ?? 0,
           bb: s.stat?.baseOnBalls ?? 0,
           k: s.stat?.strikeOuts ?? 0,
+          sf: s.stat?.sacFlies ?? 0,
+          hbp: s.stat?.hitByPitch ?? 0,
         })))
       })
       .catch(() => setLog([]))
@@ -1062,7 +1065,47 @@ function HrFormSection({ b }) {
   )
 }
 
+function GameBreakdown({ g }) {
+  const singles = Math.max(0, g.h - g.d - g.t - g.hr)
+  const nonKOuts = Math.max(0, g.ab - g.h - g.k)
+  const pa = g.ab + g.bb + (g.hbp ?? 0) + (g.sf ?? 0)
+  const slg = g.ab > 0 ? (g.h + g.d + g.t * 2 + g.hr * 3) / g.ab : null
+  const obp = pa > 0 ? (g.h + g.bb + (g.hbp ?? 0)) / pa : null
+  const iso = g.ab > 0 ? (g.d + g.t * 2 + g.hr * 3) / g.ab : null
+
+  const chips = [
+    ...Array(g.hr).fill({ label: 'HR', bg: 'rgba(245,166,35,0.18)', color: 'var(--b-hot)', border: 'rgba(245,166,35,0.3)' }),
+    ...Array(g.t).fill({ label: '3B', bg: 'rgba(251,146,60,0.14)', color: '#fb923c', border: 'rgba(251,146,60,0.25)' }),
+    ...Array(g.d).fill({ label: '2B', bg: 'rgba(250,204,21,0.12)', color: '#fbbf24', border: 'rgba(250,204,21,0.22)' }),
+    ...Array(singles).fill({ label: '1B', bg: 'rgba(16,185,129,0.10)', color: 'var(--strong)', border: 'rgba(16,185,129,0.2)' }),
+    ...Array(g.bb).fill({ label: 'BB', bg: 'rgba(0,216,246,0.08)', color: 'var(--accent)', border: 'rgba(0,216,246,0.18)' }),
+    ...Array(g.hbp ?? 0).fill({ label: 'HBP', bg: 'rgba(0,216,246,0.06)', color: 'var(--accent)', border: 'rgba(0,216,246,0.14)' }),
+    ...Array(g.k).fill({ label: 'K', bg: 'rgba(239,68,68,0.10)', color: 'var(--bad)', border: 'rgba(239,68,68,0.2)' }),
+    ...Array(nonKOuts).fill({ label: 'OUT', bg: 'rgba(255,255,255,0.03)', color: 'var(--text-faint)', border: 'rgba(255,255,255,0.07)' }),
+  ]
+
+  return (
+    <div style={{ padding: '10px 14px 14px', background: 'rgba(99,102,241,0.05)' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '10px' }}>
+        {chips.map((c, i) => (
+          <span key={i} style={{ fontSize: '10px', fontWeight: '700', padding: '2px 7px', borderRadius: '6px', background: c.bg, color: c.color, border: `1px solid ${c.border}`, fontFamily: 'var(--mono)' }}>
+            {c.label}
+          </span>
+        ))}
+      </div>
+      <div style={{ display: 'flex', gap: '16px', fontSize: '11px', fontFamily: 'var(--mono)', flexWrap: 'wrap' }}>
+        <span style={{ color: 'var(--text-faint)' }}>PA <b style={{ color: '#fff' }}>{pa}</b></span>
+        {obp != null && <span style={{ color: 'var(--text-faint)' }}>OBP <b style={{ color: obp >= 0.4 ? 'var(--strong)' : '#fff' }}>{rate(obp)}</b></span>}
+        {slg != null && <span style={{ color: 'var(--text-faint)' }}>SLG <b style={{ color: slg >= 0.5 ? 'var(--strong)' : '#fff' }}>{rate(slg)}</b></span>}
+        {iso != null && <span style={{ color: 'var(--text-faint)' }}>ISO <b style={{ color: iso >= 0.2 ? 'var(--strong)' : '#fff' }}>{rate(iso)}</b></span>}
+      </div>
+    </div>
+  )
+}
+
 function GameLogTable({ log, loading }) {
+  const [selected, setSelected] = useState(null)
+
   if (loading) return (
     <Section title="Last 15 Games" icon="CalendarDays">
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--text-faint)', padding: '16px 0' }}>
@@ -1071,7 +1114,7 @@ function GameLogTable({ log, loading }) {
     </Section>
   )
   if (!log?.length) return null
-  const cols = ['Date','Opp','AB','H','2B','3B','HR','RBI','BB','K']
+  const cols = ['Date','Opp','AB','H','2B','3B','HR','RBI','BB','K','']
   return (
     <Section title="Last 15 Games" icon="CalendarDays">
       <div style={{ overflowX: 'auto', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.04)' }}>
@@ -1082,20 +1125,45 @@ function GameLogTable({ log, loading }) {
             </tr>
           </thead>
           <tbody>
-            {log.map((g, i) => (
-              <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.02)', background: g.hr > 0 ? 'rgba(245,166,35,0.04)' : 'transparent' }}>
-                <td style={{ padding: '6px 8px', fontFamily: 'var(--mono)', color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>{g.date?.slice(5)}</td>
-                <td style={{ padding: '6px 8px', color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>{g.isHome ? 'vs' : '@'} {g.opp}</td>
-                <td style={{ padding: '6px 8px', textAlign: 'center', fontFamily: 'var(--mono)' }}>{g.ab}</td>
-                <td style={{ padding: '6px 8px', textAlign: 'center', fontFamily: 'var(--mono)' }}>{g.h}</td>
-                <td style={{ padding: '6px 8px', textAlign: 'center', fontFamily: 'var(--mono)', color: g.d > 0 ? '#fff' : 'var(--text-faint)' }}>{g.d}</td>
-                <td style={{ padding: '6px 8px', textAlign: 'center', fontFamily: 'var(--mono)', color: g.t > 0 ? '#fff' : 'var(--text-faint)' }}>{g.t}</td>
-                <td style={{ padding: '6px 8px', textAlign: 'center', fontFamily: 'var(--mono)', fontWeight: g.hr > 0 ? '800' : '400', color: g.hr > 0 ? 'var(--b-hot)' : 'var(--text-faint)' }}>{g.hr}</td>
-                <td style={{ padding: '6px 8px', textAlign: 'center', fontFamily: 'var(--mono)' }}>{g.rbi}</td>
-                <td style={{ padding: '6px 8px', textAlign: 'center', fontFamily: 'var(--mono)' }}>{g.bb}</td>
-                <td style={{ padding: '6px 8px', textAlign: 'center', fontFamily: 'var(--mono)', color: g.k > 0 ? 'var(--bad)' : 'var(--text-faint)' }}>{g.k}</td>
-              </tr>
-            ))}
+            {log.map((g, i) => {
+              const open = selected === i
+              return (
+                <Fragment key={i}>
+                  <tr
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setSelected(open ? null : i)}
+                    onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && setSelected(open ? null : i)}
+                    style={{
+                      cursor: 'pointer',
+                      borderBottom: open ? 'none' : '1px solid rgba(255,255,255,0.02)',
+                      background: open ? 'rgba(99,102,241,0.08)' : g.hr > 0 ? 'rgba(245,166,35,0.04)' : 'transparent',
+                    }}
+                  >
+                    <td style={{ padding: '6px 8px', fontFamily: 'var(--mono)', color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>{g.date?.slice(5)}</td>
+                    <td style={{ padding: '6px 8px', color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>{g.isHome ? 'vs' : '@'} {g.opp}</td>
+                    <td style={{ padding: '6px 8px', textAlign: 'center', fontFamily: 'var(--mono)' }}>{g.ab}</td>
+                    <td style={{ padding: '6px 8px', textAlign: 'center', fontFamily: 'var(--mono)' }}>{g.h}</td>
+                    <td style={{ padding: '6px 8px', textAlign: 'center', fontFamily: 'var(--mono)', color: g.d > 0 ? '#fff' : 'var(--text-faint)' }}>{g.d}</td>
+                    <td style={{ padding: '6px 8px', textAlign: 'center', fontFamily: 'var(--mono)', color: g.t > 0 ? '#fff' : 'var(--text-faint)' }}>{g.t}</td>
+                    <td style={{ padding: '6px 8px', textAlign: 'center', fontFamily: 'var(--mono)', fontWeight: g.hr > 0 ? '800' : '400', color: g.hr > 0 ? 'var(--b-hot)' : 'var(--text-faint)' }}>{g.hr}</td>
+                    <td style={{ padding: '6px 8px', textAlign: 'center', fontFamily: 'var(--mono)' }}>{g.rbi}</td>
+                    <td style={{ padding: '6px 8px', textAlign: 'center', fontFamily: 'var(--mono)' }}>{g.bb}</td>
+                    <td style={{ padding: '6px 8px', textAlign: 'center', fontFamily: 'var(--mono)', color: g.k > 0 ? 'var(--bad)' : 'var(--text-faint)' }}>{g.k}</td>
+                    <td style={{ padding: '6px 4px', textAlign: 'center', color: 'var(--text-faint)' }}>
+                      <Icon name={open ? 'ChevronUp' : 'ChevronDown'} size={12} />
+                    </td>
+                  </tr>
+                  {open && (
+                    <tr>
+                      <td colSpan={11} style={{ padding: 0, borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
+                        <GameBreakdown g={g} />
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              )
+            })}
           </tbody>
         </table>
       </div>
