@@ -65,16 +65,17 @@ export default function ParlaySlip({ legs, onRemove, onClear, onSelect, onOpenBu
               <Icon name="Layers" size={14} /> Parlay · {p.n} {p.n === 1 ? 'leg' : 'legs'}
             </span>
             {pg && (
-              <span className="slip-grade" style={{ 
-                color: gColor, 
-                borderColor: hexA(gColor, 0.4), 
+              <span className="slip-grade" style={{
+                color: gColor,
+                borderColor: hexA(gColor, 0.4),
                 borderWidth: '1px',
                 borderStyle: 'solid',
                 borderRadius: '6px',
                 padding: '2px 8px',
                 fontSize: '11px',
                 fontWeight: '800',
-                background: hexA(gColor, 0.08)
+                background: hexA(gColor, 0.08),
+                whiteSpace: 'nowrap',
               }} title={`Avg leg score ${Math.round(pg.avgScore)}`}>
                 Grade {pg.letter}
               </span>
@@ -178,9 +179,7 @@ export default function ParlaySlip({ legs, onRemove, onClear, onSelect, onOpenBu
                     </span>
                   )}
                   {b.id === weakId && (
-                    <span className="slip-weak-tag" title="Weakest leg" style={{ flexShrink: 0, fontSize: '9px', background: 'rgba(249,115,22,0.08)', color: 'var(--b-hot)', borderRadius: '4px', padding: '1px 4px', display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
-                      <Icon name="TriangleAlert" size={8} /> weak
-                    </span>
+                    <Icon name="TriangleAlert" size={10} style={{ flexShrink: 0, color: 'var(--b-hot)' }} title="Weakest leg" />
                   )}
                 </button>
                 <GradeChip grade={b.grade} size="sm" score={b.score} />
