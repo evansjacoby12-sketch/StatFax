@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Icon from './Icon.jsx'
 import { GradeChip, BadgeRow, KV, hexA, ScoreRing } from './atoms.jsx'
@@ -13,6 +13,8 @@ import { blastOf, blastVsHandOf } from '../lib/groups.js'
 import { estimatedKs } from '../lib/pitchers.js'
 import { useLiveMode } from '../lib/liveMode.js'
 import { useEliLevel, reasonsForLevel } from '../lib/eliLevel.js'
+
+const WORKER_URL = import.meta.env?.VITE_WORKER_URL || ''
 
 // ---------------------------------------------------------------------------
 // Hooks
@@ -119,6 +121,22 @@ function usePlatoonSplits(playerId, enabled) {
   return { splits, loading }
 }
 
+function useSavantBIP(playerId, enabled) {
+  const [bips, setBips] = useState(null)
+  const [loading, setLoading] = useState(false)
+  useEffect(() => {
+    if (!playerId || !enabled || !WORKER_URL) return
+    setLoading(true)
+    const season = new Date().getFullYear()
+    fetch(`${WORKER_URL}/savant-bip?playerId=${playerId}&season=${season}`)
+      .then(r => r.json())
+      .then(d => setBips(d.bips || []))
+      .catch(() => setBips([]))
+      .finally(() => setLoading(false))
+  }, [playerId, enabled])
+  return { bips, loading }
+}
+
 // ---------------------------------------------------------------------------
 // Tab definitions
 // ---------------------------------------------------------------------------
@@ -130,6 +148,7 @@ const TABS = [
   { id: 'splits',    label: 'Splits'    },
   { id: 'statcast',  label: 'Statcast'  },
   { id: 'trends',    label: 'Trends'    },
+  { id: 'spray',     label: 'Spray'     },
 ]
 
 function TabBar({ active, onChange }) {
@@ -214,6 +233,7 @@ export default function PlayerDrawer({ batter: b, batters, onClose, watched, inS
           {tab === 'splits'    && <SplitsTab    b={b} />}
           {tab === 'statcast'  && <StatcastTab  b={b} />}
           {tab === 'trends'    && <TrendsTab    b={b} />}
+          {tab === 'spray'     && <SprayTab     b={b} />}
         </div>
       </aside>
     </>
@@ -287,6 +307,193 @@ function TrendsTab({ b }) {
       <TodaysOutlook b={b} />
       <DueIndicatorSection b={b} />
     </>
+  )
+}
+
+function SprayTab({ b }) {
+  const [enabled, setEnabled] = useState(false)
+  useEffect(() => { setEnabled(true) }, [])
+  const { bips, loading } = useSavantBIP(b.playerId, enabled)
+
+  if (!WORKER_URL) return (
+    <Section title="Spray Chart" icon="Target">
+      <p style={{ color: 'var(--text-faint)', fontSize: 12, textAlign: 'center', padding: '24px 0', margin: 0 }}>
+        Set <code>VITE_WORKER_URL</code> to your deployed Cloudflare Worker to enable live Savant BIP data.
+      </p>
+    </Section>
+  )
+
+  if (loading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 0', gap: 10, color: 'var(--text-faint)', fontSize: 13 }}>
+      <Icon name="Loader" size={16} style={{ animation: 'spin 1s linear infinite' }} />
+      Loading Savant BIP data…
+    </div>
+  )
+
+  if (!bips || bips.length === 0) return (
+    <Section title="Spray Chart" icon="Target">
+      <p style={{ color: 'var(--text-faint)', fontSize: 12, textAlign: 'center', padding: '24px 0', margin: 0 }}>
+        {bips === null ? 'No data yet' : 'No batted ball events found this season.'}
+      </p>
+    </Section>
+  )
+
+  return (
+    <>
+      <SprayChart bips={bips} />
+      <StatcastTrend bips={bips} />
+    </>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// SprayChart & StatcastTrend
+// ---------------------------------------------------------------------------
+
+const HIT_EVENTS = new Set(['single', 'double', 'triple', 'home_run'])
+
+function bipDotColor(b) {
+  if (b.events === 'home_run') return '#ef4444'
+  if (b.events === 'triple')   return '#f97316'
+  if (b.events === 'double')   return '#facc15'
+  if (HIT_EVENTS.has(b.events)) return '#4ade80'
+  return 'rgba(148,163,184,0.45)'
+}
+
+function SprayChart({ bips }) {
+  const [filter, setFilter] = useState('all')
+
+  const displayed = bips.filter(b => {
+    if (filter === 'gb') return b.bbType === 'ground_ball'
+    if (filter === 'ld') return b.bbType === 'line_drive'
+    if (filter === 'fb') return b.bbType === 'fly_ball'
+    if (filter === 'hr') return b.events === 'home_run'
+    return true
+  })
+
+  const hits = displayed.filter(b => HIT_EVENTS.has(b.events)).length
+  const hrs  = displayed.filter(b => b.events === 'home_run').length
+
+  const FILTERS = [
+    { key: 'all', label: 'All'  },
+    { key: 'gb',  label: 'GB'   },
+    { key: 'ld',  label: 'LD'   },
+    { key: 'fb',  label: 'FB'   },
+    { key: 'hr',  label: 'HR'   },
+  ]
+
+  return (
+    <Section title="Spray Chart" icon="Target">
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
+        {FILTERS.map(f => (
+          <button key={f.key} onClick={() => setFilter(f.key)} style={{
+            padding: '3px 10px', borderRadius: 12, border: 'none',
+            fontSize: 11, fontWeight: 600, cursor: 'pointer',
+            background: filter === f.key ? 'var(--accent)' : 'rgba(255,255,255,0.06)',
+            color: filter === f.key ? '#fff' : 'var(--text-dim)',
+          }}>{f.label}</button>
+        ))}
+        <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text-faint)' }}>
+          {hits}H / {hrs}HR · {displayed.length} BIP
+        </span>
+      </div>
+
+      <svg viewBox="0 0 250 250" style={{ width: '100%', maxWidth: 300, display: 'block', margin: '0 auto', borderRadius: 8 }}>
+        <rect width="250" height="250" fill="#0c1a0c" rx="6"/>
+        {/* Fair territory */}
+        <path d="M 125,205 L 0,78 Q 125,2 250,78 Z" fill="#1a3d1a"/>
+        {/* Foul lines */}
+        <line x1="125" y1="205" x2="0"   y2="78" stroke="rgba(255,255,255,0.45)" strokeWidth="0.8"/>
+        <line x1="125" y1="205" x2="250" y2="78" stroke="rgba(255,255,255,0.45)" strokeWidth="0.8"/>
+        {/* Outfield fence arc */}
+        <path d="M 15,85 Q 125,8 235,85" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="1.2" strokeDasharray="4,3"/>
+        {/* Infield dirt */}
+        <polygon points="125,205 190,142 125,79 60,142" fill="#5c3d1e" stroke="#7a5230" strokeWidth="0.5"/>
+        {/* Pitcher's mound */}
+        <circle cx="125" cy="150" r="5" fill="#6b4820"/>
+        {/* Bases — 2B */}
+        <g transform="rotate(45,125,79)"><rect x="121.5" y="75.5" width="7" height="7" fill="white"/></g>
+        {/* 1B */}
+        <g transform="rotate(45,190,142)"><rect x="186.5" y="138.5" width="7" height="7" fill="white"/></g>
+        {/* 3B */}
+        <g transform="rotate(45,60,142)"><rect x="56.5" y="138.5" width="7" height="7" fill="white"/></g>
+        {/* Home plate */}
+        <polygon points="125,210 130,205 130,200 120,200 120,205" fill="white"/>
+        {/* BIP dots */}
+        {displayed.map((b, i) => (
+          <circle key={i} cx={b.x} cy={b.y}
+            r={b.events === 'home_run' ? 4.5 : 3}
+            fill={bipDotColor(b)}
+            opacity={b.events === 'home_run' ? 0.95 : 0.72}
+            stroke={b.events === 'home_run' ? 'rgba(255,255,255,0.55)' : 'none'}
+            strokeWidth={0.8}
+          />
+        ))}
+      </svg>
+
+      <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 10, flexWrap: 'wrap' }}>
+        {[['#4ade80','Single'],['#facc15','Double'],['#f97316','Triple'],['#ef4444','HR'],['rgba(148,163,184,0.65)','Out']].map(([c,l]) => (
+          <span key={l} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--text-faint)' }}>
+            <svg width="8" height="8"><circle cx="4" cy="4" r="4" fill={c}/></svg>
+            {l}
+          </span>
+        ))}
+      </div>
+    </Section>
+  )
+}
+
+function StatcastTrend({ bips }) {
+  const games = useMemo(() => {
+    const byDate = {}
+    for (const bip of bips) {
+      if (!bip.date) continue
+      if (!byDate[bip.date]) byDate[bip.date] = []
+      byDate[bip.date].push(bip)
+    }
+    return Object.entries(byDate)
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .slice(-15)
+      .map(([date, evts]) => {
+        const withEV = evts.filter(e => e.ev != null && e.ev > 0)
+        const avgEV = withEV.length ? withEV.reduce((s, e) => s + e.ev, 0) / withEV.length : null
+        const hhPct = withEV.length ? withEV.filter(e => e.ev >= 95).length / withEV.length * 100 : null
+        return { date: date.slice(5), bip: evts.length, avgEV, hhPct }
+      })
+  }, [bips])
+
+  if (!games.length) return null
+
+  const evVals = games.filter(g => g.avgEV != null).map(g => g.avgEV)
+  const minEV = evVals.length ? Math.min(...evVals) : 60
+  const maxEV = evVals.length ? Math.max(...evVals) : 105
+  const rangeEV = Math.max(maxEV - minEV, 8)
+
+  return (
+    <Section title="Exit Velo Trend (per game)" icon="TrendingUp">
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 64, padding: '0 2px' }}>
+        {games.map((g, i) => {
+          const h = g.avgEV != null ? Math.max(4, ((g.avgEV - minEV) / rangeEV) * 54 + 10) : 3
+          const clr = g.avgEV == null ? 'rgba(100,100,100,0.25)'
+            : g.avgEV >= 95 ? 'var(--b-hot)'
+            : g.avgEV >= 90 ? '#facc15'
+            : '#6b7280'
+          return (
+            <div key={i} title={g.avgEV != null ? `${g.date}: ${g.avgEV.toFixed(1)} mph avg EV · ${g.bip} BIP` : g.date}
+              style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'default' }}>
+              <div style={{ width: '100%', height: h, background: clr, borderRadius: '2px 2px 0 0', minHeight: 2 }}/>
+              {i % 5 === 0 && (
+                <div style={{ fontSize: 8, color: 'var(--text-faint)', writingMode: 'vertical-rl', marginTop: 2, transform: 'rotate(180deg)', lineHeight: 1 }}>{g.date}</div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+      <div style={{ display: 'flex', gap: 14, marginTop: 8, fontSize: 10, color: 'var(--text-faint)', justifyContent: 'center' }}>
+        <span>≥95 mph = <span style={{ color: 'var(--b-hot)' }}>hard hit</span></span>
+        <span>≥90 mph = <span style={{ color: '#facc15' }}>solid</span></span>
+      </div>
+    </Section>
   )
 }
 

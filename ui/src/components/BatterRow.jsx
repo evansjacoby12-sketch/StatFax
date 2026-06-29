@@ -8,6 +8,7 @@ import { useEliLevel, topReasonForLevel } from '../lib/eliLevel.js'
 import { risingForm } from '../lib/groups.js'
 import { useSwipeActions } from '../lib/useSwipeActions.js'
 import { hexA } from './atoms.jsx'
+import { hrSetup, pitchMixScore } from '../lib/scout.js'
 
 export default function BatterRow({
   batter: b,
@@ -41,6 +42,11 @@ export default function BatterRow({
     : risingForm(b)
       ? { label: 'RISING', cls: 'rising', icon: 'TrendingUp' }
       : null
+
+  const pmScore = pitchMixScore(b)
+  const dueSetup = hrSetup(b)
+  const bestOdds = b.odds?.best
+  const hrPct = b.hrProbability != null ? Math.round(b.hrProbability * 100) : null
 
   const { innerRef, leftRef, rightRef, swipedRef, onPointerDown } = useSwipeActions({
     onRight: () => onToggleWatch?.(b),
@@ -171,6 +177,43 @@ export default function BatterRow({
               </span>
             )}
           </div>
+
+          {(pmScore != null || dueSetup.n > 0 || hrPct != null || bestOdds?.american) && (
+            <div className="batter-quickstats" style={{ display: 'flex', gap: '5px', marginTop: '4px', alignItems: 'center', flexWrap: 'wrap' }}>
+              {pmScore != null && (
+                <span style={{
+                  display: 'inline-flex', alignItems: 'center', gap: '3px',
+                  fontSize: '10px', fontWeight: '700', padding: '2px 7px', borderRadius: '6px',
+                  background: pmScore >= 7 ? 'rgba(16,185,129,0.14)' : pmScore >= 5 ? 'rgba(250,204,21,0.12)' : 'rgba(239,68,68,0.12)',
+                  color: pmScore >= 7 ? 'var(--strong)' : pmScore >= 5 ? '#facc15' : 'var(--bad)',
+                  border: `1px solid ${pmScore >= 7 ? 'rgba(16,185,129,0.22)' : pmScore >= 5 ? 'rgba(250,204,21,0.18)' : 'rgba(239,68,68,0.2)'}`,
+                }}>
+                  PITCH {pmScore.toFixed(1)}
+                </span>
+              )}
+              {dueSetup.n > 0 && (
+                <span style={{
+                  display: 'inline-flex', alignItems: 'center', gap: '3px',
+                  fontSize: '10px', fontWeight: '700', padding: '2px 7px', borderRadius: '6px',
+                  background: dueSetup.n >= 5 ? 'rgba(239,68,68,0.14)' : dueSetup.n >= 3 ? 'rgba(250,204,21,0.10)' : 'rgba(255,255,255,0.04)',
+                  color: dueSetup.n >= 5 ? 'var(--bad)' : dueSetup.n >= 3 ? '#facc15' : 'var(--text-faint)',
+                  border: `1px solid ${dueSetup.n >= 5 ? 'rgba(239,68,68,0.22)' : 'rgba(255,255,255,0.06)'}`,
+                }}>
+                  DUE {dueSetup.n}/{dueSetup.checks.length}
+                </span>
+              )}
+              {hrPct != null && (
+                <span style={{ fontSize: '10px', fontWeight: '800', color: 'var(--accent)', fontFamily: 'var(--mono)' }}>
+                  {hrPct}%
+                </span>
+              )}
+              {bestOdds?.american && (
+                <span style={{ fontSize: '10px', color: 'var(--text-faint)', fontFamily: 'var(--mono)' }}>
+                  {american(bestOdds.american)}
+                </span>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="col-right">

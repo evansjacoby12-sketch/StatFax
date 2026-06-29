@@ -46,6 +46,9 @@ export default {
     if (url.pathname === '/parse') {
       return handleParse(request, env);
     }
+    if (url.pathname === '/savant-bip') {
+      return handleSavantBip(request, env);
+    }
     if (url.pathname !== '/' && url.pathname !== '/trigger') {
       return new Response('Not found', { status: 404 });
     }
@@ -217,4 +220,114 @@ async function handleParse(request, env) {
   const g = (out.grades || []).filter((x) => grades.includes(x));
   const s = (out.signals || []).filter((x) => signals.includes(x));
   return jsonResponse({ grades: g, signals: s }, 200, env);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * Baseball Savant BIP proxy
+ * ─────────────────────────────────────────────────────────────────────────
+ * GET /savant-bip?playerId=xxx&season=2025
+ *   → { bips: [{x,y,events,bbType,ev,la,dist,date}], count: N }
+ *
+ * Proxies Savant statcast_search CSV (BIP events only) using browser-
+ * spoofed headers. Returns parsed JSON with CORS headers for direct
+ * browser calls from the StatFax UI.
+ *
+ * Optional Worker var:  ALLOW_ORIGIN  (default "*")
+ */
+async function handleSavantBip(request, env) {
+  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders(env) });
+  if (request.method !== 'GET') return jsonResponse({ error: 'GET only' }, 405, env);
+
+  const url = new URL(request.url);
+  const playerId = url.searchParams.get('playerId') || '';
+  const season = url.searchParams.get('season') || String(new Date().getFullYear());
+
+  if (!/^\d{1,9}$/.test(playerId)) return jsonResponse({ error: 'invalid playerId' }, 400, env);
+  if (!/^\d{4}$/.test(season))    return jsonResponse({ error: 'invalid season' },   400, env);
+
+  const savantUrl = [
+    'https://baseballsavant.mlb.com/statcast_search/csv',
+    '?hfGT=R%7C',
+    `&hfSe=${season}%7C`,
+    '&player_type=batter',
+    `&batters_lookup%5B%5D=${playerId}`,
+    '&min_pitches=0&min_results=0',
+    '&group_by=name',
+    '&sort_col=pitches&player_event_sort=api_h_launch_speed&sort_order=desc',
+    '&min_pas=0&type=details',
+    '&hfBBT=ground_ball%7Cline_drive%7Cfly_ball%7Cpopup%7C',
+  ].join('');
+
+  let csv;
+  try {
+    const resp = await fetch(savantUrl, {
+      headers: {
+        'User-Agent':      'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+        'Accept':          'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Referer':         'https://baseballsavant.mlb.com/',
+        'Origin':          'https://baseballsavant.mlb.com',
+      },
+    });
+    if (!resp.ok) return jsonResponse({ error: 'savant error', status: resp.status }, 502, env);
+    csv = await resp.text();
+  } catch (e) {
+    return jsonResponse({ error: 'savant unreachable', detail: String(e).slice(0, 200) }, 502, env);
+  }
+
+  const trimmed = csv.replace(/^﻿/, '').trimStart();
+  if (trimmed.startsWith('<') || trimmed.startsWith('{')) {
+    return jsonResponse({ error: 'savant challenge', preview: trimmed.slice(0, 120) }, 503, env);
+  }
+
+  const bips = parseBipCsv(csv);
+  return jsonResponse({ bips, count: bips.length }, 200, env);
+}
+
+function parseBipCsv(csv) {
+  const lines = csv.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+  if (lines.length < 2) return [];
+
+  const header = parseCsvRow(lines[0].replace(/^﻿/, ''));
+  const col = (name) => header.indexOf(name);
+
+  const iX = col('hc_x'), iY = col('hc_y');
+  const iEv = col('events'), iBbt = col('bb_type');
+  const iLS = col('launch_speed'), iLA = col('launch_angle');
+  const iDist = col('hit_distance_sc'), iDate = col('game_date');
+
+  if (iX < 0 || iY < 0) return [];
+
+  const bips = [];
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+    const f = parseCsvRow(line);
+    const x = parseFloat(f[iX]);
+    const y = parseFloat(f[iY]);
+    if (isNaN(x) || isNaN(y)) continue;
+    bips.push({
+      x, y,
+      events: iEv   >= 0 ? (f[iEv]   || '') : '',
+      bbType: iBbt  >= 0 ? (f[iBbt]  || '') : '',
+      ev:     iLS   >= 0 ? (parseFloat(f[iLS])   || null) : null,
+      la:     iLA   >= 0 ? (parseFloat(f[iLA])   || null) : null,
+      dist:   iDist >= 0 ? (parseFloat(f[iDist]) || null) : null,
+      date:   iDate >= 0 ? (f[iDate] || '') : '',
+    });
+  }
+  return bips;
+}
+
+function parseCsvRow(line) {
+  const fields = [];
+  let field = '', inQuote = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"')              { inQuote = !inQuote; }
+    else if (c === ',' && !inQuote) { fields.push(field); field = ''; }
+    else                        { field += c; }
+  }
+  fields.push(field);
+  return fields;
 }

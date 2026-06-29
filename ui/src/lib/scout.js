@@ -125,6 +125,21 @@ export function hrSetup(b) {
   return { checks, n: checks.filter((c) => c.pass).length }
 }
 
+const PITCH_LEAGUE_SLG = { FF: 0.382, SI: 0.372, FC: 0.350, SL: 0.300, CU: 0.275, KC: 0.293, CH: 0.323, FS: 0.305, SW: 0.298, ST: 0.278 }
+
+export function pitchMixScore(b) {
+  const splits = b.pitchTypeSplits
+  if (!splits?.length) return null
+  let totalW = 0, totalAdv = 0
+  for (const p of splits) {
+    const league = PITCH_LEAGUE_SLG[p.key] ?? 0.330
+    const adv = p.slg != null ? p.slg - league : 0
+    totalW += p.usage ?? 0
+    totalAdv += adv * (p.usage ?? 0)
+  }
+  return totalW > 0 ? Math.max(0, Math.min(10, 5 + (totalAdv / totalW) * 25)) : null
+}
+
 export function toolGrades(b) {
   return {
     power: toGrade(b.batterScore),
