@@ -1,6 +1,6 @@
 // Loads the brain's scored slate (dist/daily.json) and shapes it for the board.
 
-import { heatIndex } from './scout.js'
+import { heatIndex, pitchMixScore } from './scout.js'
 
 // Relative to the app's base URL so it works at any deploy path (root host or
 // a GitHub Pages project subpath) as well as the dev server. Guarded so the
@@ -158,6 +158,12 @@ export async function loadSlate() {
       // Boolean signal: the opposing starter gives up notably more HR to this
       // batter's side than the other (RudeBets' "vs LHB/RHB"). Computed below.
       hrPlatoonEdge: hasHrPlatoonEdge(b),
+      // Boolean signal: strong zone matchup — batter's ISO in the pitcher's
+      // most-used zones rates 7+/10, or server flagged ZONE_MASTER.
+      zoneEdge: (b.zoneMatchup?.zoneRating ?? 0) >= 7 || b.zoneMatchup?.badge === 'ZONE_MASTER',
+      // Boolean signal: favorable pitch-type matchup — batter's weighted SLG
+      // advantage across the pitcher's arsenal scores 7+/10 (5 = neutral).
+      pitchMixEdge: (pitchMixScore(b) ?? 0) >= 7,
       // Pitch-type matchup data for the Zone page: the batter's own arsenal
       // (SLG/RV/Whiff per pitch) and the opposing starter's mix (usage% + shape).
       arsenal: d.batterArsenal?.[b.playerId] || null,
