@@ -6938,6 +6938,17 @@ button.th:focus-visible {
   border: 1px dashed var(--border);
   border-radius: 10px;
 }
+.grp-trim-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent);
+  font-size: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
 
 /* Tail (green) / caution (yellow) / risk (red) glow on parlay combo cards */
 .grp-card.tone-tail {

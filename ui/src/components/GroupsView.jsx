@@ -250,6 +250,7 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard, g
   const [confirmedOnly, setConfirmedOnly] = useState(false)
   const [spread, setSpread] = useState(false) // de-correlated subset (min bat overlap)
   const [valueSort, setValueSort] = useState(false) // sort by EV when books are posted
+  const [showAll, setShowAll] = useState(false)
   // windowMode (start-window grouping) is an app-level setting — see Settings.
 
   // Distinct, still-playable games in the pool — for the game selector.
@@ -361,7 +362,7 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard, g
     ? spreadPick(groups, 4)
     : [...groups]
         .sort(valueSort && anyPriced ? byValue : byProb)
-        .slice(0, DISPLAY_CAP[activeSize] ?? Infinity)
+        .slice(0, showAll ? Infinity : (DISPLAY_CAP[activeSize] ?? Infinity))
 
   const toggleGame = (pk) =>
     setGames((prev) => {
@@ -431,7 +432,7 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard, g
       )}
       <div className="grp-controls" role="group" aria-label="Group size">
         {available.map((t) => (
-          <button key={t.k} className={`badge-toggle ${activeSize === t.k ? 'on' : ''}`} onClick={() => setSize(t.k)}>
+          <button key={t.k} className={`badge-toggle ${activeSize === t.k ? 'on' : ''}`} onClick={() => { setSize(t.k); setShowAll(false) }}>
             {t.label}
           </button>
         ))}
@@ -480,9 +481,15 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard, g
             <div className="grp-trim dim">
               <b>Spread set</b> — {shownGroups.length} {activeSize}-leg combos chosen to share the fewest bats, so they're independent shots. Tap Spread off to see the full list.
             </div>
+          ) : showAll && groups.length > (DISPLAY_CAP[activeSize] ?? Infinity) ? (
+            <div className="grp-trim dim">
+              Showing all {groups.length} {activeSize}-leg combos ·{' '}
+              <button className="grp-trim-link" onClick={() => setShowAll(false)}>show fewer</button>
+            </div>
           ) : groups.length > shownGroups.length && (
             <div className="grp-trim dim">
-              Showing the top {shownGroups.length} {activeSize}-leg combos · {groups.length - shownGroups.length} weaker hidden ({activeSize}-leg is a longshot tier)
+              Showing the top {shownGroups.length} {activeSize}-leg combos · {groups.length - shownGroups.length} weaker hidden ·{' '}
+              <button className="grp-trim-link" onClick={() => setShowAll(true)}>show all</button>
             </div>
           )}
         </div>
