@@ -2,30 +2,39 @@ import { useEffect, useState } from 'react'
 import Icon from './Icon.jsx'
 
 const BASE_URL = import.meta.env?.BASE_URL ?? '/'
-// Commit SHA baked in at build (vite define). 'dev' locally → banner disabled.
-const BUILD_SHA = typeof __BUILD_SHA__ !== 'undefined' ? __BUILD_SHA__ : 'dev'
+// Commit SHA + build timestamp baked in at build time (vite define).
+// SHA is 'dev' for local/non-CI builds; timestamp is always a real ISO string.
+const BUILD_SHA  = typeof __BUILD_SHA__  !== 'undefined' ? __BUILD_SHA__  : 'dev'
+const BUILD_TIME = typeof __BUILD_TIME__ !== 'undefined' ? __BUILD_TIME__ : null
 
-// Fetch the deployed build's commit SHA from version.json. Comparing the SHA
-// (not the bundle hash) is immune to non-deterministic builds + CDN edge skew —
-// it flips only on an actual new commit. Always cache-busted.
-async function latestSha() {
+// Fetch the deployed version.json (always cache-busted).
+async function latestVersion() {
   const res = await fetch(`${BASE_URL}version.json?_v=${Date.now()}`, { cache: 'no-store' })
   if (!res.ok) return null
-  const j = await res.json().catch(() => null)
-  return j?.sha || null
+  return res.json().catch(() => null)
 }
 
-// Polls the deployed SHA and flips true once it differs from the running build —
-// so a home-screen PWA (no pull-to-refresh) gets a one-tap update.
+// Polls the deployed version and flips true once a newer build is detected.
+// Primary: SHA mismatch (CI builds only). Fallback: builtAt timestamp is
+// newer than the running build — works even when GITHUB_SHA wasn't set.
 function useUpdateAvailable() {
   const [stale, setStale] = useState(false)
   useEffect(() => {
-    if (BUILD_SHA === 'dev' || stale) return // dev build, or already flagged
+    if (stale) return
     let alive = true
     const check = async () => {
       try {
-        const sha = await latestSha()
-        if (alive && sha && sha !== BUILD_SHA) setStale(true)
+        const v = await latestVersion()
+        if (!alive || !v) return
+        // SHA path: only when both sides have a real (non-dev) SHA.
+        if (BUILD_SHA !== 'dev' && v.sha && v.sha !== 'dev' && v.sha !== BUILD_SHA) {
+          setStale(true)
+          return
+        }
+        // Timestamp fallback: any newer deploy has a later builtAt.
+        if (BUILD_TIME && v.builtAt && v.builtAt > BUILD_TIME) {
+          setStale(true)
+        }
       } catch {
         /* offline / transient — retry next tick */
       }

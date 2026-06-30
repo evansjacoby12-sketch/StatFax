@@ -66,8 +66,13 @@ export default defineConfig(({ command }) => ({
   // Relative base on build → works at any URL (root host OR a GitHub Pages
   // project subpath). Root '/' in dev keeps the dev server simple.
   base: command === 'build' ? './' : '/',
-  // Bake the commit SHA into the app so it can compare against version.json.
-  define: { __BUILD_SHA__: JSON.stringify(process.env.GITHUB_SHA || 'dev') },
+  // Bake the commit SHA + build timestamp into the app. SHA is 'dev' locally
+  // (GITHUB_SHA only set in CI); the timestamp fallback lets the banner fire
+  // even in dev-SHA builds when a newer deploy has a later builtAt.
+  define: {
+    __BUILD_SHA__:  JSON.stringify(process.env.GITHUB_SHA || 'dev'),
+    __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
+  },
   plugins: [react(), statfaxData()],
   server: {
     port: 5180,
