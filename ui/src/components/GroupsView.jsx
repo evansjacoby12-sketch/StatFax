@@ -10,7 +10,7 @@ import * as store from '../lib/storage.js'
 const GROUP_GRADE_COLOR = { S: '#f5a623', A: '#32d74b', B: '#3b82f6', C: '#9aa6b6', D: '#6b7787' }
 const SIZE_TABS = [2, 3, 4].map((k) => ({ k, label: `${k}-leg` }))
 // How many combos to SHOW per size, strongest first.
-const DISPLAY_CAP = { 2: 3, 3: 3, 4: 2 }
+const DISPLAY_CAP = { 2: 3, 3: 2, 4: 1 }
 
 // Per-leg weakness checks (legFlags / legIsBad) are shared with the SGP tab —
 // see ui/lib/groups.js.

@@ -104,7 +104,9 @@ export default function LiveCombosView({ batters, onSelect, favorConsistency = f
     return [{ value: '', label: 'All games' }, ...[...m].map(([value, label]) => ({ value, label }))]
   }, [started])
 
-  const shown = started
+  // Cap: at most 3 combos per size (best first) so "All sizes" doesn't flood the view.
+  const PER_SIZE_CAP = 3
+  const shownRaw = started
     .filter((c) => (filter === 'cashed' ? c.v.code === 'cashed' : filter === 'live' ? c.v.code === 'live' : c.v.code === 'cashed' || c.v.code === 'live'))
     .filter((c) => !size || c.g.size === size)
     .filter((c) => strat === 'all' || c.g.strategy === strat)
@@ -114,6 +116,12 @@ export default function LiveCombosView({ batters, onSelect, favorConsistency = f
       (b.v.hits / b.v.n) - (a.v.hits / a.v.n) ||
       (b.g.allHit ?? 0) - (a.g.allHit ?? 0),
     )
+  const sizeCount = {}
+  const shown = shownRaw.filter((c) => {
+    const k = c.g.size
+    sizeCount[k] = (sizeCount[k] || 0) + 1
+    return sizeCount[k] <= PER_SIZE_CAP
+  })
 
   return (
     <>
