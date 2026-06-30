@@ -62,6 +62,10 @@ export function blastRate(raw) {
 export const positiveReasonCount = (raw) =>
   (raw?.eli5Reasons || []).filter((r) => r?.tone === 'good').length
 
+// Count of eli5Reasons with tone === 'bad' — negative flags in the Trends tab.
+export const negativeReasonCount = (raw) =>
+  (raw?.eli5Reasons || []).filter((r) => r?.tone === 'bad').length
+
 // ── Matchup edge derivations — shared by both adapters ──────────────────────
 // These pull raw per-batter fields into the booleans that both toComboRow
 // (client) and comboRowFromSnapshot (server) attach to the canonical row.
@@ -130,8 +134,8 @@ export const powerRank = (b) =>
 // re-pick `top`'s legs. Gates (barrel ≥ 11, hr9 ≥ 1.3, air ≥ 1.08) sit a notch
 // above neutral so each strategy surfaces distinct bats, not the same elite tier.
 export const STRATEGIES = [
-  // Precision — pitch mix ≥7 + heat ≥75 + 9+ positive outlook reasons.
-  { key: 'precision', rank: (b) => (b.positiveReasons ?? 0) + ((b.heat ?? 0) / 100),            require: (b) => b.pitchMixEdge === true && (b.heat ?? 0) >= 75 && (b.positiveReasons ?? 0) >= 9 },
+  // Precision — pitch mix ≥7 · heat ≥48 · HR due 4/6+ · 9+ positive trends · ≤3 negatives.
+  { key: 'precision', rank: (b) => (b.positiveReasons ?? 0) - (b.negativeReasons ?? 0) + ((b.heat ?? 0) / 100), require: (b) => b.pitchMixEdge === true && (b.heat ?? 0) >= 48 && (b.hrDueScore ?? 0) >= 4 && (b.positiveReasons ?? 0) >= 9 && (b.negativeReasons ?? 0) <= 3 },
   // Soft Matchup — batter quality × pitcher HR/9; best historical leg hit rate (66.7%).
   { key: 'matchup',   rank: (b) => (b.score ?? 0) * (b.pitcherHr9 ?? 0),                        require: (b) => Number.isFinite(b.pitcherHr9) && b.pitcherHr9 >= 1.3 },
   // Best Mix — score + barrel + heat blend; 2nd best historically (63% legs, 33% combos).

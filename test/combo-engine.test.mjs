@@ -25,6 +25,7 @@ const row = (over = {}) => ({
   barrel: 8, recentBarrel: null, blast: null,
   pitcherHr9: 1.0, air: 1.0,
   hot: false, homeEdge: false, awayEdge: false, bullpenLegend: false, barrelKing: false,
+  positiveReasons: 0, negativeReasons: 0, hrDueScore: 0,
   ...over,
 })
 
@@ -35,13 +36,17 @@ const sig = (strategy, size, legIds) => `${strategy}:${size}:${[...legIds].sort(
 
 // ─── strategy rank/require gates ──────────────────────────────────────────────
 
-test('precision gate requires pitchMixEdge + heat >= 75 + 9+ positive reasons', () => {
-  assert.equal(stratByKey.precision.require(row({ pitchMixEdge: true, heat: 74, positiveReasons: 9 })), false)
-  assert.equal(stratByKey.precision.require(row({ pitchMixEdge: true, heat: 75, positiveReasons: 8 })), false)
-  assert.equal(stratByKey.precision.require(row({ pitchMixEdge: false, heat: 75, positiveReasons: 9 })), false)
-  assert.equal(stratByKey.precision.require(row({ pitchMixEdge: true, heat: 75, positiveReasons: 9 })), true)
-  const r = stratByKey.precision.rank(row({ positiveReasons: 10, heat: 80 }))
-  assert.ok(Math.abs(r - (10 + 0.80)) < 1e-9)
+test('precision gate: pitch mix ≥7, heat ≥48, hrDueScore ≥4, 9+ positives, ≤3 negatives', () => {
+  const pass = { pitchMixEdge: true, heat: 48, hrDueScore: 4, positiveReasons: 9, negativeReasons: 3 }
+  assert.equal(stratByKey.precision.require(row({ ...pass, pitchMixEdge: false })), false)
+  assert.equal(stratByKey.precision.require(row({ ...pass, heat: 47 })), false)
+  assert.equal(stratByKey.precision.require(row({ ...pass, hrDueScore: 3 })), false)
+  assert.equal(stratByKey.precision.require(row({ ...pass, positiveReasons: 8 })), false)
+  assert.equal(stratByKey.precision.require(row({ ...pass, negativeReasons: 4 })), false)
+  assert.equal(stratByKey.precision.require(row(pass)), true)
+  // rank = positives - negatives + heat/100
+  const r = stratByKey.precision.rank(row({ positiveReasons: 10, negativeReasons: 2, heat: 60 }))
+  assert.ok(Math.abs(r - (10 - 2 + 0.60)) < 1e-9)
 })
 
 test('edge gate requires 2+ matchup signals', () => {

@@ -25,7 +25,9 @@ import {
   hrPlatoonEdgeOf,
   flyBallMatchupOf,
   positiveReasonCount,
+  negativeReasonCount,
 } from './combo-engine.js'
+import { hrSetup } from './scout.js'
 import { comboMarket } from './odds.js'
 
 // Re-export the engine's blast threshold for any UI that references it.
@@ -112,7 +114,7 @@ export const blastMixOf = (b) => {
 // Display metadata per strategy key — the label/icon/desc the engine doesn't
 // carry (it only needs key/rank/require). Keys match combo-engine.js STRATEGIES.
 const STRAT_META = {
-  precision: { label: 'Precision',    icon: 'ScanSearch', desc: 'pitch mix ≥7 · heat ≥75 · 9+ positive trends' },
+  precision: { label: 'Precision',    icon: 'ScanSearch', desc: 'pitch mix ≥7 · heat ≥48 · HR due 4/6+ · 9+ positive trends · ≤3 negatives' },
   matchup:   { label: 'Soft Matchup', icon: 'Target',     desc: 'facing HR-prone pitchers · best historical leg hit rate' },
   mix:       { label: 'Best Mix',     icon: 'Sparkles',   desc: 'grade + barrel + heat blend' },
   park:      { label: 'Park & Air',   icon: 'Wind',       desc: 'park × weather × hand boosts HR' },
@@ -153,6 +155,8 @@ function toComboRow(b) {
     hrPlatoonEdge: b.hrPlatoonEdge === true || hrPlatoonEdgeOf(b),
     flyBallMatchup: b.flyBallMatchup === true || flyBallMatchupOf(b),
     positiveReasons: positiveReasonCount(b),
+    negativeReasons: negativeReasonCount(b),
+    hrDueScore: hrSetup(b).n,
     consistency: consistencyFactor(b),
   }
 }

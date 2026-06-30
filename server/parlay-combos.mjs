@@ -26,7 +26,7 @@
  * engine's canonical row) plus the grading/scorecard that's server-only.
  */
 
-import { heatIndex, pitchMixScore } from '../ui/src/lib/scout.js';
+import { heatIndex, pitchMixScore, hrSetup } from '../ui/src/lib/scout.js';
 import {
   buildCombos,
   barrelOf,
@@ -39,6 +39,7 @@ import {
   hrPlatoonEdgeOf,
   flyBallMatchupOf,
   positiveReasonCount,
+  negativeReasonCount,
 } from '../ui/src/lib/combo-engine.js';
 
 /**
@@ -96,8 +97,11 @@ export function comboRowFromSnapshot(row) {
     pitchMixEdge:   (pitchMixScore(row) ?? 0) >= 7,
     hrPlatoonEdge:  hrPlatoonEdgeOf(row),
     flyBallMatchup: flyBallMatchupOf(row),
-    // Precision strategy: count of positive eli5Reasons (green bullets in Trends tab).
+    // Precision strategy: positive/negative eli5Reasons counts (Trends tab bullets).
     positiveReasons: positiveReasonCount(row),
+    negativeReasons: negativeReasonCount(row),
+    // HR Due Indicator checklist score (0-6) from scout.hrSetup — precision gate.
+    hrDueScore: hrSetup(row).n,
   };
 }
 
