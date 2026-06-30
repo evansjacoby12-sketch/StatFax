@@ -24,6 +24,7 @@ import {
   zoneEdgeOf,
   hrPlatoonEdgeOf,
   flyBallMatchupOf,
+  positiveReasonCount,
 } from './combo-engine.js'
 import { comboMarket } from './odds.js'
 
@@ -118,7 +119,8 @@ const STRAT_META = {
   power:   { label: 'Power Bats',   icon: 'Crosshair',  desc: 'barrel + blast rate' },
   matchup: { label: 'Soft Matchup', icon: 'Target',     desc: 'facing HR-prone pitchers' },
   park:    { label: 'Park & Air',   icon: 'Wind',       desc: 'park × weather boosts HR' },
-  edge:    { label: 'Edge Stack',   icon: 'Zap',        desc: '2+ matchup signals converge (pitch type, zones, platoon, fly-ball)' },
+  edge:      { label: 'Edge Stack',  icon: 'Zap',          desc: '2+ matchup signals converge (pitch type, zones, platoon, fly-ball)' },
+  precision: { label: 'Precision',   icon: 'ScanSearch',   desc: 'pitch mix ≥7 + heat ≥75 + 9+ positive trends — your exact filter' },
 }
 
 // Map a live scored batter → the engine's canonical combo row. `ref` carries the
@@ -154,6 +156,7 @@ function toComboRow(b) {
     pitchMixEdge:  b.pitchMixEdge  === true,
     hrPlatoonEdge: b.hrPlatoonEdge === true || hrPlatoonEdgeOf(b),
     flyBallMatchup: b.flyBallMatchup === true || flyBallMatchupOf(b),
+    positiveReasons: positiveReasonCount(b),
     consistency: consistencyFactor(b),
   }
 }

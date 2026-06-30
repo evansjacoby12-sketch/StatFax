@@ -38,6 +38,7 @@ import {
   zoneEdgeOf,
   hrPlatoonEdgeOf,
   flyBallMatchupOf,
+  positiveReasonCount,
 } from '../ui/src/lib/combo-engine.js';
 
 /**
@@ -95,6 +96,8 @@ export function comboRowFromSnapshot(row) {
     pitchMixEdge:   (pitchMixScore(row) ?? 0) >= 7,
     hrPlatoonEdge:  hrPlatoonEdgeOf(row),
     flyBallMatchup: flyBallMatchupOf(row),
+    // Precision strategy: count of positive eli5Reasons (green bullets in Trends tab).
+    positiveReasons: positiveReasonCount(row),
   };
 }
 

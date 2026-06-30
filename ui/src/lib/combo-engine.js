@@ -57,6 +57,11 @@ export function blastRate(raw) {
   return Number.isFinite(t.blastPerContact) ? t.blastPerContact : null
 }
 
+// Count of eli5Reasons with tone === 'good' — the "positive trends" the user
+// sees in the Trends tab. Shared by both adapters so neither recomputes it.
+export const positiveReasonCount = (raw) =>
+  (raw?.eli5Reasons || []).filter((r) => r?.tone === 'good').length
+
 // ── Matchup edge derivations — shared by both adapters ──────────────────────
 // These pull raw per-batter fields into the booleans that both toComboRow
 // (client) and comboRowFromSnapshot (server) attach to the canonical row.
@@ -136,7 +141,12 @@ export const STRATEGIES = [
   // zone, arsenal, platoon, fly-ball environment). Count is the primary rank;
   // model score breaks ties inside makeLegCmp. Orthogonal to `stack`, which
   // surfaces form-based signals (hot/barrel/home/bullpen) from the badge audit.
-  { key: 'edge',    rank: edgeCount,                                   require: (b) => edgeCount(b) >= 2 },
+  { key: 'edge',      rank: edgeCount,                                             require: (b) => edgeCount(b) >= 2 },
+  // Precision — requires ALL THREE: pitch mix ≥7, heat ≥75, and ≥9 positive
+  // reasons in Today's Outlook. Highly selective; when it has enough legs the
+  // picks are the convergence of favorable pitch matchup, genuinely hot form,
+  // and a deep stack of positive model signals. Ranks on reasons count + heat.
+  { key: 'precision', rank: (b) => (b.positiveReasons ?? 0) + ((b.heat ?? 0) / 100), require: (b) => b.pitchMixEdge === true && (b.heat ?? 0) >= 75 && (b.positiveReasons ?? 0) >= 9 },
 ]
 
 // Letter grade from a combo's average leg score (the shared S/A/B/C/D ladder).
