@@ -9,9 +9,8 @@ import * as store from '../lib/storage.js'
 
 const GROUP_GRADE_COLOR = { S: '#f5a623', A: '#32d74b', B: '#3b82f6', C: '#9aa6b6', D: '#6b7787' }
 const SIZE_TABS = [2, 3, 4].map((k) => ({ k, label: `${k}-leg` }))
-// How many combos to SHOW per size, strongest first. 2-leg is the cashable tier
-// (show all); 4-leg is lottery (trim hard).
-const DISPLAY_CAP = { 2: Infinity, 3: 5, 4: 3 }
+// How many combos to SHOW per size, strongest first.
+const DISPLAY_CAP = { 2: 3, 3: 3, 4: 2 }
 
 // Per-leg weakness checks (legFlags / legIsBad) are shared with the SGP tab —
 // see ui/lib/groups.js.
@@ -30,7 +29,7 @@ function assessCombo(g) {
   return { legs, weakestIdx, tone: anyBad ? 'risk' : anyFlag ? 'caution' : 'tail' }
 }
 
-const STRAT_LABEL = { top: 'Top Picks', mix: 'Best Mix', stack: 'Signal Stack', hot: 'Hot Hand', power: 'Power Bats', matchup: 'Soft Matchup', park: 'Park & Air' }
+const STRAT_LABEL = { precision: 'Precision', mix: 'Best Mix', edge: 'Edge Stack', matchup: 'Soft Matchup', park: 'Park & Air', top: 'Top Picks', stack: 'Signal Stack', hot: 'Hot Hand', power: 'Power Bats' }
 
 // Rolling combo scorecard — the real "have our combos hit?" record, graded
 // server-side off frozen pregame combos vs actual HRs (server/parlay-combos.mjs).
