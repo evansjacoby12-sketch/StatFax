@@ -194,14 +194,16 @@ function makeLegCmp(rank, items) {
     ((a.playerId ?? 0) - (b.playerId ?? 0))
 }
 
-// Eligible legs for a strategy: drop SKIP grades, scoreless rows, gamePk-less
-// rows, then anything the strategy's require-gate rejects. Game-state filtering
-// (live/final) is the caller's job — both adapters pass pregame-only rows.
+const COMBO_TIERS = new Set(['PRIME', 'STRONG'])
+
+// Eligible legs for a strategy: only PRIME/STRONG grades, scoreless rows and
+// gamePk-less rows are dropped, then anything the strategy's require-gate rejects.
+// Game-state filtering (live/final) is the caller's job.
 function eligible(rows, require) {
   const out = []
   for (const b of rows || []) {
     if (!b || b.gamePk == null) continue
-    if ((b.grade || 'SKIP') === 'SKIP') continue
+    if (!COMBO_TIERS.has(b.grade || 'SKIP')) continue
     if (!Number.isFinite(b.score)) continue
     if (require && !require(b)) continue
     out.push(b)
