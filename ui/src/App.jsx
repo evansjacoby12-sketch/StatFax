@@ -500,7 +500,10 @@ export default function App() {
           />
         ) : (
           <>
-            {showDayRating && <DayRating rating={data.meta?.dayRating} />}
+            {showDayRating && <DayRating
+              rating={data.meta?.dayRating}
+              estHRs={data.batters?.reduce((s, b) => s + (Number.isFinite(b.hrProbability) ? b.hrProbability : 0), 0) ?? null}
+            />}
             {lineupStatus.total > 0 && lineupStatus.confirmed < lineupStatus.total && !lineupNoticeOff && (
               <div className="lineup-banner" role="status">
                 <button className="lb-close icon-btn" onClick={() => setLineupNoticeOff(true)} aria-label="Dismiss">

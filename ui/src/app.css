@@ -5405,7 +5405,18 @@ button.th:focus-visible {
 .dr-stars { letter-spacing: 1px; font-size: 14px; }
 .dr-star { color: var(--border-soft, #444); }
 .dr-star.on { color: #f5a623; }
-.dr-verdict { font-size: 12px; color: var(--text-dim); flex: 1; min-width: 140px; }
+.dr-verdict { font-size: 12px; color: var(--text-dim); flex: 1; min-width: 0; }
+.dr-est-hrs {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent);
+  white-space: nowrap;
+  padding: 2px 7px;
+  border-radius: 5px;
+  background: rgba(0, 216, 246, 0.08);
+  border: 1px solid rgba(0, 216, 246, 0.18);
+}
 .dr-chev { margin-left: auto; color: var(--text-faint); transition: transform 0.15s; }
 .day-rating[open] .dr-chev { transform: rotate(180deg); }
 .dr-body { padding: 0 12px 11px; }
