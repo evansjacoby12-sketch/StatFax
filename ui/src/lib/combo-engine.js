@@ -130,23 +130,16 @@ export const powerRank = (b) =>
 // re-pick `top`'s legs. Gates (barrel ≥ 11, hr9 ≥ 1.3, air ≥ 1.08) sit a notch
 // above neutral so each strategy surfaces distinct bats, not the same elite tier.
 export const STRATEGIES = [
-  { key: 'top',     rank: (b) => b.score ?? 0,                         require: null },
-  { key: 'mix',     rank: mixRank,                                     require: null },
-  { key: 'stack',   rank: signalScore,                                 require: (b) => signalCount(b) >= 2 },
-  { key: 'hot',     rank: (b) => (b.heat ?? 0) * (b.heatMult ?? 1),    require: (b) => b.hot === true || (b.heat ?? 0) >= HOT_HEAT },
-  { key: 'power',   rank: powerRank,                                   require: (b) => Number.isFinite(b.barrel) && b.barrel >= 11 },
-  { key: 'matchup', rank: (b) => (b.score ?? 0) * (b.pitcherHr9 ?? 0), require: (b) => Number.isFinite(b.pitcherHr9) && b.pitcherHr9 >= 1.3 },
-  { key: 'park',    rank: (b) => (b.score ?? 0) * (b.air ?? 0),        require: (b) => Number.isFinite(b.air) && b.air >= 1.08 },
-  // Edge Stack — legs where ≥2 distinct matchup signals converge (pitch type,
-  // zone, arsenal, platoon, fly-ball environment). Count is the primary rank;
-  // model score breaks ties inside makeLegCmp. Orthogonal to `stack`, which
-  // surfaces form-based signals (hot/barrel/home/bullpen) from the badge audit.
-  { key: 'edge',      rank: edgeCount,                                             require: (b) => edgeCount(b) >= 2 },
-  // Precision — requires ALL THREE: pitch mix ≥7, heat ≥75, and ≥9 positive
-  // reasons in Today's Outlook. Highly selective; when it has enough legs the
-  // picks are the convergence of favorable pitch matchup, genuinely hot form,
-  // and a deep stack of positive model signals. Ranks on reasons count + heat.
-  { key: 'precision', rank: (b) => (b.positiveReasons ?? 0) + ((b.heat ?? 0) / 100), require: (b) => b.pitchMixEdge === true && (b.heat ?? 0) >= 75 && (b.positiveReasons ?? 0) >= 9 },
+  // Top Picks — pure model score, the anchor.
+  { key: 'top',       rank: (b) => b.score ?? 0,                                                                                                       require: null },
+  // Precision — pitch mix ≥7 + heat ≥75 + 9+ positive outlook reasons.
+  { key: 'precision', rank: (b) => (b.positiveReasons ?? 0) + ((b.heat ?? 0) / 100),                                                                   require: (b) => b.pitchMixEdge === true && (b.heat ?? 0) >= 75 && (b.positiveReasons ?? 0) >= 9 },
+  // Edge Stack — ≥2 matchup signals converge (pitch type, zone, arsenal, platoon, fly-ball).
+  { key: 'edge',      rank: edgeCount,                                                                                                                   require: (b) => edgeCount(b) >= 2 },
+  // Power Bats — barrel + recent barrel + blast rate; gate at ≥11% barrel.
+  { key: 'power',     rank: powerRank,                                                                                                                   require: (b) => Number.isFinite(b.barrel) && b.barrel >= 11 },
+  // Signal Stack — form signals weighted by badge-audit lift (hot/barrel/home/bullpen).
+  { key: 'stack',     rank: signalScore,                                                                                                                 require: (b) => signalCount(b) >= 2 },
 ]
 
 // Letter grade from a combo's average leg score (the shared S/A/B/C/D ladder).
