@@ -11,12 +11,6 @@
   /* Trap rubber-band overscroll here so it can't chain to the locked body and
      jitter the fixed bottom-nav / slip on iOS. */
   overscroll-behavior: none;
-  /* iOS PWA safe area: push ALL app content below the status bar. The body
-     background (var(--bg) = #030508) fills the transparent status-bar strip
-     above, so the notch region reads as the same dark surface. Handled here
-     rather than on .topbar so the sticky threshold and the content origin are
-     in sync — see .topbar below. */
-  padding-top: env(safe-area-inset-top, 0px);
 }
 .main {
   flex: 1;
@@ -53,15 +47,14 @@
 /* ============ Sticky chrome ============ */
 .topbar {
   position: sticky;
-  /* Stick just below the status bar, not at the raw viewport top. Because .app
-     has padding-top: env(safe-area-inset-top), the topbar's natural position
-     already starts below the status bar. Matching top to the same inset keeps
-     the sticky threshold in sync so the bar never drifts under the status bar
-     while scrolling. On desktop / non-PWA (inset = 0) this collapses to top:0,
-     the original behaviour. */
-  top: env(safe-area-inset-top, 0px);
+  top: 0;
   z-index: 30;
   background: color-mix(in srgb, var(--bg) 80%, transparent);
+  /* iOS PWA safe area: the topbar visually absorbs the status bar just like the
+     bottom nav absorbs the home indicator — its background extends behind the
+     status bar icons and padding-top pushes the actual header content below them.
+     On desktop / non-PWA (inset = 0) this collapses to the flat padding in .header. */
+  padding-top: env(safe-area-inset-top, 0px);
 }
 /* When the filters panel is expanded the sticky chrome can grow taller than the
    viewport (especially on phones), and a sticky box taller than the screen
