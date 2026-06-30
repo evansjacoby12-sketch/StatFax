@@ -112,11 +112,11 @@ export const blastMixOf = (b) => {
 // Display metadata per strategy key — the label/icon/desc the engine doesn't
 // carry (it only needs key/rank/require). Keys match combo-engine.js STRATEGIES.
 const STRAT_META = {
-  top:       { label: 'Top Picks',    icon: 'TrendingUp', desc: 'highest model score' },
   precision: { label: 'Precision',    icon: 'ScanSearch', desc: 'pitch mix ≥7 · heat ≥75 · 9+ positive trends' },
+  matchup:   { label: 'Soft Matchup', icon: 'Target',     desc: 'facing HR-prone pitchers · best historical leg hit rate' },
+  mix:       { label: 'Best Mix',     icon: 'Sparkles',   desc: 'grade + barrel + heat blend' },
+  park:      { label: 'Park & Air',   icon: 'Wind',       desc: 'park × weather × hand boosts HR' },
   edge:      { label: 'Edge Stack',   icon: 'Zap',        desc: '2+ matchup signals converge (pitch type, zones, platoon, fly-ball)' },
-  power:     { label: 'Power Bats',   icon: 'Crosshair',  desc: 'barrel + blast rate' },
-  stack:     { label: 'Signal Stack', icon: 'Layers',     desc: 'form signals stacked (hot · barrel · home · bullpen)' },
 }
 
 // Map a live scored batter → the engine's canonical combo row. `ref` carries the
