@@ -26,14 +26,22 @@ function useUpdateAvailable() {
       try {
         const v = await latestVersion()
         if (!alive || !v) return
-        // SHA path: only when both sides have a real (non-dev) SHA.
-        if (BUILD_SHA !== 'dev' && v.sha && v.sha !== 'dev' && v.sha !== BUILD_SHA) {
-          setStale(true)
+        // SHA path (CI builds): both sides have a real non-dev SHA — most reliable.
+        // Early-return here so same-build can never accidentally trigger via timestamp.
+        if (BUILD_SHA !== 'dev' && v.sha && v.sha !== 'dev') {
+          if (v.sha !== BUILD_SHA) setStale(true)
           return
         }
-        // Timestamp fallback: any newer deploy has a later builtAt.
-        if (BUILD_TIME && v.builtAt && v.builtAt > BUILD_TIME) {
-          setStale(true)
+        // Timestamp fallback for dev/non-CI builds. BUILD_TIME is injected at
+        // vite-config-load time, version.json.builtAt is written after the bundle
+        // closes — same build has a delta of ~30-120s. Use a 5-min grace so a
+        // same-build check never triggers; a newer deploy (different day / CI run)
+        // will have a delta well above 5 min.
+        if (BUILD_TIME && v.builtAt) {
+          const gracePeriod = 5 * 60 * 1000
+          if (new Date(v.builtAt).getTime() > new Date(BUILD_TIME).getTime() + gracePeriod) {
+            setStale(true)
+          }
         }
       } catch {
         /* offline / transient — retry next tick */

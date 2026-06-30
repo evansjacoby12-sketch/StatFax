@@ -418,6 +418,7 @@ export default function App() {
   return (
     <LiveModeContext.Provider value={liveScores}>
     <EliLevelContext.Provider value={eliLevel}>
+    <>
     <div className="app">
       <div className="topbar" ref={topbarRef}>
         <Header
@@ -559,25 +560,6 @@ export default function App() {
       <footer className="foot">
         <span className="dim">StatFax</span>
       </footer>
-
-      <nav className="bottom-nav">
-        {[
-          { id: 'board', label: 'Board', icon: 'List' },
-          { id: 'games', label: 'Games', icon: 'LayoutGrid' },
-          { id: 'pitchers', label: 'Pitchers', icon: 'Crosshair' },
-          { id: 'weather', label: 'Weather', icon: 'Wind' },
-          { id: 'results', label: 'Results', icon: 'Activity' }
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            className={`bottom-nav-btn ${view === tab.id || (tab.id === 'results' && view === 'combos') ? 'active' : ''}`}
-            onClick={() => setView(tab.id)}
-          >
-            <Icon name={tab.icon} size={20} />
-            <span className="bottom-nav-label">{tab.label}</span>
-          </button>
-        ))}
-      </nav>
 
       <ParlaySlip
         legs={slipLegs}
@@ -768,6 +750,28 @@ export default function App() {
       <PullToRefresh onRefresh={load} />
       <UpdateBanner />
     </div>
+    {/* Bottom nav is a sibling of .app (not a child) so iOS doesn't route its
+        touch events through the overflow-y:auto scroll container, which can
+        swallow taps on position:fixed descendants in standalone PWA mode. */}
+    <nav className="bottom-nav">
+      {[
+        { id: 'board', label: 'Board', icon: 'List' },
+        { id: 'games', label: 'Games', icon: 'LayoutGrid' },
+        { id: 'pitchers', label: 'Pitchers', icon: 'Crosshair' },
+        { id: 'weather', label: 'Weather', icon: 'Wind' },
+        { id: 'results', label: 'Results', icon: 'Activity' }
+      ].map((tab) => (
+        <button
+          key={tab.id}
+          className={`bottom-nav-btn ${view === tab.id || (tab.id === 'results' && view === 'combos') ? 'active' : ''}`}
+          onClick={() => setView(tab.id)}
+        >
+          <Icon name={tab.icon} size={20} />
+          <span className="bottom-nav-label">{tab.label}</span>
+        </button>
+      ))}
+    </nav>
+    </>
     </EliLevelContext.Provider>
     </LiveModeContext.Provider>
   )

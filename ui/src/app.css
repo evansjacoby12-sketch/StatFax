@@ -50,11 +50,6 @@
   top: 0;
   z-index: 30;
   background: color-mix(in srgb, var(--bg) 80%, transparent);
-  /* iOS PWA safe area: the topbar visually absorbs the status bar just like the
-     bottom nav absorbs the home indicator — its background extends behind the
-     status bar icons and padding-top pushes the actual header content below them.
-     On desktop / non-PWA (inset = 0) this collapses to the flat padding in .header. */
-  padding-top: env(safe-area-inset-top, 0px);
 }
 /* When the filters panel is expanded the sticky chrome can grow taller than the
    viewport (especially on phones), and a sticky box taller than the screen
@@ -7323,12 +7318,14 @@ button.th:focus-visible {
     font-size: 11px !important;
   }
 
-  /* Header Spacing and Stacking. Notch inset is handled by .topbar (the sticky
-     container), so this stays a flat pad — see the .topbar rule. */
+  /* iOS PWA safe area: push header content below the status bar. The topbar
+     background (position:sticky, top:0) already covers the status-bar region;
+     this padding keeps the brand and icons clear of the status bar icons.
+     On non-PWA / no-notch devices env() resolves to 0 so the base 10px applies. */
   .header {
     flex-wrap: nowrap !important;
     justify-content: space-between !important;
-    padding: 10px 14px 10px !important;
+    padding: max(env(safe-area-inset-top, 0px), 10px) 14px 10px !important;
   }
   
   .header-left {
