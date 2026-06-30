@@ -610,6 +610,7 @@ export default function App() {
                 onSelect={(b) => setSelectedId(b.id)}
                 onClose={() => setShowBuilder(false)}
                 favorConsistency={favorConsistency}
+                scorecard={data.meta?.comboScorecard}
               />
             </div>
           </div>

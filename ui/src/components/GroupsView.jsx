@@ -324,8 +324,8 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard, g
   }, [incKey])
 
   const bySize = useMemo(
-    () => buildGroups(pool, { favorConsistency, incumbents: incRef.current }),
-    [pool, favorConsistency],
+    () => buildGroups(pool, { favorConsistency, incumbents: incRef.current, scorecard }),
+    [pool, favorConsistency, scorecard],
   )
 
   // Persist this build's legs as next build's incumbents.

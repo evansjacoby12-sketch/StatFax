@@ -199,12 +199,19 @@ function makeGroup({ strategy, size, legs: rows }) {
 // straight through to the engine (see buildCombos). `includeFinals` keeps
 // finished games in the pool — used by the Live tracker (not the betting board)
 // so a combo can be followed all day, not dropped the moment a game ends.
-export function buildGroups(batters, { maxPerBat = 2, globalMaxPerBat = 4, favorConsistency = false, incumbents = null, stickMargin = 0.05, includeFinals = false } = {}) {
+export function buildGroups(batters, { maxPerBat = 2, globalMaxPerBat = 4, favorConsistency = false, incumbents = null, stickMargin = 0.05, includeFinals = false, scorecard = null } = {}) {
   const rows = (batters || []).filter((b) => includeFinals || !b.game?.isFinal).map(toComboRow)
   const combos = buildCombos(rows, { sizes: SIZES, maxPerBat, globalMaxPerBat, favorConsistency, incumbents, stickMargin })
   const out = {}
   for (const c of combos) {
     ;(out[c.size] ||= []).push(makeGroup(c))
+  }
+  // Sort within each size by historical leg hit rate (descending) when scorecard
+  // data is available. Strategies with no history (null) sort after those with a
+  // real track record; ties fall back to STRATEGIES array order (already stable).
+  if (scorecard?.byStrategy) {
+    const hr = (g) => scorecard.byStrategy[g.strategy]?.legHitRate ?? -1
+    for (const size of Object.keys(out)) out[size].sort((a, b) => hr(b) - hr(a))
   }
   return out
 }

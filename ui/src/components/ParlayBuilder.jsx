@@ -173,7 +173,7 @@ function LegRow({ b, perLeg, weak, onSelect, onRemove }) {
   )
 }
 
-export default function ParlayBuilder({ batters, legs, slipSet, onToggle, onRemove, onClear, onReplace, onSelect, onClose, favorConsistency = false }) {
+export default function ParlayBuilder({ batters, legs, slipSet, onToggle, onRemove, onClear, onReplace, onSelect, onClose, favorConsistency = false, scorecard = null }) {
   const [correlate, setCorrelate] = useState(true)
   const [wager, setWager] = useState('10')
   const [tab, setTab] = useState('legs') // legs | build | saved
@@ -239,7 +239,7 @@ export default function ParlayBuilder({ batters, legs, slipSet, onToggle, onRemo
   const autoSuggest = useMemo(() => {
     const need = autoSize - legs.length
     if (legs.length === 0) {
-      const out = buildGroups(batters, { favorConsistency })
+      const out = buildGroups(batters, { favorConsistency, scorecard })
       const items = (out[autoSize] || [])
         .slice()
         .sort((a, b) => (b.ev ?? -Infinity) - (a.ev ?? -Infinity) || (b.allHit ?? 0) - (a.allHit ?? 0))
