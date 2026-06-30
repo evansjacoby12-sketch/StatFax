@@ -474,9 +474,6 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard, g
       </div>
       {available.length ? (
         <div className="grp-list">
-          {shownGroups.map((g) => (
-            <GroupCard key={g.id} g={g} onSelect={onSelect} selectedId={selectedId} comboConf={comboConf} />
-          ))}
           {spread ? (
             <div className="grp-trim dim">
               <b>Spread set</b> — {shownGroups.length} {activeSize}-leg combos chosen to share the fewest bats, so they're independent shots. Tap Spread off to see the full list.
@@ -492,6 +489,9 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard, g
               <button className="grp-trim-link" onClick={() => setShowAll(true)}>show all</button>
             </div>
           )}
+          {shownGroups.map((g) => (
+            <GroupCard key={g.id} g={g} onSelect={onSelect} selectedId={selectedId} comboConf={comboConf} />
+          ))}
         </div>
       ) : (
         <div className="empty-note">
