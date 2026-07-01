@@ -32,7 +32,6 @@ import BackToTop from './components/BackToTop.jsx'
 import PullToRefresh from './components/PullToRefresh.jsx'
 import PickOfDay from './components/PickOfDay.jsx'
 import UpdateBanner from './components/UpdateBanner.jsx'
-import ListBuilderView from './components/ListBuilderView.jsx'
 import Icon from './components/Icon.jsx'
 import './app.css'
 
@@ -42,7 +41,7 @@ const SLATE_REFRESH_MS   = 3 * 60_000 // always-on background poll — pipeline 
 
 // Each view is its own page via a URL hash (#board, #pitchers, …) — bookmarkable
 // and back/forward navigable. Hash routing works as-is on static hosting.
-const VIEWS = new Set(['board', 'games', 'pitchers', 'weather', 'combos', 'results', 'listbuilder'])
+const VIEWS = new Set(['board', 'games', 'pitchers', 'weather', 'combos', 'results'])
 const viewFromHash = () => {
   const h = (typeof location !== 'undefined' ? location.hash : '').replace(/^#\/?/, '')
   return VIEWS.has(h) ? h : null
@@ -489,11 +488,6 @@ export default function App() {
             onSelect={(b) => setSelectedId(b.id)}
             selectedId={selectedId}
           />
-        ) : view === 'listbuilder' ? (
-          <ListBuilderView
-            batters={all}
-            onSelect={(b) => setSelectedId(b.id)}
-          />
         ) : view === 'games' ? (
           <GamesView
             games={data.games}
@@ -764,7 +758,6 @@ export default function App() {
       {[
         { id: 'board', label: 'Board', icon: 'List' },
         { id: 'games', label: 'Games', icon: 'LayoutGrid' },
-        { id: 'listbuilder', label: 'Lists', icon: 'Filter' },
         { id: 'pitchers', label: 'Pitchers', icon: 'Crosshair' },
         { id: 'results', label: 'Results', icon: 'Activity' }
       ].map((tab) => (
