@@ -100,6 +100,19 @@ export function risingForm(b) {
   return delta >= RISING_DELTA ? { recent: rb, season, delta } : null
 }
 
+// Returns true when this batter meets every precision parlay gate — the same
+// criteria the precision strategy uses when auto-building combos.
+export function precisionSignal(b) {
+  const { n } = hrSetup(b)
+  return (
+    b.pitchMixEdge === true &&
+    (b.heatIndex ?? 0) >= 48 &&
+    n >= 4 &&
+    positiveReasonCount(b) >= 9 &&
+    negativeReasonCount(b) <= 3
+  )
+}
+
 // Matchup-relevant blast cuts (display): vs today's starter's HAND, and the
 // usage-weighted blast vs his exact MIX (only when we cover ≥half the arsenal).
 export const blastVsHandOf = (b) => {

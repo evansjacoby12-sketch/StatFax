@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, useCallback, useRef, useLayoutEffect } fr
 import { loadSlate, normName } from './lib/data.js'
 import { GRADE_ORDER, BADGES } from './lib/badges.js'
 import { HOT_HEAT, DESC_BY_DEFAULT, DEFAULT_FILTERS, SORTS } from './lib/constants.js'
-import { risingForm } from './lib/groups.js'
+import { risingForm, precisionSignal } from './lib/groups.js'
 import * as store from './lib/storage.js'
 import { LiveModeContext } from './lib/liveMode.js'
 import { EliLevelContext, nextEliLevel } from './lib/eliLevel.js'
@@ -279,7 +279,10 @@ export default function App() {
   // boolean flag so every consumer — board badges, filters, counts, backtest —
   // reads it the same way as the engine's server-side flags.
   const all = useMemo(
-    () => (state.data?.batters || []).map((b) => (risingForm(b) ? { ...b, rising: true } : b)),
+    () => (state.data?.batters || []).map((b) => {
+      const b2 = risingForm(b) ? { ...b, rising: true } : b
+      return precisionSignal(b2) ? { ...b2, precision: true } : b2
+    }),
     [state.data],
   )
   const slipSet = useMemo(() => new Set(slipIds), [slipIds])
