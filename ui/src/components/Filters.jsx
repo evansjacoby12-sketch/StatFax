@@ -27,7 +27,7 @@ export default function Filters({ value, onChange, gradeCounts, games, badgeCoun
   }
 
   const activeMore =
-    v.gamePks.size + (v.confirmedOnly ? 1 : 0) + (v.watchedOnly ? 1 : 0) + (v.hotOnly ? 1 : 0) + v.badges.size
+    v.gamePks.size + (v.confirmedOnly ? 1 : 0) + (v.watchedOnly ? 1 : 0) + (v.hotOnly ? 1 : 0) + (v.precisionOnly ? 1 : 0) + v.badges.size
   const badgeDefs = BADGES.filter((b) => v.badges.has(b.key))
 
   return (
@@ -148,6 +148,7 @@ export default function Filters({ value, onChange, gradeCounts, games, badgeCoun
           {v.confirmedOnly && <FilterChip label="Confirmed" onClear={() => onChange({ confirmedOnly: false })} />}
           {v.watchedOnly && <FilterChip label="Watchlist" onClear={() => onChange({ watchedOnly: false })} />}
           {v.hotOnly && <FilterChip label="Heating up" icon="Flame" onClear={() => onChange({ hotOnly: false })} />}
+          {v.precisionOnly && <FilterChip label="Precision" icon="Sparkles" onClear={() => onChange({ precisionOnly: false })} />}
           {badgeDefs.map((bd) => (
             <FilterChip
               key={bd.key}
@@ -229,6 +230,20 @@ export default function Filters({ value, onChange, gradeCounts, games, badgeCoun
             >
               <Icon name="Flame" size={14} />
               Heating up
+            </button>
+
+            <button
+              className={`toggle-btn ${v.precisionOnly ? 'on' : ''}`}
+              onClick={() => onChange({ precisionOnly: !v.precisionOnly })}
+              title="Only batters meeting all precision gates (pitch mix ≥7, heat ≥48, HR due 4/6+, 9+ positive trends, ≤3 negatives)"
+              style={v.precisionOnly ? {
+                background: 'rgba(0, 216, 246, 0.1)',
+                borderColor: 'var(--accent)',
+                color: 'var(--accent)'
+              } : {}}
+            >
+              <Icon name="Sparkles" size={14} />
+              Precision
             </button>
           </div>
 

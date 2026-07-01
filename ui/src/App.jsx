@@ -62,6 +62,7 @@ function initialFilters() {
     confirmedOnly: !!saved.confirmedOnly,
     watchedOnly: !!saved.watchedOnly,
     hotOnly: !!saved.hotOnly,
+    precisionOnly: !!saved.precisionOnly,
   }
 }
 
@@ -115,6 +116,7 @@ export default function App() {
       confirmedOnly: filters.confirmedOnly,
       watchedOnly: filters.watchedOnly,
       hotOnly: filters.hotOnly,
+      precisionOnly: filters.precisionOnly,
     })
   }, [filters])
   useEffect(() => store.save('watchlist', [...watchlist]), [watchlist])
@@ -316,6 +318,7 @@ export default function App() {
       if (filters.confirmedOnly && !b.lineupConfirmed) return false
       if (filters.watchedOnly && !watchlist.has(b.id)) return false
       if (filters.hotOnly && (b.heatIndex ?? 0) < HOT_HEAT) return false
+      if (filters.precisionOnly && !b.precision) return false
       // Signals are multi-select (AND): a batter must carry EVERY chosen signal.
       if (filters.badges.size && ![...filters.badges].every((k) => b[k])) return false
       if (q) {

@@ -65,7 +65,7 @@ export default function BatterRow({
       </div>
       <div
         ref={innerRef}
-        className={`board-row ${selected ? 'selected' : ''} ${isFinal ? 'final' : ''} row-grade-${g.toLowerCase()}`}
+        className={`board-row ${selected ? 'selected' : ''} ${isFinal ? 'final' : ''} ${b.precision ? 'row-precision' : ''} row-grade-${g.toLowerCase()}`}
         role="button"
         tabIndex={0}
         onPointerDown={onPointerDown}
@@ -97,7 +97,7 @@ export default function BatterRow({
           '--row-accent': color,
           '--team-logo': teamLogo(b.teamId) ? `url(${teamLogo(b.teamId)})` : 'none',
           '--i': Math.min(rank, 24),
-          borderLeft: selected ? `3px solid var(--accent)` : `3px solid ${hexA(color, 0.3)}`
+          borderLeft: selected ? `3px solid var(--accent)` : b.precision ? `3px solid var(--accent)` : `3px solid ${hexA(color, 0.3)}`
         }}
       >
         <div className="col-rank mono">{rank}</div>

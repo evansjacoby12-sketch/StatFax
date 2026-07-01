@@ -158,8 +158,9 @@ export function Badge({ badge }) {
   return (
     <span
       className="badge"
+      data-badge-key={b.key}
       title={b.desc}
-      style={{ 
+      style={{
         borderColor: hexA(b.color, 0.2),
         background: `linear-gradient(135deg, ${hexA(b.color, 0.08)} 0%, rgba(255, 255, 255, 0.01) 100%)`,
         boxShadow: `0 2px 6px ${hexA(b.color, 0.04)}, inset 0 1px 0 rgba(255, 255, 255, 0.04)`

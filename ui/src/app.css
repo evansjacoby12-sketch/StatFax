@@ -7597,6 +7597,26 @@ button.th:focus-visible {
 .lb-col-stat { width: 70px; flex-shrink: 0; font-size: 12px; text-align: right; }
 .lb-col-hrp { width: 44px; flex-shrink: 0; font-size: 12px; font-weight: 700; color: var(--accent); text-align: right; }
 
+/* ─── Precision signal row glow ─────────────────────────────────────────────── */
+.board-row.row-precision {
+  background: linear-gradient(90deg, rgba(0, 216, 246, 0.05) 0%, transparent 55%);
+}
+.board-row.row-precision:hover,
+.board-row.row-precision.selected {
+  background: linear-gradient(90deg, rgba(0, 216, 246, 0.1) 0%, rgba(0, 216, 246, 0.03) 55%);
+}
+
+/* Precision badge: cyan shimmer sweep */
+.badge[data-badge-key="precision"] {
+  animation: precisionShimmer 3.2s linear infinite;
+}
+@keyframes precisionShimmer {
+  0% { box-shadow: 0 0 0 0 rgba(0, 216, 246, 0); }
+  40% { box-shadow: 0 0 0 2px rgba(0, 216, 246, 0.18); }
+  80% { box-shadow: 0 0 0 0 rgba(0, 216, 246, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(0, 216, 246, 0); }
+}
+
 /* ─── List Builder View (lbv-*) ─────────────────────────────────────────────── */
 .lbv-root { padding: 0 0 80px; }
 .lbv-header { padding: 16px 16px 0; margin-bottom: 4px; }
