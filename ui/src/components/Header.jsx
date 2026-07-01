@@ -5,7 +5,7 @@ import { GRADE_ORDER, gradeColor } from '../lib/badges.js'
 import { hexA } from './atoms.jsx'
 
 // Help dropdown anchored to the header info button
-function HelpMenu({ onOpenWeather, onOpenBuilder, onOpenGroups, onOpenSGP, onOpenSplits, onOpenBacktest, onOpenGuide, onOpenHowTo, onOpenLegend, onOpenSettings }) {
+function HelpMenu({ onOpenWeather, onOpenBuilder, onOpenGroups, onOpenSGP, onOpenSplits, onOpenBacktest, onOpenListBuilder, onOpenGuide, onOpenHowTo, onOpenLegend, onOpenSettings }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
   
@@ -39,6 +39,7 @@ function HelpMenu({ onOpenWeather, onOpenBuilder, onOpenGroups, onOpenSGP, onOpe
       title: 'Find plays',
       items: [
         { label: 'Cheat Sheet', desc: 'HR plays, barrels, weak arms & parks', icon: 'LayoutGrid', fn: onOpenSplits },
+        { label: 'List Builder', desc: 'Filter batters by your own Statcast criteria', icon: 'Filter', fn: onOpenListBuilder },
         { label: 'Signal Backtest', desc: 'Hit rates by grade and signals', icon: 'Activity', fn: onOpenBacktest },
       ],
     },
@@ -143,6 +144,7 @@ export default function Header({
   onOpenSGP,
   onOpenSplits,
   onOpenBacktest,
+  onOpenListBuilder,
   onOpenSettings,
 }) {
   const m = meta.modelMetrics
@@ -260,7 +262,7 @@ export default function Header({
           <Icon name={eliLevel === 'eli5' ? 'Sparkles' : 'BarChart3'} size={14} style={{ color: 'var(--accent)' }} />
         </button>
 
-        <HelpMenu onOpenWeather={onOpenWeather} onOpenBuilder={onOpenBuilder} onOpenGroups={onOpenGroups} onOpenSGP={onOpenSGP} onOpenSplits={onOpenSplits} onOpenBacktest={onOpenBacktest} onOpenGuide={onOpenGuide} onOpenHowTo={onOpenHowTo} onOpenLegend={onOpenLegend} onOpenSettings={onOpenSettings} />
+        <HelpMenu onOpenWeather={onOpenWeather} onOpenBuilder={onOpenBuilder} onOpenGroups={onOpenGroups} onOpenSGP={onOpenSGP} onOpenSplits={onOpenSplits} onOpenBacktest={onOpenBacktest} onOpenListBuilder={onOpenListBuilder} onOpenGuide={onOpenGuide} onOpenHowTo={onOpenHowTo} onOpenLegend={onOpenLegend} onOpenSettings={onOpenSettings} />
 
         <button
           className={`icon-btn ${refreshing ? 'refreshing' : ''}`}

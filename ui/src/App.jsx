@@ -32,6 +32,7 @@ import BackToTop from './components/BackToTop.jsx'
 import PullToRefresh from './components/PullToRefresh.jsx'
 import PickOfDay from './components/PickOfDay.jsx'
 import UpdateBanner from './components/UpdateBanner.jsx'
+import ListBuilderView from './components/ListBuilderView.jsx'
 import Icon from './components/Icon.jsx'
 import './app.css'
 
@@ -80,6 +81,7 @@ export default function App() {
   const [showBuilder, setShowBuilder] = useState(false)
   const [showSplits, setShowSplits] = useState(false)
   const [showBacktest, setShowBacktest] = useState(false)
+  const [showListBuilder, setShowListBuilder] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   // Default ON: same-window grouping is the default combos view — those are the
   // combos you can actually bet as one ticket (every leg's lineup confirms before
@@ -219,6 +221,7 @@ export default function App() {
         else if (zoneId) setZoneId(null)
         else if (selectedId) setSelectedId(null) // drawer stacks above the modals — close it first
         else if (showBacktest) setShowBacktest(false)
+        else if (showListBuilder) setShowListBuilder(false)
         else if (showSplits) setShowSplits(false)
         else if (showBuilder) setShowBuilder(false)
         else if (showGroups) setShowGroups(false)
@@ -230,7 +233,7 @@ export default function App() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [selectedId, showLegend, showGuide, showHowTo, zoneId, showGroups, showSGP, showBuilder, showSplits, showBacktest, pitcherKey])
+  }, [selectedId, showLegend, showGuide, showHowTo, zoneId, showGroups, showSGP, showBuilder, showSplits, showBacktest, showListBuilder, pitcherKey])
 
   const patch = useCallback((p) => setFilters((f) => ({ ...f, ...p })), [])
 
@@ -444,6 +447,7 @@ export default function App() {
           onOpenHowTo={() => setShowHowTo(true)}
           onOpenBuilder={() => setShowBuilder(true)}
           onOpenWeather={() => setView('weather')}
+          onOpenListBuilder={() => setShowListBuilder(true)}
           onOpenGroups={() => setShowGroups(true)}
           onOpenSGP={() => setShowSGP(true)}
           onOpenSplits={() => setShowSplits(true)}
@@ -697,6 +701,23 @@ export default function App() {
             </div>
             <div className="groups-modal-body">
               <CheatSheet batters={all} onSelect={(b) => setSelectedId(b.id)} onOpenPitcher={openPitcher} />
+            </div>
+          </div>
+        </>
+      )}
+      {showListBuilder && (
+        <>
+          <div className="drawer-scrim" onClick={() => setShowListBuilder(false)} />
+          <div className="modal groups-modal cheat-modal" role="dialog" aria-modal="true" aria-label="List Builder">
+            <button className="drawer-close icon-btn" onClick={() => setShowListBuilder(false)} aria-label="Close">
+              <Icon name="X" size={18} />
+            </button>
+            <div className="groups-modal-head">
+              <Icon name="Filter" size={18} />
+              <h2>List Builder</h2>
+            </div>
+            <div className="groups-modal-body">
+              <ListBuilderView batters={all} onSelect={(b) => { setSelectedId(b.id); setShowListBuilder(false) }} />
             </div>
           </div>
         </>

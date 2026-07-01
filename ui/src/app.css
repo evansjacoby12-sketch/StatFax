@@ -3447,10 +3447,20 @@ button.th:focus-visible {
   .mom-chip.hot {
     color: var(--b-hot);
     background: color-mix(in srgb, var(--b-hot) 14%, transparent);
+    animation: hotPulse 2.2s ease-in-out infinite;
   }
   .mom-chip.rising {
     color: var(--good);
     background: color-mix(in srgb, var(--good) 14%, transparent);
+    animation: risingPulse 2.8s ease-in-out infinite;
+  }
+  @keyframes hotPulse {
+    0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--b-hot) 50%, transparent); }
+    50% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--b-hot) 0%, transparent); }
+  }
+  @keyframes risingPulse {
+    0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--good) 40%, transparent); }
+    50% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--good) 0%, transparent); }
   }
   /* Matchup line: team → opp · pitcher, dimmed */
   .batter-line2 {
@@ -7188,14 +7198,33 @@ button.th:focus-visible {
     border: none !important;
   }
   
+  .bottom-nav-btn {
+    position: relative !important;
+  }
   .bottom-nav-btn.active {
     color: var(--text) !important;
   }
-  
+  .bottom-nav-btn.active::before {
+    content: '' !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    width: 28px !important;
+    height: 2px !important;
+    border-radius: 0 0 3px 3px !important;
+    background: var(--accent) !important;
+    box-shadow: 0 0 10px var(--accent-glow) !important;
+    animation: navPop 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) both !important;
+  }
+  @keyframes navPop {
+    from { width: 0; opacity: 0; }
+  }
   .bottom-nav-btn.active svg {
     color: var(--accent) !important;
     filter: drop-shadow(0 0 6px var(--accent-glow)) !important;
     transform: scale(1.1) !important;
+    transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
   }
   
   .bottom-nav-label {
