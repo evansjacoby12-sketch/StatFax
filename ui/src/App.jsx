@@ -444,6 +444,7 @@ export default function App() {
           onOpenGuide={() => setShowGuide(true)}
           onOpenHowTo={() => setShowHowTo(true)}
           onOpenBuilder={() => setShowBuilder(true)}
+          onOpenWeather={() => setView('weather')}
           onOpenGroups={() => setShowGroups(true)}
           onOpenSGP={() => setShowSGP(true)}
           onOpenSplits={() => setShowSplits(true)}

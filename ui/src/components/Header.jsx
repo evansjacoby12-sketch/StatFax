@@ -5,7 +5,7 @@ import { GRADE_ORDER, gradeColor } from '../lib/badges.js'
 import { hexA } from './atoms.jsx'
 
 // Help dropdown anchored to the header info button
-function HelpMenu({ onOpenBuilder, onOpenGroups, onOpenSGP, onOpenSplits, onOpenBacktest, onOpenGuide, onOpenHowTo, onOpenLegend, onOpenSettings }) {
+function HelpMenu({ onOpenWeather, onOpenBuilder, onOpenGroups, onOpenSGP, onOpenSplits, onOpenBacktest, onOpenGuide, onOpenHowTo, onOpenLegend, onOpenSettings }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
   
@@ -29,6 +29,7 @@ function HelpMenu({ onOpenBuilder, onOpenGroups, onOpenSGP, onOpenSplits, onOpen
     {
       title: 'Parlays',
       items: [
+        { label: 'Weather', desc: 'Park factors, wind & game-time conditions', icon: 'Wind', fn: onOpenWeather },
         { label: 'Parlay Combos', desc: 'Auto-built chalk, value, lottery combos', icon: 'Layers', fn: onOpenGroups },
         { label: 'Parlay Builder', desc: 'Build your own slip — live odds, EV & correlation', icon: 'Sparkles', fn: onOpenBuilder },
         { label: 'Same-Game Parlays', desc: 'Best correlated 2–4 leg SGPs', icon: 'Zap', fn: onOpenSGP },
@@ -136,6 +137,7 @@ export default function Header({
   total = 0,
   onOpenGuide,
   onOpenHowTo,
+  onOpenWeather,
   onOpenBuilder,
   onOpenGroups,
   onOpenSGP,
@@ -258,7 +260,7 @@ export default function Header({
           <Icon name={eliLevel === 'eli5' ? 'Sparkles' : 'BarChart3'} size={14} style={{ color: 'var(--accent)' }} />
         </button>
 
-        <HelpMenu onOpenBuilder={onOpenBuilder} onOpenGroups={onOpenGroups} onOpenSGP={onOpenSGP} onOpenSplits={onOpenSplits} onOpenBacktest={onOpenBacktest} onOpenGuide={onOpenGuide} onOpenHowTo={onOpenHowTo} onOpenLegend={onOpenLegend} onOpenSettings={onOpenSettings} />
+        <HelpMenu onOpenWeather={onOpenWeather} onOpenBuilder={onOpenBuilder} onOpenGroups={onOpenGroups} onOpenSGP={onOpenSGP} onOpenSplits={onOpenSplits} onOpenBacktest={onOpenBacktest} onOpenGuide={onOpenGuide} onOpenHowTo={onOpenHowTo} onOpenLegend={onOpenLegend} onOpenSettings={onOpenSettings} />
 
         <button
           className={`icon-btn ${refreshing ? 'refreshing' : ''}`}
