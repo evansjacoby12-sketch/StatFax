@@ -80,7 +80,7 @@ function SigCheck({ sig, active, onToggle }) {
 function ResultRow({ b, onSelect, cols }) {
   return (
     <li className="lbv-row" role="button" tabIndex={0} onClick={() => onSelect(b)} onKeyDown={e => e.key === 'Enter' && onSelect(b)}>
-      <GradeChip grade={b.grade?.label || b.grade} size="sm" score={b.score} />
+      <GradeChip grade={b.grade} size="sm" score={b.score} />
       <div className="lbv-row-name">
         <span className="lbv-name">{lastFirst(b.name)}</span>
         <span className="lbv-team dim">{b.team}</span>
