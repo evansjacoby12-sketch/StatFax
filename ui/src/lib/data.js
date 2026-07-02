@@ -7,6 +7,41 @@ import { heatIndex, pitchMixScore } from './scout.js'
 // module also imports cleanly under Node (tests), where import.meta.env is unset.
 const BASE_URL = import.meta.env?.BASE_URL ?? '/'
 const DATA_URL = `${BASE_URL}data/daily.json`
+const STATUS_URL = `${BASE_URL}api/status`
+const REFRESH_URL = `${BASE_URL}api/refresh`
+
+// Returns true if the local server is running (has /api/status).
+async function hasLocalServer() {
+  try {
+    const r = await fetch(STATUS_URL, { cache: 'no-store' })
+    return r.ok
+  } catch {
+    return false
+  }
+}
+
+// Triggers a server-side slate regeneration (POST /api/refresh) and waits for
+// it to finish, then returns so the caller can re-loadSlate() with fresh data.
+// Falls back silently if not running against the local server (e.g. GitHub Pages).
+export async function forceSlateRefresh(onStatus) {
+  const live = await hasLocalServer()
+  if (!live) return // GitHub Pages / static host — nothing to trigger
+
+  await fetch(REFRESH_URL, { method: 'POST', cache: 'no-store' }).catch(() => {})
+
+  // Poll /api/status until refreshing goes false.
+  for (let i = 0; i < 120; i++) {
+    await new Promise((r) => setTimeout(r, 2000))
+    try {
+      const r = await fetch(`${STATUS_URL}?t=${Date.now()}`, { cache: 'no-store' })
+      const s = await r.json()
+      onStatus?.(s)
+      if (!s.refreshing) return
+    } catch {
+      // keep polling
+    }
+  }
+}
 
 // Normalize a player name for fuzzy matching across sources (MLB API vs books).
 // Strips accents, punctuation, generational suffixes; lowercases.

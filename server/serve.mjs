@@ -100,6 +100,12 @@ const server = http.createServer(async (req, res) => {
     return res.end(JSON.stringify({ refreshing, lastRun, lastOk, refreshMinutes: REFRESH_MIN }))
   }
 
+  if (url === '/api/refresh' && req.method === 'POST') {
+    runSlate('manual')
+    head(res, 202, 'application/json')
+    return res.end(JSON.stringify({ triggered: true, refreshing: true }))
+  }
+
   // Live brain data.
   if (url.startsWith('/data/')) {
     const rel = url.slice(6).replace(/^\/+/, '')

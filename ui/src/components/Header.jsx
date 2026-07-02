@@ -134,6 +134,7 @@ export default function Header({
   eliLevel = 'eli5',
   onCycleEli,
   refreshing,
+  slateBuilding = false,
   gradeCounts = {},
   total = 0,
   onOpenGuide,
@@ -267,14 +268,14 @@ export default function Header({
         <button
           className={`icon-btn ${refreshing ? 'refreshing' : ''}`}
           onClick={onRefresh}
-          title="Reload slate now"
-          aria-label="Reload slate"
+          title={slateBuilding ? 'Building fresh slate from MLB APIs…' : 'Force-fetch new slate from MLB APIs'}
+          aria-label={slateBuilding ? 'Building slate' : 'Force refresh slate'}
           style={{
             position: 'relative',
             overflow: 'hidden'
           }}
         >
-          <Icon name="RefreshCw" size={14} className={refreshing ? 'animate-spin' : ''} />
+          <Icon name={slateBuilding ? 'Loader' : 'RefreshCw'} size={14} className={refreshing ? 'animate-spin' : ''} />
         </button>
       </div>
     </header>

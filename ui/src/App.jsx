@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback, useRef, useLayoutEffect } from 'react'
-import { loadSlate, normName } from './lib/data.js'
+import { loadSlate, forceSlateRefresh, normName } from './lib/data.js'
 import { GRADE_ORDER, BADGES } from './lib/badges.js'
 import { HOT_HEAT, DESC_BY_DEFAULT, DEFAULT_FILTERS, SORTS } from './lib/constants.js'
 import { risingForm, precisionSignal } from './lib/groups.js'
@@ -69,6 +69,7 @@ function initialFilters() {
 export default function App() {
   const [state, setState] = useState({ status: 'loading', data: null, error: null })
   const [refreshing, setRefreshing] = useState(false)
+  const [slateBuilding, setSlateBuilding] = useState(false)
   const [filters, setFilters] = useState(initialFilters)
   const [selectedId, setSelectedId] = useState(null)
   const [zoneId, setZoneId] = useState(null)
@@ -168,6 +169,19 @@ export default function App() {
       setRefreshing(false)
     }
   }, [])
+
+  // Force-refresh: ask the local server to re-run fetch-slate.mjs, wait for it,
+  // then reload the new JSON. On static hosts (GitHub Pages) falls back to load().
+  const forceRefresh = useCallback(async () => {
+    if (refreshing || slateBuilding) return
+    setSlateBuilding(true)
+    try {
+      await forceSlateRefresh()
+    } finally {
+      setSlateBuilding(false)
+    }
+    await load()
+  }, [refreshing, slateBuilding, load])
 
   useEffect(() => {
     load()
@@ -437,7 +451,7 @@ export default function App() {
             total: all.length,
             shown: filtered.length,
           }}
-          onRefresh={load}
+          onRefresh={forceRefresh}
           onOpenModel={() => setView('results')}
           onOpenLegend={() => setShowLegend(true)}
           autoRefresh={autoRefresh}
@@ -446,7 +460,8 @@ export default function App() {
           onToggleLive={() => setLiveScores((v) => !v)}
           eliLevel={eliLevel}
           onCycleEli={() => setEliLevel((v) => nextEliLevel(v))}
-          refreshing={refreshing}
+          refreshing={refreshing || slateBuilding}
+          slateBuilding={slateBuilding}
           gradeCounts={gradeCounts}
           total={all.length}
           onOpenGuide={() => setShowGuide(true)}
