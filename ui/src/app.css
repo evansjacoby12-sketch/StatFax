@@ -650,6 +650,7 @@ button.th:focus-visible {
 }
 .batter-meta,
 .mom-chip,
+.streak-chip,
 .prob-num-mobile {
   display: none;
 }
@@ -876,12 +877,18 @@ button.th:focus-visible {
   align-items: center;
   gap: 4px;
   font-size: 9.5px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  color: var(--bad);
-  background: rgba(255, 92, 92, 0.12);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #ff5c5c;
+  background: rgba(255, 92, 92, 0.14);
+  border: 1px solid rgba(255, 92, 92, 0.3);
   border-radius: 4px;
-  padding: 1px 5px;
+  padding: 1px 6px;
+  animation: liveTagPulse 2s ease-in-out infinite;
+}
+@keyframes liveTagPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 92, 92, 0); }
+  50% { box-shadow: 0 0 6px 1px rgba(255, 92, 92, 0.25); }
 }
 .final-tag {
   display: inline-flex;
@@ -3461,6 +3468,25 @@ button.th:focus-visible {
   @keyframes risingPulse {
     0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--good) 40%, transparent); }
     50% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--good) 0%, transparent); }
+  }
+  /* HR streak chip — orange fire pill, pulses like HOT */
+  .streak-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    padding: 2px 5px;
+    border-radius: 999px;
+    border: 1px solid color-mix(in srgb, var(--b-hot) 50%, transparent);
+    color: var(--b-hot);
+    background: color-mix(in srgb, var(--b-hot) 12%, transparent);
+    animation: streakPulse 1.8s ease-in-out infinite;
+  }
+  @keyframes streakPulse {
+    0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--b-hot) 50%, transparent); }
+    50% { box-shadow: 0 0 4px 2px color-mix(in srgb, var(--b-hot) 0%, transparent); }
   }
   /* Matchup line: team → opp · pitcher, dimmed */
   .batter-line2 {

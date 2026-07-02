@@ -539,7 +539,13 @@ function DrawerHeader({ b, color, onClose, watched, inSlip, onToggleWatch, onTog
             <span>·</span><span>{b.isHome ? 'Home' : 'Away'}</span>
             {b.game?.venueName && <><span>·</span><span>{b.game.venueName}</span></>}
           </div>
-          <div style={{ marginBottom: '10px' }}><BadgeRow batter={b} /></div>
+          <div style={{ marginBottom: b.precision ? '8px' : '10px' }}><BadgeRow batter={b} /></div>
+          {b.precision && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(0,216,246,0.08)', border: '1px solid rgba(0,216,246,0.2)', borderRadius: '8px', padding: '6px 10px', marginBottom: '10px', fontSize: '11px', fontWeight: '700', color: 'var(--accent)' }}>
+              <Icon name="Sparkles" size={12} />
+              Precision Play — all 5 gates cleared
+            </div>
+          )}
           <div style={{ display: 'flex', gap: '8px' }}>
             <button className={`d-act ${inSlip ? 'on' : ''}`} onClick={() => onToggleSlip(b)} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: inSlip ? 'rgba(16,185,129,0.12)' : 'rgba(255,255,255,0.04)', color: inSlip ? 'var(--strong)' : '#fff', border: inSlip ? '1px solid var(--strong)' : '1px solid rgba(255,255,255,0.08)', padding: '5px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: '600' }}>
               <Icon name={inSlip ? 'Check' : 'Plus'} size={13} />{inSlip ? 'In parlay' : 'Add to parlay'}

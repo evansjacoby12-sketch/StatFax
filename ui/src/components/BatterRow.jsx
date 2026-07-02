@@ -113,7 +113,7 @@ export default function BatterRow({
               <span className="confirm-dot pending" title="Projected lineup" style={{ background: 'var(--text-faint)' }} />
             )}
             {live && (
-              <span className="live-tag" style={{ background: 'rgba(239, 68, 68, 0.12)', color: 'var(--bad)', fontSize: '9px' }}>
+              <span className="live-tag">
                 <span className="live-dot" /> LIVE
               </span>
             )}
@@ -130,6 +130,11 @@ export default function BatterRow({
             {mom && (
               <span className={`mom-chip ${mom.cls}`}>
                 <Icon name={mom.icon} size={10} /> {mom.label}
+              </span>
+            )}
+            {(b.hrStreak ?? 0) >= 2 && (
+              <span className="streak-chip" title={`${b.hrStreak}-game HR streak`}>
+                <Icon name="Flame" size={9} /> {b.hrStreak}G
               </span>
             )}
           </div>
