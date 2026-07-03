@@ -173,6 +173,18 @@ jobs:
         with:
           path: ui/dist
 
+      # Pages' deployment API intermittently rejects with "Deployment failed,
+      # try again later" even when the artifact is fine (3 flakes on 2026-07-03
+      # alone) — so take its advice: retry once after a pause before failing
+      # the run for real.
       - name: Deploy to GitHub Pages
         id: deploy
         uses: actions/deploy-pages@v4
+        continue-on-error: true
+
+      - name: Retry deploy (Pages API flake)
+        id: deploy-retry
+        if: steps.deploy.outcome == 'failure'
+        run: sleep 60
+      - uses: actions/deploy-pages@v4
+        if: steps.deploy.outcome == 'failure'
