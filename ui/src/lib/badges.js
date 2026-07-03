@@ -16,7 +16,7 @@ export function gradeColor(label) {
 // Boolean flags on a scored batter → display chips.
 // `lucide` field is the lucide-react icon name; tone drives color.
 export const BADGES = [
-  { key: 'precision', label: 'Precision', lucide: 'Sparkles', color: 'var(--accent)', tone: 'good', desc: 'Meets every precision gate: pitch mix ≥7, heat ≥48, HR due 4/6+, 9+ positive trends, ≤3 negatives' },
+  { key: 'precision', label: 'Precision', lucide: 'Sparkles', color: 'var(--accent)', tone: 'good', desc: 'Meets every precision gate: pitch mix ≥7, heat ≥48, HR due 5/6+, 8+ positive trends, ≤3 negatives' },
   { key: 'hot', label: 'Hot', lucide: 'Flame', color: 'var(--b-hot)', tone: 'good', desc: 'On a hot streak — recent power surge' },
   { key: 'rising', label: 'Rising', lucide: 'TrendingUp', color: 'var(--good)', tone: 'good', desc: 'Recent ~14-day barrel rate surging above the season rate — heating up right now (the recency edge sharps ride)' },
   { key: 'due', label: 'Due', lucide: 'Hourglass', color: 'var(--b-due)', tone: 'good', desc: 'HR drought vs. expected — regression candidate' },

@@ -107,8 +107,8 @@ export function precisionSignal(b) {
   return (
     b.pitchMixEdge === true &&
     (b.heatIndex ?? 0) >= 48 &&
-    n >= 4 &&
-    positiveReasonCount(b) >= 9 &&
+    n >= 5 &&
+    positiveReasonCount(b) >= 8 &&
     negativeReasonCount(b) <= 3
   )
 }
@@ -127,7 +127,7 @@ export const blastMixOf = (b) => {
 // Display metadata per strategy key — the label/icon/desc the engine doesn't
 // carry (it only needs key/rank/require). Keys match combo-engine.js STRATEGIES.
 const STRAT_META = {
-  precision: { label: 'Precision',    icon: 'ScanSearch', desc: 'pitch mix ≥7 · heat ≥48 · HR due 4/6+ · 9+ positive trends · ≤3 negatives' },
+  precision: { label: 'Precision',    icon: 'ScanSearch', desc: 'pitch mix ≥7 · heat ≥48 · HR due 5/6+ · 8+ positive trends · ≤3 negatives' },
   matchup:   { label: 'Soft Matchup', icon: 'Target',     desc: 'facing HR-prone pitchers · best historical leg hit rate' },
   mix:       { label: 'Best Mix',     icon: 'Sparkles',   desc: 'grade + barrel + heat blend' },
   park:      { label: 'Park & Air',   icon: 'Wind',       desc: 'park × weather × hand boosts HR' },

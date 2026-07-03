@@ -36,12 +36,12 @@ const sig = (strategy, size, legIds) => `${strategy}:${size}:${[...legIds].sort(
 
 // ─── strategy rank/require gates ──────────────────────────────────────────────
 
-test('precision gate: pitch mix ≥7, heat ≥48, hrDueScore ≥4, 9+ positives, ≤3 negatives', () => {
-  const pass = { pitchMixEdge: true, heat: 48, hrDueScore: 4, positiveReasons: 9, negativeReasons: 3 }
+test('precision gate: pitch mix ≥7, heat ≥48, hrDueScore ≥5, 8+ positives, ≤3 negatives', () => {
+  const pass = { pitchMixEdge: true, heat: 48, hrDueScore: 5, positiveReasons: 8, negativeReasons: 3 }
   assert.equal(stratByKey.precision.require(row({ ...pass, pitchMixEdge: false })), false)
   assert.equal(stratByKey.precision.require(row({ ...pass, heat: 47 })), false)
-  assert.equal(stratByKey.precision.require(row({ ...pass, hrDueScore: 3 })), false)
-  assert.equal(stratByKey.precision.require(row({ ...pass, positiveReasons: 8 })), false)
+  assert.equal(stratByKey.precision.require(row({ ...pass, hrDueScore: 4 })), false)
+  assert.equal(stratByKey.precision.require(row({ ...pass, positiveReasons: 7 })), false)
   assert.equal(stratByKey.precision.require(row({ ...pass, negativeReasons: 4 })), false)
   assert.equal(stratByKey.precision.require(row(pass)), true)
   // rank = positives - negatives + heat/100

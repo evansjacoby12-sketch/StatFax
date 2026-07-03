@@ -235,7 +235,7 @@ export default function Filters({ value, onChange, gradeCounts, games, badgeCoun
             <button
               className={`toggle-btn ${v.precisionOnly ? 'on' : ''}`}
               onClick={() => onChange({ precisionOnly: !v.precisionOnly })}
-              title="Only batters meeting all precision gates (pitch mix ≥7, heat ≥48, HR due 4/6+, 9+ positive trends, ≤3 negatives)"
+              title="Only batters meeting all precision gates (pitch mix ≥7, heat ≥48, HR due 5/6+, 8+ positive trends, ≤3 negatives)"
               style={v.precisionOnly ? {
                 background: 'rgba(0, 216, 246, 0.1)',
                 borderColor: 'var(--accent)',

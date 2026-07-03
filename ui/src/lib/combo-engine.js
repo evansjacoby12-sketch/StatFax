@@ -134,8 +134,11 @@ export const powerRank = (b) =>
 // re-pick `top`'s legs. Gates (barrel ≥ 11, hr9 ≥ 1.3, air ≥ 1.08) sit a notch
 // above neutral so each strategy surfaces distinct bats, not the same elite tier.
 export const STRATEGIES = [
-  // Precision — pitch mix ≥7 · heat ≥48 · HR due 4/6+ · 9+ positive trends · ≤3 negatives.
-  { key: 'precision', rank: (b) => (b.positiveReasons ?? 0) - (b.negativeReasons ?? 0) + ((b.heat ?? 0) / 100), require: (b) => b.pitchMixEdge === true && (b.heat ?? 0) >= 48 && (b.hrDueScore ?? 0) >= 4 && (b.positiveReasons ?? 0) >= 9 && (b.negativeReasons ?? 0) <= 3 },
+  // Precision — pitch mix ≥7 · heat ≥48 · HR due 5/6+ · 8+ positive trends · ≤3 negatives.
+  // Tuned 2026-07-03 on 30d of reconciled outcomes: setup 5/6 legs hit 25.3%
+  // vs 20.4% at 4/6 (14d window), while the positives gate was the binding
+  // constraint with no measurable lift behind 9-vs-8 — so due tightened, positives softened.
+  { key: 'precision', rank: (b) => (b.positiveReasons ?? 0) - (b.negativeReasons ?? 0) + ((b.heat ?? 0) / 100), require: (b) => b.pitchMixEdge === true && (b.heat ?? 0) >= 48 && (b.hrDueScore ?? 0) >= 5 && (b.positiveReasons ?? 0) >= 8 && (b.negativeReasons ?? 0) <= 3 },
   // Soft Matchup — batter quality × pitcher HR/9; best historical leg hit rate (66.7%).
   { key: 'matchup',   rank: (b) => (b.score ?? 0) * (b.pitcherHr9 ?? 0),                        require: (b) => Number.isFinite(b.pitcherHr9) && b.pitcherHr9 >= 1.3 },
   // Best Mix — score + barrel + heat blend; 2nd best historically (63% legs, 33% combos).
