@@ -7862,6 +7862,55 @@ button.th:focus-visible {
   }
 }
 
+/* ─── View toggle: sliding glow indicator ────────────────────────────────
+   Late in the file on purpose — must outrank the !important skin block. */
+.view-toggle {
+  position: relative !important;
+  background: rgba(255, 255, 255, 0.02) !important;
+  border: 1px solid rgba(255, 255, 255, 0.05) !important;
+  border-radius: 11px !important;
+  padding: 3px !important;
+  gap: 2px !important;
+}
+.view-ind {
+  position: absolute;
+  top: 3px;
+  left: 0;
+  bottom: 3px;
+  width: 0;
+  opacity: 0;
+  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(0, 216, 246, 0.16) 0%, rgba(0, 82, 212, 0.10) 100%);
+  border: 1px solid var(--accent);
+  box-shadow: 0 0 12px var(--accent-glow), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1), width 0.32s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.15s;
+  pointer-events: none;
+}
+.view-toggle .view-btn {
+  position: relative !important;
+  z-index: 1 !important;
+  border: 1px solid transparent !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.view-toggle .view-btn:hover {
+  background: rgba(255, 255, 255, 0.04) !important;
+  color: #fff !important;
+}
+.view-toggle .view-btn.on {
+  background: transparent !important; /* the sliding indicator carries the active look */
+  border-color: transparent !important;
+  color: #fff !important;
+  box-shadow: none !important;
+}
+.view-toggle .view-btn.on svg {
+  color: var(--accent);
+  filter: drop-shadow(0 0 4px var(--accent-glow));
+}
+@media (prefers-reduced-motion: reduce) {
+  .view-ind { transition: opacity 0.15s; }
+}
+
 /* ─── First-pitch countdown (header slate meta) ─────────────────────────── */
 .first-pitch {
   display: inline-flex;

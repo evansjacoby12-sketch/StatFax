@@ -258,8 +258,8 @@ export default function App() {
         if (input) { input.focus(); input.select() }
         return
       }
-      if (!typing && !e.metaKey && !e.ctrlKey && !e.altKey && ['1', '2', '3', '4'].includes(e.key)) {
-        setView(['board', 'games', 'pitchers', 'results'][+e.key - 1])
+      if (!typing && !e.metaKey && !e.ctrlKey && !e.altKey && ['1', '2', '3', '4', '5'].includes(e.key)) {
+        setView(['board', 'games', 'pitchers', 'weather', 'results'][+e.key - 1]) // matches the view-toggle tab order
         return
       }
       if (e.key === 'Escape') {

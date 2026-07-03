@@ -1,10 +1,62 @@
-import { useState } from 'react'
+import { useState, useRef, useLayoutEffect } from 'react'
 import Icon from './Icon.jsx'
 import Select from './Select.jsx'
 import { GRADE_ORDER, gradeColor, BADGES } from '../lib/badges.js'
 import { SORTS } from '../lib/constants.js'
 import { useLiveMode } from '../lib/liveMode.js'
 import { hexA } from './atoms.jsx'
+
+const VIEW_TABS = [
+  { id: 'board', label: 'Board', icon: 'List', desc: 'Ranked board' },
+  { id: 'games', label: 'Games', icon: 'LayoutGrid', desc: 'Game-by-game' },
+  { id: 'pitchers', label: 'Pitchers', icon: 'Crosshair', desc: 'Pitcher vulnerability' },
+  { id: 'weather', label: 'Weather', icon: 'Wind', desc: 'Weather report' },
+  { id: 'results', label: 'Results', icon: 'Activity', desc: 'Model track record + combos' },
+]
+
+// Segmented view switcher with a sliding glow indicator. The indicator is one
+// absolutely-positioned pill measured off the active button, so it glides
+// between tabs instead of the active style teleporting.
+function ViewToggle({ view, onView }) {
+  const activeId = view === 'combos' ? 'results' : view
+  const wrapRef = useRef(null)
+  const indRef = useRef(null)
+
+  useLayoutEffect(() => {
+    const wrap = wrapRef.current
+    const ind = indRef.current
+    if (!wrap || !ind) return
+    const place = () => {
+      const btn = wrap.querySelector(`[data-view="${activeId}"]`)
+      if (!btn) { ind.style.opacity = '0'; return }
+      ind.style.opacity = '1'
+      ind.style.transform = `translateX(${btn.offsetLeft}px)`
+      ind.style.width = `${btn.offsetWidth}px`
+    }
+    place()
+    const ro = new ResizeObserver(place) // reflows (font load, phone rotate) re-seat it
+    ro.observe(wrap)
+    return () => ro.disconnect()
+  }, [activeId])
+
+  return (
+    <div className="view-toggle" role="group" aria-label="View" ref={wrapRef}>
+      <span className="view-ind" ref={indRef} aria-hidden="true" />
+      {VIEW_TABS.map((tab, i) => (
+        <button
+          key={tab.id}
+          data-view={tab.id}
+          className={`view-btn ${activeId === tab.id ? 'on' : ''}`}
+          onClick={() => onView(tab.id)}
+          title={`${tab.desc} — press ${i + 1}`}
+        >
+          <Icon name={tab.icon} size={14} />
+          {tab.label}
+        </button>
+      ))}
+    </div>
+  )
+}
 
 export default function Filters({ value, onChange, gradeCounts, games, badgeCounts, watchCount, view, onView }) {
   const v = value
@@ -33,31 +85,7 @@ export default function Filters({ value, onChange, gradeCounts, games, badgeCoun
   return (
     <div className="filters">
       <div className="filters-row">
-        <div className="view-toggle" role="group" aria-label="View">
-          {[
-            { id: 'board', label: 'Board', icon: 'List', desc: 'Ranked board' },
-            { id: 'games', label: 'Games', icon: 'LayoutGrid', desc: 'Game-by-game' },
-            { id: 'pitchers', label: 'Pitchers', icon: 'Crosshair', desc: 'Pitcher vulnerability' },
-            { id: 'weather', label: 'Weather', icon: 'Wind', desc: 'Weather report' },
-            { id: 'results', label: 'Results', icon: 'Activity', desc: 'Model track record + combos' }
-          ].map((tab) => (
-            <button 
-              key={tab.id}
-              className={`view-btn ${view === tab.id || (tab.id === 'results' && view === 'combos') ? 'on' : ''}`}
-              onClick={() => onView(tab.id)} 
-              title={tab.desc}
-              style={view === tab.id ? {
-                background: 'var(--hover)',
-                borderColor: 'var(--accent)',
-                color: '#fff',
-                boxShadow: '0 0 12px var(--accent-glow)'
-              } : {}}
-            >
-              <Icon name={tab.icon} size={14} style={{ color: view === tab.id ? 'var(--accent)' : 'inherit' }} />
-              {tab.label}
-            </button>
-          ))}
-        </div>
+        <ViewToggle view={view} onView={onView} />
 
         {showFilters ? (
           <>
