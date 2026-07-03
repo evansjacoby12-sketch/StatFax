@@ -365,9 +365,16 @@ export default function App() {
     }
   }, [all, slipSet, watchlist])
 
+  // Resolve slip ids → batter objects in slip order; drop any not in this slate.
+  const slipLegs = useMemo(() => {
+    const byId = new Map(all.map((b) => [b.id, b]))
+    return slipIds.map((id) => byId.get(id)).filter(Boolean)
+  }, [all, slipIds])
+
   // The big one: every slip leg has homered → confetti. Fires once per unique
   // slip (keyed by leg ids), so editing the slip re-arms it but a re-render
-  // or poll can't replay the same celebration.
+  // or poll can't replay the same celebration. NOTE: must stay BELOW the
+  // slipLegs declaration — referencing the const earlier is a TDZ crash.
   const [celebrate, setCelebrate] = useState(false)
   const cashedKeyRef = useRef(null)
   useEffect(() => {
@@ -380,12 +387,6 @@ export default function App() {
     toast.success(`🎉 PARLAY CASHED — all ${slipLegs.length} legs homered!`, 9000)
     buzz(120)
   }, [slipLegs])
-
-  // Resolve slip ids → batter objects in slip order; drop any not in this slate.
-  const slipLegs = useMemo(() => {
-    const byId = new Map(all.map((b) => [b.id, b]))
-    return slipIds.map((id) => byId.get(id)).filter(Boolean)
-  }, [all, slipIds])
 
   const gradeCounts = useMemo(() => {
     const c = {}

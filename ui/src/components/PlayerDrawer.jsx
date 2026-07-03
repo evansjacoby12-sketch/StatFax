@@ -14,6 +14,7 @@ import { estimatedKs } from '../lib/pitchers.js'
 import { useLiveMode } from '../lib/liveMode.js'
 import { useEliLevel, reasonsForLevel } from '../lib/eliLevel.js'
 import { toast } from './Toast.jsx'
+import { sharePickCard } from '../lib/shareCard.js'
 
 const WORKER_URL = import.meta.env?.VITE_WORKER_URL || ''
 
@@ -609,6 +610,19 @@ function DrawerHeader({ b, color, onClose, watched, inSlip, onToggleWatch, onTog
               style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'transparent', color: 'var(--text-dim)', border: '1px solid transparent', padding: '5px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: '600' }}
             >
               <Icon name="Copy" size={13} />Copy
+            </button>
+            <button
+              className="d-act ghost"
+              title="Share this pick as an image card"
+              onClick={() => {
+                toast.info('Rendering card…', 1500)
+                sharePickCard(b)
+                  .then((how) => { if (how !== 'cancelled') toast.success(how === 'shared' ? 'Card shared' : 'Card downloaded') })
+                  .catch(() => toast.warn("Couldn't render the card"))
+              }}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'transparent', color: 'var(--text-dim)', border: '1px solid transparent', padding: '5px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: '600' }}
+            >
+              <Icon name="Share2" size={13} />Share
             </button>
           </div>
         </div>
