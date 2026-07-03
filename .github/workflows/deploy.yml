@@ -173,18 +173,28 @@ jobs:
         with:
           path: ui/dist
 
-      # Pages' deployment API intermittently rejects with "Deployment failed,
-      # try again later" even when the artifact is fine (3 flakes on 2026-07-03
-      # alone) — so take its advice: retry once after a pause before failing
-      # the run for real.
+      # Pages throttles deployments that come in quick succession ("Deployment
+      # failed, try again later" — observed repeatedly on 2026-07-03 when 5
+      # pushes landed within 30 min; isolated deploys always succeed). Two
+      # retries with growing backoff: 60s clears transient flakes, 5min clears
+      # a short throttle window. Only the LAST attempt's failure fails the run.
       - name: Deploy to GitHub Pages
         id: deploy
         uses: actions/deploy-pages@v4
         continue-on-error: true
 
-      - name: Retry deploy (Pages API flake)
-        id: deploy-retry
+      - name: Backoff before retry 1
         if: steps.deploy.outcome == 'failure'
         run: sleep 60
-      - uses: actions/deploy-pages@v4
+      - name: Retry deploy 1
+        id: deploy-retry1
         if: steps.deploy.outcome == 'failure'
+        uses: actions/deploy-pages@v4
+        continue-on-error: true
+
+      - name: Backoff before retry 2
+        if: steps.deploy.outcome == 'failure' && steps.deploy-retry1.outcome == 'failure'
+        run: sleep 300
+      - name: Retry deploy 2 (final)
+        if: steps.deploy.outcome == 'failure' && steps.deploy-retry1.outcome == 'failure'
+        uses: actions/deploy-pages@v4

@@ -433,7 +433,7 @@ export default function ParlayBuilder({ batters, legs, slipSet, onToggle, onRemo
                   const qbP = buildParlay(qbBuilt, { correlate: false })
                   const qbColor = qbP.grade ? GRADE_COLOR[qbP.grade.letter] : 'var(--text-faint)'
                   return (
-                    <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', overflow: 'hidden' }}>
+                    <div className="qb-result" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', overflow: 'hidden' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                         <Icon name="Zap" size={13} style={{ color: 'var(--accent)' }} />
                         <span style={{ fontSize: '12px', fontWeight: '800', color: '#fff', flex: 1 }}>{qbBuilt.length}-leg · {QB_STRATEGIES[qbStrat].label}</span>
@@ -443,7 +443,7 @@ export default function ParlayBuilder({ batters, legs, slipSet, onToggle, onRemo
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
                         {qbBuilt.map((b, i) => (
-                          <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', borderBottom: i < qbBuilt.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
+                          <div key={b.id} className="qb-leg" style={{ '--i': i, display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', borderBottom: i < qbBuilt.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
                             <span style={{ background: hexA(gradeColor(b.grade?.label), 0.7), width: '5px', height: '5px', borderRadius: '50%', flex: 'none' }} />
                             <span style={{ flex: 1, minWidth: 0 }}>
                               <span style={{ fontSize: '12px', fontWeight: '600', color: '#fff', display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.name}</span>

@@ -172,9 +172,13 @@ function WindDial({ wind }) {
       <circle cx="32" cy="32" r="28" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="1.5" />
       <text x="32" y="10" fill="var(--text-faint)" fontSize="7" fontWeight="800" textAnchor="middle">CF</text>
       <text x="32" y="58" fill="var(--text-faint)" fontSize="7" fontWeight="800" textAnchor="middle">HP</text>
-      <g transform={`rotate(${rot} 32 32)`}>
-        <line x1="32" y1="46" x2="32" y2="20" stroke={tint} strokeWidth="3" strokeLinecap="round" style={{ filter: `drop-shadow(0 0 3px ${hexA(tint, 0.4)})` }} />
-        <path d="M32 14 L27 24 L37 24 Z" fill={tint} />
+      {/* Outer g: CSS-transitioned heading (eases when a refresh shifts the wind).
+          Inner g: gentle idle sway so the arrow reads as live air, not a print. */}
+      <g style={{ transform: `rotate(${rot}deg)`, transformOrigin: '32px 32px', transition: 'transform 0.8s cubic-bezier(0.22, 1, 0.36, 1)' }}>
+        <g className="wind-sway" style={{ transformOrigin: '32px 32px' }}>
+          <line x1="32" y1="46" x2="32" y2="20" stroke={tint} strokeWidth="3" strokeLinecap="round" style={{ filter: `drop-shadow(0 0 3px ${hexA(tint, 0.4)})` }} />
+          <path d="M32 14 L27 24 L37 24 Z" fill={tint} />
+        </g>
       </g>
     </svg>
   )

@@ -7911,6 +7911,72 @@ button.th:focus-visible {
   .view-ind { transition: opacity 0.15s; }
 }
 
+/* ─── Weather cards: live wind + bandbox glow + hover lift ──────────────── */
+.wind-sway {
+  animation: windSway 3.4s ease-in-out infinite;
+}
+@keyframes windSway {
+  0%, 100% { transform: rotate(-3deg); }
+  50% { transform: rotate(3deg); }
+}
+.wxcard {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.wxcard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+.wxcard-env.tone-good {
+  animation: envGlow 2.6s ease-in-out infinite;
+}
+@keyframes envGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+  50% { box-shadow: 0 0 8px 1px rgba(16, 185, 129, 0.3); }
+}
+
+/* ─── Parlay builder: quick-build result reveal + toast ─────────────────── */
+.qb-result {
+  animation: qbIn 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes qbIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.985); }
+}
+.qb-leg {
+  animation: rowIn 0.3s ease both;
+  animation-delay: calc(var(--i, 0) * 55ms);
+}
+.pb-toast {
+  animation: pbToastIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+@keyframes pbToastIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(-10px) scale(0.9); }
+  to { transform: translateX(-50%); }
+}
+
+/* ─── Cheat sheet: leaderboard rows come alive ──────────────────────────── */
+.splits-row:not(.static) {
+  transition: background 0.15s, border-color 0.15s;
+  border-left: 2px solid transparent;
+}
+.splits-row:not(.static):hover {
+  background: rgba(0, 216, 246, 0.05);
+  border-left-color: var(--accent);
+}
+.splits-list .splits-row:nth-child(1) .splits-rank { color: #f5c33b; font-weight: 800; text-shadow: 0 0 8px rgba(245, 195, 59, 0.45); }
+.splits-list .splits-row:nth-child(2) .splits-rank { color: #c8d2e0; font-weight: 800; }
+.splits-list .splits-row:nth-child(3) .splits-rank { color: #d08a4e; font-weight: 800; }
+
+@media (prefers-reduced-motion: reduce) {
+  .wind-sway,
+  .wxcard-env.tone-good,
+  .qb-result,
+  .qb-leg,
+  .pb-toast {
+    animation: none;
+  }
+  .wxcard { transition: none; }
+}
+
 /* ─── Day Rating: stars pop in ───────────────────────────────────────────── */
 .dr-star.on {
   display: inline-block;
