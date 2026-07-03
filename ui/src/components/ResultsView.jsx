@@ -299,16 +299,16 @@ function ModelResults({ meta }) {
           </div>
           {daily.map((d) => (
             <div className="daily-row" key={d.date} style={{ padding: '8px 10px', borderBottom: '1px solid rgba(255,255,255,0.02)', fontSize: '12px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)' }}>
-                <span className="mono" style={{ color: '#fff' }}>{d.date.slice(5)}</span>
-                <span className="mono">{d.n}</span>
-                <span className="mono">{d.hits}</span>
-                <span className="mono">{d.n ? pct(d.hits / d.n, 0) : '—'}</span>
-                <span className="mono dim">{d.topN}</span>
-                <span className={`mono ${d.topN && d.topHits / d.topN > base ? 'pos' : ''}`} style={d.topN && d.topHits / d.topN > base ? { color: 'var(--strong)', fontWeight: '700' } : {}}>{d.topN ? pct(d.topHits / d.topN, 0) : '—'}</span>
-              </div>
+              {/* Six values stay DIRECT children — .daily-row's own CSS grid
+                  (64px + 5 columns) aligns them under the header row. */}
+              <span className="mono" style={{ color: '#fff' }}>{d.date.slice(5)}</span>
+              <span className="mono">{d.n}</span>
+              <span className="mono">{d.hits}</span>
+              <span className="mono">{d.n ? pct(d.hits / d.n, 0) : '—'}</span>
+              <span className="mono dim">{d.topN}</span>
+              <span className={`mono ${d.topN && d.topHits / d.topN > base ? 'pos' : ''}`} style={d.topN && d.topHits / d.topN > base ? { color: 'var(--strong)', fontWeight: '700' } : {}}>{d.topN ? pct(d.topHits / d.topN, 0) : '—'}</span>
               {d.dots.length > 0 && (
-                <div className="daily-dots" style={{ display: 'flex', flexWrap: 'wrap', gap: '3px', marginTop: '5px' }}>
+                <div className="daily-dots" style={{ gridColumn: '1 / -1', display: 'flex', flexWrap: 'wrap', gap: '3px', marginTop: '3px' }}>
                   {d.dots.slice(0, 40).map((p, i) => (
                     <span
                       key={i}
