@@ -160,11 +160,35 @@ const TABS = [
 ]
 
 function TabBar({ active, onChange }) {
+  // Sliding underline: one absolute bar measured off the active tab so it
+  // glides between tabs (same motion language as the board's view toggle).
+  const wrapRef = useRef(null)
+  const indRef = useRef(null)
+  useEffect(() => {
+    const wrap = wrapRef.current
+    const ind = indRef.current
+    if (!wrap || !ind) return
+    const place = () => {
+      const btn = wrap.querySelector(`[data-tab="${active}"]`)
+      if (!btn) { ind.style.opacity = '0'; return }
+      ind.style.opacity = '1'
+      ind.style.transform = `translateX(${btn.offsetLeft}px)`
+      ind.style.width = `${btn.offsetWidth}px`
+      // On the phone bottom-sheet the tab row scrolls — keep the active tab visible.
+      btn.scrollIntoView?.({ inline: 'nearest', block: 'nearest' })
+    }
+    place()
+    const ro = new ResizeObserver(place)
+    ro.observe(wrap)
+    return () => ro.disconnect()
+  }, [active])
   return (
-    <div className="drawer-tabs">
+    <div className="drawer-tabs" ref={wrapRef}>
+      <span className="drawer-tab-ind" ref={indRef} aria-hidden="true" />
       {TABS.map(t => (
         <button
           key={t.id}
+          data-tab={t.id}
           className={`drawer-tab ${active === t.id ? 'active' : ''}`}
           onClick={() => onChange(t.id)}
         >{t.label}</button>
@@ -545,7 +569,7 @@ function DrawerHeader({ b, color, onClose, watched, inSlip, onToggleWatch, onTog
         <img
           src={playerHeadshot(b.playerId, 160)}
           alt={b.name}
-          style={{ borderColor: hexA(color, 0.4), borderWidth: '2px', borderStyle: 'solid', borderRadius: '12px', width: '72px', height: '72px', background: 'var(--card-2)', objectFit: 'cover', flexShrink: 0 }}
+          style={{ borderColor: hexA(color, 0.4), borderWidth: '2px', borderStyle: 'solid', borderRadius: '12px', width: '72px', height: '72px', background: 'var(--card-2)', objectFit: 'cover', flexShrink: 0, boxShadow: `0 0 20px ${hexA(color, 0.25)}, 0 4px 12px rgba(0,0,0,0.4)` }}
         />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '4px', paddingRight: '40px' }}>
@@ -649,7 +673,7 @@ function PillarBar({ label, value, hint }) {
         <span style={{ fontWeight: '700', fontFamily: 'var(--mono)' }}>{v == null ? '—' : Math.round(v)}</span>
       </div>
       <span style={{ display: 'block', background: 'rgba(255,255,255,0.05)', borderRadius: '99px', height: '4px', overflow: 'hidden' }}>
-        <span style={{ display: 'block', width: `${v ?? 0}%`, height: '100%', background: tone === 'good' ? 'var(--strong)' : tone === 'mid' ? 'var(--prime)' : 'var(--bad)' }} />
+        <span className="pillar-fill" style={{ display: 'block', width: `${v ?? 0}%`, height: '100%', background: tone === 'good' ? 'var(--strong)' : tone === 'mid' ? 'var(--prime)' : 'var(--bad)', boxShadow: `0 0 6px ${tone === 'good' ? 'var(--strong)' : tone === 'mid' ? 'var(--prime)' : 'var(--bad)'}` }} />
       </span>
     </div>
   )

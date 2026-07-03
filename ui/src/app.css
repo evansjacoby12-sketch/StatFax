@@ -7911,6 +7911,43 @@ button.th:focus-visible {
   .view-ind { transition: opacity 0.15s; }
 }
 
+/* ─── Drawer tabs: sliding underline ─────────────────────────────────────── */
+.drawer-tabs {
+  position: relative;
+}
+.drawer-tab-ind {
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  height: 2px;
+  width: 0;
+  opacity: 0;
+  border-radius: 2px 2px 0 0;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent-glow);
+  transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), width 0.3s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.15s;
+  pointer-events: none;
+}
+.drawer-tab.active {
+  border-bottom-color: transparent; /* the sliding bar replaces the static underline */
+}
+@media (prefers-reduced-motion: reduce) {
+  .drawer-tab-ind { transition: opacity 0.15s; }
+}
+
+/* ─── Plate-matchup pillar bars grow in ──────────────────────────────────── */
+.pillar-fill {
+  transform-origin: left;
+  animation: barGrow 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: 0.1s;
+}
+@keyframes barGrow {
+  from { transform: scaleX(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pillar-fill { animation: none; }
+}
+
 /* ─── First-pitch countdown (header slate meta) ─────────────────────────── */
 .first-pitch {
   display: inline-flex;
