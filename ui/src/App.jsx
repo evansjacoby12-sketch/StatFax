@@ -36,6 +36,7 @@ import UpdateBanner from './components/UpdateBanner.jsx'
 import ListBuilderView from './components/ListBuilderView.jsx'
 import ToastStack, { toast } from './components/Toast.jsx'
 import InstallPrompt from './components/InstallPrompt.jsx'
+import Confetti from './components/Confetti.jsx'
 import Icon from './components/Icon.jsx'
 import './app.css'
 
@@ -363,6 +364,22 @@ export default function App() {
       else toast.info(`💥 ${b.name} homered`, 4000)
     }
   }, [all, slipSet, watchlist])
+
+  // The big one: every slip leg has homered → confetti. Fires once per unique
+  // slip (keyed by leg ids), so editing the slip re-arms it but a re-render
+  // or poll can't replay the same celebration.
+  const [celebrate, setCelebrate] = useState(false)
+  const cashedKeyRef = useRef(null)
+  useEffect(() => {
+    if (slipLegs.length < 2) return
+    if (!slipLegs.every((b) => b.liveContext?.isHRThisGame)) return
+    const key = slipLegs.map((b) => b.id).sort().join(',')
+    if (cashedKeyRef.current === key) return
+    cashedKeyRef.current = key
+    setCelebrate(true)
+    toast.success(`🎉 PARLAY CASHED — all ${slipLegs.length} legs homered!`, 9000)
+    buzz(120)
+  }, [slipLegs])
 
   // Resolve slip ids → batter objects in slip order; drop any not in this slate.
   const slipLegs = useMemo(() => {
@@ -858,6 +875,7 @@ export default function App() {
       <UpdateBanner />
       <ToastStack />
       <InstallPrompt />
+      {celebrate && <Confetti onDone={() => setCelebrate(false)} />}
     </div>
     {/* Bottom nav is a sibling of .app (not a child) so iOS doesn't route its
         touch events through the overflow-y:auto scroll container, which can
