@@ -49,6 +49,9 @@
   position: sticky;
   top: 0;
   z-index: 30;
+  /* Standalone PWA with black-translucent status bar: content extends under
+     the iPhone notch, so the sticky chrome must pad below it. 0 in browsers. */
+  padding-top: env(safe-area-inset-top, 0px);
   background: color-mix(in srgb, var(--bg) 80%, transparent);
 }
 /* When the filters panel is expanded the sticky chrome can grow taller than the
