@@ -248,13 +248,18 @@ export default function App() {
     }
   }, [load])
 
-  // Esc closes the topmost overlay; '/' focuses the search bar.
+  // Esc closes the topmost overlay; '/' focuses search; 1-4 switch views.
   useEffect(() => {
     const onKey = (e) => {
-      if (e.key === '/' && !['INPUT', 'TEXTAREA'].includes(e.target.tagName)) {
+      const typing = ['INPUT', 'TEXTAREA'].includes(e.target.tagName)
+      if (e.key === '/' && !typing) {
         e.preventDefault()
         const input = document.querySelector('.search input')
         if (input) { input.focus(); input.select() }
+        return
+      }
+      if (!typing && !e.metaKey && !e.ctrlKey && !e.altKey && ['1', '2', '3', '4'].includes(e.key)) {
+        setView(['board', 'games', 'pitchers', 'results'][+e.key - 1])
         return
       }
       if (e.key === 'Escape') {
@@ -502,6 +507,7 @@ export default function App() {
           slateBuilding={slateBuilding}
           gradeCounts={gradeCounts}
           total={all.length}
+          games={data.games}
           onOpenGuide={() => setShowGuide(true)}
           onOpenHowTo={() => setShowHowTo(true)}
           onOpenBuilder={() => setShowBuilder(true)}

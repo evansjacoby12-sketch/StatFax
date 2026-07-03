@@ -4,6 +4,34 @@ import { timeAgo, pct } from '../lib/format.js'
 import { GRADE_ORDER, gradeColor } from '../lib/badges.js'
 import { hexA } from './atoms.jsx'
 
+// "First pitch in 38m" — live countdown to the next scheduled game. Hidden
+// once something is live (the board carries the LIVE story from there) or
+// when the whole slate is done. Ticks every 30s.
+function FirstPitchCountdown({ games = [] }) {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 30_000)
+    return () => clearInterval(t)
+  }, [])
+  if (games.some((g) => g.isLive)) return null
+  const next = games
+    .filter((g) => !g.isFinal && !g.isLive && Number.isFinite(Date.parse(g.gameDate)))
+    .map((g) => Date.parse(g.gameDate))
+    .filter((t) => t > now)
+    .sort((a, b) => a - b)[0]
+  if (!next) return null
+  const mins = Math.max(1, Math.round((next - now) / 60_000))
+  const label = mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins}m`
+  return (
+    <>
+      <span className="dot-sep">·</span>
+      <span className="first-pitch" title="Time until the next scheduled first pitch">
+        <Icon name="Clock" size={11} style={{ color: 'var(--accent)' }} /> first pitch {label}
+      </span>
+    </>
+  )
+}
+
 // Help dropdown anchored to the header info button
 function HelpMenu({ onOpenWeather, onOpenBuilder, onOpenGroups, onOpenSGP, onOpenSplits, onOpenBacktest, onOpenListBuilder, onOpenGuide, onOpenHowTo, onOpenLegend, onOpenSettings }) {
   const [open, setOpen] = useState(false)
@@ -137,6 +165,7 @@ export default function Header({
   slateBuilding = false,
   gradeCounts = {},
   total = 0,
+  games = [],
   onOpenGuide,
   onOpenHowTo,
   onOpenWeather,
@@ -185,6 +214,7 @@ export default function Header({
             <span className="slate-batters">
               <b className="mono" style={{ color: 'var(--accent)' }}>{counts.shown}</b> / {counts.total} batters
             </span>
+            <FirstPitchCountdown games={games} />
           </div>
           {total > 0 && (
             <div className="grade-bar" title="Grade distribution" style={{ height: '4px', background: 'rgba(255,255,255,0.05)', borderRadius: '2px', overflow: 'hidden', marginTop: '6px' }}>

@@ -13,6 +13,7 @@ import { blastOf, blastVsHandOf } from '../lib/groups.js'
 import { estimatedKs } from '../lib/pitchers.js'
 import { useLiveMode } from '../lib/liveMode.js'
 import { useEliLevel, reasonsForLevel } from '../lib/eliLevel.js'
+import { toast } from './Toast.jsx'
 
 const WORKER_URL = import.meta.env?.VITE_WORKER_URL || ''
 
@@ -509,6 +510,24 @@ function StatcastTrend({ bips }) {
 // DrawerHeader
 // ---------------------------------------------------------------------------
 
+// Plain-text share card — the drawer's key numbers in a paste-anywhere shape.
+function playerCardText(b) {
+  const g = b.grade?.label || 'SKIP'
+  const hr = b.hrProbability != null ? `${(b.hrProbability * 100).toFixed(1)}% HR` : null
+  const setup = hrSetup(b)
+  const best = b.odds?.best
+  const line1 = `⚾ ${b.name} (${b.team}) vs ${b.pitcher?.name || 'TBD'}${b.pitcher?.hand ? ` (${b.pitcher.hand}HP)` : ''}`
+  const line2 = [
+    `${g} ${Math.round(b.score ?? 0)}`,
+    hr,
+    Number.isFinite(b.heatIndex) ? `Heat ${b.heatIndex}` : null,
+    setup.n ? `Setup ${setup.n}/6` : null,
+    b.precision ? 'PRECISION' : null,
+  ].filter(Boolean).join(' · ')
+  const line3 = best?.american ? `Best odds ${american(best.american)}${best.book ? ` (${bookLabel(best.book)})` : ''}` : null
+  return [line1, line2, line3, 'statfax.online'].filter(Boolean).join('\n')
+}
+
 function DrawerHeader({ b, color, onClose, watched, inSlip, onToggleWatch, onToggleSlip }) {
   const liveMode = useLiveMode()
   return (
@@ -554,6 +573,18 @@ function DrawerHeader({ b, color, onClose, watched, inSlip, onToggleWatch, onTog
             </button>
             <button className={`d-act ghost ${watched ? 'on' : ''}`} onClick={() => onToggleWatch(b)} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: watched ? 'rgba(245,166,35,0.12)' : 'transparent', color: watched ? 'var(--prime)' : 'var(--text-dim)', border: watched ? '1px solid var(--prime)' : '1px solid transparent', padding: '5px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: '600' }}>
               <Icon name="Star" size={13} style={{ fill: watched ? 'currentColor' : 'none' }} />{watched ? 'Watching' : 'Watch'}
+            </button>
+            <button
+              className="d-act ghost"
+              title="Copy this card as text"
+              onClick={() => {
+                navigator.clipboard?.writeText(playerCardText(b))
+                  .then(() => toast.success(`${b.name}'s card copied`))
+                  .catch(() => toast.warn('Copy failed'))
+              }}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'transparent', color: 'var(--text-dim)', border: '1px solid transparent', padding: '5px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: '600' }}
+            >
+              <Icon name="Copy" size={13} />Copy
             </button>
           </div>
         </div>

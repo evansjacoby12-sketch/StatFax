@@ -7862,6 +7862,19 @@ button.th:focus-visible {
   }
 }
 
+/* ─── First-pitch countdown (header slate meta) ─────────────────────────── */
+.first-pitch {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-dim);
+  font-weight: 600;
+  white-space: nowrap;
+}
+@media (max-width: 560px) {
+  .first-pitch { display: none; } /* header is tight on phones — meta stays lean */
+}
+
 /* ─── Board empty state ──────────────────────────────────────────────────── */
 .empty-ball {
   font-size: 40px;
