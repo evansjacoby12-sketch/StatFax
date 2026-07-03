@@ -11,3 +11,11 @@ createRoot(document.getElementById('root')).render(
     </ErrorBoundary>
   </React.StrictMode>,
 )
+
+// Offline support: cached shell + last slate. Prod only — the dev server's
+// module graph and a SW cache fight each other.
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {})
+  })
+}

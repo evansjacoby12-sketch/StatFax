@@ -34,6 +34,7 @@ import PickOfDay from './components/PickOfDay.jsx'
 import UpdateBanner from './components/UpdateBanner.jsx'
 import ListBuilderView from './components/ListBuilderView.jsx'
 import ToastStack, { toast } from './components/Toast.jsx'
+import InstallPrompt from './components/InstallPrompt.jsx'
 import Icon from './components/Icon.jsx'
 import './app.css'
 
@@ -232,6 +233,19 @@ export default function App() {
     const t = setInterval(poll, SLATE_REFRESH_MS)
     return () => clearInterval(t)
   }, [])
+
+  // Connectivity toasts — the SW keeps serving the last cached slate offline,
+  // so tell the user what they're looking at.
+  useEffect(() => {
+    const onOffline = () => toast.warn('Offline — showing last saved slate', 4000)
+    const onOnline = () => { toast.success('Back online'); load() }
+    window.addEventListener('offline', onOffline)
+    window.addEventListener('online', onOnline)
+    return () => {
+      window.removeEventListener('offline', onOffline)
+      window.removeEventListener('online', onOnline)
+    }
+  }, [load])
 
   // Esc closes the topmost overlay; '/' focuses the search bar.
   useEffect(() => {
@@ -809,6 +823,7 @@ export default function App() {
       <PullToRefresh onRefresh={load} />
       <UpdateBanner />
       <ToastStack />
+      <InstallPrompt />
     </div>
     {/* Bottom nav is a sibling of .app (not a child) so iOS doesn't route its
         touch events through the overflow-y:auto scroll container, which can
