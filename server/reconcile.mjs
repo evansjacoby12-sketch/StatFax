@@ -26,6 +26,13 @@
  *   which the multipliers actually move scores.
  */
 
+// Same gate functions the UI board + combo engine run, so the logged values
+// match exactly what users saw — the whole point of logging them is to make
+// the precision-gate thresholds (heat/setup/positives) forward-validatable
+// against real outcomes instead of proxy reconstructions.
+import { heatIndex, hrSetup, pitchMixScore } from '../ui/src/lib/scout.js';
+import { positiveReasonCount, negativeReasonCount } from '../ui/src/lib/combo-engine.js';
+
 const MLB_BASE = 'https://statsapi.mlb.com/api/v1';
 const ROLLING_DAYS = 30;
 const MIN_SAMPLES_TO_CALIBRATE = 1500;
@@ -137,6 +144,14 @@ export function extractPredictionRecord(row) {
     hot:  row.hot ? 1 : 0,
     due:  row.due ? 1 : 0,
     he:   row.homeEdge ? 1 : 0,   // home/park split edge — logged so the homeEdge up-weight is forward-validatable (it wasn't in feat before)
+    // Precision-gate inputs, computed with the SAME functions the UI/combo
+    // engine use (not proxies). scoreFeatProb reads a fixed FEAT_KEYS list,
+    // so extra keys here are inert for the learned model until opted in.
+    heat: num(heatIndex(row)),               // Heat Index 0-100 (gate: >=48)
+    setup: hrSetup(row).n,                    // HR-setup checklist 0-6 (gate: >=5)
+    pm:   num(pitchMixScore(row)),            // pitch-mix score 0-10 (gate: >=7)
+    pos:  positiveReasonCount(row),           // good-tone trend count (gate: >=8)
+    neg:  negativeReasonCount(row),           // bad-tone trend count (gate: <=3)
   };
   return {
     feat,
