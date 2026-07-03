@@ -28,6 +28,8 @@ export default function BatterTable({
   onToggleSlip,
   onOpenPitcher,
   splitProjected = false,
+  total = 0,
+  onClearFilters,
 }) {
   const [projOpen, setProjOpen] = useState(true)
   const HeadCol = ({ k, children, className, title }) => {
@@ -91,8 +93,15 @@ export default function BatterTable({
             color: 'var(--text-faint)',
             gap: '12px'
           }}>
-            <Icon name="Search" size={32} />
-            <p style={{ fontSize: '14px', fontWeight: '500' }}>No batters match these filters.</p>
+            <span className="empty-ball" aria-hidden="true">⚾</span>
+            <p style={{ fontSize: '14px', fontWeight: '500' }}>
+              {total > 0 ? `0 of ${total} batters match these filters.` : 'No batters match these filters.'}
+            </p>
+            {onClearFilters && total > 0 && (
+              <button className="empty-clear" onClick={onClearFilters} type="button">
+                <Icon name="X" size={13} /> Clear filters
+              </button>
+            )}
           </div>
         ) : (() => {
           // batters arrive confirmed-first (App.jsx sort), so all confirmed bats

@@ -7862,6 +7862,36 @@ button.th:focus-visible {
   }
 }
 
+/* ─── Board empty state ──────────────────────────────────────────────────── */
+.empty-ball {
+  font-size: 40px;
+  line-height: 1;
+  filter: grayscale(0.4) brightness(0.9);
+  animation: ballFloat 2.6s ease-in-out infinite;
+}
+@keyframes ballFloat {
+  0%, 100% { transform: translateY(0) rotate(-8deg); }
+  50% { transform: translateY(-9px) rotate(8deg); }
+}
+.empty-clear {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 700;
+  padding: 8px 16px;
+  border-radius: 10px;
+  color: var(--accent);
+  background: rgba(0, 216, 246, 0.08);
+  border: 1px solid rgba(0, 216, 246, 0.25);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.empty-clear:hover { background: rgba(0, 216, 246, 0.14); }
+@media (prefers-reduced-motion: reduce) {
+  .empty-ball { animation: none; }
+}
+
 /* ─── PWA install pill ───────────────────────────────────────────────────── */
 .install-pill {
   position: fixed;

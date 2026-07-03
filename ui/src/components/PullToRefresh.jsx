@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import Icon from './Icon.jsx'
+import { buzz } from '../lib/haptics.js'
 
 const THRESHOLD = 72 // px of pull needed to fire
 const MAX = 96 // px the indicator travels at most
@@ -51,6 +52,7 @@ export default function PullToRefresh({ onRefresh }) {
       }
       g.current.busy = true
       setBusy(true)
+      buzz(15)
       setP(THRESHOLD)
       try {
         await onRefresh?.()

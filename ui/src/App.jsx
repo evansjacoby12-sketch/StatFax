@@ -4,6 +4,7 @@ import { GRADE_ORDER, BADGES } from './lib/badges.js'
 import { HOT_HEAT, DESC_BY_DEFAULT, DEFAULT_FILTERS, SORTS } from './lib/constants.js'
 import { risingForm, precisionSignal } from './lib/groups.js'
 import * as store from './lib/storage.js'
+import { buzz } from './lib/haptics.js'
 import { LiveModeContext } from './lib/liveMode.js'
 import { EliLevelContext, nextEliLevel } from './lib/eliLevel.js'
 import Header from './components/Header.jsx'
@@ -277,6 +278,11 @@ export default function App() {
 
   const patch = useCallback((p) => setFilters((f) => ({ ...f, ...p })), [])
 
+  // Empty-state escape hatch: back to defaults but keep the user's sort.
+  const clearFilters = useCallback(() => {
+    setFilters((f) => ({ ...DEFAULT_FILTERS, grades: new Set(GRADE_ORDER), gamePks: new Set(), sort: f.sort, dir: f.dir }))
+  }, [])
+
   // Pop up the opposing pitcher's card as an overlay (entry key matches
   // groupPitchers: `${pitcherId}-${gamePk}`). Stays in place — no view change.
   const openPitcher = useCallback((pitcherId, gamePk) => {
@@ -299,6 +305,7 @@ export default function App() {
   }, [])
 
   const toggleWatch = useCallback((b) => {
+    buzz()
     setWatchlist((prev) => {
       const next = new Set(prev)
       const adding = !next.has(b.id)
@@ -309,6 +316,7 @@ export default function App() {
   }, [])
 
   const toggleSlip = useCallback((b) => {
+    buzz()
     setSlipIds((prev) => {
       const adding = !prev.includes(b.id)
       toast.success(adding ? `➕ ${b.name} added to parlay` : `Removed ${b.name} from parlay`)
@@ -608,6 +616,8 @@ export default function App() {
               onToggleSlip={toggleSlip}
               onOpenPitcher={openPitcher}
               splitProjected={splitProjected}
+              total={all.length}
+              onClearFilters={clearFilters}
             />
           </>
         )}

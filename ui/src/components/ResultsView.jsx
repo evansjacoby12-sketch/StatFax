@@ -118,6 +118,12 @@ function ModelResults({ meta }) {
       hits: rs.filter((r) => r.homered).length,
       topN: prime.length,
       topHits: prime.filter((r) => r.homered).length,
+      // Per-pick hit/miss for the tier picks, best score first — the story
+      // behind the T-hit% number rendered as a dot strip.
+      dots: prime
+        .slice()
+        .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+        .map((r) => ({ hit: r.homered, name: r.name })),
     }
   })
 
@@ -292,13 +298,34 @@ function ModelResults({ meta }) {
             <span>Date</span><span>Picks</span><span>HR</span><span>Hit%</span><span>Tier</span><span>T-hit%</span>
           </div>
           {daily.map((d) => (
-            <div className="daily-row" key={d.date} style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', padding: '8px 10px', borderBottom: '1px solid rgba(255,255,255,0.02)', fontSize: '12px' }}>
-              <span className="mono" style={{ color: '#fff' }}>{d.date.slice(5)}</span>
-              <span className="mono">{d.n}</span>
-              <span className="mono">{d.hits}</span>
-              <span className="mono">{d.n ? pct(d.hits / d.n, 0) : '—'}</span>
-              <span className="mono dim">{d.topN}</span>
-              <span className={`mono ${d.topN && d.topHits / d.topN > base ? 'pos' : ''}`} style={d.topN && d.topHits / d.topN > base ? { color: 'var(--strong)', fontWeight: '700' } : {}}>{d.topN ? pct(d.topHits / d.topN, 0) : '—'}</span>
+            <div className="daily-row" key={d.date} style={{ padding: '8px 10px', borderBottom: '1px solid rgba(255,255,255,0.02)', fontSize: '12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)' }}>
+                <span className="mono" style={{ color: '#fff' }}>{d.date.slice(5)}</span>
+                <span className="mono">{d.n}</span>
+                <span className="mono">{d.hits}</span>
+                <span className="mono">{d.n ? pct(d.hits / d.n, 0) : '—'}</span>
+                <span className="mono dim">{d.topN}</span>
+                <span className={`mono ${d.topN && d.topHits / d.topN > base ? 'pos' : ''}`} style={d.topN && d.topHits / d.topN > base ? { color: 'var(--strong)', fontWeight: '700' } : {}}>{d.topN ? pct(d.topHits / d.topN, 0) : '—'}</span>
+              </div>
+              {d.dots.length > 0 && (
+                <div className="daily-dots" style={{ display: 'flex', flexWrap: 'wrap', gap: '3px', marginTop: '5px' }}>
+                  {d.dots.slice(0, 40).map((p, i) => (
+                    <span
+                      key={i}
+                      title={`${p.name} — ${p.hit ? 'HR ✓' : 'no HR'}`}
+                      style={{
+                        width: '7px',
+                        height: '7px',
+                        borderRadius: '50%',
+                        background: p.hit ? 'var(--strong)' : 'rgba(255,255,255,0.08)',
+                        boxShadow: p.hit ? '0 0 5px rgba(16,185,129,0.5)' : 'none',
+                        flexShrink: 0,
+                      }}
+                    />
+                  ))}
+                  {d.dots.length > 40 && <span className="dim" style={{ fontSize: '9px' }}>+{d.dots.length - 40}</span>}
+                </div>
+              )}
             </div>
           ))}
         </div>
