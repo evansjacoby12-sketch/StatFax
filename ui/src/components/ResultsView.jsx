@@ -118,11 +118,12 @@ function ModelResults({ meta }) {
       hits: rs.filter((r) => r.homered).length,
       topN: prime.length,
       topHits: prime.filter((r) => r.homered).length,
-      // Per-pick hit/miss for the tier picks, best score first — the story
-      // behind the T-hit% number rendered as a dot strip.
+      // Per-pick hit/miss for the tier picks — hits first (best score first
+      // within each group), so the strip reads as a solid green block + dim
+      // tail: a discrete ratio bar, not scattered noise.
       dots: prime
         .slice()
-        .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+        .sort((a, b) => (b.homered - a.homered) || (b.score ?? 0) - (a.score ?? 0))
         .map((r) => ({ hit: r.homered, name: r.name })),
     }
   })
