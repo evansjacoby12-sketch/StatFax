@@ -5,8 +5,18 @@ import { computeParlay, parlayGrade } from '../lib/parlay.js'
 import { pct, american, signedPct } from '../lib/format.js'
 import { gradeColor } from '../lib/badges.js'
 import { hexA } from './atoms.jsx'
+import { toast } from './Toast.jsx'
 
 const GRADE_COLOR = { S: '#f5a623', A: '#10b981', B: '#3b82f6', C: '#94a3b8', D: '#64748b' }
+
+function buildCopyText(legs, p) {
+  const header = `📊 StatFax Parlay · ${p.n} ${p.n === 1 ? 'leg' : 'legs'} · Model: ${pct(p.modelProb, 1)}${p.allPriced ? ` · ${american(p.american)}` : ''}`
+  const items = legs.map((b, i) => {
+    const odds = b.odds?.best?.american ? ` ${american(b.odds.best.american)}` : ''
+    return `${i + 1}. ${b.name} (${b.team})${odds} — ${Math.round((b.hrProbability ?? 0) * 100)}% HR`
+  })
+  return [header, ...items].join('\n')
+}
 
 function parlaySummary(p, pg) {
   if (!p.n) return ''
@@ -86,6 +96,18 @@ export default function ParlaySlip({ legs, onRemove, onClear, onSelect, onOpenBu
                   <Icon name="Sparkles" size={12} /> Build
                 </button>
               )}
+              <button
+                className="slip-copy"
+                title="Copy parlay to clipboard"
+                onClick={() => {
+                  navigator.clipboard?.writeText(buildCopyText(legs, p)).then(() => {
+                    toast.success('Parlay copied!')
+                  }).catch(() => toast.warn('Copy failed'))
+                }}
+                style={{ fontSize: '11px', color: 'var(--text-dim)', fontWeight: '700', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+              >
+                <Icon name="Copy" size={12} /> Copy
+              </button>
               <button className="slip-clear" onClick={onClear} style={{ fontSize: '11px', color: 'var(--text-faint)', fontWeight: '600' }}>
                 Clear all
               </button>
@@ -206,7 +228,7 @@ export default function ParlaySlip({ legs, onRemove, onClear, onSelect, onOpenBu
         cursor: 'pointer'
       }}>
         <span className="slip-bar-left" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span className="slip-count" style={{
+          <span key={p.n} className="slip-count slip-count-bump" style={{
             background: 'var(--accent)',
             color: '#fff',
             fontSize: '11px',

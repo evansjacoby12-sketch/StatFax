@@ -233,9 +233,15 @@ export default function App() {
     return () => clearInterval(t)
   }, [])
 
-  // Esc closes the topmost overlay.
+  // Esc closes the topmost overlay; '/' focuses the search bar.
   useEffect(() => {
     const onKey = (e) => {
+      if (e.key === '/' && !['INPUT', 'TEXTAREA'].includes(e.target.tagName)) {
+        e.preventDefault()
+        const input = document.querySelector('.search input')
+        if (input) { input.focus(); input.select() }
+        return
+      }
       if (e.key === 'Escape') {
         if (pitcherKey) setPitcherKey(null)
         else if (zoneId) setZoneId(null)

@@ -568,6 +568,7 @@ function HeroNumbers({ b, color }) {
   const vegas = b.vegasImpliedProb
   const diff = vegas != null && b.hrProbability != null ? b.hrProbability - vegas : null
   const shownProb = useCountUp(b.hrProbability)
+  const shownScore = useCountUp(b.score ?? 0)
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '12px', marginBottom: '16px' }}>
       <div style={{ borderColor: hexA(color, 0.3), background: `linear-gradient(135deg, ${hexA(color, 0.08)} 0%, rgba(255,255,255,0.01) 100%)`, padding: '14px', borderRadius: '12px', borderWidth: '1px', borderStyle: 'solid', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -576,7 +577,7 @@ function HeroNumbers({ b, color }) {
           <div style={{ color, fontSize: '30px', fontWeight: '800', lineHeight: 1.1, fontFamily: 'var(--mono)' }}>{pct(shownProb, 2)}</div>
           <div style={{ fontSize: '10px', color: 'var(--text-faint)', marginTop: '4px' }}>raw score {num(b.rawScore)}</div>
         </div>
-        <ScoreRing score={b.score} color={color} size={58} />
+        <ScoreRing score={shownScore} color={color} size={58} />
       </div>
       <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '6px' }}>
         <KV k="Expected HRs" v={num(b.expectedHRs, 3)} />

@@ -7755,6 +7755,15 @@ button.th:focus-visible {
   50%       { box-shadow: 0 4px 12px rgba(0,0,0,0.15), 0 0 10px 3px rgba(0,216,246,0.22); }
 }
 
+/* ─── Parlay count badge bounce ─────────────────────────────────────────── */
+.slip-count-bump {
+  animation: countBump 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+@keyframes countBump {
+  from { transform: scale(0.55); }
+  to   { transform: scale(1); }
+}
+
 /* ─── +EV odds chip ──────────────────────────────────────────────────────── */
 .ev-chip {
   display: inline-flex;
