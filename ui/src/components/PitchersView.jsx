@@ -714,6 +714,16 @@ function PvpRow({ e, onSelect }) {
   )
 }
 
+// Match Savant's long pitch_name ("4-Seam Fastball") to our short usage label
+// ("4-Seam") — prefix match either way on the first 5 letters, punctuation-blind.
+function pitchNameMatches(savantName, label) {
+  const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z]/g, '')
+  const a = norm(savantName)
+  const b = norm(label)
+  if (!a || !b) return false
+  return a.startsWith(b) || b.startsWith(a) || a.slice(0, 5) === b.slice(0, 5)
+}
+
 const HITTABLE = 'bad'
 const TOUGH = 'good'
 function tone(value, { hi, lo, invert = false }) {
@@ -924,16 +934,24 @@ export function PitcherCard({ entry, onSelect, selectedId, watchlist, slip }) {
                 <Icon name="Layers" size={12} style={{ color: 'var(--accent)' }} /> Pitch mix
               </h4>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                {usage.slice(0, 4).map((p) => (
-                  <div className="mix-row" key={p.code} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10px' }}>
-                    <span className="mix-label" style={{ width: '45px', color: 'var(--text-dim)' }}>{p.label}</span>
-                    <span className="mix-track" style={{ flex: '1', height: '4px', background: 'rgba(255,255,255,0.05)', borderRadius: '99px', overflow: 'hidden' }}>
-                      <span className="mix-fill" style={{ display: 'block', height: '100%', width: `${Math.min(100, p.pct)}%`, background: 'var(--accent)' }} />
-                    </span>
-                    <span className="mix-pct mono" style={{ width: '22px', textAlign: 'right' }}>{num(p.pct, 0)}%</span>
-                  </div>
-                ))}
+                {usage.slice(0, 4).map((p) => {
+                  const isWorst = worst?.rv > 0.5 && pitchNameMatches(worst.name, p.label)
+                  return (
+                    <div className="mix-row" key={p.code} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10px' }}>
+                      <span className="mix-label" style={{ width: '45px', color: isWorst ? 'var(--b-hot)' : 'var(--text-dim)' }}>{p.label}</span>
+                      <span className="mix-track" style={{ flex: '1', height: '4px', background: 'rgba(255,255,255,0.05)', borderRadius: '99px', overflow: 'hidden' }}>
+                        <span className="mix-fill" style={{ display: 'block', height: '100%', width: `${Math.min(100, p.pct)}%`, background: isWorst ? 'var(--b-hot)' : 'var(--accent)', boxShadow: isWorst ? '0 0 6px var(--b-hot)' : 'none' }} />
+                      </span>
+                      <span className="mix-pct mono" style={{ width: '22px', textAlign: 'right' }}>{num(p.pct, 0)}%</span>
+                    </div>
+                  )
+                })}
               </div>
+              {worst && worst.rv > 0.5 && (
+                <div className="mix-worst" title={`Run value allowed per 100 pitches — batters are producing +${worst.rv.toFixed(1)} runs per 100 ${worst.name}s. The pitch to sit on.`}>
+                  <Icon name="Flame" size={11} /> Gopher pitch: <b>{worst.name}</b> +{worst.rv.toFixed(1)} RV/100
+                </div>
+              )}
             </div>
           )}
 

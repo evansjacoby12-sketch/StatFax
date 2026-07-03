@@ -232,7 +232,7 @@ function ModelResults({ meta }) {
           </div>
         )}
         {shownHRs.length ? (
-          <ul className="hr-feed" style={{ listStyle: 'none', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '10px' }}>
+          <ul className="hr-feed" style={{ listStyle: 'none', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '10px' }}>
             {shownHRs.map((r, i) => (
               <li className="hr-feed-row" key={`${r.playerId}-${r.date}-${i}`} style={{
                 display: 'flex',
@@ -243,9 +243,13 @@ function ModelResults({ meta }) {
                 borderRadius: '8px',
                 padding: '8px 12px'
               }}>
-                <span className="hr-feed-date mono dim" style={{ fontSize: '10px', color: 'var(--text-faint)' }}>{r.date.slice(5)}</span>
-                <img className="hr-feed-photo" src={playerHeadshot(r.playerId, 64)} alt="" loading="lazy" style={{ width: '24px', height: '24px', borderRadius: '50%', objectFit: 'cover' }} />
-                <span className="hr-feed-name" style={{ fontSize: '12px', fontWeight: '600', color: '#fff', flex: '1', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.name || `#${r.playerId}`}</span>
+                <img className="hr-feed-photo" src={playerHeadshot(r.playerId, 64)} alt="" loading="lazy" style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                {/* Name owns the flexible width (two-line block with the date
+                    beneath) so it can't be crushed by the fixed-size grade chip. */}
+                <span style={{ flex: '1', minWidth: 0, display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                  <span className="hr-feed-name" style={{ fontSize: '12px', fontWeight: '600', color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.name || `#${r.playerId}`}</span>
+                  <span className="hr-feed-date mono dim" style={{ fontSize: '9.5px', color: 'var(--text-faint)' }}>{r.date.slice(5)}</span>
+                </span>
                 <GradeChip grade={{ label: r.grade, color: gradeColor(r.grade) }} size="sm" score={r.score} />
               </li>
             ))}
