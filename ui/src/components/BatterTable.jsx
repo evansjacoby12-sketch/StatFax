@@ -1,6 +1,41 @@
-import { useState } from 'react'
+import { useState, useRef, useLayoutEffect } from 'react'
 import BatterRow from './BatterRow.jsx'
 import Icon from './Icon.jsx'
+
+// FLIP: when a sort/filter reorders the list, rows glide from their old slot
+// to the new one instead of teleporting. We snapshot each row's top before
+// paint, invert the delta as a transform, then release it into a transition.
+// Rows that enter/leave or jump further than ~1.5 screens just appear — the
+// glide only helps when the eye can actually follow it.
+function useFlipRows(bodyRef, deps) {
+  const prevTops = useRef(new Map())
+  useLayoutEffect(() => {
+    const body = bodyRef.current
+    if (!body) return
+    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    const nodes = body.querySelectorAll('.board-swipe[data-flip-id]')
+    const next = new Map()
+    for (const n of nodes) {
+      const id = n.dataset.flipId
+      const top = n.getBoundingClientRect().top
+      next.set(id, top)
+      if (reduce) continue
+      const old = prevTops.current.get(id)
+      if (old == null) continue
+      const dy = old - top
+      if (Math.abs(dy) < 4 || Math.abs(dy) > window.innerHeight * 1.5) continue
+      n.style.transition = 'none'
+      n.style.transform = `translateY(${dy}px)`
+      requestAnimationFrame(() => {
+        n.style.transition = 'transform 0.38s cubic-bezier(0.22, 1, 0.36, 1)'
+        n.style.transform = ''
+        setTimeout(() => { n.style.transition = ''; }, 420)
+      })
+    }
+    prevTops.current = next
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, deps)
+}
 
 // Divider between the confirmed-lineup plays and the projected (roster-fallback)
 // bats. Collapsible because pre-lineup the projected group is the whole roster.
@@ -32,6 +67,8 @@ export default function BatterTable({
   onClearFilters,
 }) {
   const [projOpen, setProjOpen] = useState(true)
+  const bodyRef = useRef(null)
+  useFlipRows(bodyRef, [batters])
   const HeadCol = ({ k, children, className, title }) => {
     const active = sort === k
     return (
@@ -82,7 +119,7 @@ export default function BatterTable({
         <div className="th col-actions" title="Watchlist & parlay" />
       </div>
 
-      <div className="board-body">
+      <div className="board-body" ref={bodyRef}>
         {batters.length === 0 ? (
           <div className="empty" style={{
             display: 'flex',

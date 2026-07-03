@@ -5,6 +5,8 @@ import { gradeColor } from '../lib/badges.js'
 import { teamLogo } from '../lib/teams.js'
 import { pct, signedPct, american } from '../lib/format.js'
 import { hexA } from './atoms.jsx'
+import { sharePickCard } from '../lib/shareCard.js'
+import { toast } from './Toast.jsx'
 
 function heatTag(h) {
   if (h == null) return null
@@ -287,6 +289,30 @@ export default function PickOfDay({ batter: b, onSelect, watched, inSlip, onTogg
           }}
         >
           <Icon name={inSlip ? 'Check' : 'Plus'} size={14} />
+        </button>
+        <button
+          className="act-btn"
+          aria-label="Share pick as image"
+          title="Share this pick as an image card"
+          onClick={(e) => {
+            e.stopPropagation()
+            toast.info('Rendering card…', 1500)
+            sharePickCard(b)
+              .then((how) => { if (how !== 'cancelled') toast.success(how === 'shared' ? 'Card shared' : 'Card downloaded') })
+              .catch(() => toast.warn("Couldn't render the card"))
+          }}
+          style={{
+            width: '32px',
+            height: '32px',
+            borderRadius: '8px',
+            border: '1px solid var(--border)',
+            background: 'var(--card)',
+            color: 'var(--text-faint)',
+            display: 'grid',
+            placeItems: 'center'
+          }}
+        >
+          <Icon name="Share2" size={14} />
         </button>
       </div>
     </section>

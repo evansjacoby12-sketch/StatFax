@@ -54,7 +54,7 @@ export default function BatterRow({
   })
 
   return (
-    <div className="board-swipe">
+    <div className="board-swipe" data-flip-id={b.id}>
       <div className="board-swipe-actions" aria-hidden="true">
         <span ref={leftRef} className={`bsa bsa-watch ${watched ? 'on' : ''}`}>
           <Icon name="Star" size={16} />
