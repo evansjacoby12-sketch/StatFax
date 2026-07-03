@@ -100,7 +100,7 @@ export default function BatterRow({
           borderLeft: selected ? `3px solid var(--accent)` : b.precision ? `3px solid var(--accent)` : `3px solid ${hexA(color, 0.3)}`
         }}
       >
-        <div className="col-rank mono">{rank}</div>
+        <div className={`col-rank mono${rank <= 3 ? ` rank-medal rank-${rank}` : ''}`}>{rank}</div>
 
         <div className="col-batter">
           <div className="batter-line1">
@@ -197,7 +197,13 @@ export default function BatterRow({
                 </span>
               )}
               {dueSetup.n > 0 && (
-                <span style={{
+                <span className={dueSetup.n === dueSetup.checks.length ? 'due-perfect' : ''} style={dueSetup.n === dueSetup.checks.length ? {
+                  display: 'inline-flex', alignItems: 'center', gap: '3px',
+                  fontSize: '10px', fontWeight: '800', padding: '2px 7px', borderRadius: '6px',
+                  background: 'rgba(245,166,35,0.12)',
+                  color: 'var(--prime)',
+                  border: '1px solid rgba(245,166,35,0.4)',
+                } : {
                   display: 'inline-flex', alignItems: 'center', gap: '3px',
                   fontSize: '10px', fontWeight: '700', padding: '2px 7px', borderRadius: '6px',
                   background: dueSetup.n >= 5 ? 'rgba(239,68,68,0.14)' : dueSetup.n >= 3 ? 'rgba(250,204,21,0.10)' : 'rgba(255,255,255,0.04)',
@@ -244,15 +250,18 @@ export default function BatterRow({
           <span className="col-xhr-sub">{num(b.expectedPAs, 1)} PA</span>
         </div>
 
-        <div className="col-rating" title={`Heat index ${b.heatIndex}/100`}>
+        <div className={`col-rating${(b.heatIndex ?? 0) >= 90 ? ' heat-max' : ''}`} title={`Heat index ${b.heatIndex}/100${(b.heatIndex ?? 0) >= 90 ? ' — molten' : ''}`}>
           <span className="rating-meter" style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '99px', height: '4px' }}>
-            <span className="rating-fill heat-fill" style={{ 
-              width: `${b.heatIndex}%`, 
+            <span className="rating-fill heat-fill" style={{
+              width: `${b.heatIndex}%`,
               background: 'linear-gradient(90deg, var(--b-due) 0%, var(--b-hot) 100%)',
               boxShadow: '0 0 6px var(--b-hot)'
             }} />
           </span>
-          <span className="rating-num mono">{b.heatIndex}</span>
+          <span className="rating-num mono">
+            {(b.heatIndex ?? 0) >= 90 && <Icon name="Flame" size={10} className="heat-flame" />}
+            {b.heatIndex}
+          </span>
         </div>
 
         <div className="col-signals">

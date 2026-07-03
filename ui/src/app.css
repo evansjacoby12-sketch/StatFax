@@ -7911,6 +7911,53 @@ button.th:focus-visible {
   .view-ind { transition: opacity 0.15s; }
 }
 
+/* ─── Board: top-3 rank medals ───────────────────────────────────────────── */
+.rank-medal { font-weight: 800 !important; }
+.rank-medal.rank-1 { color: #f5c33b; text-shadow: 0 0 10px rgba(245, 195, 59, 0.5); }
+.rank-medal.rank-2 { color: #c8d2e0; text-shadow: 0 0 8px rgba(200, 210, 224, 0.35); }
+.rank-medal.rank-3 { color: #d08a4e; text-shadow: 0 0 8px rgba(208, 138, 78, 0.4); }
+
+/* ─── Board: molten heat (≥90) ───────────────────────────────────────────── */
+.heat-max .heat-fill {
+  animation: heatFlicker 1.6s ease-in-out infinite;
+}
+.heat-max .rating-num {
+  color: var(--b-hot);
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.heat-flame {
+  color: var(--b-hot);
+  filter: drop-shadow(0 0 3px var(--b-hot));
+  animation: flameWobble 1.1s ease-in-out infinite;
+}
+@keyframes heatFlicker {
+  0%, 100% { box-shadow: 0 0 6px var(--b-hot); }
+  50% { box-shadow: 0 0 12px 2px var(--b-hot); }
+}
+@keyframes flameWobble {
+  0%, 100% { transform: scale(1) rotate(-4deg); }
+  50% { transform: scale(1.15) rotate(4deg); }
+}
+
+/* ─── Board: perfect DUE 6/6 chip pulse ──────────────────────────────────── */
+.due-perfect {
+  animation: duePerfect 2.2s ease-in-out infinite;
+}
+@keyframes duePerfect {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(245, 166, 35, 0); }
+  50% { box-shadow: 0 0 8px 1px rgba(245, 166, 35, 0.35); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .heat-max .heat-fill,
+  .heat-flame,
+  .due-perfect {
+    animation: none;
+  }
+}
+
 /* ─── Drawer tabs: sliding underline ─────────────────────────────────────── */
 .drawer-tabs {
   position: relative;
