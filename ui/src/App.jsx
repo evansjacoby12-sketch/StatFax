@@ -33,6 +33,7 @@ import PullToRefresh from './components/PullToRefresh.jsx'
 import PickOfDay from './components/PickOfDay.jsx'
 import UpdateBanner from './components/UpdateBanner.jsx'
 import ListBuilderView from './components/ListBuilderView.jsx'
+import ToastStack, { toast } from './components/Toast.jsx'
 import Icon from './components/Icon.jsx'
 import './app.css'
 
@@ -181,6 +182,7 @@ export default function App() {
       setSlateBuilding(false)
     }
     await load()
+    toast.success('Slate refreshed')
   }, [refreshing, slateBuilding, load])
 
   useEffect(() => {
@@ -219,6 +221,8 @@ export default function App() {
         const fresh = await loadSlate()
         setState((s) => {
           if (!s.data || fresh.meta?.generatedAt !== s.data.meta?.generatedAt) {
+            const n = fresh.batters?.length
+            toast.success(`Slate updated${n ? ` · ${n} players` : ''}`)
             return { status: 'ready', data: fresh, error: null }
           }
           return s
@@ -277,13 +281,19 @@ export default function App() {
   const toggleWatch = useCallback((b) => {
     setWatchlist((prev) => {
       const next = new Set(prev)
-      next.has(b.id) ? next.delete(b.id) : next.add(b.id)
+      const adding = !next.has(b.id)
+      adding ? next.add(b.id) : next.delete(b.id)
+      toast.info(adding ? `⭐ Watching ${b.name}` : `Removed ${b.name} from watchlist`)
       return next
     })
   }, [])
 
   const toggleSlip = useCallback((b) => {
-    setSlipIds((prev) => (prev.includes(b.id) ? prev.filter((x) => x !== b.id) : [...prev, b.id]))
+    setSlipIds((prev) => {
+      const adding = !prev.includes(b.id)
+      toast.success(adding ? `➕ ${b.name} added to parlay` : `Removed ${b.name} from parlay`)
+      return adding ? [...prev, b.id] : prev.filter((x) => x !== b.id)
+    })
   }, [])
 
   const removeSlip = useCallback((id) => setSlipIds((prev) => prev.filter((x) => x !== id)), [])
@@ -792,6 +802,7 @@ export default function App() {
       <BackToTop />
       <PullToRefresh onRefresh={load} />
       <UpdateBanner />
+      <ToastStack />
     </div>
     {/* Bottom nav is a sibling of .app (not a child) so iOS doesn't route its
         touch events through the overflow-y:auto scroll container, which can

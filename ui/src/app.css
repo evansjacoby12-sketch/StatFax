@@ -7688,3 +7688,84 @@ button.th:focus-visible {
 .lbv-team { font-size: 10px; }
 .lbv-row-stat { width: 60px; flex-shrink: 0; font-size: 12px; text-align: right; color: var(--text-dim); }
 .lbv-row-hrp { width: 44px; flex-shrink: 0; font-size: 12px; font-weight: 700; color: var(--accent); text-align: right; }
+
+/* ─── Toast stack ────────────────────────────────────────────────────────── */
+.toast-stack {
+  position: fixed;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 72px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: center;
+  gap: 6px;
+  z-index: 9999;
+  pointer-events: none;
+}
+.toast-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #fff;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.4), 0 1px 0 rgba(255,255,255,0.06) inset;
+  pointer-events: auto;
+  cursor: pointer;
+  white-space: nowrap;
+  max-width: 92vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.toast-in  { animation: toastIn  0.28s cubic-bezier(0.34,1.56,0.64,1) both; }
+.toast-out { animation: toastOut 0.22s ease-in both; }
+@keyframes toastIn  { from { opacity: 0; transform: translateY(12px) scale(0.92); } }
+@keyframes toastOut { to   { opacity: 0; transform: translateY(8px)  scale(0.94); } }
+
+.toast-info    { background: rgba(0,  120, 210, 0.85); border: 1px solid rgba(0,  160, 255, 0.25); }
+.toast-success { background: rgba(10, 160, 100, 0.85); border: 1px solid rgba(16, 185, 129, 0.3); }
+.toast-warn    { background: rgba(180,120,  0,  0.85); border: 1px solid rgba(245,166, 35, 0.3); }
+
+.toast-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: rgba(255,255,255,0.7);
+}
+.toast-msg { flex: 1; }
+
+/* ─── PRIME / ELITE grade chip glow on board rows ────────────────────────── */
+.board-row .grade-chip.label-prime {
+  animation: primePulse 2.6s ease-in-out infinite;
+}
+.board-row .grade-chip.label-elite {
+  animation: elitePulse 2.2s ease-in-out infinite;
+}
+@keyframes primePulse {
+  0%, 100% { box-shadow: 0 4px 12px rgba(0,0,0,0.15), 0 0 0 0 rgba(245,166,35,0); }
+  50%       { box-shadow: 0 4px 12px rgba(0,0,0,0.15), 0 0 8px 2px rgba(245,166,35,0.22); }
+}
+@keyframes elitePulse {
+  0%, 100% { box-shadow: 0 4px 12px rgba(0,0,0,0.15), 0 0 0 0 rgba(0,216,246,0); }
+  50%       { box-shadow: 0 4px 12px rgba(0,0,0,0.15), 0 0 10px 3px rgba(0,216,246,0.22); }
+}
+
+/* ─── +EV odds chip ──────────────────────────────────────────────────────── */
+.ev-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 1px 5px;
+  border-radius: 5px;
+  color: var(--strong);
+  background: rgba(16,185,129,0.13);
+  border: 1px solid rgba(16,185,129,0.25);
+}

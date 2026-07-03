@@ -217,6 +217,11 @@ export default function BatterRow({
                   {american(bestOdds.american)}
                 </span>
               )}
+              {Number.isFinite(edge) && edge > 0 && (
+                <span className="ev-chip" title={`+${(edge * 100).toFixed(0)}% edge vs market`}>
+                  +EV
+                </span>
+              )}
             </div>
           )}
         </div>
