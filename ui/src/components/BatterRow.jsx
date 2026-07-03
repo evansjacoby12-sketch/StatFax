@@ -47,6 +47,10 @@ export default function BatterRow({
   const dueSetup = hrSetup(b)
   const bestOdds = b.odds?.best
   const hrPct = b.hrProbability != null ? Math.round(b.hrProbability * 100) : null
+  // Air pull — the hand-adjusted park × weather HR multiplier (1.0 = neutral).
+  // The number behind the wxEdge badge, surfaced signed so suppression shows too.
+  const air = Number.isFinite(b.parkWeatherHandFactor) ? b.parkWeatherHandFactor : null
+  const airTone = air == null ? null : air >= 1.05 ? 'good' : air <= 0.95 ? 'bad' : 'mut'
 
   const { innerRef, leftRef, rightRef, swipedRef, onPointerDown } = useSwipeActions({
     onRight: () => onToggleWatch?.(b),
@@ -183,7 +187,7 @@ export default function BatterRow({
             )}
           </div>
 
-          {(pmScore != null || dueSetup.n > 0 || hrPct != null || bestOdds?.american) && (
+          {(pmScore != null || dueSetup.n > 0 || air != null || hrPct != null || bestOdds?.american) && (
             <div className="batter-quickstats" style={{ display: 'flex', gap: '5px', marginTop: '4px', alignItems: 'center', flexWrap: 'wrap' }}>
               {pmScore != null && (
                 <span style={{
@@ -211,6 +215,17 @@ export default function BatterRow({
                   border: `1px solid ${dueSetup.n >= 5 ? 'rgba(239,68,68,0.22)' : 'rgba(255,255,255,0.06)'}`,
                 }}>
                   DUE {dueSetup.n}/{dueSetup.checks.length}
+                </span>
+              )}
+              {air != null && (
+                <span title={`Air pull — park × weather × hand HR multiplier: ${air.toFixed(2)}× (1.00 = neutral). ${airTone === 'good' ? 'Tonight’s air helps the ball out.' : airTone === 'bad' ? 'Tonight’s air holds the ball in.' : 'Roughly neutral tonight.'}`} style={{
+                  display: 'inline-flex', alignItems: 'center', gap: '3px',
+                  fontSize: '10px', fontWeight: '700', padding: '2px 7px', borderRadius: '6px',
+                  background: airTone === 'good' ? 'rgba(16,185,129,0.14)' : airTone === 'bad' ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.04)',
+                  color: airTone === 'good' ? 'var(--strong)' : airTone === 'bad' ? 'var(--bad)' : 'var(--text-faint)',
+                  border: `1px solid ${airTone === 'good' ? 'rgba(16,185,129,0.22)' : airTone === 'bad' ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.06)'}`,
+                }}>
+                  AIR {signedPct(air - 1, 0)}
                 </span>
               )}
               {hrPct != null && (

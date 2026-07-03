@@ -432,6 +432,7 @@ export default function App() {
       if (sort === 'zone') return b.zoneMatchup?.zoneRating ?? null
       if (sort === 'edge') return b.edge
       if (sort === 'heat') return b.heatIndex
+      if (sort === 'air') return b.parkWeatherHandFactor ?? null
       return b[sort]
     }
     // Deterministic, meaningful tie-break: many picks share a probability at the

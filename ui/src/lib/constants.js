@@ -12,12 +12,13 @@ export const SORTS = [
   { key: 'hrProbability', label: 'HR Probability' },
   { key: 'score', label: 'Model Score' },
   { key: 'heat', label: 'Heat Index' },
+  { key: 'air', label: 'Air Pull' },
   { key: 'battingOrder', label: 'Lineup Spot' },
   { key: 'zone', label: 'Zone Hitter' },
 ]
 
 // Sort keys that should default to descending when first selected (bigger = better).
-export const DESC_BY_DEFAULT = new Set(['hrProbability', 'score', 'rating', 'heat', 'edge', 'expectedHRs', 'zone'])
+export const DESC_BY_DEFAULT = new Set(['hrProbability', 'score', 'rating', 'heat', 'edge', 'expectedHRs', 'zone', 'air'])
 
 export const DEFAULT_FILTERS = {
   q: '',
