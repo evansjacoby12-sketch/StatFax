@@ -9,7 +9,7 @@ function Stars({ n }) {
   return (
     <span className="dr-stars" aria-label={`${n} of 5 stars`}>
       {[1, 2, 3, 4, 5].map((i) => (
-        <span key={i} className={`dr-star ${i <= n ? 'on' : ''}`}>★</span>
+        <span key={i} className={`dr-star ${i <= n ? 'on' : ''}`} style={{ '--i': i }}>★</span>
       ))}
     </span>
   )

@@ -346,6 +346,24 @@ export default function App() {
   )
   const slipSet = useMemo(() => new Set(slipIds), [slipIds])
 
+  // Live HR alerts — when a refresh brings a new "homered this game" flag,
+  // announce it. Slip legs celebrate loudest, then watchlist, then everyone.
+  // First load seeds silently so we never announce HRs that already happened.
+  const prevHRs = useRef(null)
+  useEffect(() => {
+    if (!all.length) return
+    const current = new Set(all.filter((b) => b.liveContext?.isHRThisGame).map((b) => b.id))
+    const prev = prevHRs.current
+    prevHRs.current = current
+    if (!prev) return
+    const fresh = all.filter((b) => current.has(b.id) && !prev.has(b.id))
+    for (const b of fresh.slice(0, 4)) {
+      if (slipSet.has(b.id)) { toast.success(`💰 PARLAY LEG HIT — ${b.name} HOMERED!`, 7000); buzz(60) }
+      else if (watchlist.has(b.id)) { toast.success(`⭐💥 ${b.name} just homered!`, 6000); buzz(30) }
+      else toast.info(`💥 ${b.name} homered`, 4000)
+    }
+  }, [all, slipSet, watchlist])
+
   // Resolve slip ids → batter objects in slip order; drop any not in this slate.
   const slipLegs = useMemo(() => {
     const byId = new Map(all.map((b) => [b.id, b]))

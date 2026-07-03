@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Icon from './Icon.jsx'
 import { GradeChip } from './atoms.jsx'
 import { computeParlay, parlayGrade } from '../lib/parlay.js'
@@ -8,6 +8,28 @@ import { hexA } from './atoms.jsx'
 import { toast } from './Toast.jsx'
 
 const GRADE_COLOR = { S: '#f5a623', A: '#10b981', B: '#3b82f6', C: '#94a3b8', D: '#64748b' }
+
+// Roll the payout toward its new value when the wager or legs change —
+// money that ticks up feels like money.
+function useCountUp(target, ms = 450) {
+  const [v, setV] = useState(target)
+  useEffect(() => {
+    if (target == null || !Number.isFinite(target)) { setV(target); return }
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) { setV(target); return }
+    let raf, start = null
+    const from = Number.isFinite(v) ? v : 0
+    const tick = (t) => {
+      if (start === null) start = t
+      const p = Math.min(1, (t - start) / ms)
+      setV(from + (target - from) * (1 - Math.pow(1 - p, 3)))
+      if (p < 1) raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [target, ms])
+  return v
+}
 
 function buildCopyText(legs, p) {
   const header = `📊 StatFax Parlay · ${p.n} ${p.n === 1 ? 'leg' : 'legs'} · Model: ${pct(p.modelProb, 1)}${p.allPriced ? ` · ${american(p.american)}` : ''}`
@@ -38,11 +60,12 @@ function parlaySummary(p, pg) {
 export default function ParlaySlip({ legs, onRemove, onClear, onSelect, onOpenBuilder }) {
   const [open, setOpen] = useState(false)
   const [wager, setWager] = useState('10')
-  if (!legs.length) return null
-  const p = computeParlay(legs)
-  const payDecimal = p.allPriced ? p.decimal : p.fairDecimal
+  const p = legs.length ? computeParlay(legs) : null
+  const payDecimal = p ? (p.allPriced ? p.decimal : p.fairDecimal) : null
   const wagerNum = parseFloat(wager)
-  const payout = Number.isFinite(wagerNum) && wagerNum > 0 && payDecimal ? wagerNum * payDecimal : null
+  const payout = p && Number.isFinite(wagerNum) && wagerNum > 0 && payDecimal ? wagerNum * payDecimal : null
+  const shownPayout = useCountUp(payout)
+  if (!legs.length) return null
   const pg = parlayGrade(legs)
   const gColor = pg ? GRADE_COLOR[pg.letter] : null
   const weak =
@@ -167,7 +190,7 @@ export default function ParlaySlip({ legs, onRemove, onClear, onSelect, onOpenBu
             </span>
             <span className="slip-wager-field" style={{ display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'flex-end' }}>
               <span className="slip-wager-k" style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-faint)' }}>Payout{p.allPriced ? '' : ' (fair)'}</span>
-              <span className="slip-wager-payout mono" style={{ fontSize: '15px', fontWeight: '800', color: 'var(--strong)' }}>{payout != null ? `$${payout >= 100 ? Math.round(payout) : payout.toFixed(2)}` : '—'}</span>
+              <span className="slip-wager-payout mono" style={{ fontSize: '15px', fontWeight: '800', color: 'var(--strong)' }}>{shownPayout != null && Number.isFinite(shownPayout) ? `$${shownPayout >= 100 ? Math.round(shownPayout) : shownPayout.toFixed(2)}` : '—'}</span>
             </span>
           </div>
 
