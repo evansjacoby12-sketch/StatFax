@@ -79,7 +79,7 @@ export default function Filters({ value, onChange, gradeCounts, games, badgeCoun
   }
 
   const activeMore =
-    v.gamePks.size + (v.confirmedOnly ? 1 : 0) + (v.watchedOnly ? 1 : 0) + (v.hotOnly ? 1 : 0) + (v.precisionOnly ? 1 : 0) + v.badges.size
+    v.gamePks.size + (v.confirmedOnly ? 1 : 0) + (v.watchedOnly ? 1 : 0) + (v.hotOnly ? 1 : 0) + (v.precisionOnly ? 1 : 0) + (v.sleepersOnly ? 1 : 0) + v.badges.size
   const badgeDefs = BADGES.filter((b) => v.badges.has(b.key))
 
   return (
@@ -177,6 +177,7 @@ export default function Filters({ value, onChange, gradeCounts, games, badgeCoun
           {v.watchedOnly && <FilterChip label="Watchlist" onClear={() => onChange({ watchedOnly: false })} />}
           {v.hotOnly && <FilterChip label="Heating up" icon="Flame" onClear={() => onChange({ hotOnly: false })} />}
           {v.precisionOnly && <FilterChip label="Precision" icon="Sparkles" onClear={() => onChange({ precisionOnly: false })} />}
+          {v.sleepersOnly && <FilterChip label="Sleepers" icon="Moon" onClear={() => onChange({ sleepersOnly: false })} />}
           {badgeDefs.map((bd) => (
             <FilterChip
               key={bd.key}
@@ -272,6 +273,20 @@ export default function Filters({ value, onChange, gradeCounts, games, badgeCoun
             >
               <Icon name="Sparkles" size={14} />
               Precision
+            </button>
+
+            <button
+              className={`toggle-btn ${v.sleepersOnly ? 'on' : ''}`}
+              onClick={() => onChange({ sleepersOnly: !v.sleepersOnly })}
+              title="Under-the-radar value: STRONG/LEAN bats with PRIME-adjacent form (heat ≥48, setup 3/6+, hot or rising) — hit 21% over the validation window"
+              style={v.sleepersOnly ? {
+                background: 'rgba(139, 92, 246, 0.12)',
+                borderColor: '#8b5cf6',
+                color: '#a78bfa'
+              } : {}}
+            >
+              <Icon name="Moon" size={14} />
+              Sleepers
             </button>
           </div>
 

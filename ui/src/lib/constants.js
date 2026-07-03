@@ -27,6 +27,7 @@ export const DEFAULT_FILTERS = {
   watchedOnly: false,
   hotOnly: false,
   precisionOnly: false,
+  sleepersOnly: false,
   badges: new Set(),
   sort: 'hrProbability',
   dir: 'desc',

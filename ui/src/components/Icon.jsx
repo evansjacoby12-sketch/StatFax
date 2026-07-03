@@ -59,6 +59,7 @@ import {
   Filter,
   Loader,
   Users,
+  Moon,
 } from 'lucide-react'
 
 const REGISTRY = {
@@ -122,6 +123,7 @@ const REGISTRY = {
   Filter,
   Loader,
   Users,
+  Moon,
 }
 
 export default function Icon({ name, size = 16, ...rest }) {

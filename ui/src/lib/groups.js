@@ -113,6 +113,20 @@ export function precisionSignal(b) {
   )
 }
 
+// Sleeper — a non-PRIME bat with PRIME-adjacent form the board doesn't
+// headline. Tuned 2026-07-03 on 30d of reconciled outcomes: STRONG/LEAN bats
+// with heat ≥48 + HR setup 3/6+ + a live power surge (hot or rising) homered
+// at 20.7% over the trailing 14 days (1.69x base, n=440) — a whisker under
+// PRIME's 24.5%, from bats priced much longer. Setup ≥4 measured NO better
+// (19.1%) at half the pool, so the gate stays at 3.
+export function sleeperSignal(b) {
+  const g = b.grade?.label
+  if (g !== 'STRONG' && g !== 'LEAN') return false // sleepers aren't the chalk
+  if ((b.heatIndex ?? 0) < 48) return false
+  if (hrSetup(b).n < 3) return false
+  return b.hot === true || risingForm(b) !== null
+}
+
 // Matchup-relevant blast cuts (display): vs today's starter's HAND, and the
 // usage-weighted blast vs his exact MIX (only when we cover ≥half the arsenal).
 export const blastVsHandOf = (b) => {

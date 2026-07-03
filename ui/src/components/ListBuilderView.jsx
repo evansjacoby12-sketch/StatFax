@@ -19,6 +19,7 @@ const blast = (b) => {
 
 const BOOL_SIGNALS = [
   { key: 'precision',     label: 'Precision',      get: b => b.precision },
+  { key: 'sleeper',       label: 'Sleeper',        get: b => b.sleeper },
   { key: 'hot',           label: 'Hot Bat',        get: b => b.hot },
   { key: 'barrelKing',    label: 'Barrel King',    get: b => b.barrelKing },
   { key: 'blast',         label: 'Blast',          get: b => b.blast },

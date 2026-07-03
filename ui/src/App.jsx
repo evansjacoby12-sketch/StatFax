@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, useCallback, useRef, useLayoutEffect } fr
 import { loadSlate, forceSlateRefresh, normName } from './lib/data.js'
 import { GRADE_ORDER, BADGES } from './lib/badges.js'
 import { HOT_HEAT, DESC_BY_DEFAULT, DEFAULT_FILTERS, SORTS } from './lib/constants.js'
-import { risingForm, precisionSignal } from './lib/groups.js'
+import { risingForm, precisionSignal, sleeperSignal } from './lib/groups.js'
 import * as store from './lib/storage.js'
 import { buzz } from './lib/haptics.js'
 import { LiveModeContext } from './lib/liveMode.js'
@@ -67,6 +67,7 @@ function initialFilters() {
     watchedOnly: !!saved.watchedOnly,
     hotOnly: !!saved.hotOnly,
     precisionOnly: !!saved.precisionOnly,
+    sleepersOnly: !!saved.sleepersOnly,
   }
 }
 
@@ -122,6 +123,7 @@ export default function App() {
       watchedOnly: filters.watchedOnly,
       hotOnly: filters.hotOnly,
       precisionOnly: filters.precisionOnly,
+      sleepersOnly: filters.sleepersOnly,
     })
   }, [filters])
   useEffect(() => store.save('watchlist', [...watchlist]), [watchlist])
@@ -340,8 +342,10 @@ export default function App() {
   // reads it the same way as the engine's server-side flags.
   const all = useMemo(
     () => (state.data?.batters || []).map((b) => {
-      const b2 = risingForm(b) ? { ...b, rising: true } : b
-      return precisionSignal(b2) ? { ...b2, precision: true } : b2
+      let b2 = risingForm(b) ? { ...b, rising: true } : b
+      if (precisionSignal(b2)) b2 = { ...b2, precision: true }
+      if (sleeperSignal(b2)) b2 = { ...b2, sleeper: true }
+      return b2
     }),
     [state.data],
   )
@@ -412,6 +416,7 @@ export default function App() {
       if (filters.watchedOnly && !watchlist.has(b.id)) return false
       if (filters.hotOnly && (b.heatIndex ?? 0) < HOT_HEAT) return false
       if (filters.precisionOnly && !b.precision) return false
+      if (filters.sleepersOnly && !b.sleeper) return false
       // Signals are multi-select (AND): a batter must carry EVERY chosen signal.
       if (filters.badges.size && ![...filters.badges].every((k) => b[k])) return false
       if (q) {
