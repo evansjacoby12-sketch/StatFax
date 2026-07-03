@@ -294,7 +294,9 @@ function ModelResults({ meta }) {
           )}
         </h3>
         <div className="daily-table" style={{ display: 'flex', flexDirection: 'column', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '8px', overflow: 'hidden' }}>
-          <div className="daily-row daily-th" style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', padding: '6px 10px', background: 'rgba(255,255,255,0.03)', fontSize: '10px', fontWeight: '700', color: 'var(--text-faint)', textTransform: 'uppercase' }}>
+          {/* No inline grid here — the header must share .daily-row's CSS grid
+              (64px + 5 columns) or its columns drift off the data rows'. */}
+          <div className="daily-row daily-th" style={{ padding: '6px 10px', background: 'rgba(255,255,255,0.03)', fontSize: '10px', fontWeight: '700', color: 'var(--text-faint)', textTransform: 'uppercase' }}>
             <span>Date</span><span>Picks</span><span>HR</span><span>Hit%</span><span>Tier</span><span>T-hit%</span>
           </div>
           {daily.map((d) => (
@@ -308,22 +310,23 @@ function ModelResults({ meta }) {
               <span className="mono dim">{d.topN}</span>
               <span className={`mono ${d.topN && d.topHits / d.topN > base ? 'pos' : ''}`} style={d.topN && d.topHits / d.topN > base ? { color: 'var(--strong)', fontWeight: '700' } : {}}>{d.topN ? pct(d.topHits / d.topN, 0) : '—'}</span>
               {d.dots.length > 0 && (
-                <div className="daily-dots" style={{ gridColumn: '1 / -1', display: 'flex', flexWrap: 'wrap', gap: '3px', marginTop: '3px' }}>
-                  {d.dots.slice(0, 40).map((p, i) => (
+                // Every tier pick gets a dot (no cap) — smaller and tighter so
+                // a 140-pick day still reads as one or two clean lines.
+                <div className="daily-dots" style={{ gridColumn: '1 / -1', display: 'flex', flexWrap: 'wrap', gap: '2px', marginTop: '4px', alignItems: 'center' }}>
+                  {d.dots.map((p, i) => (
                     <span
                       key={i}
                       title={`${p.name} — ${p.hit ? 'HR ✓' : 'no HR'}`}
                       style={{
-                        width: '7px',
-                        height: '7px',
+                        width: '5px',
+                        height: '5px',
                         borderRadius: '50%',
-                        background: p.hit ? 'var(--strong)' : 'rgba(255,255,255,0.08)',
-                        boxShadow: p.hit ? '0 0 5px rgba(16,185,129,0.5)' : 'none',
+                        background: p.hit ? 'var(--strong)' : 'rgba(255,255,255,0.09)',
+                        boxShadow: p.hit ? '0 0 4px rgba(16,185,129,0.55)' : 'none',
                         flexShrink: 0,
                       }}
                     />
                   ))}
-                  {d.dots.length > 40 && <span className="dim" style={{ fontSize: '9px' }}>+{d.dots.length - 40}</span>}
                 </div>
               )}
             </div>
