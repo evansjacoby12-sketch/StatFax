@@ -186,7 +186,11 @@ export default function PickOfDay({ batter: b, onSelect, watched, inSlip, onTogg
               <Icon name="Flame" size={12} /> Heat {heat ?? '—'} · {heatTag(heat)}
             </span>
             <span className="dot-sep" style={{ opacity: 0.3 }}>·</span>
-            <span className="potd-setup" style={{ color: 'var(--text-dim)' }}>Setup Match {n}/6</span>
+            {n === 6 ? (
+              <span className="potd-setup perfect-setup" title="Every setup check passed — the rarest kind of pick">PERFECT SETUP 6/6</span>
+            ) : (
+              <span className="potd-setup" style={{ color: 'var(--text-dim)' }}>Setup Match {n}/6</span>
+            )}
             {best && (
               <>
                 <span className="dot-sep" style={{ opacity: 0.3 }}>·</span>
@@ -218,12 +222,13 @@ export default function PickOfDay({ batter: b, onSelect, watched, inSlip, onTogg
         listStyle: 'none',
         marginBottom: '4px'
       }}>
-        {checks.map((c) => (
-          <li 
-            key={c.key} 
-            className={c.pass ? 'on' : 'off'} 
+        {checks.map((c, idx) => (
+          <li
+            key={c.key}
+            className={c.pass ? 'on' : 'off'}
             title={c.detail}
             style={{
+              '--i': idx,
               fontSize: '11px',
               display: 'inline-flex',
               alignItems: 'center',

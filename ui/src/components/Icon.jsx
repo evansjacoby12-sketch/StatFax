@@ -52,6 +52,13 @@ import {
   Share2,
   Bookmark,
   Trash2,
+  ArrowUp,
+  BookOpen,
+  ChevronLeft,
+  Copy,
+  Filter,
+  Loader,
+  Users,
 } from 'lucide-react'
 
 const REGISTRY = {
@@ -108,6 +115,13 @@ const REGISTRY = {
   Share2,
   Bookmark,
   Trash2,
+  ArrowUp,
+  BookOpen,
+  ChevronLeft,
+  Copy,
+  Filter,
+  Loader,
+  Users,
 }
 
 export default function Icon({ name, size = 16, ...rest }) {

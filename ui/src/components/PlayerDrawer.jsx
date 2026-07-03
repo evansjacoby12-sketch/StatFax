@@ -221,7 +221,9 @@ export default function PlayerDrawer({ batter: b, batters, onClose, watched, inS
         <button className="drawer-grab" onClick={onClose} aria-label="Close" title="Close" />
         <DrawerHeader b={b} color={color} onClose={onClose} watched={watched} inSlip={inSlip} onToggleWatch={onToggleWatch} onToggleSlip={onToggleSlip} />
         <TabBar active={tab} onChange={setTab} />
-        <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
+        {/* key={tab} remounts the pane on tab change so the section-stagger
+            entrance animation (.drawer-pane > * in app.css) replays. */}
+        <div key={tab} className="drawer-pane" style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
           {tab === 'overview'  && <OverviewTab  b={b} color={color} onOpenZone={onOpenZone} liveMode={liveMode} />}
           {tab === 'matchup'   && <MatchupTab   b={b} batters={batters} onOpenZone={onOpenZone} onOpenPitcher={onOpenPitcher} />}
           {tab === 'form'      && <FormTab      b={b} />}

@@ -121,6 +121,17 @@ function ModelResults({ meta }) {
     }
   })
 
+  // Model cash streak: consecutive days (newest first, all history) where at
+  // least one PRIME/STRONG pick homered. Purely client-side over the same log.
+  let cashStreak = 0
+  for (const d of dates) {
+    const rs = (log.records[d] || []).filter((r) => typeof r.homered === 'boolean')
+    const tier = rs.filter((r) => r.grade === 'PRIME' || r.grade === 'STRONG')
+    if (!tier.length) break
+    if (tier.some((r) => r.homered)) cashStreak++
+    else break
+  }
+
   const m = meta.modelMetrics
   const reliability = m?.reliability || []
 
@@ -270,6 +281,11 @@ function ModelResults({ meta }) {
           <span style={{ fontWeight: '400', textTransform: 'none', marginLeft: '6px', fontSize: '12px', color: 'var(--text-faint)' }}>
             · last 7 days
           </span>
+          {cashStreak >= 2 && (
+            <span className={`cash-streak${cashStreak >= 3 ? ' hot' : ''}`} title={`A PRIME/STRONG pick has homered ${cashStreak} days in a row`}>
+              <Icon name="Flame" size={11} /> {cashStreak}-day cash streak
+            </span>
+          )}
         </h3>
         <div className="daily-table" style={{ display: 'flex', flexDirection: 'column', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '8px', overflow: 'hidden' }}>
           <div className="daily-row daily-th" style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', padding: '6px 10px', background: 'rgba(255,255,255,0.03)', fontSize: '10px', fontWeight: '700', color: 'var(--text-faint)', textTransform: 'uppercase' }}>

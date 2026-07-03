@@ -7778,3 +7778,82 @@ button.th:focus-visible {
   background: rgba(16,185,129,0.13);
   border: 1px solid rgba(16,185,129,0.25);
 }
+
+/* ─── Live score pop (team-tinted via --tc set on .gc-team) ─────────────── */
+.gc-score.scored {
+  animation: scorePop 1.4s ease both;
+}
+@keyframes scorePop {
+  0%   { transform: scale(1); }
+  18%  { transform: scale(1.35); background: color-mix(in srgb, var(--tc) 40%, transparent); box-shadow: 0 0 14px color-mix(in srgb, var(--tc) 60%, transparent); color: #fff; }
+  100% { transform: scale(1); }
+}
+
+/* ─── PickOfDay: PERFECT SETUP gold shimmer + staggered check chips ─────── */
+.perfect-setup {
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  background: linear-gradient(90deg, var(--prime), #fff3c4, var(--prime));
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: goldSweep 2.4s linear infinite;
+}
+@keyframes goldSweep {
+  to { background-position: -200% center; }
+}
+.potd-checks li {
+  animation: rowIn 0.3s ease both;
+  animation-delay: calc(var(--i, 0) * 45ms);
+}
+
+/* ─── Drawer: staggered section entrance on tab switch ──────────────────── */
+@media (prefers-reduced-motion: no-preference) {
+  .drawer-pane > * {
+    animation: paneSecIn 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .drawer-pane > *:nth-child(2) { animation-delay: 45ms; }
+  .drawer-pane > *:nth-child(3) { animation-delay: 90ms; }
+  .drawer-pane > *:nth-child(4) { animation-delay: 135ms; }
+  .drawer-pane > *:nth-child(5) { animation-delay: 160ms; }
+  .drawer-pane > *:nth-child(n + 6) { animation-delay: 180ms; }
+}
+@keyframes paneSecIn {
+  from { opacity: 0; transform: translateY(10px); }
+}
+
+/* ─── Model cash-streak chip (Results · daily track record) ─────────────── */
+.cash-streak {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--b-hot);
+  background: rgba(255, 140, 0, 0.08);
+  border: 1px solid rgba(255, 140, 0, 0.25);
+  border-radius: 99px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+.cash-streak.hot {
+  animation: cashPulse 2s ease-in-out infinite;
+}
+@keyframes cashPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 140, 0, 0); }
+  50% { box-shadow: 0 0 8px 1px rgba(255, 140, 0, 0.3); }
+}
+
+/* Motion opt-out for the new animations */
+@media (prefers-reduced-motion: reduce) {
+  .gc-score.scored,
+  .perfect-setup,
+  .potd-checks li,
+  .cash-streak.hot {
+    animation: none;
+  }
+}

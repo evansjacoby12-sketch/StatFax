@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Icon from './Icon.jsx'
 import { GradeChip, BadgeRow, ProbBar, ProbRing } from './atoms.jsx'
 import { teamColor, teamLogo, hexToRgba, readableOn, playerHeadshot } from '../lib/teams.js'
@@ -270,7 +270,7 @@ function ExtractorCard({ game: g, groups, idx = 0, ...ctx }) {
         </div>
         <GameStatus g={g} />
       </header>
-      <GameChips sample={groups.away?.[0] || groups.home?.[0]} />
+      <GameChips sample={groups.away?.[0] || groups.home?.[0]} game={g} />
       {alert && (
         <div className={`xc-alert ${alert.tone}`} style={{
           display: 'flex',
@@ -349,6 +349,19 @@ function TeamHead({ team, pitcher, score, showScore, align, gamePk, onOpenPitche
   const color = teamColor(team?.id)
   const logo = teamLogo(team?.id)
   const canOpen = !!onOpenPitcher && pitcher?.id != null
+  // Flash the score pill when a poll brings a higher score. Works because
+  // GameCard is keyed by stable gamePk, so this instance survives refreshes.
+  const prevScore = useRef(score)
+  const [popped, setPopped] = useState(false)
+  useEffect(() => {
+    const scored = showScore && Number.isFinite(score) && Number.isFinite(prevScore.current) && score > prevScore.current
+    prevScore.current = score
+    if (scored) {
+      setPopped(true)
+      const t = setTimeout(() => setPopped(false), 1400)
+      return () => clearTimeout(t)
+    }
+  }, [score, showScore])
   return (
     <div className={`gc-team ${align}`} style={{ '--tc': color }}>
       {logo && <img className="gc-logo" src={logo} alt={team?.name || ''} loading="lazy" style={{ width: '28px', height: '28px' }} />}
@@ -371,7 +384,7 @@ function TeamHead({ team, pitcher, score, showScore, align, gamePk, onOpenPitche
           <span className="gc-pitcher" style={{ fontSize: '11px' }}>{pitcher?.name || 'TBD'}</span>
         )}
       </div>
-      {showScore && <span className="gc-score mono" style={{ fontSize: '18px', fontWeight: '800', background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: '6px' }}>{score ?? 0}</span>}
+      {showScore && <span className={`gc-score mono${popped ? ' scored' : ''}`} style={{ fontSize: '18px', fontWeight: '800', background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: '6px' }}>{score ?? 0}</span>}
     </div>
   )
 }
@@ -405,7 +418,7 @@ function GameCard({ game: g, groups, idx = 0, ...ctx }) {
         <TeamHead team={g.homeTeam} pitcher={g.homePitcher} score={g.homeScore} showScore={showScore} align="right" gamePk={g.gamePk} onOpenPitcher={ctx.onOpenPitcher} />
       </header>
 
-      <GameChips sample={groups.away[0] || groups.home[0]} />
+      <GameChips sample={groups.away[0] || groups.home[0]} game={g} />
 
       <div className="gc-silos" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
         <Silo team={g.awayTeam} batters={groups.away} {...ctx} />
@@ -415,14 +428,27 @@ function GameCard({ game: g, groups, idx = 0, ...ctx }) {
   )
 }
 
-function GameChips({ sample }) {
+function GameChips({ sample, game }) {
   const w = sample?.weather
   const park = sample?.gameParkHRFactor
   if (!w && park == null) return null
   const chips = []
   if (w?.tempF != null) chips.push({ icon: 'Thermometer', text: `${Math.round(w.tempF)}°F` })
-  if (w?.windSpeedMph != null)
+  // Wind: park-relative verdict (out = HR-friendly green, in = red) with an
+  // arrow rotated to the actual blow direction (0deg = out to CF). Falls back
+  // to the raw compass chip when we can't resolve the park orientation.
+  const wind = w && !w.roofClosed ? interpretWind(w, game?.homeTeam?.abbr, { roofClosed: w.roofClosed }) : null
+  if (wind) {
+    chips.push({
+      icon: 'ArrowUp',
+      rot: wind.arrowRotation,
+      text: `${Math.round(wind.mph)} ${wind.verdict === 'OUT' ? `out ${wind.side}` : wind.verdict === 'IN' ? 'in' : 'cross'}`,
+      tone: wind.verdict === 'OUT' ? 'good' : wind.verdict === 'IN' ? 'bad' : '',
+      title: wind.caption,
+    })
+  } else if (w?.windSpeedMph != null) {
     chips.push({ icon: 'Wind', text: `${Math.round(w.windSpeedMph)} ${compass(w.windDirDeg) || ''}`.trim() })
+  }
   if (park != null)
     chips.push({ icon: 'Gauge', text: `${num(park, 2)}× park`, tone: park >= 1.05 ? 'good' : park <= 0.95 ? 'bad' : '' })
   if (w?.roofClosed) chips.push({ icon: 'House', text: 'Roof closed' })
@@ -431,7 +457,7 @@ function GameChips({ sample }) {
   return (
     <div className="gc-chips" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', padding: '12px', background: 'rgba(0,0,0,0.1)' }}>
       {chips.map((c, i) => (
-        <span className={`gc-chip ${c.tone || ''}`} key={i} style={{
+        <span className={`gc-chip ${c.tone || ''}`} key={i} title={c.title} style={{
           display: 'inline-flex',
           alignItems: 'center',
           gap: '4px',
@@ -442,7 +468,7 @@ function GameChips({ sample }) {
           padding: '2px 8px',
           borderRadius: '6px'
         }}>
-          <Icon name={c.icon} size={11} />
+          <Icon name={c.icon} size={11} style={c.rot != null ? { transform: `rotate(${c.rot}deg)` } : undefined} />
           {c.text}
         </span>
       ))}
