@@ -635,28 +635,36 @@ function DrawerHeader({ b, color, onClose, watched, inSlip, onToggleWatch, onTog
 // HeroNumbers (Overview tab)
 // ---------------------------------------------------------------------------
 
+// Compact hero strip — one row: big HR%, score ring, and the model stats as a
+// tight mini-grid (replaces the two tall boxes that ate ~180px of the modal).
+function HeroMini({ k, v, tone, title }) {
+  return (
+    <div title={title} style={{ textAlign: 'right', minWidth: '52px' }}>
+      <div style={{ fontSize: '8.5px', textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-faint)', marginBottom: '2px', whiteSpace: 'nowrap' }}>{k}</div>
+      <div className="mono" style={{ fontSize: '13px', fontWeight: '700', color: tone || '#fff', whiteSpace: 'nowrap' }}>{v}</div>
+    </div>
+  )
+}
+
 function HeroNumbers({ b, color }) {
   const vegas = b.vegasImpliedProb
   const diff = vegas != null && b.hrProbability != null ? b.hrProbability - vegas : null
   const shownProb = useCountUp(b.hrProbability)
   const shownScore = useCountUp(b.score ?? 0)
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '12px', marginBottom: '16px' }}>
-      <div style={{ borderColor: hexA(color, 0.3), background: `linear-gradient(135deg, ${hexA(color, 0.08)} 0%, rgba(255,255,255,0.01) 100%)`, padding: '14px', borderRadius: '12px', borderWidth: '1px', borderStyle: 'solid', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div>
-          <div style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-dim)', marginBottom: '4px' }}>HR Probability</div>
-          <div style={{ color, fontSize: '30px', fontWeight: '800', lineHeight: 1.1, fontFamily: 'var(--mono)' }}>{pct(shownProb, 2)}</div>
-          <div style={{ fontSize: '10px', color: 'var(--text-faint)', marginTop: '4px' }}>raw score {num(b.rawScore)}</div>
-        </div>
-        <ScoreRing score={shownScore} color={color} size={58} />
+    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', rowGap: '10px', flexWrap: 'wrap', padding: '12px 16px', marginBottom: '16px', borderRadius: '12px', border: `1px solid ${hexA(color, 0.25)}`, background: `linear-gradient(135deg, ${hexA(color, 0.07)} 0%, rgba(255,255,255,0.01) 100%)` }}>
+      <div title={`raw score ${num(b.rawScore)}`}>
+        <div style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-dim)', marginBottom: '3px' }}>HR Probability</div>
+        <div style={{ color, fontSize: '27px', fontWeight: '800', lineHeight: 1, fontFamily: 'var(--mono)' }}>{pct(shownProb, 2)}</div>
       </div>
-      <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '6px' }}>
-        <KV k="Expected HRs" v={num(b.expectedHRs, 3)} />
-        <KV k="Expected PAs" v={num(b.expectedPAs, 1)} />
-        <KV k="Sim HR%" v={pct(b.simHRProb, 2)} />
-        <KV k="Ensemble" v={num(b.ensembleScore)} />
-        {vegas != null && <KV k="Market implied" v={pct(vegas, 1)} />}
-        {diff != null && <KV k="Model vs Mkt" v={signedPct(diff, 1)} accent={diff >= 0 ? 'var(--good)' : 'var(--bad)'} />}
+      <ScoreRing score={shownScore} color={color} size={48} />
+      <div style={{ display: 'flex', gap: '14px', rowGap: '8px', flexWrap: 'wrap', flex: 1, justifyContent: 'flex-end', alignItems: 'center' }}>
+        <HeroMini k="xHR" v={num(b.expectedHRs, 3)} title="Expected HRs this game" />
+        <HeroMini k="PAs" v={num(b.expectedPAs, 1)} title="Expected plate appearances" />
+        <HeroMini k="Sim" v={pct(b.simHRProb, 1)} title="AB-by-AB simulated HR probability" />
+        <HeroMini k="Ens" v={num(b.ensembleScore)} title="Ensemble model score" />
+        {vegas != null && <HeroMini k="Market" v={pct(vegas, 1)} title="Market implied HR probability (mean across books)" />}
+        {diff != null && <HeroMini k="vs Mkt" v={signedPct(diff, 1)} tone={diff >= 0 ? 'var(--good)' : 'var(--bad)'} title="Model probability minus market implied — positive = value" />}
       </div>
     </div>
   )
