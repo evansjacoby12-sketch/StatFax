@@ -13,14 +13,17 @@ const WX_SORTS = [
   { key: 'park', label: 'Best parks', icon: 'Gauge' },
   { key: 'wind', label: 'Wind out', icon: 'TrendingUp' },
   { key: 'warm', label: 'Warmest', icon: 'Thermometer' },
+  { key: 'time', label: 'First pitch', icon: 'Clock' },
 ]
 
 function sortGames(games, sort) {
   const byAir = (a, b) => (b.envFactor ?? 0) - (a.envFactor ?? 0) || (a.gamePk ?? 0) - (b.gamePk ?? 0)
   const arr = games.slice()
+  const startOf = (g) => (g.game?.gameDate ? Date.parse(g.game.gameDate) : Infinity)
   if (sort === 'park') arr.sort((a, b) => (b.parkHR ?? 0) - (a.parkHR ?? 0) || byAir(a, b))
   else if (sort === 'wind') arr.sort((a, b) => (b.windOutMph ?? -99) - (a.windOutMph ?? -99) || byAir(a, b))
   else if (sort === 'warm') arr.sort((a, b) => (b.tempF ?? -99) - (a.tempF ?? -99) || byAir(a, b))
+  else if (sort === 'time') arr.sort((a, b) => startOf(a) - startOf(b) || byAir(a, b))
   else arr.sort((a, b) => byAir(a, b) || (b.windOutMph ?? 0) - (a.windOutMph ?? 0))
   return arr
 }

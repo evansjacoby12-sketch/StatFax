@@ -106,7 +106,6 @@ export default function App() {
   const [view, setView] = useState(() => viewFromHash() || store.load('view', 'board'))
   const [liveScores, setLiveScores] = useState(() => store.load('liveScores', true))
   const [eliLevel, setEliLevel] = useState(() => store.load('eliLevel', 'eli5')) // 'eli5' | 'eli15'
-  const [lineupNoticeOff, setLineupNoticeOff] = useState(false)
   // Dismissed Pick of the Day, keyed by batter id (which embeds the gamePk, so
   // it's inherently scoped to that day). Persisted, so a dismiss survives reloads
   // — but a new day's (or changed) pick has a new id and shows again.
@@ -475,13 +474,6 @@ export default function App() {
     [all, zoneId],
   )
 
-  // Slate-wide lineup confirmation, for the unconfirmed banner.
-  const lineupStatus = useMemo(() => {
-    const playable = all.filter((b) => (b.grade?.label || 'SKIP') !== 'SKIP')
-    const confirmed = playable.filter((b) => b.lineupConfirmed).length
-    return { confirmed, total: playable.length }
-  }, [all])
-
   // Pick of the Day: the model's single best HR play with the lineup set.
   // Lead with MODEL SCORE, not HR probability — probability saturates at a
   // ceiling (~26.5%), so the top tier ties on it and the pick flickers on every
@@ -617,28 +609,6 @@ export default function App() {
               rating={data.meta?.dayRating}
               estHRs={data.batters?.reduce((s, b) => s + (Number.isFinite(b.hrProbability) ? b.hrProbability : 0), 0) ?? null}
             />}
-            {lineupStatus.total > 0 && lineupStatus.confirmed < lineupStatus.total && !lineupNoticeOff && (
-              <div className="lineup-banner" role="status">
-                <button className="lb-close icon-btn" onClick={() => setLineupNoticeOff(true)} aria-label="Dismiss">
-                  <Icon name="X" size={14} />
-                </button>
-                <p className="lb-text">
-                  <Icon name="TriangleAlert" size={15} className="lb-inline-icon" />
-                  {lineupStatus.confirmed === 0 ? (
-                    <>
-                      <b>Lineups not posted yet.</b> Projections use probable lineups — <b>including the Pick of the Day below</b> — so <b>only place bets on confirmed lineups.</b> Re-check near first pitch.
-                    </>
-                  ) : (
-                    <>
-                      <b>
-                        {lineupStatus.confirmed}/{lineupStatus.total} lineups confirmed.
-                      </b>{' '}
-                      Unconfirmed bats are projections and may be benched — <b>only bet legs whose lineup is confirmed</b> (the Pick of the Day shows its own Confirmed / Projected status).
-                    </>
-                  )}
-                </p>
-              </div>
-            )}
             {pick && pick.id !== podDismissedId && (
               <PickOfDay
                 batter={pick}

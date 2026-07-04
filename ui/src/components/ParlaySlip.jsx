@@ -73,9 +73,6 @@ export default function ParlaySlip({ legs, onRemove, onClear, onSelect, onOpenBu
       ? legs.slice().sort((a, b) => (a.hrProbability ?? 1) - (b.hrProbability ?? 1) || (a.score ?? 0) - (b.score ?? 0) || String(a.id).localeCompare(String(b.id)))[0]
       : null
   const weakId = weak?.id
-  // Legs whose lineup isn't posted yet — they can still be scratched or dropped
-  // out of a run-producing slot, so the whole parlay can change before lock.
-  const unconfirmed = legs.filter((b) => b.lineupConfirmed !== true)
 
   return (
     <div className={`slip ${open ? 'open' : ''}`} style={{
@@ -143,12 +140,6 @@ export default function ParlaySlip({ legs, onRemove, onClear, onSelect, onOpenBu
               <span className="slip-weak-note" style={{ display: 'flex', marginTop: '6px', color: 'var(--b-hot)', alignItems: 'center', gap: '4px', fontSize: '11px' }}>
                 <Icon name="TriangleAlert" size={11} />
                 <span>Weak link: <b>{weak.name}</b> ({pct(weak.hrProbability, 2)})</span>
-              </span>
-            )}
-            {unconfirmed.length > 0 && (
-              <span className="slip-prov-note" style={{ display: 'flex', marginTop: '6px', color: 'var(--prime)', alignItems: 'center', gap: '4px', fontSize: '11px' }}>
-                <Icon name="Clock" size={11} />
-                <span>{unconfirmed.length} {unconfirmed.length === 1 ? 'leg' : 'legs'} on unposted lineups — can still change before first pitch</span>
               </span>
             )}
           </div>
@@ -263,11 +254,6 @@ export default function ParlaySlip({ legs, onRemove, onClear, onSelect, onOpenBu
             placeItems: 'center'
           }}>{p.n}</span>
           <span className="slip-bar-label" style={{ fontSize: '13px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Parlay Slip</span>
-          {unconfirmed.length > 0 && (
-            <span className="slip-bar-prov" title={`${unconfirmed.length} leg(s) on unposted lineups — can still change`} style={{ display: 'inline-flex', alignItems: 'center', gap: '2px', color: 'var(--prime)', fontSize: '10px', fontWeight: '800' }}>
-              <Icon name="Clock" size={11} /> {unconfirmed.length}
-            </span>
-          )}
           {pg && (
             <span className="slip-bar-grade" style={{ 
               color: gColor, 

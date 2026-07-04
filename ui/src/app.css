@@ -5508,11 +5508,6 @@ button.th:focus-visible {
 .grp-stamp-txt b { font-weight: 700; }
 .grp-stamp-time { font-size: 11px; white-space: nowrap; }
 
-/* Provisional combo — lineup not posted, can still reshuffle. Dim + dashed. */
-.grp-card.provisional {
-  opacity: 0.62;
-  border-style: dashed;
-}
 .grp-prov-tag,
 .grp-locked-tag,
 .grp-split-tag {

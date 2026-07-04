@@ -4172,8 +4172,16 @@ async function main() {
     const refreshMin = +(process.env.ODDS_REFRESH_MINUTES ?? 120);
     const cache = backtestLog.oddsCache;
     if (cache?.date === date) oddsByGamePk = cache.odds || {};
-    const cacheFresh = cache?.date === date && Date.now() - Date.parse(cache.at) < refreshMin * 60_000;
+    // An EMPTY cached snapshot is never fresh — one pre-props morning save
+    // must not block retries for the whole refresh window (bit us 2026-07-04:
+    // a pre-fix run cached {} at 12:32 and the 1440-min window sat on it).
+    const cacheFresh = cache?.date === date
+      && Object.keys(cache.odds || {}).length > 0
+      && Date.now() - Date.parse(cache.at) < refreshMin * 60_000;
     const anyPregame = games.some((g) => !g.isLive && !g.isFinal);
+    if (oddsKey && cacheFresh) {
+      console.log(`[odds] using cached snapshot from ${cache.at} (${Object.keys(oddsByGamePk).length} games)`);
+    }
     if (oddsKey && !cacheFresh && anyPregame) {
       const { oddsByGamePk: got, remaining, priced } = await fetchHROdds(oddsKey, games);
       // Merge over the cache: started games keep their last pregame prices.

@@ -423,19 +423,6 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard, g
     <>
       <ScoreCard sc={scorecard} />
       <LockedBoard locked={lockedBoard} batters={batters} onSelect={onSelect} />
-      {conf.total > 0 && (
-        <div className={`grp-stamp ${conf.allIn ? 'ready' : 'provisional'}`}>
-          <Icon name={conf.allIn ? 'UserCheck' : 'Clock'} size={13} />
-          <span className="grp-stamp-txt">
-            {conf.allIn ? (
-              <><b>Lineups in</b> ({conf.confirmed}/{conf.total} games) — combos are bettable</>
-            ) : (
-              <><b>Provisional board</b> — {conf.confirmed}/{conf.total} lineups confirmed. Bats shift as lineups post; wait before betting.</>
-            )}
-          </span>
-          {asOf && <span className="grp-stamp-time dim">as of {asOf}</span>}
-        </div>
-      )}
       <div className={`grp-mode ${windowMode ? 'window' : 'full'}`}>
         <Icon name={windowMode ? 'Lock' : 'Layers'} size={12} />
         {windowMode ? (
@@ -556,10 +543,6 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard, g
 function GroupCard({ g, onSelect, selectedId, comboConf = 'off' }) {
   const gc = GROUP_GRADE_COLOR[g.grade] || '#6b7787'
   const { legs: legInfo, weakestIdx, tone } = assessCombo(g)
-  // Provisional = a leg's lineup isn't posted yet, so this combo can still
-  // reshuffle before first pitch — not safe to bet (the 6 AM-board trap).
-  const unconfirmed = g.legs.filter((b) => b.lineupConfirmed !== true)
-  const provisional = unconfirmed.length > 0
   // Start-time spread: a parlay locks at the EARLIEST leg's first pitch, but a
   // much-later leg's lineup won't be posted by then — so you're forced to bet it
   // blind. Warn when legs are >2.5h apart (mixing an early + late game).
@@ -586,9 +569,9 @@ function GroupCard({ g, onSelect, selectedId, comboConf = 'off' }) {
         : '✅ Tail — every leg is clean'
   return (
     <section
-      className={`grp-card tone-${tone} ${provisional ? 'provisional' : ''}`}
+      className={`grp-card tone-${tone}`}
       style={{ '--gc': gc }}
-      title={provisional ? `⏳ Provisional — lineup not posted for ${unconfirmed.map((b) => lastFirst(b.name).split(',')[0]).join(', ')}. Can still reshuffle before first pitch.` : title}
+      title={title}
     >
       <header className="grp-head">
         <span className="grp-legbadge">{g.size}-LEG</span>
@@ -599,8 +582,6 @@ function GroupCard({ g, onSelect, selectedId, comboConf = 'off' }) {
           <span className="grp-live-tag" title={`Live: ${live.hits}/${live.n} legs homered`} style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '10px', fontWeight: '800', color: lv.color, background: `color-mix(in srgb, ${lv.color} 12%, transparent)`, border: `1px solid color-mix(in srgb, ${lv.color} 35%, transparent)`, borderRadius: '5px', padding: '1px 6px' }}>
             <Icon name={lv.icon} size={10} className={live.code === 'live' ? 'spin-pulse' : ''} /> {lv.label} {live.hits}/{live.n}
           </span>
-        ) : provisional ? (
-          <span className="grp-prov-tag"><Icon name="Clock" size={10} /> PROVISIONAL</span>
         ) : spreadWarn ? (
           <span className="grp-split-tag" title="Benchmark combo — its legs start in different windows (>2.5h apart), so it can't be locked as one clean ticket. Shown to measure the model, not to bet as a single parlay.">
             <Icon name="Layers" size={10} /> CROSS-WINDOW
