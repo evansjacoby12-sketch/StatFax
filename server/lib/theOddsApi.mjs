@@ -46,6 +46,8 @@ export async function fetchHROdds(apiKey, games) {
   const oddsByGamePk = {};
   let remaining = null;
   let priced = 0;
+  let matched = 0;
+  let debugSample = null; // raw response snippet when nothing prices — diagnosis aid
   for (const ev of events || []) {
     const cands = byMatch.get(`${norm(ev.home_team)}|${norm(ev.away_team)}`);
     if (!cands?.length) continue;
@@ -57,8 +59,13 @@ export async function fetchHROdds(apiKey, games) {
       `${BASE}/events/${ev.id}/odds?apiKey=${apiKey}&regions=us&markets=batter_home_runs&oddsFormat=american&bookmakers=${BOOKMAKERS}`,
     );
     remaining = r.headers.get('x-requests-remaining') ?? remaining;
-    if (!r.ok) continue;
+    if (!r.ok) {
+      if (!debugSample) debugSample = `HTTP ${r.status}: ${(await r.text().catch(() => '')).slice(0, 300)}`;
+      continue;
+    }
+    matched++;
     const data = await r.json();
+    if (!debugSample) debugSample = JSON.stringify(data).slice(0, 600);
 
     const books = {};
     for (const bm of data.bookmakers || []) {
@@ -81,5 +88,5 @@ export async function fetchHROdds(apiKey, games) {
       priced++;
     }
   }
-  return { oddsByGamePk, remaining, priced };
+  return { oddsByGamePk, remaining, priced, matched, debugSample };
 }

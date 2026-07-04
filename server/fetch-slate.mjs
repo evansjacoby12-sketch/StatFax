@@ -4183,7 +4183,8 @@ async function main() {
       console.log(`[odds] using cached snapshot from ${cache.at} (${Object.keys(oddsByGamePk).length} games)`);
     }
     if (oddsKey && !cacheFresh && anyPregame) {
-      const { oddsByGamePk: got, remaining, priced } = await fetchHROdds(oddsKey, games);
+      const { oddsByGamePk: got, remaining, priced, matched, debugSample } = await fetchHROdds(oddsKey, games);
+      if (priced === 0 && debugSample) console.log(`[odds] diagnosis — ${matched} events matched, 0 priced; first response: ${debugSample}`);
       // Merge over the cache: started games keep their last pregame prices.
       oddsByGamePk = { ...oddsByGamePk, ...got };
       // Only start the refresh clock when the fetch actually priced games.
