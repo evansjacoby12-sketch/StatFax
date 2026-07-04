@@ -92,10 +92,11 @@ export default function ParlaySlip({ legs, onRemove, onClear, onSelect, onOpenBu
         <div className="slip-panel" style={{ padding: '16px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
           <div className="slip-panel-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
             <span className="slip-panel-title" style={{ fontSize: '13px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Icon name="Layers" size={14} /> Parlay · {p.n} {p.n === 1 ? 'leg' : 'legs'}
+              <Icon name="Layers" size={14} /> Parlay ·{' '}
+              <span key={p.n} className="slip-legs-bump">{p.n} {p.n === 1 ? 'leg' : 'legs'}</span>
             </span>
             {pg && (
-              <span className="slip-grade" style={{
+              <span className={`slip-grade grade-glow-${pg.letter}`} style={{
                 color: gColor,
                 borderColor: hexA(gColor, 0.4),
                 borderWidth: '1px',
@@ -106,7 +107,8 @@ export default function ParlaySlip({ legs, onRemove, onClear, onSelect, onOpenBu
                 fontWeight: '800',
                 background: hexA(gColor, 0.08),
                 whiteSpace: 'nowrap',
-              }} title={`Avg leg score ${Math.round(pg.avgScore)}`}>
+              }} title={`Avg leg score ${Math.round(pg.avgScore)}${pg.letter === 'S' ? ' — the cream' : ''}`}>
+                {pg.letter === 'S' && <Icon name="Trophy" size={10} style={{ marginRight: '3px', verticalAlign: '-1px' }} />}
                 Grade {pg.letter}
               </span>
             )}
@@ -128,8 +130,8 @@ export default function ParlaySlip({ legs, onRemove, onClear, onSelect, onOpenBu
               >
                 <Icon name="Copy" size={12} /> Copy
               </button>
-              <button className="slip-clear" onClick={onClear} style={{ fontSize: '11px', color: 'var(--text-faint)', fontWeight: '600' }}>
-                Clear all
+              <button className="slip-clear" onClick={onClear} title="Remove every leg" style={{ fontSize: '11px', color: 'var(--text-faint)', fontWeight: '600' }}>
+                Clear
               </button>
             </div>
           </div>
@@ -255,7 +257,7 @@ export default function ParlaySlip({ legs, onRemove, onClear, onSelect, onOpenBu
           }}>{p.n}</span>
           <span className="slip-bar-label" style={{ fontSize: '13px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Parlay Slip</span>
           {pg && (
-            <span className="slip-bar-grade" style={{ 
+            <span className={`slip-bar-grade grade-glow-${pg.letter}`} style={{ 
               color: gColor, 
               borderColor: hexA(gColor, 0.4),
               borderWidth: '1px',
