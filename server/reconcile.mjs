@@ -149,7 +149,7 @@ export function extractPredictionRecord(row) {
     // so extra keys here are inert for the learned model until opted in.
     heat: num(heatIndex(row)),               // Heat Index 0-100 (gate: >=48)
     setup: hrSetup(row).n,                    // HR-setup checklist 0-6 (gate: >=5)
-    pm:   num(pitchMixScore(row)),            // pitch-mix score 0-10 (gate: >=7)
+    pm:   num(Number.isFinite(row.pmScore) ? row.pmScore : pitchMixScore(row)), // pitch-mix score 0-10 (gate: >=7); prefer the frozen scalar — final rows lose pitchTypeSplits
     pos:  positiveReasonCount(row),           // good-tone trend count (gate: >=8)
     neg:  negativeReasonCount(row),           // bad-tone trend count (gate: <=3)
   };

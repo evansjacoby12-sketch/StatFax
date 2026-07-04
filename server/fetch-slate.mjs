@@ -641,6 +641,7 @@ import { fetchCatcherFraming } from './catcherFraming.mjs';
 import { fetchRecentBatterBarrelsMultiWindow, fetchRecentPitcherVelo } from './statcastRecent.mjs';
 import { applySimResolution } from './lib/simResolution.mjs';
 import { fetchHROdds } from './lib/theOddsApi.mjs';
+import { pitchMixScore } from '../ui/src/lib/scout.js';
 
 // ─── HTTP helpers ────────────────────────────────────────────────────────────
 
@@ -4121,6 +4122,13 @@ async function main() {
       const live  = liveByGame.get(row.gamePk)  === true;
       const final = finalByGame.get(row.gamePk) === true;
       if (!live && !final) {
+        // Persist the pitch-mix score as a SCALAR while pitchTypeSplits still
+        // exist on the row — end-of-day final rows lose the raw splits array,
+        // which left the reconcile log's `pm` field null on every record.
+        if (!Number.isFinite(row.pmScore)) {
+          const s = pitchMixScore(row);
+          if (Number.isFinite(s)) row.pmScore = +s.toFixed(3);
+        }
         const { liveContext, ...rest } = row; // pregame: snapshot pre-first-pitch values
         nextByKey[key] = rest;
         stored++;
@@ -4148,6 +4156,7 @@ async function main() {
         // sim-resolution training signal. Only restore when the snapshot actually
         // carried one, so never-live (e.g. postponed) rows keep their own value.
         if (Number.isFinite(snap.simHRProb)) row.simHRProb = snap.simHRProb;
+        if (Number.isFinite(snap.pmScore)) row.pmScore = snap.pmScore; // pitch-mix scalar survives to the post-Final snapshot reconcile reads
         nextByKey[key] = snap; // carry forward through final too, so it survives to the post-Final snapshot reconcile reads
         frozen++;
       }
