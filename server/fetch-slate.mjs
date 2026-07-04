@@ -4178,7 +4178,12 @@ async function main() {
       const { oddsByGamePk: got, remaining, priced } = await fetchHROdds(oddsKey, games);
       // Merge over the cache: started games keep their last pregame prices.
       oddsByGamePk = { ...oddsByGamePk, ...got };
-      backtestLog.oddsCache = { date, at: new Date().toISOString(), odds: oddsByGamePk };
+      // Only start the refresh clock when the fetch actually priced games.
+      // Books post batter_home_runs mid-morning; caching an early-morning
+      // empty result would otherwise block retries for the whole window.
+      // Empty pulls are free (The Odds API charges per market RETURNED), so
+      // retrying every run until props post costs nothing.
+      if (priced > 0) backtestLog.oddsCache = { date, at: new Date().toISOString(), odds: oddsByGamePk };
       console.log(`[odds] The Odds API: ${priced} games priced this refresh, ${Object.keys(oddsByGamePk).length} total (credits remaining: ${remaining ?? '?'})`);
     } else if (!oddsKey) {
       console.log('[odds] ODDS_API_KEY not set — board ships without market prices');
