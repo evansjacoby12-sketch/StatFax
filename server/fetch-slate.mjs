@@ -640,6 +640,7 @@ import { fetchBatterExpectedStats } from './statcastExpected.mjs';
 import { fetchCatcherFraming } from './catcherFraming.mjs';
 import { fetchRecentBatterBarrelsMultiWindow, fetchRecentPitcherVelo } from './statcastRecent.mjs';
 import { applySimResolution } from './lib/simResolution.mjs';
+import { fetchHROdds } from './lib/theOddsApi.mjs';
 
 // ─── HTTP helpers ────────────────────────────────────────────────────────────
 
@@ -4159,6 +4160,61 @@ async function main() {
   }
 
   // 9) Assemble final payload
+  // ── 8.95) HR prop odds (The Odds API) ──────────────────────────────────
+  // payload.odds never existed before this — the UI's whole odds layer
+  // (books, best price, +EV, edge) was dormant plumbing. Snapshot is cached
+  // in the persisted log and refreshed at most every ODDS_REFRESH_MINUTES
+  // (each refresh ≈ 1 credit per pregame game), so the 15-min cron doesn't
+  // burn API credits. No key → board ships without prices, as before.
+  let oddsByGamePk = {};
+  try {
+    const oddsKey = process.env.ODDS_API_KEY;
+    const refreshMin = +(process.env.ODDS_REFRESH_MINUTES ?? 120);
+    const cache = backtestLog.oddsCache;
+    if (cache?.date === date) oddsByGamePk = cache.odds || {};
+    const cacheFresh = cache?.date === date && Date.now() - Date.parse(cache.at) < refreshMin * 60_000;
+    const anyPregame = games.some((g) => !g.isLive && !g.isFinal);
+    if (oddsKey && !cacheFresh && anyPregame) {
+      const { oddsByGamePk: got, remaining, priced } = await fetchHROdds(oddsKey, games);
+      // Merge over the cache: started games keep their last pregame prices.
+      oddsByGamePk = { ...oddsByGamePk, ...got };
+      backtestLog.oddsCache = { date, at: new Date().toISOString(), odds: oddsByGamePk };
+      console.log(`[odds] The Odds API: ${priced} games priced this refresh, ${Object.keys(oddsByGamePk).length} total (credits remaining: ${remaining ?? '?'})`);
+    } else if (!oddsKey) {
+      console.log('[odds] ODDS_API_KEY not set — board ships without market prices');
+    }
+  } catch (e) { console.warn(`[odds] fetch skipped: ${e?.message}`); }
+
+  // Attach the market's implied HR prob to each row (mean of 1/decimal across
+  // books). Feeds the reconcile log's `vig` — the field whose 94-of-7197
+  // coverage blocked every odds-edge validation to date. Deliberately NOT a
+  // morning-locked field: the market keeps moving, and frozen-model-vs-live-
+  // market is exactly what the +EV signal should measure.
+  try {
+    const nrmName = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\b(jr|sr|ii|iii|iv|v)\b/g, '').replace(/[^a-z\s]/g, '').replace(/\s+/g, ' ').trim();
+    const idxByPk = new Map();
+    for (const [pk, og] of Object.entries(oddsByGamePk)) {
+      const m = new Map();
+      for (const players of Object.values(og.books || {})) {
+        for (const [name, price] of Object.entries(players)) {
+          if (!(price?.decimal > 1)) continue;
+          const k = nrmName(name);
+          if (!m.has(k)) m.set(k, []);
+          m.get(k).push(1 / price.decimal);
+        }
+      }
+      idxByPk.set(Number(pk), m);
+    }
+    let attached = 0;
+    for (const key of Object.keys(scoredBatters)) {
+      if (!key.includes('-')) continue; // bare-id alias is the SAME object
+      const row = scoredBatters[key];
+      const imps = idxByPk.get(row?.gamePk)?.get(nrmName(row?.name));
+      if (imps?.length) { row.vegasImpliedProb = imps.reduce((s, x) => s + x, 0) / imps.length; attached++; }
+    }
+    if (attached) console.log(`[odds] vegasImpliedProb attached to ${attached} rows`);
+  } catch (e) { console.warn(`[odds] implied-prob attach skipped: ${e?.message}`); }
+
   const payload = {
     version:     4,
     generatedAt: startedAt.toISOString(),
@@ -4171,6 +4227,9 @@ async function main() {
     pitcherStats,
     bullpenHR9,
     weatherByGame,
+    // HR prop prices per game/book (The Odds API) — drives the board's odds
+    // column, best-price display, +EV chips and parlay EV math client-side.
+    odds: oddsByGamePk,
 
     // For Final games today: which players actually hit a HR.
     // Shape: { [gamePk]: [playerId, ...] }. Empty when no games are

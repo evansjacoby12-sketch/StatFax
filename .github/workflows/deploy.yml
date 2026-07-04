@@ -110,7 +110,16 @@ jobs:
       - name: Tests
         run: npm test
 
-      - name: Generate slate (live MLB + Savant; no keys)
+      # ODDS_API_KEY (the-odds-api.com) unlocks HR prop prices: board odds,
+      # +EV chips, parlay EV, and the reconcile log's vig field. Optional —
+      # without it the slate builds exactly as before. ODDS_REFRESH_MINUTES
+      # (repo variable) throttles credit burn: each refresh ≈ 1 credit per
+      # pregame game (~15/slate). 120 ≈ 3k credits/mo; free tier (500/mo)
+      # should set it to 1440 (one refresh per day, at the morning lock).
+      - name: Generate slate (live MLB + Savant)
+        env:
+          ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+          ODDS_REFRESH_MINUTES: ${{ vars.ODDS_REFRESH_MINUTES || '120' }}
         run: |
           npm run build-model
           npm run slate
