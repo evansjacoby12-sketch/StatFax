@@ -12,8 +12,11 @@
  */
 
 const BASE = 'https://api.the-odds-api.com/v4/sports/baseball_mlb';
-// The books the UI knows (BOOK_LABELS). williamhill_us is Caesars' API key.
-const BOOKMAKERS = 'draftkings,fanduel,betmgm,williamhill_us';
+// Take EVERY us-region book — restricting bookmakers saves no credits (cost
+// is per market × region), and on 2026-07-04 the big four's prop feeds came
+// back empty while books' own apps had prices. More books = better best-price
+// coverage too. williamhill_us is Caesars' API key; unknown keys pass through
+// (the UI's bookLabel falls back to the raw key).
 const BOOK_KEY = { williamhill_us: 'caesars' };
 
 const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z]/g, '');
@@ -56,7 +59,7 @@ export async function fetchHROdds(apiKey, games) {
     const pick = cands.slice().sort((a, b) => Math.abs(a.t - evT) - Math.abs(b.t - evT))[0];
 
     const r = await fetch(
-      `${BASE}/events/${ev.id}/odds?apiKey=${apiKey}&regions=us&markets=batter_home_runs&oddsFormat=american&bookmakers=${BOOKMAKERS}`,
+      `${BASE}/events/${ev.id}/odds?apiKey=${apiKey}&regions=us&markets=batter_home_runs&oddsFormat=american`,
     );
     remaining = r.headers.get('x-requests-remaining') ?? remaining;
     if (!r.ok) {
