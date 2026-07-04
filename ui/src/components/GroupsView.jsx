@@ -10,26 +10,24 @@ import * as store from '../lib/storage.js'
 const GROUP_GRADE_COLOR = { S: '#f5a623', A: '#32d74b', B: '#3b82f6', C: '#9aa6b6', D: '#6b7787' }
 const LOCK_STRAT_LABEL = { precision: 'Precision', matchup: 'Soft Matchup', mix: 'Best Mix', park: 'Park & Air', edge: 'Edge Stack' }
 
-// The server-frozen bettable board: captured on the last all-pregame cron run
-// and locked (final: true) the moment the first game goes live. Unlike the live
-// combos below — which rebuild with every refresh — this list never shifts
-// after lock, so it's the record of what you could actually still bet.
+// The server-frozen bettable board, shown only AFTER the slate has started
+// (final: true). Pregame it's redundant — the morning score lock already keeps
+// the live combos below stable — but once games go live the builder hides
+// started games, so this is the record of what the full board actually was.
 function LockedBoard({ locked, batters, onSelect }) {
   const [open, setOpen] = useState(false)
-  if (!locked?.combos?.length) return null
+  if (!locked?.final || !locked?.combos?.length) return null
   const byId = new Map()
   for (const b of batters || []) if (!byId.has(b.playerId)) byId.set(b.playerId, b)
   const at = new Date(locked.at)
   const time = Number.isFinite(at.getTime()) ? at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : ''
   return (
-    <div className={`locked-board ${locked.final ? 'final' : 'pending'}`}>
+    <div className="locked-board final">
       <button className="locked-board-head" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
-        <Icon name={locked.final ? 'Lock' : 'Clock'} size={13} />
-        <b>{locked.final ? 'Locked board' : 'Board locks at first pitch'}</b>
+        <Icon name="Lock" size={13} />
+        <b>Locked board</b>
         <span className="locked-board-sub">
-          {locked.final
-            ? `frozen ${time} — the last fully-bettable board (${locked.combos.length} combos)`
-            : `current candidate from ${time} — refreshes until the first game starts`}
+          {`frozen ${time} — the board as it stood at first pitch (${locked.combos.length} combos)`}
         </span>
         <Icon name={open ? 'ChevronUp' : 'ChevronDown'} size={14} className="locked-board-chev" />
       </button>
