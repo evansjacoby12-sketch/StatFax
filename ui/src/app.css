@@ -7911,6 +7911,31 @@ button.th:focus-visible {
   .view-ind { transition: opacity 0.15s; }
 }
 
+/* ─── Player drawer: centered pop-up on desktop ──────────────────────────
+   Late in the file on purpose — must outrank the skin block's border-left/
+   box-shadow !importants. Phones (≤560px) keep the bottom sheet untouched. */
+@media (min-width: 561px) {
+  .drawer {
+    inset: 0;
+    margin: auto;
+    width: min(620px, calc(100vw - 48px));
+    height: min(88vh, 940px);
+    border-radius: 20px !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.65), 0 0 60px rgba(0, 216, 246, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
+    animation: drawerPop 0.28s cubic-bezier(0.34, 1.45, 0.64, 1);
+  }
+}
+@keyframes drawerPop {
+  from {
+    transform: scale(0.93) translateY(16px);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .drawer { animation: none !important; }
+}
+
 /* ─── Locked board (Parlay Combos) ───────────────────────────────────────── */
 .locked-board {
   border-radius: 12px;
