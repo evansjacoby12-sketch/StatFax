@@ -290,6 +290,16 @@ export const BOOK_LABELS = {
   draftkings: 'DraftKings',
   betmgm: 'BetMGM',
   caesars: 'Caesars',
+  betrivers: 'BetRivers',
+  espnbet: 'ESPN Bet',
+  fanatics: 'Fanatics',
+  hardrockbet: 'Hard Rock',
+  bovada: 'Bovada',
+  betonlineag: 'BetOnline',
+  mybookieag: 'MyBookie',
+  lowvig: 'LowVig',
+  ballybet: 'Bally Bet',
+  fliff: 'Fliff',
 }
 
 export function bookLabel(b) {
