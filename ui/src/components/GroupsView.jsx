@@ -620,11 +620,6 @@ function GroupCard({ g, onSelect, selectedId, comboConf = 'off' }) {
           </span>
         )}
       </div>
-      {spreadWarn && !provisional && (
-        <div className="grp-spread-warn" title="A parlay locks at the earliest leg's first pitch. The later game's lineup won't be posted by then, so you'd bet that leg before its lineup is confirmed.">
-          <Icon name="Clock" size={11} /> Legs {spreadHrs.toFixed(1)}h apart — ticket locks at {earliestTime}, but the late leg's lineup won't be set yet
-        </div>
-      )}
       <ul className="grp-legs">
         {g.legs.map((b, i) => (
           <GroupLeg
