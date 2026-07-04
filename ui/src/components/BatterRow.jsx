@@ -131,6 +131,11 @@ export default function BatterRow({
                 <Icon name="Flame" size={10} /> HR
               </span>
             )}
+            {b.pitcherChanged && (
+              <span className="hr-tag" title="Starting pitcher changed after the morning lock — this row was re-scored for the new matchup" style={{ background: 'rgba(245,166,35,0.12)', color: 'var(--prime)', fontWeight: '700' }}>
+                <Icon name="RefreshCw" size={9} /> NEW ARM
+              </span>
+            )}
             {mom && (
               <span className={`mom-chip ${mom.cls}`}>
                 <Icon name={mom.icon} size={10} /> {mom.label}

@@ -215,6 +215,14 @@ export default function Header({
               <b className="mono" style={{ color: 'var(--accent)' }}>{counts.shown}</b> / {counts.total} batters
             </span>
             <FirstPitchCountdown games={games} />
+            {meta.morningLockAt && (
+              <>
+                <span className="dot-sep">·</span>
+                <span className="first-pitch" title={`Scores locked for the day at ${new Date(meta.morningLockAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} — only lineups, scratches, odds and live state update from here. A changed starting pitcher re-scores that game.`}>
+                  <Icon name="Lock" size={10} style={{ color: 'var(--prime)' }} /> locked {new Date(meta.morningLockAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                </span>
+              </>
+            )}
           </div>
           {total > 0 && (
             <div className="grade-bar" title="Grade distribution" style={{ height: '4px', background: 'rgba(255,255,255,0.05)', borderRadius: '2px', overflow: 'hidden', marginTop: '6px' }}>

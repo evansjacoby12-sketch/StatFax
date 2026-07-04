@@ -4044,6 +4044,58 @@ async function main() {
     if (patched) console.warn(`[calib] safety-net: backfilled ${patched} null/NaN hrProbability row(s)`);
   }
 
+  // 8.85) Morning score lock — one scoring pass a day.
+  // The first run at/after MORNING_LOCK_HOUR (UTC, default 13 ≈ 9am ET)
+  // freezes every pregame batter's model outputs into the persisted log;
+  // every later run re-publishes those frozen values instead of its own.
+  // What still flows intraday: lineup confirmations, batting order,
+  // scratches, odds, game state, live context — the FACTS. What no longer
+  // churns: score, grade, probability, reasons — the TAKES. Exception: a
+  // CHANGED starting pitcher invalidates the frozen matchup, so those
+  // batters keep the fresh run's values and get pitcherChanged: true.
+  // Runs before the morning cutoff float freely (probables/weather still
+  // settling). Disable with MORNING_LOCK=0; move the cutoff with
+  // MORNING_LOCK_HOUR. Live/final rows are skipped — the live-decay and
+  // per-batter pregame-freeze passes own those.
+  const MORNING_LOCK_ON = (process.env.MORNING_LOCK ?? '1') !== '0';
+  const MORNING_LOCK_HOUR = +(process.env.MORNING_LOCK_HOUR ?? 13);
+  const LOCK_FIELDS = ['score', 'grade', 'rating', 'hrProbability', 'simHRProb', 'expectedHRs', 'ensembleScore', 'batterScore', 'matchupScore', 'envScore', 'reasons', 'eli5Reasons'];
+  if (MORNING_LOCK_ON) try {
+    const gameByPk = new Map((games || []).map((g) => [g.gamePk, g]));
+    const started = (pk) => { const g = gameByPk.get(pk); return !!(g && (g.isLive || g.isFinal)); };
+    const ml = backtestLog.morningLock;
+    if (ml?.date === date && ml.rows) {
+      let frozen = 0, changed = 0;
+      for (const key of Object.keys(scoredBatters)) {
+        if (!key.includes('-')) continue; // bare-id alias is the SAME object
+        const row = scoredBatters[key];
+        if (!row || row.playerId == null || started(row.gamePk)) continue;
+        const f = ml.rows[`${row.playerId}-${row.gamePk}`];
+        if (!f) continue; // late-added batter — fresh values stand
+        if ((row.pitcher?.id ?? null) !== (f.pitcherId ?? null)) { row.pitcherChanged = true; changed++; continue; }
+        for (const k of LOCK_FIELDS) if (f[k] !== undefined) row[k] = f[k];
+        frozen++;
+      }
+      console.log(`[lock] morning lock (${ml.at}): ${frozen} rows frozen, ${changed} kept fresh on pitcher change`);
+    } else if (new Date().getUTCHours() >= MORNING_LOCK_HOUR) {
+      const rows = {};
+      for (const key of Object.keys(scoredBatters)) {
+        if (!key.includes('-')) continue;
+        const row = scoredBatters[key];
+        if (!row || row.playerId == null || started(row.gamePk)) continue;
+        const id = `${row.playerId}-${row.gamePk}`;
+        if (rows[id]) continue;
+        const f = { pitcherId: row.pitcher?.id ?? null };
+        for (const k of LOCK_FIELDS) if (row[k] !== undefined) f[k] = row[k];
+        rows[id] = f;
+      }
+      if (Object.keys(rows).length) {
+        backtestLog.morningLock = { date, at: new Date().toISOString(), rows };
+        console.log(`[lock] morning board locked at ${backtestLog.morningLock.at} (${Object.keys(rows).length} batters)`);
+      }
+    }
+  } catch (e) { console.warn(`[lock] morning lock skipped: ${e?.message}`); }
+
   // 8.9) Pregame freeze. The Live/Pregame view toggle is display-only — it
   // hides live scores/innings but the model's recent-form stats (and Heat Index)
   // legitimately absorb today's in-progress results on each refresh (a player who
@@ -4333,6 +4385,9 @@ async function main() {
     for (const d of lk.slice(0, -14)) delete lbMap[d];
     payload.lockedBoard = lbMap[date] || null;
   } catch (e) { console.warn(`[combo] locked-board capture skipped: ${e?.message}`); }
+  // Morning-lock stamp — lets the UI show "scores locked HH:MM" so the user
+  // knows the board they're reading won't shift under them.
+  payload.morningLockAt = backtestLog?.morningLock?.date === date ? backtestLog.morningLock.at : null;
 
   mkdirSync(dirname(OUT_PATH), { recursive: true });
   writeFileSync(OUT_PATH, JSON.stringify(payload));
