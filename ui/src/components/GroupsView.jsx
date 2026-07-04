@@ -8,6 +8,56 @@ import { comboStatus, legStatus, VERDICT_META } from '../lib/live.js'
 import * as store from '../lib/storage.js'
 
 const GROUP_GRADE_COLOR = { S: '#f5a623', A: '#32d74b', B: '#3b82f6', C: '#9aa6b6', D: '#6b7787' }
+const LOCK_STRAT_LABEL = { precision: 'Precision', matchup: 'Soft Matchup', mix: 'Best Mix', park: 'Park & Air', edge: 'Edge Stack' }
+
+// The server-frozen bettable board: captured on the last all-pregame cron run
+// and locked (final: true) the moment the first game goes live. Unlike the live
+// combos below — which rebuild with every refresh — this list never shifts
+// after lock, so it's the record of what you could actually still bet.
+function LockedBoard({ locked, batters, onSelect }) {
+  const [open, setOpen] = useState(false)
+  if (!locked?.combos?.length) return null
+  const byId = new Map()
+  for (const b of batters || []) if (!byId.has(b.playerId)) byId.set(b.playerId, b)
+  const at = new Date(locked.at)
+  const time = Number.isFinite(at.getTime()) ? at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : ''
+  return (
+    <div className={`locked-board ${locked.final ? 'final' : 'pending'}`}>
+      <button className="locked-board-head" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
+        <Icon name={locked.final ? 'Lock' : 'Clock'} size={13} />
+        <b>{locked.final ? 'Locked board' : 'Board locks at first pitch'}</b>
+        <span className="locked-board-sub">
+          {locked.final
+            ? `frozen ${time} — the last fully-bettable board (${locked.combos.length} combos)`
+            : `current candidate from ${time} — refreshes until the first game starts`}
+        </span>
+        <Icon name={open ? 'ChevronUp' : 'ChevronDown'} size={14} className="locked-board-chev" />
+      </button>
+      {open && (
+        <div className="locked-board-list">
+          {locked.combos.map((c, i) => (
+            <div className="locked-combo" key={`${c.strategy}-${c.size}-${i}`}>
+              <span className="locked-strat">{LOCK_STRAT_LABEL[c.strategy] || c.strategy}</span>
+              <span className="locked-size mono">{c.size}-leg</span>
+              <span className="locked-legs">
+                {c.legs.map((id) => {
+                  const b = byId.get(id)
+                  return b ? (
+                    <button key={id} className="locked-leg" onClick={() => onSelect?.(b)} title={`${b.name} — open card`}>
+                      {lastFirst(b.name)}
+                    </button>
+                  ) : (
+                    <span key={id} className="locked-leg dim">#{id}</span>
+                  )
+                })}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 const SIZE_TABS = [2, 3, 4].map((k) => ({ k, label: `${k}-leg` }))
 // How many combos to SHOW per size, strongest first.
 const DISPLAY_CAP = { 2: 3, 3: 2, 4: 1 }
@@ -241,7 +291,7 @@ function spreadPick(groups, n = 4) {
   return picked
 }
 
-export default function GroupsView({ batters, onSelect, selectedId, scorecard, generatedAt, windowMode = false, comboConf = 'off', favorConsistency = false }) {
+export default function GroupsView({ batters, onSelect, selectedId, scorecard, generatedAt, windowMode = false, comboConf = 'off', favorConsistency = false, lockedBoard = null }) {
   const [size, setSize] = useState(2)
   const [games, setGames] = useState(() => new Set()) // empty = all games
   // Hide started defaults ON: HR props can't be bet pregame once the game is
@@ -374,6 +424,7 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard, g
   return (
     <>
       <ScoreCard sc={scorecard} />
+      <LockedBoard locked={lockedBoard} batters={batters} onSelect={onSelect} />
       {conf.total > 0 && (
         <div className={`grp-stamp ${conf.allIn ? 'ready' : 'provisional'}`}>
           <Icon name={conf.allIn ? 'UserCheck' : 'Clock'} size={13} />

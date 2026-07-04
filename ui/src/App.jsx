@@ -770,6 +770,7 @@ export default function App() {
                 windowMode={windowMode}
                 comboConf={comboConf}
                 favorConsistency={favorConsistency}
+                lockedBoard={data.raw?.lockedBoard}
               />
             </div>
           </div>

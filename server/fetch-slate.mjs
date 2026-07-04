@@ -4303,6 +4303,37 @@ async function main() {
     }
   }
 
+  // ── Locked board ──────────────────────────────────────────────────────────
+  // The full board is rebuilt every run, so it churns right up until every
+  // game has started — exactly when you can no longer bet it. This captures
+  // the LAST all-pregame board each run and freezes it the moment the first
+  // game goes live (final: true, never overwritten again). Published inside
+  // daily.json so the Parlay Combos view can show "locked at HH:MM" with the
+  // exact combos that were still fully bettable.
+  try {
+    backtestLog.combos = backtestLog.combos || {};
+    const lbMap = backtestLog.combos.lockedByDate = backtestLog.combos.lockedByDate || {};
+    const anyStarted = (payload.games || []).some((g) => g.isLive || g.isFinal);
+    if (!anyStarted) {
+      const seenL = new Set();
+      const lockCr = [];
+      for (const r of Object.values(payload.scoredBatters || {})) {
+        if (r.playerId == null || seenL.has(r.playerId)) continue;
+        seenL.add(r.playerId);
+        const x = comboRowFromSnapshot(r);
+        if (x) lockCr.push(x);
+      }
+      const board = buildComboRecords(lockCr).map((c) => ({ strategy: c.strategy, size: c.size, legs: c.legs }));
+      if (board.length) lbMap[date] = { at: new Date().toISOString(), final: false, combos: board };
+    } else if (lbMap[date] && !lbMap[date].final) {
+      lbMap[date] = { ...lbMap[date], final: true };
+      console.log(`[combo] locked board for ${date} frozen (captured ${lbMap[date].at}, ${lbMap[date].combos.length} combos)`);
+    }
+    const lk = Object.keys(lbMap).sort();
+    for (const d of lk.slice(0, -14)) delete lbMap[d];
+    payload.lockedBoard = lbMap[date] || null;
+  } catch (e) { console.warn(`[combo] locked-board capture skipped: ${e?.message}`); }
+
   mkdirSync(dirname(OUT_PATH), { recursive: true });
   writeFileSync(OUT_PATH, JSON.stringify(payload));
   const sizeKB = (JSON.stringify(payload).length / 1024).toFixed(1);
