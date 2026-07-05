@@ -7969,8 +7969,10 @@ button.th:focus-visible {
 .header {
   border-bottom: none !important;
   box-shadow: none !important;
-  /* THE one notch inset. max() keeps 10-12px on no-notch devices/browsers. */
-  padding-top: max(env(safe-area-inset-top, 0px), 12px) !important;
+  /* THE one notch inset. --safe-top is JS-measured at launch (lib/safeArea.js)
+     because env() proved unreliable on installed iOS PWAs; env() stays as the
+     inner fallback, and max() keeps a 12px floor on no-notch devices. */
+  padding-top: max(var(--safe-top, env(safe-area-inset-top, 0px)), 12px) !important;
 }
 .bottom-nav {
   border-top: none !important;
