@@ -35,7 +35,7 @@ export default function PickOfDay({ batter: b, onSelect, watched, inSlip, onTogg
       style={{ 
         '--row-accent': color, 
         '--team-logo': teamLogo(b.teamId) ? `url(${teamLogo(b.teamId)})` : 'none',
-        background: `linear-gradient(135deg, rgba(8, 12, 28, 0.85) 0%, rgba(20, 24, 48, 0.6) 100%)`,
+        background: `linear-gradient(135deg, rgba(10, 10, 12, 0.85) 0%, rgba(20, 24, 48, 0.6) 100%)`,
         border: `1px solid ${hexA(color, 0.25)}`,
         boxShadow: `0 8px 32px rgba(0, 0, 0, 0.4), 0 0 16px ${hexA(color, 0.08)}, inset 0 1px 0 rgba(255, 255, 255, 0.05)`,
         borderRadius: '16px',

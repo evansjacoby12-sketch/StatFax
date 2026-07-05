@@ -251,7 +251,7 @@ function ExtractorCard({ game: g, groups, idx = 0, ...ctx }) {
   return (
     <section className="xcard" style={{ 
       '--i': Math.min(idx, 12),
-      background: 'rgba(16, 24, 48, 0.45)',
+      background: 'rgba(17, 18, 20, 0.45)',
       border: '1px solid rgba(255,255,255,0.06)',
       boxShadow: 'var(--glass-shadow)',
       borderRadius: '16px',
@@ -397,7 +397,7 @@ function GameCard({ game: g, groups, idx = 0, ...ctx }) {
   return (
     <section className={`game-card ${g.isFinal ? 'final' : ''}`} style={{ 
       '--i': Math.min(idx, 12),
-      background: 'rgba(16, 24, 48, 0.45)',
+      background: 'rgba(17, 18, 20, 0.45)',
       border: '1px solid rgba(255,255,255,0.06)',
       boxShadow: 'var(--glass-shadow)',
       borderRadius: '16px',

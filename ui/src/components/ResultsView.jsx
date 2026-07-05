@@ -162,7 +162,7 @@ function ModelResults({ meta }) {
 
       <div className="results-cols" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px', flexWrap: 'wrap' }}>
         <section className="results-card" style={{
-          background: 'rgba(16, 24, 48, 0.45)',
+          background: 'rgba(17, 18, 20, 0.45)',
           border: '1px solid rgba(255,255,255,0.06)',
           borderRadius: '12px',
           padding: '20px'
@@ -193,7 +193,7 @@ function ModelResults({ meta }) {
         </section>
 
         <section className="results-card" style={{
-          background: 'rgba(16, 24, 48, 0.45)',
+          background: 'rgba(17, 18, 20, 0.45)',
           border: '1px solid rgba(255,255,255,0.06)',
           borderRadius: '12px',
           padding: '20px',
@@ -211,7 +211,7 @@ function ModelResults({ meta }) {
       </div>
 
       <section className="results-card" style={{
-        background: 'rgba(16, 24, 48, 0.45)',
+        background: 'rgba(17, 18, 20, 0.45)',
         border: '1px solid rgba(255,255,255,0.06)',
         borderRadius: '12px',
         padding: '20px',
@@ -278,7 +278,7 @@ function ModelResults({ meta }) {
       </section>
 
       <section className="results-card" style={{
-        background: 'rgba(16, 24, 48, 0.45)',
+        background: 'rgba(17, 18, 20, 0.45)',
         border: '1px solid rgba(255,255,255,0.06)',
         borderRadius: '12px',
         padding: '20px'
@@ -341,7 +341,7 @@ function ModelResults({ meta }) {
 function Kpi({ label, value, sub, accent }) {
   return (
     <div className="results-kpi" style={{
-      background: 'rgba(16, 24, 48, 0.45)',
+      background: 'rgba(17, 18, 20, 0.45)',
       border: '1px solid rgba(255, 255, 255, 0.06)',
       boxShadow: accent ? `0 0 16px ${hexA(accent, 0.05)}` : 'none',
       borderRadius: '12px',
@@ -394,7 +394,7 @@ function Reliability({ bins }) {
         return (
           <g key={i}>
             <circle cx={x(b.avgPredicted)} cy={y(b.observedRate)} r={radius * 2} fill="url(#dotGlow)" />
-            <circle cx={x(b.avgPredicted)} cy={y(b.observedRate)} r={radius} fill="var(--accent)" stroke="#030508" strokeWidth="1.5">
+            <circle cx={x(b.avgPredicted)} cy={y(b.observedRate)} r={radius} fill="var(--accent)" stroke="#010102" strokeWidth="1.5">
               <title>predicted {pct(b.avgPredicted, 1)} → observed {pct(b.observedRate, 1)} (n={b.n})</title>
             </circle>
           </g>

@@ -578,7 +578,7 @@ function PitcherPreview({ pitchers, onSelect }) {
         if (!rows.length) return null
         return (
           <div className="pvp-tier" key={t.key} style={{
-            background: 'rgba(16, 24, 48, 0.3)',
+            background: 'rgba(17, 18, 20, 0.3)',
             border: '1px solid rgba(255,255,255,0.04)',
             borderRadius: '12px',
             padding: '16px',
@@ -598,7 +598,7 @@ function PitcherPreview({ pitchers, onSelect }) {
       })}
       {tbd.length > 0 && (
         <div className="pvp-tier" style={{
-          background: 'rgba(16, 24, 48, 0.3)',
+          background: 'rgba(17, 18, 20, 0.3)',
           border: '1px solid rgba(255,255,255,0.04)',
           borderRadius: '12px',
           padding: '16px'
@@ -759,7 +759,7 @@ export function PitcherCard({ entry, onSelect, selectedId, watchlist, slip }) {
   return (
     <section id={`pcard-${entry.key}`} className={`pcard ${isFinal ? 'final' : ''}`} style={{ 
       '--tc': color,
-      background: 'rgba(16, 24, 48, 0.45)',
+      background: 'rgba(17, 18, 20, 0.45)',
       border: '1px solid rgba(255,255,255,0.06)',
       boxShadow: 'var(--glass-shadow)',
       borderRadius: '16px',

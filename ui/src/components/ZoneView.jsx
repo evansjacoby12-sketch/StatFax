@@ -355,7 +355,7 @@ export default function ZoneView({ batter: b, onClose }) {
         ) : (
           <>
             <section className="zone-card" style={{
-              background: 'rgba(16, 24, 48, 0.45)',
+              background: 'rgba(17, 18, 20, 0.45)',
               border: '1px solid rgba(255,255,255,0.06)',
               borderRadius: '14px',
               padding: '20px',
@@ -451,7 +451,7 @@ export default function ZoneView({ batter: b, onClose }) {
             </section>
 
             <section className="zone-card" style={{
-              background: 'rgba(16, 24, 48, 0.45)',
+              background: 'rgba(17, 18, 20, 0.45)',
               border: '1px solid rgba(255,255,255,0.06)',
               borderRadius: '14px',
               padding: '20px',

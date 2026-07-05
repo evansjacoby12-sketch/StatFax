@@ -6,7 +6,7 @@ import { teamColor, playerHeadshot } from './teams.js'
 import { hrSetup } from './scout.js'
 import { american } from './format.js'
 
-const BG = '#05070a'
+const BG = '#000000'
 const ACCENT = '#00d8f6'
 const DIM = '#8b98ab'
 const FAINT = '#5b6b80'

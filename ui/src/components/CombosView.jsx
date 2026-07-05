@@ -12,7 +12,7 @@ import LiveCombosView from './LiveCombosView.jsx'
 
 const RECENT_DAYS = 7
 const STRAT_LABEL = { top: 'Top Picks', mix: 'Best Mix', stack: 'Signal Stack', hot: 'Hot Hand', power: 'Power Bats', matchup: 'Soft Matchup', park: 'Park & Air', precision: 'Precision', edge: 'Edge Stack' }
-const CARD = { background: 'rgba(16, 24, 48, 0.45)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '12px', padding: '20px', marginBottom: '24px' }
+const CARD = { background: 'rgba(17, 18, 20, 0.45)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '12px', padding: '20px', marginBottom: '24px' }
 const H3 = { fontSize: '13px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '16px', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: '8px' }
 
 export default function CombosView({ batters, onSelect, favorConsistency = false }) {
