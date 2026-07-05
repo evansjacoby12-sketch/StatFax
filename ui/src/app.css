@@ -7953,6 +7953,31 @@ button.th:focus-visible {
   .view-ind { transition: opacity 0.15s; }
 }
 
+/* ─── PWA edge-to-edge: no frame seams ───────────────────────────────────
+   Kill the hairlines that framed the app at the status bar and above the
+   bottom nav, and blend both bars into true black so the installed app
+   melts into the phone's bezel. Late in the file to outrank the skin. */
+.topbar {
+  border-bottom: none !important;
+  background: rgba(0, 0, 0, 0.82) !important;
+}
+.header {
+  border-bottom: none !important;
+  box-shadow: none !important;
+}
+.bottom-nav {
+  border-top: none !important;
+  background: rgba(0, 0, 0, 0.9) !important;
+}
+@media (max-width: 560px) {
+  /* The skin gave .header its own safe-area padding, but .topbar (the sticky
+     container) already carries the notch inset — the doubled spacing drew a
+     visible boundary line under the status bar. Header goes back to flat. */
+  .header {
+    padding-top: 10px !important;
+  }
+}
+
 /* ─── Player drawer: centered pop-up on desktop ──────────────────────────
    Late in the file on purpose — must outrank the skin block's border-left/
    box-shadow !importants. Phones (≤560px) keep the bottom sheet untouched. */
