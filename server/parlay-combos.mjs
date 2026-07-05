@@ -64,10 +64,14 @@ export function comboRowFromSnapshot(row) {
     team:     row.team,
     score,
     grade,
-    // Frozen PREGAME HR probability (simHRProb is pinned before live decay) —
-    // the model's stated chance this leg homers, used to compute each combo's
-    // predicted all-hit prob so the scorecard can grade predicted vs actual.
-    hrProb:   Number.isFinite(row.simHRProb) ? row.simHRProb : (Number.isFinite(row.hrProbability) ? row.hrProbability : null),
+    // The model's stated chance this leg homers — the CALIBRATED headline
+    // probability, matching the client adapter (groups.js toComboRow).
+    // The 2026-07-05 combo audit caught the old preference for raw simHRProb:
+    // the sim is the pre-calibration, under-confident value (the isotonic
+    // table exists to correct it), which deflated every recorded combo pred
+    // ~70x (E[all-hits] 0.3 vs 21 actual over 343 graded combos) and made the
+    // scorecard's predicted-vs-actual column meaningless.
+    hrProb:   Number.isFinite(row.hrProbability) ? row.hrProbability : (Number.isFinite(row.simHRProb) ? row.simHRProb : null),
     barrel,
     // Recent (L14) barrel%, when a real sample — blended into the power rank so
     // it isn't always the same season-barrel leaders. null => fall back to season.
