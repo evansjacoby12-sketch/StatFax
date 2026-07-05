@@ -7953,29 +7953,28 @@ button.th:focus-visible {
   .view-ind { transition: opacity 0.15s; }
 }
 
-/* ─── PWA edge-to-edge: no frame seams ───────────────────────────────────
+/* ─── PWA edge-to-edge: no frame seams, ONE notch inset ──────────────────
    Kill the hairlines that framed the app at the status bar and above the
    bottom nav, and blend both bars into true black so the installed app
-   melts into the phone's bezel. Late in the file to outrank the skin. */
+   melts into the phone's bezel. The safe-area inset is owned by exactly
+   ONE rule (the header, below) — earlier there were two competing inset
+   rules (topbar + header skin) whose stacking/overriding produced either
+   doubled spacing with a seam or a clipped brand depending on order.
+   Late in the file so nothing outranks it. */
 .topbar {
   border-bottom: none !important;
   background: rgba(0, 0, 0, 0.82) !important;
+  padding-top: 0 !important; /* header owns the inset — never stack two */
 }
 .header {
   border-bottom: none !important;
   box-shadow: none !important;
+  /* THE one notch inset. max() keeps 10-12px on no-notch devices/browsers. */
+  padding-top: max(env(safe-area-inset-top, 0px), 12px) !important;
 }
 .bottom-nav {
   border-top: none !important;
   background: rgba(0, 0, 0, 0.9) !important;
-}
-@media (max-width: 560px) {
-  /* The skin gave .header its own safe-area padding, but .topbar (the sticky
-     container) already carries the notch inset — the doubled spacing drew a
-     visible boundary line under the status bar. Header goes back to flat. */
-  .header {
-    padding-top: 10px !important;
-  }
 }
 
 /* ─── Player drawer: centered pop-up on desktop ──────────────────────────
