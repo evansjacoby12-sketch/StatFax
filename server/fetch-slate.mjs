@@ -4061,7 +4061,11 @@ async function main() {
   // per-batter pregame-freeze passes own those.
   const MORNING_LOCK_ON = (process.env.MORNING_LOCK ?? '1') !== '0';
   const MORNING_LOCK_HOUR = +(process.env.MORNING_LOCK_HOUR ?? 13);
-  const LOCK_FIELDS = ['score', 'grade', 'rating', 'hrProbability', 'simHRProb', 'expectedHRs', 'ensembleScore', 'batterScore', 'matchupScore', 'envScore', 'reasons', 'eli5Reasons'];
+  // parkWeatherHandFactor is in the lock because it feeds the combo engine's
+  // park strategy (rank score×air, gate air≥1.08): left floating, each 15-min
+  // weather refresh could reorder park-combo legs all day while the scores
+  // built FROM that same weather sat frozen. One lock, one story.
+  const LOCK_FIELDS = ['score', 'grade', 'rating', 'hrProbability', 'simHRProb', 'expectedHRs', 'ensembleScore', 'batterScore', 'matchupScore', 'envScore', 'reasons', 'eli5Reasons', 'parkWeatherHandFactor'];
   if (MORNING_LOCK_ON) try {
     const gameByPk = new Map((games || []).map((g) => [g.gamePk, g]));
     const started = (pk) => { const g = gameByPk.get(pk); return !!(g && (g.isLive || g.isFinal)); };
