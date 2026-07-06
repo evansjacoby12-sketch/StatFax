@@ -51,6 +51,32 @@ export function dejuicedEdge(modelProb, yesAmerican, noAmerican = null) {
 }
 
 /**
+ * Best SINGLE-BOOK parlay price. comboMarket's `american` multiplies each leg's
+ * best price across DIFFERENT books — a number no sportsbook pays on one
+ * ticket. This intersects the books that price EVERY leg and returns the best
+ * one-ticket price: { book, decimal, american, perBook } (perBook sorted
+ * best-first), or null when no single book covers the whole combo. `legs` are
+ * batter rows carrying odds.books = [{ book, american, decimal, ... }].
+ */
+export function bestSingleBook(legs) {
+  const lists = (legs || []).map((b) => (b.odds?.books || []).filter((x) => Number.isFinite(x.decimal) && x.decimal > 1))
+  if (!lists.length || lists.some((l) => !l.length)) return null
+  let common = null
+  for (const l of lists) {
+    const keys = new Set(l.map((x) => x.book))
+    common = common ? new Set([...common].filter((k) => keys.has(k))) : keys
+  }
+  if (!common?.size) return null
+  const perBook = [...common]
+    .map((book) => {
+      const decimal = lists.reduce((p, l) => p * l.find((x) => x.book === book).decimal, 1)
+      return { book, decimal, american: decimalToAmerican(decimal) }
+    })
+    .sort((a, b) => b.decimal - a.decimal)
+  return { ...perBook[0], perBook }
+}
+
+/**
  * Combine a parlay's legs into market figures. `legs` is an array of plain
  * descriptors { american, decimal?, modelProb } so this stays pure + testable.
  *

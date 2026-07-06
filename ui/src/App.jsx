@@ -741,6 +741,8 @@ export default function App() {
                 comboConf={comboConf}
                 favorConsistency={favorConsistency}
                 lockedBoard={data.raw?.lockedBoard}
+                slipSet={slipSet}
+                onToggleSlip={toggleSlip}
               />
             </div>
           </div>

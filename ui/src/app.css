@@ -6936,6 +6936,7 @@ button.th:focus-visible {
 }
 
 .grp-trim {
+  grid-column: 1 / -1; /* span the combo grid — don't sit in a card cell */
   font-size: 11.5px;
   text-align: center;
   padding: 9px;
@@ -8516,6 +8517,105 @@ button.th:focus-visible {
 }
 @media (prefers-reduced-motion: reduce) {
   .splits-grid .splits-card {
+    animation: none;
+  }
+}
+
+/* ─── Combos round 2: tail btn, live rail, hit rail, one-book, dup linking ── */
+.grp-tail {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 9px;
+  font-size: 11px;
+  font-weight: 800;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  color: var(--accent);
+  cursor: pointer;
+  transition: background 0.15s, box-shadow 0.2s, transform 0.1s;
+}
+.grp-tail:hover { background: color-mix(in srgb, var(--accent) 18%, transparent); box-shadow: 0 0 12px rgba(0, 216, 246, 0.25); }
+.grp-tail:active { transform: scale(0.95); }
+.grp-tail.on {
+  color: var(--good);
+  border-color: color-mix(in srgb, var(--good) 45%, transparent);
+  background: color-mix(in srgb, var(--good) 10%, transparent);
+}
+.grp-progress {
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+  margin: -6px 0 10px;
+}
+.grp-progress-fill {
+  height: 100%;
+  width: calc(var(--p, 0) * 100%);
+  border-radius: 2px;
+  transition: width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.grp-card.one-away { border-color: color-mix(in srgb, var(--prime) 55%, transparent); }
+.grp-card.one-away .grp-progress-fill { animation: heatFlicker 1.6s ease-in-out infinite; }
+.grp-card.one-away .grp-live-tag { animation: cashPulse 2.2s ease-in-out infinite; }
+.grp-hitrail {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 0 8px;
+}
+.grp-hitrail-bar {
+  position: relative;
+  flex: 1;
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.05);
+  overflow: visible;
+}
+.grp-hitrail-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--gc) 55%, transparent), var(--gc));
+  transition: width 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.grp-hitrail-tick {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 2px;
+  border-radius: 1px;
+  background: rgba(255, 255, 255, 0.55);
+}
+.grp-hitrail-cap {
+  flex: none;
+  font-size: 10px;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+.grp-hitrail-cap .pos { color: var(--good); }
+.grp-hitrail-cap .neg { color: var(--bad); }
+.grp-onebook { color: var(--text-dim); }
+.grp-onebook b { color: #fff; }
+.grp-chip.dup {
+  color: var(--b-plat, #8b5cf6);
+  background: color-mix(in srgb, #8b5cf6 12%, transparent);
+  border-color: color-mix(in srgb, #8b5cf6 35%, transparent);
+  font-weight: 800;
+}
+.grp-leg.same-bat {
+  background: color-mix(in srgb, #8b5cf6 10%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #8b5cf6 45%, transparent);
+}
+@media (prefers-reduced-motion: reduce) {
+  .grp-progress-fill,
+  .grp-hitrail-fill {
+    transition: none;
+  }
+  .grp-card.one-away .grp-progress-fill,
+  .grp-card.one-away .grp-live-tag {
     animation: none;
   }
 }

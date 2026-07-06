@@ -5,6 +5,8 @@ import Select from './Select.jsx'
 import { pct, num, rate, american, signedPct } from '../lib/format.js'
 import { buildGroups, legsByStrategy, mergeGroups, lastFirst, isoOf, blastOf, blastMixOf, blastVsHandOf, legFlags, legIsBad, risingForm } from '../lib/groups.js'
 import { comboStatus, legStatus, VERDICT_META } from '../lib/live.js'
+import { americanToRawImplied, bestSingleBook } from '../lib/odds.js'
+import { bookLabel } from '../lib/data.js'
 import * as store from '../lib/storage.js'
 import { toast } from './Toast.jsx'
 
@@ -295,7 +297,7 @@ function spreadPick(groups, n = 4) {
   return picked
 }
 
-export default function GroupsView({ batters, onSelect, selectedId, scorecard, generatedAt, windowMode = false, comboConf = 'off', favorConsistency = false, lockedBoard = null }) {
+export default function GroupsView({ batters, onSelect, selectedId, scorecard, generatedAt, windowMode = false, comboConf = 'off', favorConsistency = false, lockedBoard = null, slipSet = null, onToggleSlip = null }) {
   const [size, setSize] = useState(2)
   const [games, setGames] = useState(() => new Set()) // empty = all games
   // Hide started defaults ON: HR props can't be bet pregame once the game is
@@ -460,6 +462,17 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard, g
     return out.sort((x, y) => (y.allHit ?? 0) - (x.allHit ?? 0)).slice(0, 2)
   })()
 
+  // Shared domain for the per-card all-hit rails: every card's bar is scaled
+  // against the same max, so the drop-off from card 1 to card 3 reads at a
+  // glance (a per-card scale would make every bar look full).
+  const allCards = [...shownGroups, ...stacks]
+  const railMax = 1.2 * Math.max(0.01, ...allCards.map((g) => Math.max(g.allHit ?? 0, americanToRawImplied(g.american) ?? 0)))
+  // How many SHOWN combos each bat appears in — ≥2 means tailing several
+  // tickets is really re-betting that bat. Drives the ×N chip + hover linking.
+  const legCount = new Map()
+  for (const g of allCards) for (const b of g.legs) if (b.playerId != null) legCount.set(b.playerId, (legCount.get(b.playerId) || 0) + 1)
+  const [hoverPid, setHoverPid] = useState(null)
+
   return (
     <>
       <ScoreCard sc={scorecard} />
@@ -573,7 +586,7 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard, g
             </div>
           )}
           {shownGroups.map((g, i) => (
-            <GroupCard key={g.id} g={g} idx={i} onSelect={onSelect} selectedId={selectedId} comboConf={comboConf} />
+            <GroupCard key={g.id} g={g} idx={i} onSelect={onSelect} selectedId={selectedId} comboConf={comboConf} slipSet={slipSet} onToggleSlip={onToggleSlip} railMax={railMax} legCount={legCount} hoverPid={hoverPid} onHoverPid={setHoverPid} />
           ))}
           {stacks.length > 0 && (
             <>
@@ -581,7 +594,7 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard, g
                 <Icon name="GitMerge" size={12} /> Two green 2-legs share a bat — the fused 3-man
               </div>
               {stacks.map((g, i) => (
-                <GroupCard key={g.id} g={g} idx={shownGroups.length + i} onSelect={onSelect} selectedId={selectedId} comboConf={comboConf} />
+                <GroupCard key={g.id} g={g} idx={shownGroups.length + i} onSelect={onSelect} selectedId={selectedId} comboConf={comboConf} slipSet={slipSet} onToggleSlip={onToggleSlip} railMax={railMax} legCount={legCount} hoverPid={hoverPid} onHoverPid={setHoverPid} />
               ))}
             </>
           )}
@@ -597,7 +610,12 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard, g
   )
 }
 
-function GroupCard({ g, idx = 0, onSelect, selectedId, comboConf = 'off' }) {
+function GroupCard({ g, idx = 0, onSelect, selectedId, comboConf = 'off', slipSet = null, onToggleSlip = null, railMax = null, legCount = null, hoverPid = null, onHoverPid = null }) {
+  const allInSlip = !!slipSet && g.legs.length > 0 && g.legs.every((b) => slipSet.has(b.id))
+  // Best one-ticket price: the headline `pays` multiplies each leg's best price
+  // across different books; this is the best single book that prices every leg.
+  const oneBook = bestSingleBook(g.legs)
+  const implied = americanToRawImplied(g.american)
   const gc = GROUP_GRADE_COLOR[g.grade] || '#6b7787'
   const { legs: legInfo, weakestIdx, tone } = assessCombo(g)
   // Start-time spread: a parlay locks at the EARLIEST leg's first pitch, but a
@@ -625,13 +643,19 @@ function GroupCard({ g, idx = 0, onSelect, selectedId, comboConf = 'off' }) {
             .join(' · ')}`
         : '✅ Tail — every leg is clean'
   const cashed = live.started && g.legs.length > 0 && live.hits >= g.legs.length
+  const oneAway = live.started && live.code === 'live' && live.n >= 2 && live.hits === live.n - 1
   return (
     <section
-      className={`grp-card tone-${tone}${cashed ? ' cashed' : ''}`}
+      className={`grp-card tone-${tone}${cashed ? ' cashed' : ''}${oneAway ? ' one-away' : ''}`}
       data-strat={g.strategy}
       style={{ '--gc': gc, '--i': Math.min(idx, 8) }}
-      title={cashed ? '💰 CASHED — every leg homered' : title}
+      title={cashed ? '💰 CASHED — every leg homered' : oneAway ? '🔥 ONE AWAY — one more HR cashes this ticket' : title}
     >
+      {live.started && (
+        <div className="grp-progress" title={`${live.hits} of ${live.n} legs homered`}>
+          <div className="grp-progress-fill" style={{ '--p': live.n ? live.hits / live.n : 0, background: cashed ? 'var(--strong)' : oneAway ? 'var(--prime)' : lv.color }} />
+        </div>
+      )}
       <header className="grp-head">
         <span className="grp-legbadge">{g.size}-LEG</span>
         <span className="grp-strategy">
@@ -665,20 +689,46 @@ function GroupCard({ g, idx = 0, onSelect, selectedId, comboConf = 'off' }) {
           onClick={(e) => {
             e.stopPropagation()
             const legsTxt = g.legs.map((b) => `${lastFirst(b.name).split(',')[0]}${b.odds?.best?.american ? ` ${american(b.odds.best.american)}` : ''}`).join(' + ')
-            const line = `${g.size}-leg ${g.label}: ${legsTxt} — all-hit ${pct(g.allHit, g.allHit < 0.01 ? 2 : 1)}${g.american ? ` · pays ${american(g.american)}` : ''} (StatFax)`
+            const line = `${g.size}-leg ${g.label}: ${legsTxt} — all-hit ${pct(g.allHit, g.allHit < 0.01 ? 2 : 1)}${oneBook ? ` · ${bookLabel(oneBook.book)} one-ticket ${american(oneBook.american)}` : g.american ? ` · pays ${american(g.american)}` : ''} (StatFax)`
             navigator.clipboard?.writeText(line).then(() => toast.success('Combo copied')).catch(() => toast.warn('Copy failed'))
           }}
         >
           <Icon name="Copy" size={12} />
         </button>
+        {onToggleSlip && (
+          <button
+            className={`grp-tail${allInSlip ? ' on' : ''}`}
+            title={allInSlip ? 'Every leg is already in your parlay slip' : 'Tail — drop every leg into your parlay slip'}
+            onClick={(e) => {
+              e.stopPropagation()
+              const missing = g.legs.filter((b) => !slipSet?.has(b.id))
+              if (!missing.length) {
+                toast.info('Already in your slip')
+                return
+              }
+              missing.forEach((b) => onToggleSlip(b))
+              toast.success(`${missing.length} leg${missing.length > 1 ? 's' : ''} → parlay slip`)
+            }}
+          >
+            <Icon name={allInSlip ? 'Check' : 'Plus'} size={12} /> Tail
+          </button>
+        )}
       </header>
       <div className="grp-sub dim">
         — {g.desc} · 1 per game · all-hit {pct(g.allHit, g.allHit < 0.01 ? 2 : 1)}
         {g.american && (
           <>
             {' · pays '}
-            <b className="grp-pays">{american(g.american)}</b>
+            <b className="grp-pays" title="Best price per leg across ALL books multiplied — no single book pays this on one ticket">{american(g.american)}</b>
           </>
+        )}
+        {oneBook && (
+          <span
+            className="grp-onebook"
+            title={`Best single book that prices every leg — an actually placeable ticket.\n${oneBook.perBook.slice(0, 3).map((x) => `${bookLabel(x.book)}: ${american(x.american)}`).join(' · ')}`}
+          >
+            {' · '}{bookLabel(oneBook.book)} <b className="mono">{american(oneBook.american)}</b> one ticket
+          </span>
         )}
         {g.ev != null && (
           <span className={`grp-edge ${g.ev >= 0 ? 'pos' : 'neg'}`} title="Betting EV per $1 staked — model all-hit % × the posted parlay payout − 1">
@@ -691,6 +741,20 @@ function GroupCard({ g, idx = 0, onSelect, selectedId, comboConf = 'off' }) {
           </span>
         )}
       </div>
+      {railMax != null && Number.isFinite(g.allHit) && (
+        <div className="grp-hitrail" title={implied != null ? `Model: hits ~1 in ${Math.max(1, Math.round(1 / g.allHit))} · priced like 1 in ${Math.max(1, Math.round(1 / implied))} — fill past the tick = the model likes it more than the price` : `Model: hits ~1 in ${Math.max(1, Math.round(1 / g.allHit))} — no full price posted`}>
+        <div className="grp-hitrail-bar">
+          <div className="grp-hitrail-fill" style={{ width: `${Math.min(100, (g.allHit / railMax) * 100)}%` }} />
+          {implied != null && <span className="grp-hitrail-tick" style={{ left: `${Math.min(100, (implied / railMax) * 100)}%` }} />}
+        </div>
+        <span className="grp-hitrail-cap mono">
+          ~1 in {Math.max(1, Math.round(1 / g.allHit))}
+          {implied != null && (
+            <span className={g.allHit >= implied ? 'pos' : 'neg'}> · priced 1 in {Math.max(1, Math.round(1 / implied))}</span>
+          )}
+        </span>
+        </div>
+      )}
       <ul className="grp-legs">
         {g.legs.map((b, i) => (
           <GroupLeg
@@ -703,6 +767,9 @@ function GroupCard({ g, idx = 0, onSelect, selectedId, comboConf = 'off' }) {
             weakest={i === weakestIdx && legInfo[i].bad}
             reasons={legInfo[i].flags}
             unconfirmed={b.lineupConfirmed !== true}
+            dupCount={legCount?.get(b.playerId) || 0}
+            sameBat={hoverPid != null && b.playerId === hoverPid}
+            onHoverPid={onHoverPid}
           />
         ))}
       </ul>
@@ -717,7 +784,7 @@ function GroupCard({ g, idx = 0, onSelect, selectedId, comboConf = 'off' }) {
   )
 }
 
-function GroupLeg({ b, idx, onSelect, selected, bad, weakest, reasons, unconfirmed }) {
+function GroupLeg({ b, idx, onSelect, selected, bad, weakest, reasons, unconfirmed, dupCount = 0, sameBat = false, onHoverPid = null }) {
   const hm = b.hotnessMultiplier
   const hotTone = hm > 1.02 ? 'good' : hm < 0.98 ? 'bad' : ''
   const hotLabel = hm > 1.02 ? 'HOT' : hm < 0.98 ? 'COLD' : 'NEU'
@@ -738,10 +805,14 @@ function GroupLeg({ b, idx, onSelect, selected, bad, weakest, reasons, unconfirm
   const legLocked = !!(b.game?.isFinal || b.game?.isLive)
   return (
     <li
-      className={`grp-leg ${selected ? 'selected' : ''} ${bad ? 'weak-leg' : ''}`}
+      className={`grp-leg ${selected ? 'selected' : ''} ${bad ? 'weak-leg' : ''}${sameBat ? ' same-bat' : ''}`}
       role="button"
       tabIndex={0}
       onClick={() => onSelect(b)}
+      onMouseEnter={onHoverPid ? () => onHoverPid(b.playerId) : undefined}
+      onMouseLeave={onHoverPid ? () => onHoverPid(null) : undefined}
+      onFocus={onHoverPid ? () => onHoverPid(b.playerId) : undefined}
+      onBlur={onHoverPid ? () => onHoverPid(null) : undefined}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault()
@@ -754,6 +825,11 @@ function GroupLeg({ b, idx, onSelect, selected, bad, weakest, reasons, unconfirm
         <div className="grp-leg-l1">
           <span className={`grp-leg-name ${hrToday ? 'hr-glow' : ''}`}>{lastFirst(b.name)}</span>
           <span className="grp-team">{b.team}</span>
+          {dupCount >= 2 && (
+            <span className="grp-chip dup" title={`In ${dupCount} of the shown combos — tailing several tickets is re-betting this bat, not diversifying. Hover to light him up across cards.`}>
+              ×{dupCount}
+            </span>
+          )}
           {hrToday ? (
             <span className="grp-chip" style={{ color: 'var(--strong)', background: 'color-mix(in srgb, var(--strong) 12%, transparent)', borderColor: 'color-mix(in srgb, var(--strong) 35%, transparent)' }} title="Homered today">
               <Icon name="Check" size={10} /> HR
