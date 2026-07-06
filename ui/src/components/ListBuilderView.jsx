@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react'
 import Icon from './Icon.jsx'
 import { GradeChip } from './atoms.jsx'
+import { toast } from './Toast.jsx'
 import { pct, num } from '../lib/format.js'
 import { pitchMixScore, hrSetup } from '../lib/scout.js'
 import { positiveReasonCount, negativeReasonCount } from '../lib/combo-engine.js'
@@ -78,9 +79,9 @@ function SigCheck({ sig, active, onToggle }) {
   )
 }
 
-function ResultRow({ b, onSelect, cols }) {
+function ResultRow({ b, idx = 0, onSelect, cols }) {
   return (
-    <li className="lbv-row" role="button" tabIndex={0} onClick={() => onSelect(b)} onKeyDown={e => e.key === 'Enter' && onSelect(b)}>
+    <li className="lbv-row" style={{ '--i': Math.min(idx, 12) }} role="button" tabIndex={0} onClick={() => onSelect(b)} onKeyDown={e => e.key === 'Enter' && onSelect(b)}>
       <GradeChip grade={b.grade} size="sm" score={b.score} />
       <div className="lbv-row-name">
         <span className="lbv-name">{lastFirst(b.name)}</span>
@@ -228,9 +229,22 @@ export default function ListBuilderView({ batters = [], onSelect }) {
         <div className="lbv-results">
           <div className="lbv-count">
             <Icon name="Users" size={13} style={{ color: 'var(--accent)' }} />
-            <b style={{ color: '#fff' }}>{results.length}</b>
+            <b key={results.length} className="slip-legs-bump" style={{ color: '#fff' }}>{results.length}</b>
             <span>/ {batters.length} players match</span>
             {results.length === 0 && <span className="dim"> — loosen a filter</span>}
+            {results.length > 0 && (
+              <button
+                className="lbv-copy"
+                title="Copy this list as text"
+                onClick={() => {
+                  const lines = results.map((b, i) => `${i + 1}. ${b.name} (${b.team}) — HR ${pct(b.hrProbability, 1)}`)
+                  const text = `StatFax list · ${results.length} bats\n${lines.join('\n')}`
+                  navigator.clipboard?.writeText(text).then(() => toast.success('List copied')).catch(() => toast.warn('Copy failed'))
+                }}
+              >
+                <Icon name="Copy" size={12} /> Copy
+              </button>
+            )}
           </div>
           {results.length > 0 && (
             <ul className="lbv-list">
@@ -240,7 +254,7 @@ export default function ListBuilderView({ batters = [], onSelect }) {
                 {cols.map(c => <span key={c.key} className="lbv-row-stat dim">{c.label}</span>)}
                 <span className="lbv-row-hrp dim">HR%</span>
               </li>
-              {results.map(b => <ResultRow key={b.id} b={b} onSelect={onSelect} cols={cols} />)}
+              {results.map((b, i) => <ResultRow key={b.id} b={b} idx={i} onSelect={onSelect} cols={cols} />)}
             </ul>
           )}
         </div>
