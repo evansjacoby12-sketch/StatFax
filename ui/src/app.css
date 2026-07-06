@@ -8452,3 +8452,32 @@ button.th:focus-visible {
     animation: none;
   }
 }
+
+/* ─── Parlay Builder vibecode: hovers, build-button glow, result cascade ──── */
+.pb-sugg {
+  transition: border-color 0.15s, background 0.15s, transform 0.1s;
+  cursor: pointer;
+}
+.pb-sugg:hover {
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent) !important;
+  background: rgba(0, 216, 246, 0.05) !important;
+}
+.pb-sugg:active { transform: scale(0.99); }
+.qb-build-btn {
+  cursor: pointer;
+  box-shadow: 0 0 14px rgba(0, 216, 246, 0.22);
+  transition: box-shadow 0.2s, transform 0.1s;
+}
+.qb-build-btn:hover { box-shadow: 0 0 24px rgba(0, 216, 246, 0.4); }
+.qb-build-btn:active { transform: scale(0.985); }
+.qb-result { animation: cardIn 0.35s ease both; }
+.qb-leg {
+  animation: rowIn 0.3s ease both;
+  animation-delay: calc(var(--i, 0) * 45ms);
+}
+@media (prefers-reduced-motion: reduce) {
+  .qb-result,
+  .qb-leg {
+    animation: none;
+  }
+}

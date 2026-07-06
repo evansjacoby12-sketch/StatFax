@@ -8,6 +8,7 @@ import { buildParlay } from '../lib/parlayMath.js'
 import { buildGroups, lastFirst } from '../lib/groups.js'
 import { comboStatus, legStatus, VERDICT_META, LEG_META } from '../lib/live.js'
 import * as store from '../lib/storage.js'
+import { toast } from './Toast.jsx'
 
 const GRADE_COLOR = { S: '#f5a623', A: '#10b981', B: '#3b82f6', C: '#94a3b8', D: '#64748b' }
 const SIZES = [2, 3, 4]
@@ -87,12 +88,12 @@ function Summary({ p, live, correlate, onToggleCorr, wager, onWager }) {
   const payout = Number.isFinite(wagerNum) && wagerNum > 0 && payDecimal ? wagerNum * payDecimal : null
   const evColor = p.ev == null ? 'var(--text-faint)' : p.ev >= 0 ? 'var(--strong)' : 'var(--bad)'
   return (
-    <div className="pb-summary" style={{ background: 'rgba(16,24,48,0.55)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '14px', padding: '16px', marginBottom: '16px' }}>
+    <div className="pb-summary" style={{ background: 'rgba(8, 9, 12, 0.6)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '14px', padding: '16px', marginBottom: '16px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span style={{ fontSize: '13px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--accent)' }}>{p.n}-leg parlay</span>
           {p.grade && (
-            <span style={{ color: gColor, borderColor: hexA(gColor, 0.4), borderWidth: '1px', borderStyle: 'solid', borderRadius: '6px', padding: '2px 8px', fontSize: '11px', fontWeight: '800', background: hexA(gColor, 0.08) }} title={`Avg leg score ${Math.round(p.grade.avgScore)}`}>
+            <span className={`grade-glow-${p.grade.letter}`} style={{ color: gColor, borderColor: hexA(gColor, 0.4), borderWidth: '1px', borderStyle: 'solid', borderRadius: '6px', padding: '2px 8px', fontSize: '11px', fontWeight: '800', background: hexA(gColor, 0.08) }} title={`Avg leg score ${Math.round(p.grade.avgScore)}`}>
               Grade {p.grade.letter}
             </span>
           )}
@@ -127,7 +128,7 @@ function Summary({ p, live, correlate, onToggleCorr, wager, onWager }) {
         <Icon name="ChevronRight" size={14} style={{ color: 'var(--text-faint)' }} />
         <span style={{ display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'flex-end', marginLeft: 'auto' }}>
           <span style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-faint)' }}>Payout{p.allPriced ? '' : ' (fair)'}</span>
-          <span className="mono" style={{ fontSize: '16px', fontWeight: '800', color: 'var(--strong)' }}>{payout != null ? `$${payout >= 100 ? Math.round(payout) : payout.toFixed(2)}` : '—'}</span>
+          <span key={payout ?? 'none'} className="mono slip-legs-bump" style={{ fontSize: '16px', fontWeight: '800', color: 'var(--strong)' }}>{payout != null ? `$${payout >= 100 ? Math.round(payout) : payout.toFixed(2)}` : '—'}</span>
         </span>
       </div>
     </div>
@@ -179,7 +180,6 @@ export default function ParlayBuilder({ batters, legs, slipSet, onToggle, onRemo
   const [tab, setTab] = useState('legs') // legs | build | saved
   const [autoSize, setAutoSize] = useState(3)
   const [saved, setSaved] = useState(() => store.load('savedSlips', []))
-  const [toast, setToast] = useState(null)
 
   // Quick Build state
   const [qbStrat, setQbStrat] = useState('balanced')
@@ -264,11 +264,6 @@ export default function ParlayBuilder({ batters, legs, slipSet, onToggle, onRemo
     return { mode: 'complete', need, items }
   }, [batters, autoSize, favorConsistency, legs, slipSet, correlate])
 
-  const flash = (msg) => {
-    setToast(msg)
-    setTimeout(() => setToast(null), 1800)
-  }
-
   const saveSlip = () => {
     if (!legs.length) return
     const name = legs.map((b) => b.name.split(' ').slice(-1)[0]).join(' · ')
@@ -276,7 +271,7 @@ export default function ParlayBuilder({ batters, legs, slipSet, onToggle, onRemo
     const next = [entry, ...saved.filter((s) => s.ids.join() !== entry.ids.join())].slice(0, 20)
     setSaved(next)
     store.save('savedSlips', next)
-    flash('Saved')
+    toast.success('Slip saved')
   }
   const deleteSaved = (id) => {
     const next = saved.filter((s) => s.id !== id)
@@ -292,7 +287,7 @@ export default function ParlayBuilder({ batters, legs, slipSet, onToggle, onRemo
       if (navigator.share) await navigator.share({ title: 'StatFax parlay', text })
       else {
         await navigator.clipboard.writeText(text)
-        flash('Copied to clipboard')
+        toast.success('Copied to clipboard')
       }
     } catch {
       /* user dismissed share sheet */
@@ -301,10 +296,6 @@ export default function ParlayBuilder({ batters, legs, slipSet, onToggle, onRemo
 
   return (
     <div className="pb" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {toast && (
-        <div className="pb-toast" style={{ position: 'absolute', top: '12px', left: '50%', transform: 'translateX(-50%)', zIndex: 10, background: 'var(--strong)', color: '#06251a', fontWeight: '800', fontSize: '12px', padding: '6px 14px', borderRadius: '999px', boxShadow: '0 4px 16px rgba(0,0,0,0.4)' }}>{toast}</div>
-      )}
-
       <Summary p={p} live={live} correlate={correlate} onToggleCorr={() => setCorrelate((c) => !c)} wager={wager} onWager={setWager} />
 
       {sgGroups.length > 0 && correlate && (
@@ -419,7 +410,7 @@ export default function ParlayBuilder({ batters, legs, slipSet, onToggle, onRemo
               </div>
 
               {/* Build button */}
-              <button onClick={runQuickBuild}
+              <button onClick={runQuickBuild} className="qb-build-btn"
                 style={{ width: '100%', padding: '11px', borderRadius: '10px', fontSize: '13px', fontWeight: '800', color: '#001a22', background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px' }}>
                 <Icon name="Zap" size={15} />
                 Build {qbLegs}-leg {QB_STRATEGIES[qbStrat].label} Parlay
