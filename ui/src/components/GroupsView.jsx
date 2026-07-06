@@ -6,6 +6,7 @@ import { pct, num, rate, american, signedPct } from '../lib/format.js'
 import { buildGroups, legsByStrategy, lastFirst, isoOf, blastOf, blastMixOf, blastVsHandOf, legFlags, legIsBad, risingForm } from '../lib/groups.js'
 import { comboStatus, legStatus, VERDICT_META } from '../lib/live.js'
 import * as store from '../lib/storage.js'
+import { toast } from './Toast.jsx'
 
 const GROUP_GRADE_COLOR = { S: '#f5a623', A: '#32d74b', B: '#3b82f6', C: '#9aa6b6', D: '#6b7787' }
 const LOCK_STRAT_LABEL = { precision: 'Precision', matchup: 'Soft Matchup', mix: 'Best Mix', park: 'Park & Air', edge: 'Edge Stack' }
@@ -538,8 +539,8 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard, g
               <button className="grp-trim-link" onClick={() => setShowAll(true)}>show all</button>
             </div>
           )}
-          {shownGroups.map((g) => (
-            <GroupCard key={g.id} g={g} onSelect={onSelect} selectedId={selectedId} comboConf={comboConf} />
+          {shownGroups.map((g, i) => (
+            <GroupCard key={g.id} g={g} idx={i} onSelect={onSelect} selectedId={selectedId} comboConf={comboConf} />
           ))}
         </div>
       ) : (
@@ -553,7 +554,7 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard, g
   )
 }
 
-function GroupCard({ g, onSelect, selectedId, comboConf = 'off' }) {
+function GroupCard({ g, idx = 0, onSelect, selectedId, comboConf = 'off' }) {
   const gc = GROUP_GRADE_COLOR[g.grade] || '#6b7787'
   const { legs: legInfo, weakestIdx, tone } = assessCombo(g)
   // Start-time spread: a parlay locks at the EARLIEST leg's first pitch, but a
@@ -580,11 +581,13 @@ function GroupCard({ g, onSelect, selectedId, comboConf = 'off' }) {
             .filter(Boolean)
             .join(' · ')}`
         : '✅ Tail — every leg is clean'
+  const cashed = live.started && g.legs.length > 0 && live.hits >= g.legs.length
   return (
     <section
-      className={`grp-card tone-${tone}`}
-      style={{ '--gc': gc }}
-      title={title}
+      className={`grp-card tone-${tone}${cashed ? ' cashed' : ''}`}
+      data-strat={g.strategy}
+      style={{ '--gc': gc, '--i': Math.min(idx, 8) }}
+      title={cashed ? '💰 CASHED — every leg homered' : title}
     >
       <header className="grp-head">
         <span className="grp-legbadge">{g.size}-LEG</span>
@@ -612,7 +615,19 @@ function GroupCard({ g, onSelect, selectedId, comboConf = 'off' }) {
         {comboConf === 'percent' && (
           <span className="grp-conf pct" title="Chance every leg homers (all-hit probability)">{pct(g.allHit, g.allHit < 0.01 ? 2 : 1)}</span>
         )}
-        <span className="grp-grade" style={{ color: gc, borderColor: gc }}>{g.grade}</span>
+        <span className={`grp-grade grade-glow-${g.grade}`} style={{ color: gc, borderColor: gc }}>{g.grade}</span>
+        <button
+          className="grp-copy"
+          title="Copy this combo as text"
+          onClick={(e) => {
+            e.stopPropagation()
+            const legsTxt = g.legs.map((b) => `${lastFirst(b.name).split(',')[0]}${b.odds?.best?.american ? ` ${american(b.odds.best.american)}` : ''}`).join(' + ')
+            const line = `${g.size}-leg ${g.label}: ${legsTxt} — all-hit ${pct(g.allHit, g.allHit < 0.01 ? 2 : 1)}${g.american ? ` · pays ${american(g.american)}` : ''} (StatFax)`
+            navigator.clipboard?.writeText(line).then(() => toast.success('Combo copied')).catch(() => toast.warn('Copy failed'))
+          }}
+        >
+          <Icon name="Copy" size={12} />
+        </button>
       </header>
       <div className="grp-sub dim">
         — {g.desc} · 1 per game · all-hit {pct(g.allHit, g.allHit < 0.01 ? 2 : 1)}
