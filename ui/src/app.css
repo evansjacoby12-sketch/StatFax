@@ -8441,3 +8441,44 @@ button.th:focus-visible {
     animation: none;
   }
 }
+
+/* ─── PickOfDay vibecode: trophy glint, LIVE chip, HOMERED celebration ───── */
+.potd-kicker svg {
+  animation: trophyGlint 3.4s ease-in-out infinite;
+  transform-origin: 50% 80%;
+}
+@keyframes trophyGlint {
+  0%, 88%, 100% { transform: scale(1) rotate(0deg); }
+  92% { transform: scale(1.2) rotate(-8deg); }
+  96% { transform: scale(1.12) rotate(6deg); }
+}
+.potd-hr-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: #041018;
+  background: linear-gradient(135deg, var(--prime), #ffd479);
+  border-radius: 6px;
+  padding: 3px 9px;
+  animation: hrChipPop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+@keyframes hrChipPop {
+  from { transform: scale(0.4); opacity: 0; }
+}
+.potd.potd-cashed {
+  animation: potdCashed 2.4s ease-in-out infinite;
+}
+@keyframes potdCashed {
+  0%, 100% { box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 6px rgba(245, 166, 35, 0.12); }
+  50% { box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 22px 3px rgba(245, 166, 35, 0.3); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .potd-kicker svg,
+  .potd-hr-chip,
+  .potd.potd-cashed {
+    animation: none;
+  }
+}

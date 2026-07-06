@@ -7,6 +7,7 @@ import { pct, signedPct, american } from '../lib/format.js'
 import { hexA } from './atoms.jsx'
 import { sharePickCard } from '../lib/shareCard.js'
 import { toast } from './Toast.jsx'
+import { useLiveMode } from '../lib/liveMode.js'
 
 function heatTag(h) {
   if (h == null) return null
@@ -17,12 +18,15 @@ function heatTag(h) {
 }
 
 export default function PickOfDay({ batter: b, onSelect, watched, inSlip, onToggleWatch, onToggleSlip, onOpenPitcher, onDismiss }) {
+  const liveMode = useLiveMode()
   if (!b) return null
   const g = b.grade?.label || 'SKIP'
   const color = gradeColor(g)
   const { checks, n } = hrSetup(b)
   const heat = b.heatIndex
   const best = b.odds?.best
+  const live = liveMode && b.game?.isLive
+  const hrToday = liveMode && b.liveContext?.isHRThisGame
   const canOpenPitcher = !!onOpenPitcher && b.pitcher?.id != null
   const stop = (fn) => (e) => {
     e.stopPropagation()
@@ -31,12 +35,12 @@ export default function PickOfDay({ batter: b, onSelect, watched, inSlip, onTogg
 
   return (
     <section
-      className="potd"
-      style={{ 
-        '--row-accent': color, 
+      className={`potd${hrToday ? ' potd-cashed' : ''}`}
+      style={{
+        '--row-accent': color,
         '--team-logo': teamLogo(b.teamId) ? `url(${teamLogo(b.teamId)})` : 'none',
-        background: `linear-gradient(135deg, rgba(10, 10, 12, 0.85) 0%, rgba(20, 24, 48, 0.6) 100%)`,
-        border: `1px solid ${hexA(color, 0.25)}`,
+        background: `linear-gradient(135deg, ${hexA(color, 0.1)} 0%, rgba(2, 3, 5, 0.7) 100%)`,
+        border: hrToday ? '1px solid rgba(245, 166, 35, 0.55)' : `1px solid ${hexA(color, 0.25)}`,
         boxShadow: `0 8px 32px rgba(0, 0, 0, 0.4), 0 0 16px ${hexA(color, 0.08)}, inset 0 1px 0 rgba(255, 255, 255, 0.05)`,
         borderRadius: '16px',
         padding: '20px',
@@ -105,6 +109,16 @@ export default function PickOfDay({ batter: b, onSelect, watched, inSlip, onTogg
         }}>
           <Icon name="Trophy" size={13} style={{ filter: `drop-shadow(0 0 4px ${color})` }} /> Pick of the Day
         </span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        {hrToday ? (
+          <span className="potd-hr-chip" title="The pick already homered in this game">
+            <Icon name="Flame" size={11} /> HOMERED
+          </span>
+        ) : live ? (
+          <span className="live-tag">
+            <span className="live-dot" /> LIVE
+          </span>
+        ) : null}
         <span className={`potd-lineup ${b.lineupConfirmed ? 'on' : 'pending'}`} style={{
           fontSize: '11px',
           fontWeight: '600',
@@ -123,6 +137,7 @@ export default function PickOfDay({ batter: b, onSelect, watched, inSlip, onTogg
           }} />
           {b.lineupConfirmed ? 'Confirmed' : 'Projected'}
           {b.battingOrder ? ` · #${b.battingOrder}` : ''}
+        </span>
         </span>
       </div>
 
