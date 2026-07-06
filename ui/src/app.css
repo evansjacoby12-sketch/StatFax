@@ -8520,6 +8520,31 @@ button.th:focus-visible {
   }
 }
 
+/* ─── Fused stacks: two green 2-legs sharing a bat → suggested 3-man ──────── */
+.grp-stack-divider {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-top: 4px;
+}
+.grp-stack-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.07);
+}
+.grp-card[data-strat='stack'] {
+  border-style: dashed;
+}
+.grp-card[data-strat='stack'] .grp-strategy svg {
+  color: var(--accent);
+}
+
 /* ─── List Builder vibecode: result cascade, build glow, copy chip ────────── */
 .lbv-row:not(.lbv-row-head) {
   animation: rowIn 0.3s ease both;

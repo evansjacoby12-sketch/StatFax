@@ -3,7 +3,7 @@ import Icon from './Icon.jsx'
 import { GradeChip } from './atoms.jsx'
 import Select from './Select.jsx'
 import { pct, num, rate, american, signedPct } from '../lib/format.js'
-import { buildGroups, legsByStrategy, lastFirst, isoOf, blastOf, blastMixOf, blastVsHandOf, legFlags, legIsBad, risingForm } from '../lib/groups.js'
+import { buildGroups, legsByStrategy, mergeGroups, lastFirst, isoOf, blastOf, blastMixOf, blastVsHandOf, legFlags, legIsBad, risingForm } from '../lib/groups.js'
 import { comboStatus, legStatus, VERDICT_META } from '../lib/live.js'
 import * as store from '../lib/storage.js'
 import { toast } from './Toast.jsx'
@@ -425,6 +425,27 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard, g
       return next
     })
 
+  // Fused stacks: when two GREEN (no-warning) 2-leg combos on the board share
+  // exactly one bat, offer their union as a 3-leg — "both 2-mans are green, so
+  // here's the 3-man". Clean merges only (distinct games), best two by all-hit.
+  const stacks = (() => {
+    if (activeSize !== 2 || shownGroups.length < 2) return []
+    const clean = shownGroups.filter((g) => assessCombo(g).tone === 'tail')
+    const out = []
+    const seen = new Set()
+    for (let i = 0; i < clean.length; i++) {
+      for (let j = i + 1; j < clean.length; j++) {
+        const m = mergeGroups(clean[i], clean[j])
+        if (!m) continue
+        const sig = m.legs.map((x) => x.id).sort().join('|')
+        if (seen.has(sig)) continue
+        seen.add(sig)
+        out.push(m)
+      }
+    }
+    return out.sort((x, y) => (y.allHit ?? 0) - (x.allHit ?? 0)).slice(0, 2)
+  })()
+
   return (
     <>
       <ScoreCard sc={scorecard} />
@@ -540,6 +561,16 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard, g
           {shownGroups.map((g, i) => (
             <GroupCard key={g.id} g={g} idx={i} onSelect={onSelect} selectedId={selectedId} comboConf={comboConf} />
           ))}
+          {stacks.length > 0 && (
+            <>
+              <div className="grp-stack-divider dim">
+                <Icon name="GitMerge" size={12} /> Two green 2-legs share a bat — the fused 3-man
+              </div>
+              {stacks.map((g, i) => (
+                <GroupCard key={g.id} g={g} idx={shownGroups.length + i} onSelect={onSelect} selectedId={selectedId} comboConf={comboConf} />
+              ))}
+            </>
+          )}
         </div>
       ) : (
         <div className="empty-note">

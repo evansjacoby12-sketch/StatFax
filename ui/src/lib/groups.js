@@ -224,6 +224,43 @@ function makeGroup({ strategy, size, legs: rows }) {
   }
 }
 
+// Fuse two overlapping combos into one bigger ticket (union of the legs).
+// Built for the "both 2-legs are green and share a bat — why not the 3-man?"
+// case: the shared stud anchors, the union is the model's highest-conviction
+// trio. Returns null unless the merge is clean: exactly one shared bat, and
+// every leg in a different game (keeps the 1-per-game independence rule).
+// Display-only — stacks aren't part of the graded record.
+export function mergeGroups(a, b) {
+  const aIds = new Set(a.legs.map((x) => x.id))
+  const shared = b.legs.filter((x) => aIds.has(x.id))
+  if (shared.length !== 1) return null
+  const legs = [...a.legs, ...b.legs.filter((x) => !aIds.has(x.id))]
+  if (new Set(legs.map((x) => x.gamePk)).size !== legs.length) return null
+  const size = legs.length
+  const avgScore = legs.reduce((s, x) => s + (x.score ?? 0), 0) / legs.length
+  const allHit = allHitProb(legs.map((x) => x.hrProbability))
+  const market = comboMarket(
+    legs.map((x) => ({ american: x.odds?.best?.american, decimal: x.odds?.best?.decimal, modelProb: x.hrProbability })),
+  )
+  const anchor = shared[0].name
+  return {
+    id: `stack-${a.strategy}+${b.strategy}-${size}`,
+    size,
+    strategy: 'stack',
+    label: 'Fused Stack',
+    icon: 'GitMerge',
+    desc: `${a.label} + ${b.label} both run clean and share ${anchor} — fused into one ticket`,
+    grade: gradeFor(avgScore),
+    avgScore,
+    allHit,
+    projectedLegs: legs.filter((x) => x.lineupConfirmed !== true).length,
+    legs,
+    american: market.american,
+    ev: market.ev,
+    deJuicedEdge: market.deJuicedEdge,
+  }
+}
+
 // Build the parlay combos for the board, grouped by size. Maps live batters to
 // canonical engine rows (skipping finals — not bettable pregame), delegates the
 // construction to combo-engine.buildCombos, then wraps each combo for display.
