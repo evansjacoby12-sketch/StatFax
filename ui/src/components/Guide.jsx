@@ -64,14 +64,14 @@ export default function Guide({ onClose }) {
         {/* The single most important habit — earned the hard way. */}
         <div className="guide-callout">
           <span className="guide-callout-h">
-            <Icon name="Clock" size={14} /> Bet after lineups, not before
+            <Icon name="Lock" size={14} /> Scores lock in the morning
           </span>
           <span className="dim">
-            Lineups post ~2–3 hours before each game. Until then the board is <b>provisional</b> — its bats shift as
-            lineups and probable pitchers confirm, so combos locked in the morning are usually <i>not</i> the ones that
-            grade. Wait for the <b>green “Lineups in”</b> stamp on the Combos page (or the lineup watcher) before you bet.
-            A parlay also <b>locks at its earliest leg’s first pitch</b>, so keep a combo’s legs in the same start window —
-            or the late leg goes in before its lineup is even posted.
+            The board's scores, grades and combos <b>freeze at the morning lock</b> (look for the 🔒 chip in the
+            header) — they won't drift during the day, so you can bet the board any time. The only things that
+            update after the lock are <b>lineup confirmations</b> (green dot) and <b>scratched players</b>; if a
+            starting pitcher changes, that bat is re-scored and tagged <b>NEW ARM</b>. A parlay still{' '}
+            <b>locks at its earliest leg's first pitch</b>, so keep a combo's legs in the same start window.
           </span>
         </div>
 

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import Icon from './Icon.jsx'
 import { GradeChip } from './atoms.jsx'
+import { toast } from './Toast.jsx'
 import { pct, num } from '../lib/format.js'
 import { lastFirst, consistencyFactor, legFlags, legIsBad, risingForm } from '../lib/groups.js'
 import { correlatedJoint, gameCorrelation } from '../lib/parlay.js'
@@ -53,8 +54,7 @@ function buildSGP(batters, size, { favorConsistency } = {}) {
     // Weakness + lineup-confirmation (same guards as the combos page).
     const legInfo = legs.map((b) => { const flags = legFlags(b); return { flags, bad: legIsBad(b, flags), unconfirmed: b.lineupConfirmed !== true, rising: risingForm(b) } })
     const tone = legInfo.some((l) => l.bad) ? 'risk' : legInfo.some((l) => l.flags.length) ? 'caution' : 'tail'
-    const provisional = legInfo.some((l) => l.unconfirmed)
-    out.push({ ...g, legs, legInfo, combo, comboIndep, rho, envTilt, grade: gradeFor(avg), avg, tone, provisional, stars: sgpStars(legs, tone) })
+    out.push({ ...g, legs, legInfo, combo, comboIndep, rho, envTilt, grade: gradeFor(avg), avg, tone, stars: sgpStars(legs, tone) })
   }
   return out.sort((a, b) => b.combo - a.combo || (a.gamePk ?? 0) - (b.gamePk ?? 0))
 }
@@ -81,13 +81,14 @@ export default function SameGameView({ batters, onSelect, favorConsistency = fal
         <div className="empty-note">No game has {size} eligible bats right now.</div>
       ) : (
         <div className="grp-list">
-          {sgps.map((g) => {
+          {sgps.map((g, idx) => {
             const c = GRADE_COLOR[g.grade]
             const matchup = g.game ? `${g.game.awayTeam?.abbr} @ ${g.game.homeTeam?.abbr}` : `Game ${g.gamePk}`
             const live = comboStatus(g.legs)
             const lv = VERDICT_META[live.code]
+            const cashed = live.started && g.legs.length > 0 && live.hits >= g.legs.length
             return (
-              <section className={`grp-card sgp-card tone-${g.tone} ${g.provisional ? 'provisional' : ''}`} key={g.gamePk} style={{ '--gc': c }}>
+              <section className={`grp-card sgp-card tone-${g.tone}${cashed ? ' cashed' : ''}`} key={g.gamePk} style={{ '--gc': c, '--i': Math.min(idx, 8) }} title={cashed ? '💰 CASHED — every leg homered' : undefined}>
                 <header className="grp-head">
                   <span className="grp-legbadge">{size}-LEG SGP</span>
                   <span className="grp-strategy">
@@ -98,14 +99,24 @@ export default function SameGameView({ batters, onSelect, favorConsistency = fal
                     <span className="grp-live-tag" title={`Live: ${live.hits}/${live.n} legs homered`} style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '10px', fontWeight: '800', color: lv.color, background: `color-mix(in srgb, ${lv.color} 12%, transparent)`, border: `1px solid color-mix(in srgb, ${lv.color} 35%, transparent)`, borderRadius: '5px', padding: '1px 6px' }}>
                       <Icon name={lv.icon} size={10} className={live.code === 'live' ? 'spin-pulse' : ''} /> {lv.label} {live.hits}/{live.n}
                     </span>
-                  ) : g.provisional ? (
-                    <span className="grp-prov-tag"><Icon name="Clock" size={10} /> PROVISIONAL</span>
                   ) : (
                     <span className="grp-locked-tag"><Icon name="Lock" size={10} /> LOCKED</span>
                   )}
                   {comboConf === 'stars' && <span className="grp-conf">{'★'.repeat(g.stars)}<span className="grp-conf-off">{'★'.repeat(5 - g.stars)}</span></span>}
                   {comboConf === 'percent' && <span className="grp-conf pct">{pct(g.combo, g.combo < 0.01 ? 2 : 1)}</span>}
-                  <span className="grp-grade" style={{ color: c, borderColor: c }}>{g.grade}</span>
+                  <span className={`grp-grade grade-glow-${g.grade}`} style={{ color: c, borderColor: c }}>{g.grade}</span>
+                  <button
+                    className="grp-copy"
+                    title="Copy this SGP as text"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      const legsTxt = g.legs.map((b) => lastFirst(b.name).split(',')[0]).join(' + ')
+                      const line = `${size}-leg SGP ${matchup}: ${legsTxt} — all-hit ≈ ${pct(g.combo, g.combo < 0.01 ? 2 : 1)} corr-adj (StatFax)`
+                      navigator.clipboard?.writeText(line).then(() => toast.success('SGP copied')).catch(() => toast.warn('Copy failed'))
+                    }}
+                  >
+                    <Icon name="Copy" size={12} />
+                  </button>
                 </header>
                 <div className="grp-sub dim">
                   all‑hit ≈ <b className="mono">{pct(g.combo, g.combo < 0.01 ? 2 : 1)}</b>

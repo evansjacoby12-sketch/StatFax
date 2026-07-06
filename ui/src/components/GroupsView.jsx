@@ -211,9 +211,7 @@ function ScoreCard({ sc }) {
 }
 
 // Lineup-confirmation summary for the pool: distinct still-playable games and
-// how many have their lineup posted. Early in the day (no lineups) the board is
-// PROVISIONAL — its bats shift as lineups/probables confirm, so combos locked
-// then often aren't the ones that grade. This drives the "as of" stamp + guard.
+// how many have their lineup posted. Drives the "as of" stamp.
 function confirmSummary(batters) {
   const games = new Map() // gamePk -> confirmed?
   for (const b of batters || []) {
