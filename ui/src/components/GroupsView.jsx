@@ -367,27 +367,41 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard, g
   // midnight UTC don't roll the key mid-slate and reset the anti-flicker state.
   const slateDay = (generatedAt ? new Date(generatedAt) : new Date()).toLocaleDateString('en-CA', { timeZone: 'America/New_York' })
   const incKey = `combo-incumbents-${slateDay}`
-  const incRef = useRef(null)
-  if (incRef.current == null) {
-    const raw = store.load(incKey, null) || {}
-    incRef.current = Object.fromEntries(Object.entries(raw).map(([k, v]) => [k, new Set(v)]))
+  // Incumbency is ALSO scoped to the pool selection (windows + filter chips).
+  // Sticky legs exist to steady rebuilds of the SAME pool across data
+  // refreshes; carrying them across filter changes made the board
+  // order-dependent — reaching the same window selection via different click
+  // orders inherited different incumbents and showed different combos.
+  const poolSig = `${[...games].sort((a, b) => a - b).join(',')}|${hideStarted ? 1 : 0}|${confirmedOnly ? 1 : 0}`
+  const parseInc = (raw) => {
+    const out = {}
+    for (const [sig, m] of Object.entries(raw || {})) {
+      if (!m || typeof m !== 'object' || Array.isArray(m)) continue // skip pre-scoping format
+      out[sig] = Object.fromEntries(Object.entries(m).map(([k, v]) => [k, new Set(Array.isArray(v) ? v : [])]))
+    }
+    return out
   }
+  const incRef = useRef(null)
+  if (incRef.current == null) incRef.current = parseInc(store.load(incKey, null))
   useEffect(() => {
-    const raw = store.load(incKey, null) || {}
-    incRef.current = Object.fromEntries(Object.entries(raw).map(([k, v]) => [k, new Set(v)]))
+    incRef.current = parseInc(store.load(incKey, null))
   }, [incKey])
 
   const bySize = useMemo(
-    () => buildGroups(pool, { favorConsistency, incumbents: incRef.current, scorecard }),
-    [pool, favorConsistency, scorecard],
+    () => buildGroups(pool, { favorConsistency, incumbents: incRef.current[poolSig] || null, scorecard }),
+    [pool, favorConsistency, scorecard, poolSig],
   )
 
-  // Persist this build's legs as next build's incumbents.
+  // Persist this build's legs as next build's incumbents (for this pool only).
   useEffect(() => {
-    const legs = legsByStrategy(bySize)
-    incRef.current = legs
-    store.save(incKey, Object.fromEntries(Object.entries(legs).map(([k, v]) => [k, [...v]])))
-  }, [bySize, incKey])
+    incRef.current[poolSig] = legsByStrategy(bySize)
+    store.save(
+      incKey,
+      Object.fromEntries(
+        Object.entries(incRef.current).map(([sig, m]) => [sig, Object.fromEntries(Object.entries(m).map(([k, v]) => [k, [...v]]))]),
+      ),
+    )
+  }, [bySize, incKey, poolSig])
   const available = SIZE_TABS.filter((t) => bySize[t.k]?.length)
   const activeSize = bySize[size]?.length ? size : available[0]?.k
   const groups = activeSize ? bySize[activeSize] : []
