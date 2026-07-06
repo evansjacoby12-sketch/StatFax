@@ -210,20 +210,20 @@ export default function BacktestView({ batters = [], onApply }) {
       {res && (
         <div className={`bt-result ${liftTone}`}>
           <div className="bt-stat">
-            <span className="bt-stat-v mono">{pctOf(res.hr)}</span>
+            <span key={res.hr} className="bt-stat-v mono slip-legs-bump">{pctOf(res.hr)}</span>
             <span className="bt-stat-k">homered</span>
           </div>
           <div className="bt-stat">
-            <span className="bt-stat-v mono">{res.lift.toFixed(2)}×</span>
+            <span key={res.lift} className="bt-stat-v mono slip-legs-bump">{res.lift.toFixed(2)}×</span>
             <span className="bt-stat-k">vs base</span>
           </div>
           <div className="bt-stat">
-            <span className="bt-stat-v mono">{res.hits}/{res.n.toLocaleString()}</span>
+            <span key={res.n} className="bt-stat-v mono slip-legs-bump">{res.hits}/{res.n.toLocaleString()}</span>
             <span className="bt-stat-k">sample</span>
           </div>
           {onApply && (
             <div className="bt-stat">
-              <span className="bt-stat-v mono">{res.tonight}</span>
+              <span key={res.tonight} className="bt-stat-v mono slip-legs-bump">{res.tonight}</span>
               <span className="bt-stat-k">tonight</span>
             </div>
           )}
