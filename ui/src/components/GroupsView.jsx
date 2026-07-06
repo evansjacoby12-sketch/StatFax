@@ -56,7 +56,14 @@ function LockedBoard({ locked, batters, onSelect }) {
     </div>
   )
 }
-const SIZE_TABS = [2, 3, 4].map((k) => ({ k, label: `${k}-leg` }))
+const SIZE_TABS = [
+  { k: 2, label: '2-leg' },
+  { k: 3, label: '3-leg' },
+  // Audited 2026-07-05: 4-legs went 1-for-110 with the SAME leg quality as
+  // 2-legs (which cashed 12%) — the math, not the picks, kills them. Kept as
+  // an explicitly-labeled lottery, not a core bet.
+  { k: 4, label: '4-leg · lottery', lottery: true },
+]
 // How many combos to SHOW per size, strongest first.
 const DISPLAY_CAP = { 2: 3, 3: 2, 4: 1 }
 
@@ -468,7 +475,13 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard, g
       )}
       <div className="grp-controls" role="group" aria-label="Group size">
         {available.map((t) => (
-          <button key={t.k} className={`badge-toggle ${activeSize === t.k ? 'on' : ''}`} onClick={() => { setSize(t.k); setShowAll(false) }}>
+          <button
+            key={t.k}
+            className={`badge-toggle ${activeSize === t.k ? 'on' : ''}`}
+            onClick={() => { setSize(t.k); setShowAll(false) }}
+            title={t.lottery ? '4-leg all-hits went 1-for-110 all-time despite the same leg quality as 2-legs — the multiplication, not the picks, kills them. Small stakes only.' : undefined}
+          >
+            {t.lottery && <Icon name="Sparkles" size={11} style={{ marginRight: '3px', color: 'var(--prime)' }} />}
             {t.label}
           </button>
         ))}

@@ -142,8 +142,9 @@ export const blastMixOf = (b) => {
 // carry (it only needs key/rank/require). Keys match combo-engine.js STRATEGIES.
 const STRAT_META = {
   precision: { label: 'Precision',    icon: 'ScanSearch', desc: 'pitch mix ≥7 · heat ≥48 · HR due 5/6+ · 8+ positive trends · ≤3 negatives' },
-  matchup:   { label: 'Soft Matchup', icon: 'Target',     desc: 'facing HR-prone pitchers · best historical leg hit rate' },
-  mix:       { label: 'Best Mix',     icon: 'Sparkles',   desc: 'grade + barrel + heat blend' },
+  hot:       { label: 'Hot Hand',     icon: 'Flame',      desc: 'heat-led bats on live power — best audited leg hit rate (42.9%)' },
+  matchup:   { label: 'Soft Matchup', icon: 'Target',     desc: 'facing HR-prone pitchers (HR/9 ≥1.3)' },
+  mix:       { label: 'Best Mix',     icon: 'Sparkles',   desc: 'grade + barrel + heat blend — best audited all-hit rate' },
   park:      { label: 'Park & Air',   icon: 'Wind',       desc: 'park × weather × hand boosts HR' },
   edge:      { label: 'Edge Stack',   icon: 'Zap',        desc: '2+ matchup signals converge (pitch type, zones, platoon, fly-ball)' },
 }

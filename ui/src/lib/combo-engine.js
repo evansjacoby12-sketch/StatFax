@@ -139,11 +139,21 @@ export const STRATEGIES = [
   // vs 20.4% at 4/6 (14d window), while the positives gate was the binding
   // constraint with no measurable lift behind 9-vs-8 — so due tightened, positives softened.
   { key: 'precision', rank: (b) => (b.positiveReasons ?? 0) - (b.negativeReasons ?? 0) + ((b.heat ?? 0) / 100), require: (b) => b.pitchMixEdge === true && (b.heat ?? 0) >= 48 && (b.hrDueScore ?? 0) >= 5 && (b.positiveReasons ?? 0) >= 8 && (b.negativeReasons ?? 0) <= 3 },
-  // Soft Matchup — batter quality × pitcher HR/9; best historical leg hit rate (66.7%).
+  // Hot Hand — heat × recent-form multiplier, gated at the "hot bat" bar.
+  // REVIVED by the 2026-07-05 combo audit: hot was the best leg-picker in the
+  // 343-combo graded record (42.9% legs, 11% all-hit) yet got cut in the same
+  // overhaul that (correctly) removed top/power. Ranks on heat signals, not
+  // score, so it surfaces different bats than mix/matchup.
+  { key: 'hot',       rank: (b) => (b.heat ?? 0) * (b.heatMult ?? 1),                            require: (b) => (b.heat ?? 0) >= 58 },
+  // Soft Matchup — batter quality × pitcher HR/9. (Audited 2026-07-05: 30.6%
+  // legs, 7% all-hit over 60 combos — mid-pack, the old "best leg hit rate"
+  // claim came from a tiny early sample.)
   { key: 'matchup',   rank: (b) => (b.score ?? 0) * (b.pitcherHr9 ?? 0),                        require: (b) => Number.isFinite(b.pitcherHr9) && b.pitcherHr9 >= 1.3 },
-  // Best Mix — score + barrel + heat blend; 2nd best historically (63% legs, 33% combos).
+  // Best Mix — score + barrel + heat blend. (Audited 2026-07-05: best all-hit
+  // producer — 7/60 combos, 36.1% legs.)
   { key: 'mix',       rank: mixRank,                                                              require: null },
-  // Park & Air — park × weather × hand factor; 3rd best historically (62.5% legs, 33% combos).
+  // Park & Air — park × weather × hand factor. (Audited 2026-07-05: 43.4%
+  // legs, 10% all-hit on a small 21-combo sample.)
   { key: 'park',      rank: (b) => (b.score ?? 0) * (b.air ?? 0),                               require: (b) => Number.isFinite(b.air) && b.air >= 1.08 },
   // Edge Stack — ≥2 matchup signals converge (pitch type, zone, arsenal, platoon, fly-ball).
   { key: 'edge',      rank: edgeCount,                                                            require: (b) => edgeCount(b) >= 2 },
