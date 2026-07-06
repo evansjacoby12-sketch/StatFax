@@ -4555,12 +4555,15 @@ button.th:focus-visible {
 }
 
 /* Modals: top-anchor on phones (with safe-area inset) so the title + close are
-   never tucked under the status bar / notch, and use the full usable height. */
+   never tucked under the status bar / notch, and use the full usable height.
+   The fixed bottom-nav (58px + safe-area-inset-bottom, z-index 100) paints over
+   the modal, so the max-height ALSO subtracts the nav height — otherwise the
+   last scrollable content (e.g. a combo card's footer) is stuck behind it. */
 @media (max-width: 560px) {
   .modal {
     top: calc(env(safe-area-inset-top, 0px) + 12px);
     transform: translateX(-50%);
-    max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 24px);
+    max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 58px - 24px);
     padding: 18px 16px;
     animation: none;
   }
