@@ -30,12 +30,13 @@ function Tag({ code, text, meta }) {
   )
 }
 
-function LiveCombo({ g, onSelect }) {
+function LiveCombo({ g, idx = 0, onSelect }) {
   const v = comboStatus(g.legs)
   const vm = VERDICT_META[v.code]
   const gc = GRADE_COLOR[g.grade] || '#6b7787'
+  const cashed = v.code === 'cashed'
   return (
-    <section className="lc-card" style={{ borderRadius: '12px', border: `1px solid ${hexA(vm.color, 0.3)}`, background: v.code === 'cashed' ? hexA('#10b981', 0.06) : 'rgba(16,24,48,0.4)', padding: '12px 14px', borderLeft: `3px solid ${vm.color}` }}>
+    <section className={`lc-card${cashed ? ' cashed' : ''}`} style={{ '--i': Math.min(idx, 8), borderRadius: '12px', border: `1px solid ${hexA(vm.color, 0.3)}`, background: cashed ? hexA('#10b981', 0.06) : 'rgba(8, 9, 12, 0.5)', padding: '12px 14px', borderLeft: `3px solid ${vm.color}` }}>
       <header style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
         <Icon name={g.icon || 'Layers'} size={13} style={{ color: 'var(--accent)' }} />
         <span style={{ fontSize: '12.5px', fontWeight: '700', color: '#fff' }}>{g.label}</span>
@@ -43,12 +44,15 @@ function LiveCombo({ g, onSelect }) {
         <Tag code={v.code} text={`${vm.label} ${v.hits}/${v.n}`} meta={VERDICT_META} />
         <span style={{ marginLeft: 'auto', color: gc, border: `1px solid ${gc}`, borderRadius: '5px', padding: '0 6px', fontSize: '10px', fontWeight: '800' }}>{g.grade}</span>
       </header>
+      <div className="lc-progress" title={`${v.hits} of ${v.n} legs homered`} style={{ height: '3px', borderRadius: '2px', background: 'rgba(255,255,255,0.06)', marginBottom: '8px', overflow: 'hidden' }}>
+        <div style={{ height: '100%', width: `${v.n ? (v.hits / v.n) * 100 : 0}%`, background: cashed ? 'var(--strong)' : 'linear-gradient(90deg, var(--strong), var(--accent))', borderRadius: '2px', transition: 'width 0.6s cubic-bezier(0.22, 1, 0.36, 1)' }} />
+      </div>
       <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '4px' }}>
         {g.legs.map((b, i) => {
           const st = legStatus(b)
           const lm = LEG_META[st.code]
           return (
-            <li key={b.id} onClick={() => onSelect(b)} role="button" tabIndex={0} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', padding: '4px 2px', opacity: st.code === 'dead' ? 0.55 : 1 }}>
+            <li key={b.id} onClick={() => onSelect(b)} role="button" tabIndex={0} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', padding: '4px 4px', borderRadius: '6px', background: st.code === 'hit' ? hexA('#10b981', 0.07) : 'transparent', opacity: st.code === 'dead' ? 0.55 : 1 }}>
               <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: lm.color, flexShrink: 0 }} />
               <span style={{ fontSize: '12.5px', fontWeight: '600', color: '#fff', flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{lastFirst(b.name)}</span>
               <span className="dim" style={{ fontSize: '10px', flexShrink: 0 }}>{b.team}</span>
@@ -130,7 +134,7 @@ export default function LiveCombosView({ batters, onSelect, favorConsistency = f
       </p>
 
       <div className="lc-kpis" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '14px' }}>
-        <Kpi label="Cashed" value={cashed.length} color="var(--strong)" />
+        <Kpi label="Cashed" value={cashed.length} color="var(--strong)" glow={cashed.length > 0} />
         <Kpi label="Still alive" value={alive.length} color="var(--accent)" />
         <Kpi label="Tracked" value={started.length} color="var(--text-dim)" />
       </div>
@@ -146,7 +150,7 @@ export default function LiveCombosView({ batters, onSelect, favorConsistency = f
 
       {shown.length ? (
         <div className="lc-list" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {shown.map(({ g }) => <LiveCombo key={g.id} g={g} onSelect={onSelect} />)}
+          {shown.map(({ g }, i) => <LiveCombo key={g.id} g={g} idx={i} onSelect={onSelect} />)}
         </div>
       ) : (
         <div className="empty-note" style={{ padding: '40px 16px', textAlign: 'center', color: 'var(--text-faint)' }}>
@@ -160,10 +164,10 @@ export default function LiveCombosView({ batters, onSelect, favorConsistency = f
   )
 }
 
-function Kpi({ label, value, color }) {
+function Kpi({ label, value, color, glow = false }) {
   return (
-    <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '10px', padding: '10px', textAlign: 'center' }}>
-      <div className="mono" style={{ fontSize: '22px', fontWeight: '800', color }}>{value}</div>
+    <div className={glow ? 'lc-kpi-glow' : undefined} style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${glow ? 'rgba(16,185,129,0.3)' : 'rgba(255,255,255,0.05)'}`, borderRadius: '10px', padding: '10px', textAlign: 'center' }}>
+      <div key={value} className="mono slip-legs-bump" style={{ fontSize: '22px', fontWeight: '800', color }}>{value}</div>
       <div style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-faint)', marginTop: '2px' }}>{label}</div>
     </div>
   )

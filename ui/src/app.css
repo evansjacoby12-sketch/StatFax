@@ -8481,3 +8481,22 @@ button.th:focus-visible {
     animation: none;
   }
 }
+
+/* ─── Live combo tracker vibecode: cascade, cashed pulse, KPI glow ────────── */
+.lc-card {
+  animation: cardIn 0.35s ease both;
+  animation-delay: calc(var(--i, 0) * 50ms);
+}
+.lc-card.cashed {
+  animation: cardIn 0.35s ease both, cashedGlow 2.2s ease-in-out infinite;
+}
+.lc-kpi-glow {
+  animation: cashPulse 2.2s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .lc-card,
+  .lc-card.cashed,
+  .lc-kpi-glow {
+    animation: none;
+  }
+}
