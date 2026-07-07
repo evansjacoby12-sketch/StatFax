@@ -11,15 +11,6 @@ import { gradeFor, paWeight, isBenched } from '../lib/combo-engine.js'
 const SIZES = [2, 3, 4]
 const GRADE_COLOR = { S: '#f5a623', A: '#32d74b', B: '#3b82f6', C: '#9aa6b6', D: '#6b7787' }
 
-// Stars from leg strength minus caution/weak penalty (mirrors the combos page).
-function sgpStars(legs, tone) {
-  const probs = legs.map((b) => b.hrProbability).filter(Number.isFinite)
-  const avg = probs.length ? probs.reduce((s, p) => s + p, 0) / probs.length : 0
-  const normP = Math.min(1, Math.max(0, (avg - 0.15) / (0.27 - 0.15)))
-  const penalty = tone === 'risk' ? 0.45 : tone === 'caution' ? 0.2 : 0
-  return Math.max(1, Math.round(1 + Math.min(1, Math.max(0, normP - penalty)) * 4))
-}
-
 // Same-Game Parlays: the best `size` bats from ONE game stacked together.
 // Honors the same consistency lean as the combos page.
 function buildSGP(batters, size, { favorConsistency } = {}) {
@@ -57,21 +48,30 @@ function buildSGP(batters, size, { favorConsistency } = {}) {
     // Weakness + lineup-confirmation (same guards as the combos page).
     const legInfo = legs.map((b) => { const flags = legFlags(b); return { flags, bad: legIsBad(b, flags), unconfirmed: b.lineupConfirmed !== true, rising: risingForm(b) } })
     const tone = legInfo.some((l) => l.bad) ? 'risk' : legInfo.some((l) => l.flags.length) ? 'caution' : 'tail'
-    out.push({ ...g, legs, legInfo, combo, comboIndep, rho, envTilt, grade: gradeFor(avg), avg, tone, stars: sgpStars(legs, tone) })
+    out.push({ ...g, legs, legInfo, combo, comboIndep, rho, envTilt, grade: gradeFor(avg), avg, tone })
   }
   return out.sort((a, b) => b.combo - a.combo || (a.gamePk ?? 0) - (b.gamePk ?? 0))
 }
 
-export default function SameGameView({ batters, onSelect, favorConsistency = false, comboConf = 'off' }) {
+export default function SameGameView({ batters, onSelect, favorConsistency = false, comboConf = 'off', sgpScorecard = null }) {
   const [size, setSize] = useState(2)
   const sgps = useMemo(() => buildSGP(batters, size, { favorConsistency }), [batters, size, favorConsistency])
+  const scOv = sgpScorecard?.overall
   return (
     <>
+      {scOv && scOv.combos > 0 && (
+        <div className="sgp-record" title="Settled same-game parlays graded against actual home runs.">
+          <Icon name="Activity" size={13} />
+          <span>SGP record · <b className="mono">{pct(scOv.hitRate, scOv.hitRate < 0.01 ? 1 : 0)}</b> cashed</span>
+          <span className="dim">{scOv.allHit}/{scOv.combos} · {sgpScorecard.days}d</span>
+          {scOv.hitRate < 0.03 && <span className="sgp-record-warn">long-shot bet</span>}
+        </div>
+      )}
       <p className="sgp-intro dim">
         Every leg from the <b>same game</b> — a "this game goes off" bet. Same‑game HR legs are{' '}
         <b>correlated</b> (shared park, weather, opposing pitcher), so they cash together more than the
-        independent odds suggest — but books price SGPs with a correlation discount, so the payout is{' '}
-        <i>lower</i> than the same legs across games. Best used on high‑HR parks.
+        independent odds suggest — but they're a <b>long shot</b>: same-game stacks have cashed far less
+        than cross-game combos (see the record above). Best used as a small-stake lottery on high‑HR parks.
       </p>
       <div className="grp-controls" role="group" aria-label="Legs per SGP">
         {SIZES.map((s) => (
@@ -105,7 +105,6 @@ export default function SameGameView({ batters, onSelect, favorConsistency = fal
                   ) : (
                     <span className="grp-locked-tag"><Icon name="Lock" size={10} /> LOCKED</span>
                   )}
-                  {comboConf === 'stars' && <span className="grp-conf">{'★'.repeat(g.stars)}<span className="grp-conf-off">{'★'.repeat(5 - g.stars)}</span></span>}
                   {comboConf === 'percent' && <span className="grp-conf pct">{pct(g.combo, g.combo < 0.01 ? 2 : 1)}</span>}
                   <span className={`grp-grade grade-glow-${g.grade}`} style={{ color: c, borderColor: c }}>{g.grade}</span>
                   <button

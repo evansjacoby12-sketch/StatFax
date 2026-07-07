@@ -128,18 +128,6 @@ function ScoreCard({ sc }) {
         <div className="combo-sc-cap dim">
           Canonical pregame combos (one per strategy &amp; size), graded against actual home runs.
         </div>
-        {Number.isFinite(ov.predHitRate) && (() => {
-          const d = ov.hitRate - ov.predHitRate
-          const tone = d >= 0.02 ? 'pos' : d <= -0.02 ? 'neg' : ''
-          const label = d >= 0.02 ? 'beating the model' : d <= -0.02 ? 'under the model' : 'on the model'
-          return (
-            <div className="combo-sc-calib">
-              <Icon name="Target" size={12} />
-              <span>Actual <b className="mono">{pct(ov.hitRate, 0)}</b> vs predicted <b className="mono">{pct(ov.predHitRate, 0)}</b></span>
-              <span className={`combo-sc-calib-tag ${tone}`}>{label}</span>
-            </div>
-          )
-        })()}
         {ba?.latest && (
           <div className="combo-sc-ba" title="The best perfect parlay that was sittable from the PRIME/STRONG pool — one bat per game that homered, capped at the max combo size. Gauges grading quality apart from which combos the strategies built.">
             <Icon name="Sparkles" size={12} />
@@ -165,12 +153,9 @@ function ScoreCard({ sc }) {
               <span className="combo-sc-k">{k}-leg</span>
               <span className="combo-sc-bar">
                 <span className="combo-sc-fill" style={{ width: `${Math.round((v.hitRate ?? 0) * 100)}%` }} />
-                {Number.isFinite(v.predHitRate) && (
-                  <span className="combo-sc-pred-tick" style={{ left: `${Math.min(100, Math.round(v.predHitRate * 100))}%` }} title={`predicted ${pct(v.predHitRate, 0)}`} />
-                )}
               </span>
               <span className="combo-sc-v mono">{pct(v.hitRate, 0)}</span>
-              <span className="combo-sc-n dim">{v.allHit}/{v.combos}{Number.isFinite(v.predHitRate) ? ` · exp ${pct(v.predHitRate, 0)}` : ''}</span>
+              <span className="combo-sc-n dim">{v.allHit}/{v.combos}</span>
             </div>
           ))}
         </div>
@@ -183,9 +168,6 @@ function ScoreCard({ sc }) {
                   <span className="combo-sc-k" title={`per-leg hit ${pct(v.legHitRate, 0)}`}>{STRAT_LABEL[k] || k}</span>
                   <span className="combo-sc-bar">
                     <span className="combo-sc-fill" style={{ width: `${Math.round((v.hitRate ?? 0) * 100)}%` }} />
-                    {Number.isFinite(v.predHitRate) && (
-                      <span className="combo-sc-pred-tick" style={{ left: `${Math.min(100, Math.round(v.predHitRate * 100))}%` }} title={`predicted ${pct(v.predHitRate, 0)}`} />
-                    )}
                   </span>
                   <span className="combo-sc-v mono">{pct(v.hitRate, 0)}</span>
                   <span className="combo-sc-n dim">{v.allHit}/{v.combos}</span>
@@ -261,17 +243,6 @@ function computeWindows(gameList) {
 }
 
 // Cross-Game HR Groups — auto-built multi-leg parlays, one best bat per game.
-// Combo confidence — Stars (quality: clean tail of strong legs → 5★, dinged by
-// caution/weak flags and weaker legs) and % (the real all-hit chance, g.allHit).
-function comboStars(g, tone) {
-  const probs = g.legs.map((b) => b.hrProbability).filter(Number.isFinite)
-  const avg = probs.length ? probs.reduce((s, p) => s + p, 0) / probs.length : 0
-  const normP = Math.min(1, Math.max(0, (avg - 0.15) / (0.27 - 0.15)))
-  const penalty = tone === 'risk' ? 0.45 : tone === 'caution' ? 0.2 : 0
-  const conf = Math.min(1, Math.max(0, normP - penalty))
-  return Math.max(1, Math.round(1 + conf * 4))
-}
-
 // Spread picker — from a size's combos, greedily choose a set that shares the
 // FEWEST bats, so you get independent shots instead of the same anchors N times.
 // Start with the strongest, then keep adding the combo that brings the most new
@@ -679,11 +650,6 @@ function GroupCard({ g, idx = 0, onSelect, selectedId, comboConf = 'off', slipSe
             <Icon name="Clock" size={10} /> PROJECTED
           </span>
         )}
-        {comboConf === 'stars' && (() => { const s = comboStars(g, tone); return (
-          <span className="grp-conf" title={`Confidence ${s}/5 — combo quality (leg strength minus caution/weak flags)`}>
-            {'★'.repeat(s)}<span className="grp-conf-off">{'★'.repeat(5 - s)}</span>
-          </span>
-        ) })()}
         {comboConf === 'percent' && (
           <span className="grp-conf pct" title="Chance every leg homers (all-hit probability)">{pct(g.allHit, g.allHit < 0.01 ? 2 : 1)}</span>
         )}

@@ -257,6 +257,7 @@ import {
   bestAvailableCombo,
   appendComboDay,
   comboScorecard,
+  sgpScorecard,
   freezeComboInputs,
 } from './parlay-combos.mjs';
 
@@ -2308,6 +2309,35 @@ async function main() {
     console.warn(`[combo] scorecard skipped: ${e?.message}`);
   }
 
+  // Same-game parlays were STORED as predictions but never graded — no settled
+  // SGP record existed. Grade every ungraded day's stored SGPs against that day's
+  // reconciled HR outcomes (log.records) — grades the legs that were actually
+  // shown, and backfills the whole ~2wk window at once instead of drip-feeding.
+  try {
+    const sgpBy = backtestLog?.combos?.sgpByDate;
+    if (sgpBy && typeof sgpBy === 'object') {
+      let gradedN = 0, gradedDays = 0;
+      for (const d of Object.keys(sgpBy)) {
+        const stored = sgpBy[d];
+        if (!Array.isArray(stored) || !stored.length) continue;
+        if (stored.some((s) => typeof s.allHit === 'boolean')) continue; // already graded
+        const recs = backtestLog?.records?.[d];
+        if (!Array.isArray(recs) || !recs.length) continue; // no outcomes for this day yet
+        const homerers = new Set(recs.filter((r) => r.homered === true).map((r) => Number(r.playerId)));
+        sgpBy[d] = stored.map((s) => {
+          const nHit = (s.legs || []).filter((pid) => homerers.has(Number(pid))).length;
+          return { ...s, nHit, allHit: nHit === (s.legs || []).length };
+        });
+        gradedN += sgpBy[d].length; gradedDays += 1;
+      }
+      const sk = Object.keys(sgpBy).sort();
+      for (const d of sk.slice(0, -14)) delete sgpBy[d];
+      if (gradedDays) console.log(`[sgp] graded ${gradedN} SGPs across ${gradedDays} day(s) from reconcile records`);
+    }
+  } catch (e) {
+    console.warn(`[sgp] grading skipped: ${e?.message}`);
+  }
+
   // Self-heal: backfill any recent day whose full board was captured live
   // (combos.fullByDate) but never graded into byDate — e.g. the one-shot
   // next-day grading above missed it because a late west-coast game wasn't Final
@@ -4319,6 +4349,8 @@ async function main() {
     // (one per strategy per size), graded against actual HR outcomes. The real,
     // accumulating answer to "have our combos hit?" — see server/parlay-combos.mjs.
     comboScorecard: comboScorecard(backtestLog),  // { days, overall, byStrategy, bySize }
+    // sgpScorecard: same, for the graded same-game parlays (overall + by-size).
+    sgpScorecard: sgpScorecard(backtestLog),      // { days, overall, bySize }
     // Day Rating (1-5★) — "should I bet HR props today?" gauge.
     dayRating: preCapDayRating,
 

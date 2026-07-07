@@ -153,31 +153,37 @@ export const powerRank = (b) =>
 // multiplier (both heat signals) rather than the score, so it doesn't just
 // re-pick `top`'s legs. Gates (barrel ≥ 11, hr9 ≥ 1.3, air ≥ 1.08) sit a notch
 // above neutral so each strategy surfaces distinct bats, not the same elite tier.
+// Ordered best-first by the 2026-07-05→07 reconciled record (21 graded days,
+// 358 combos). Order matters: earlier strategies claim their picks first under
+// the diversity caps and lead the display, so the proven earners (hot 14.9%,
+// mix 11.1%, park 9.5% cash) sit up top and the laggards (matchup 6.3%; edge
+// 0/18, precision 0/12) trail. Precision keeps its tight gate but is demoted off
+// the top slot it used to hold; edge is last pending a re-tune.
 export const STRATEGIES = [
-  // Precision — pitch mix ≥7 · heat ≥48 · HR due 5/6+ · 8+ positive trends · ≤3 negatives.
-  // Tuned 2026-07-03 on 30d of reconciled outcomes: setup 5/6 legs hit 25.3%
-  // vs 20.4% at 4/6 (14d window), while the positives gate was the binding
-  // constraint with no measurable lift behind 9-vs-8 — so due tightened, positives softened.
-  { key: 'precision', rank: (b) => (b.positiveReasons ?? 0) - (b.negativeReasons ?? 0) + ((b.heat ?? 0) / 100), require: (b) => b.pitchMixEdge === true && (b.heat ?? 0) >= 48 && (b.hrDueScore ?? 0) >= 5 && (b.positiveReasons ?? 0) >= 8 && (b.negativeReasons ?? 0) <= 3 },
-  // Hot Hand — heat × recent-form multiplier, gated at the "hot bat" bar.
-  // REVIVED by the 2026-07-05 combo audit: hot was the best leg-picker in the
-  // 343-combo graded record (42.9% legs, 11% all-hit) yet got cut in the same
-  // overhaul that (correctly) removed top/power. Ranks on heat signals, not
-  // score, so it surfaces different bats than mix/matchup.
+  // Hot Hand — heat × recent-form multiplier. Best in the graded record:
+  // 14.9% all-hit, 45% legs. Ranks on heat, not score, so it surfaces different
+  // bats than mix/matchup.
   { key: 'hot',       rank: (b) => (b.heat ?? 0) * (b.heatMult ?? 1),                            require: (b) => (b.heat ?? 0) >= 58 },
-  // Soft Matchup — batter quality × pitcher HR/9. (Audited 2026-07-05: 30.6%
-  // legs, 7% all-hit over 60 combos — mid-pack, the old "best leg hit rate"
-  // claim came from a tiny early sample.)
-  { key: 'matchup',   rank: (b) => (b.score ?? 0) * (b.pitcherHr9 ?? 0),                        require: (b) => Number.isFinite(b.pitcherHr9) && b.pitcherHr9 >= 1.3 },
-  // Best Mix — score + barrel + heat blend. (Audited 2026-07-05: best all-hit
-  // producer — 7/60 combos, 36.1% legs.)
+  // Best Mix — score + barrel + heat blend. 11.1% all-hit, 36% legs.
   { key: 'mix',       rank: mixRank,                                                              require: null },
-  // Park & Air — park × weather × hand factor. (Audited 2026-07-05: 43.4%
-  // legs, 10% all-hit on a small 21-combo sample.)
+  // Park & Air — park × weather × hand factor. 9.5% all-hit, 43% legs.
   { key: 'park',      rank: (b) => (b.score ?? 0) * (b.air ?? 0),                               require: (b) => Number.isFinite(b.air) && b.air >= 1.08 },
-  // Edge Stack — ≥2 matchup signals converge (pitch type, zone, arsenal, platoon, fly-ball).
+  // Soft Matchup — batter quality × pitcher HR/9. Mid-pack: 6.3% all-hit, 31% legs.
+  { key: 'matchup',   rank: (b) => (b.score ?? 0) * (b.pitcherHr9 ?? 0),                        require: (b) => Number.isFinite(b.pitcherHr9) && b.pitcherHr9 >= 1.3 },
+  // Precision — pitch mix ≥7 · heat ≥48 · HR due 5/6+ · 8+ positive trends · ≤3
+  // negatives. Tight gate, fires rarely (12 combos in 21d) and hasn't cashed —
+  // kept as a high-conviction diversifier, demoted from the top slot. Its gate
+  // is due a data-driven re-tune once more sample accrues.
+  { key: 'precision', rank: (b) => (b.positiveReasons ?? 0) - (b.negativeReasons ?? 0) + ((b.heat ?? 0) / 100), require: (b) => b.pitchMixEdge === true && (b.heat ?? 0) >= 48 && (b.hrDueScore ?? 0) >= 5 && (b.positiveReasons ?? 0) >= 8 && (b.negativeReasons ?? 0) <= 3 },
+  // Edge Stack — ≥2 matchup signals converge (pitch type, zone, arsenal, platoon,
+  // fly-ball). 35% legs but 0/18 all-hit — decent leg-picker, never cashed as a
+  // combo. Last in order pending a re-tune; a candidate to cut if it stays cold.
   { key: 'edge',      rank: edgeCount,                                                            require: (b) => edgeCount(b) >= 2 },
 ]
+
+// Keys of strategies that CURRENTLY exist — used to prune the scorecard of dead
+// strategies (top/power were removed but still sit in old graded records).
+export const STRATEGY_KEYS = new Set(STRATEGIES.map((s) => s.key))
 
 // Letter grade from a combo's average leg score (the shared S/A/B/C/D ladder).
 export function gradeFor(avgScore) {

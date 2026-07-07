@@ -42,6 +42,7 @@ import {
   negativeReasonCount,
   paWeight,
   isBenched,
+  STRATEGY_KEYS,
 } from '../ui/src/lib/combo-engine.js';
 
 /**
@@ -259,6 +260,44 @@ export function appendComboDay(log, date, gradedCombos, bestAvailable) {
 }
 
 /**
+ * Rolling scorecard for the GRADED same-game parlays (sgpByDate). SGPs have no
+ * strategies, so it's overall + by-size (2/3-leg) cash rate and per-leg hit rate.
+ * Records still carrying only a `pred` (not yet graded) are skipped. Pure read.
+ */
+export function sgpScorecard(log) {
+  const byDate = log?.combos?.sgpByDate || {};
+  const dates = Object.keys(byDate).sort().slice(-30);
+  const cell = () => ({ combos: 0, allHit: 0, legs: 0, legHits: 0 });
+  const overall = cell();
+  const bySize = {};
+  let gradedDays = 0;
+  for (const d of dates) {
+    let any = false;
+    for (const s of byDate[d] || []) {
+      if (typeof s.allHit !== 'boolean') continue; // ungraded prediction
+      any = true;
+      const n = (s.legs || []).length;
+      for (const x of [overall, (bySize[String(s.size)] ??= cell())]) {
+        x.combos += 1; x.allHit += s.allHit ? 1 : 0; x.legs += n; x.legHits += s.nHit ?? 0;
+      }
+    }
+    if (any) gradedDays += 1;
+  }
+  const finalize = (x) => ({
+    combos: x.combos,
+    allHit: x.allHit,
+    hitRate: x.combos ? x.allHit / x.combos : null,
+    legHitRate: x.legs ? x.legHits / x.legs : null,
+  });
+  return {
+    days: gradedDays,
+    overall: finalize(overall),
+    bySize: Object.fromEntries(Object.entries(bySize).map(([k, v]) => [k, finalize(v)])),
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+/**
  * Aggregate the embedded combo log into a scorecard: overall, per-strategy, and
  * per-size hit rates (parlay all-hit rate) plus per-leg hit rate. Pure read.
  */
@@ -268,30 +307,30 @@ export function comboScorecard(log) {
   // read, not a rolling multi-day blend. byDate holds only settled days
   // (appendComboDay appends graded outcomes), so the last key is yesterday.
   const dates = Object.keys(byDate).sort().slice(-30);
-  const cell = () => ({ combos: 0, allHit: 0, legs: 0, legHits: 0, predSum: 0, predN: 0 });
+  const cell = () => ({ combos: 0, allHit: 0, legs: 0, legHits: 0 });
   const byStrategy = {};
   const bySize = {};
   const overall = cell();
   const add = (x, c) => {
     x.combos += 1; x.allHit += c.allHit ? 1 : 0; x.legs += c.size; x.legHits += c.nHit;
-    if (Number.isFinite(c.pred)) { x.predSum += c.pred; x.predN += 1; }
   };
   for (const d of dates) {
     for (const c of byDate[d] || []) {
+      // Skip dead strategies (top/power were removed but linger in old records).
+      if (c.strategy && !STRATEGY_KEYS.has(c.strategy)) continue;
       add(overall, c);
       add((byStrategy[c.strategy] ??= cell()), c);
       add((bySize[String(c.size)] ??= cell()), c);
     }
   }
+  // predHitRate was dropped 2026-07-07: the pred was product-of-leg-probs off the
+  // OLD deflated snapshot (69% null, mean 0.3% vs 6.4% actual) — a misleading
+  // "predicted" column. hitRate + legHitRate are outcome-based and trustworthy.
   const finalize = (x) => ({
     combos: x.combos,
     allHit: x.allHit,
     hitRate: x.combos ? x.allHit / x.combos : null,
     legHitRate: x.legs ? x.legHits / x.legs : null,
-    // Mean predicted all-hit prob across combos that carried one — the rate the
-    // model EXPECTED to cash. Compare to hitRate for calibration. null until
-    // newly-graded days (with pred logged) accrue.
-    predHitRate: x.predN ? x.predSum / x.predN : null,
   });
   // Best-available diagnostic: the perfect parlay that WAS sittable each day,
   // and how often a winning combo (2+ legs) existed at all — a read on grading

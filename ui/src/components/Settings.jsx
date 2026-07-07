@@ -73,8 +73,8 @@ export default function Settings({
         {
           icon: 'Trophy',
           label: 'Combo confidence',
-          desc: 'Show a confidence level on each combo — Stars (quality: clean tail of strong legs = 5★) or % (the actual chance every leg homers).',
-          segments: [['off', 'Off'], ['stars', 'Stars'], ['percent', '%']],
+          desc: 'Show the actual chance every leg homers (all-hit %) on each combo.',
+          segments: [['off', 'Off'], ['percent', 'All-hit %']],
           value: comboConf,
           onSet: onSetComboConf,
         },
