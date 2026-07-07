@@ -305,13 +305,16 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard, g
     for (const s of set) for (const pk of windows[Number(s)].pks) next.add(pk)
     setGames(next)
   }
-  // With Windows on, land on the EARLY window by default (once) rather than the
-  // flickery all-games view — the all-slate board churns as unconfirmed late
-  // games wobble, the window board is stable. One-time so it never fights a tap.
+  // With Windows on, land on the earliest window that can actually FORM a combo
+  // (≥2 games) rather than the flickery all-games view. A lone early game (e.g. a
+  // getaway day game) is its own 1-game window — landing there showed an empty
+  // board even though the evening windows were full. One-time so it never fights
+  // a tap; falls back to all-games if no window has 2+ games.
   const autoWindowed = useRef(false)
   useEffect(() => {
     if (windowMode && !autoWindowed.current && windows.length > 1 && games.size === 0) {
-      setGames(new Set(windows[0].pks))
+      const w = windows.find((win) => win.pks.size >= 2)
+      if (w) setGames(new Set(w.pks)) // else keep all-games so combos still build
       autoWindowed.current = true
     }
   }, [windowMode, windows, games])
