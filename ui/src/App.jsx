@@ -98,7 +98,13 @@ export default function App() {
   const [windowMode, setWindowMode] = useState(() => store.load('windowMode', true))
   const [showDayRating, setShowDayRating] = useState(() => store.load('showDayRating', true))
   const [comboConf, setComboConf] = useState(() => store.load('comboConf', 'off')) // 'off' | 'stars' | 'percent'
-  const [favorConsistency, setFavorConsistency] = useState(() => store.load('favorConsistency', false))
+  // Favor-consistency lean removed from the UI — kept as a constant so the combo
+  // builders' `favorConsistency` prop stays wired (always off) without churn.
+  const favorConsistency = false
+  // Morning combo lock: apply the server's comboFreeze bundle so the parlay board's
+  // leg selection is pinned at the morning lock. Toggle (default OFF for now while
+  // testing) — off = the board re-ranks live from current heat/park/edge signals.
+  const [comboLock, setComboLock] = useState(() => store.load('comboLock', false))
   const [splitProjected, setSplitProjected] = useState(() => store.load('splitProjected', false))
   const [watchlist, setWatchlist] = useState(() => new Set(store.load('watchlist', [])))
   const [slipIds, setSlipIds] = useState(() => store.load('slip', []))
@@ -131,7 +137,7 @@ export default function App() {
   useEffect(() => store.save('windowMode', windowMode), [windowMode])
   useEffect(() => store.save('showDayRating', showDayRating), [showDayRating])
   useEffect(() => store.save('comboConf', comboConf), [comboConf])
-  useEffect(() => store.save('favorConsistency', favorConsistency), [favorConsistency])
+  useEffect(() => store.save('comboLock', comboLock), [comboLock])
   useEffect(() => store.save('splitProjected', splitProjected), [splitProjected])
   useEffect(() => store.save('eliLevel', eliLevel), [eliLevel])
   useEffect(() => store.save('podDismissed', podDismissedId), [podDismissedId])
@@ -743,6 +749,7 @@ export default function App() {
                 lockedBoard={data.raw?.lockedBoard}
                 slipSet={slipSet}
                 onToggleSlip={toggleSlip}
+                comboLock={comboLock}
               />
             </div>
           </div>
@@ -843,10 +850,10 @@ export default function App() {
           onSetComboConf={setComboConf}
           eliLevel={eliLevel}
           onSetEli={setEliLevel}
-          favorConsistency={favorConsistency}
-          onToggleConsistency={() => setFavorConsistency((v) => !v)}
           splitProjected={splitProjected}
           onToggleSplit={() => setSplitProjected((v) => !v)}
+          comboLock={comboLock}
+          onToggleComboLock={() => setComboLock((v) => !v)}
           onClose={() => setShowSettings(false)}
         />
       )}

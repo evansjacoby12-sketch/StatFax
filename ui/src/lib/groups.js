@@ -153,7 +153,7 @@ const STRAT_META = {
 // full batter back for display. `heat` is the precomputed Heat Index (scout.js
 // via data.js) — the SAME formula the server calls, so neither side recomputes
 // it differently. `consistency` feeds the optional favor-consistency lean.
-function toComboRow(b) {
+function toComboRow(b, applyLock = false) {
   const barrel = barrelOf(b)
   const row = {
     ref: b,
@@ -187,12 +187,12 @@ function toComboRow(b) {
     hrDueScore: hrSetup(b).n,
     consistency: consistencyFactor(b),
   }
-  // Morning combo lock: if the server pinned this bat's strategy-ranking inputs
-  // at the lock (b.comboFreeze — see server/parlay-combos freezeComboInputs), use
-  // those verbatim so the board's leg selection is frozen for the day and matches
-  // the graded record. Score/grade/prob are frozen separately via LOCK_FIELDS; a
-  // pitcher change clears comboFreeze upstream so that bat re-ranks fresh.
-  if (b.comboFreeze) Object.assign(row, b.comboFreeze)
+  // Morning combo lock (opt-in via the comboLock setting): if the server pinned
+  // this bat's strategy-ranking inputs at the lock (b.comboFreeze — see
+  // server/parlay-combos freezeComboInputs), use those verbatim so the board's
+  // leg selection is frozen for the day and matches the graded record. When the
+  // lock is OFF the board re-ranks live from current heat/park/edge signals.
+  if (applyLock && b.comboFreeze) Object.assign(row, b.comboFreeze)
   return row
 }
 
@@ -275,8 +275,8 @@ export function mergeGroups(a, b) {
 // straight through to the engine (see buildCombos). `includeFinals` keeps
 // finished games in the pool — used by the Live tracker (not the betting board)
 // so a combo can be followed all day, not dropped the moment a game ends.
-export function buildGroups(batters, { maxPerBat = 2, globalMaxPerBat = 4, favorConsistency = false, incumbents = null, stickMargin = 0.05, includeFinals = false, scorecard = null } = {}) {
-  const rows = (batters || []).filter((b) => includeFinals || !b.game?.isFinal).map(toComboRow)
+export function buildGroups(batters, { maxPerBat = 2, globalMaxPerBat = 4, favorConsistency = false, incumbents = null, stickMargin = 0.05, includeFinals = false, scorecard = null, applyComboLock = false } = {}) {
+  const rows = (batters || []).filter((b) => includeFinals || !b.game?.isFinal).map((b) => toComboRow(b, applyComboLock))
   const combos = buildCombos(rows, { sizes: SIZES, maxPerBat, globalMaxPerBat, favorConsistency, incumbents, stickMargin })
   const out = {}
   for (const c of combos) {

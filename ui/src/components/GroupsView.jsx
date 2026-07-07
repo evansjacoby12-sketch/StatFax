@@ -297,7 +297,7 @@ function spreadPick(groups, n = 4) {
   return picked
 }
 
-export default function GroupsView({ batters, onSelect, selectedId, scorecard, generatedAt, windowMode = false, comboConf = 'off', favorConsistency = false, lockedBoard = null, slipSet = null, onToggleSlip = null }) {
+export default function GroupsView({ batters, onSelect, selectedId, scorecard, generatedAt, windowMode = false, comboConf = 'off', favorConsistency = false, lockedBoard = null, slipSet = null, onToggleSlip = null, comboLock = false }) {
   const [size, setSize] = useState(2)
   const [games, setGames] = useState(() => new Set()) // empty = all games
   // Hide started defaults ON: HR props can't be bet pregame once the game is
@@ -390,8 +390,8 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard, g
   }, [incKey])
 
   const bySize = useMemo(
-    () => buildGroups(pool, { favorConsistency, incumbents: incRef.current[poolSig] || null, scorecard }),
-    [pool, favorConsistency, scorecard, poolSig],
+    () => buildGroups(pool, { favorConsistency, incumbents: incRef.current[poolSig] || null, scorecard, applyComboLock: comboLock }),
+    [pool, favorConsistency, scorecard, poolSig, comboLock],
   )
 
   // Persist this build's legs as next build's incumbents (for this pool only).
