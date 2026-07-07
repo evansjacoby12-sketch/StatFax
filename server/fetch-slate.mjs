@@ -257,6 +257,7 @@ import {
   bestAvailableCombo,
   appendComboDay,
   comboScorecard,
+  freezeComboInputs,
 } from './parlay-combos.mjs';
 
 // ─── Server-side K-distribution estimator (mirrors client kBrain) ────────────
@@ -4080,6 +4081,11 @@ async function main() {
         if (!f) continue; // late-added batter — fresh values stand
         if ((row.pitcher?.id ?? null) !== (f.pitcherId ?? null)) { row.pitcherChanged = true; changed++; continue; }
         for (const k of LOCK_FIELDS) if (f[k] !== undefined) row[k] = f[k];
+        // Re-apply the pinned combo-ranking inputs so the parlay board's leg
+        // selection stays put all day (heat/park-air/edge signals otherwise
+        // re-rank the combos even with scores frozen). Pitcher-changed rows fell
+        // through above, so they carry no comboFreeze and re-rank fresh.
+        if (f.comboFreeze) row.comboFreeze = f.comboFreeze;
         frozen++;
       }
       console.log(`[lock] morning lock (${ml.at}): ${frozen} rows frozen, ${changed} kept fresh on pitcher change`);
@@ -4093,6 +4099,11 @@ async function main() {
         if (rows[id]) continue;
         const f = { pitcherId: row.pitcher?.id ?? null };
         for (const k of LOCK_FIELDS) if (row[k] !== undefined) f[k] = row[k];
+        // Pin the strategy-ranking inputs (heat, park-air, edge signals, HR-due,
+        // pos/neg) as of the lock, and apply to this run's row too, so the combo
+        // board is frozen from lock time — not just the displayed scores.
+        const cf = freezeComboInputs(row);
+        if (cf) { f.comboFreeze = cf; row.comboFreeze = cf; }
         rows[id] = f;
       }
       if (Object.keys(rows).length) {

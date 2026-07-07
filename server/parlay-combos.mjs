@@ -57,7 +57,7 @@ export function comboRowFromSnapshot(row) {
   const score = Number.isFinite(row.preGameScore) ? row.preGameScore : row.score;
   const grade = row.preGameGrade?.label || row.preGameGrade || row.grade?.label || row.grade || null;
   const barrel = barrelOf(row);
-  return {
+  const out = {
     playerId: row.playerId,
     gamePk:   row.gamePk,
     name:     row.name,
@@ -107,6 +107,36 @@ export function comboRowFromSnapshot(row) {
     // HR Due Indicator checklist score (0-6) from scout.hrSetup — precision gate.
     hrDueScore: hrSetup(row).n,
   };
+  // Morning combo lock: when the row carries a comboFreeze bundle (pinned at the
+  // morning lock — see fetch-slate 8.85), the STRATEGY-ranking inputs are pinned
+  // to their lock-time values so the combo board's leg selection can't drift as
+  // heat / park-air / edge signals move through the day. Score/grade/hrProb are
+  // frozen separately (LOCK_FIELDS); this pins the *other* inputs the strategies
+  // rank on. A pitcher change clears comboFreeze upstream, so that bat re-derives.
+  if (row.comboFreeze) Object.assign(out, row.comboFreeze);
+  return out;
+}
+
+// The exact strategy-ranking input fields comboRowFromSnapshot derives — the set
+// pinned by the morning combo lock. Kept in lockstep with the object above and
+// with ui/src/lib/groups.js toComboRow (the client adapter applies the same
+// comboFreeze bundle), so the displayed board == the graded board.
+export const COMBO_INPUT_FIELDS = [
+  'heat', 'heatMult', 'barrel', 'recentBarrel', 'blast', 'air', 'pitcherHr9',
+  'hot', 'homeEdge', 'awayEdge', 'bullpenLegend', 'barrelKing',
+  'pitchEdge', 'zoneEdge', 'pitchMixEdge', 'hrPlatoonEdge', 'flyBallMatchup',
+  'positiveReasons', 'negativeReasons', 'hrDueScore',
+];
+
+// Compute the freezable combo-input bundle for a row (fresh, ignoring any prior
+// freeze). Called once at the morning lock to pin these values for the day.
+export function freezeComboInputs(row) {
+  const { comboFreeze, ...bare } = row || {};
+  const cr = comboRowFromSnapshot(bare);
+  if (!cr) return null;
+  const f = {};
+  for (const k of COMBO_INPUT_FIELDS) if (cr[k] !== undefined) f[k] = cr[k];
+  return f;
 }
 
 /**

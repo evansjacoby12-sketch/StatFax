@@ -155,7 +155,7 @@ const STRAT_META = {
 // it differently. `consistency` feeds the optional favor-consistency lean.
 function toComboRow(b) {
   const barrel = barrelOf(b)
-  return {
+  const row = {
     ref: b,
     playerId: b.playerId,
     gamePk: b.gamePk,
@@ -187,6 +187,13 @@ function toComboRow(b) {
     hrDueScore: hrSetup(b).n,
     consistency: consistencyFactor(b),
   }
+  // Morning combo lock: if the server pinned this bat's strategy-ranking inputs
+  // at the lock (b.comboFreeze — see server/parlay-combos freezeComboInputs), use
+  // those verbatim so the board's leg selection is frozen for the day and matches
+  // the graded record. Score/grade/prob are frozen separately via LOCK_FIELDS; a
+  // pitcher change clears comboFreeze upstream so that bat re-ranks fresh.
+  if (b.comboFreeze) Object.assign(row, b.comboFreeze)
+  return row
 }
 
 // Wrap one engine combo (legs = canonical rows) into a display group: letter
