@@ -104,15 +104,12 @@ export function risingForm(b) {
 
 // Returns true when this batter meets every precision parlay gate — the same
 // criteria the precision strategy uses when auto-building combos.
+// Precision signal — the hottest elite-barrel bats. RE-TUNED 2026-07-07 to match
+// the combo strategy's validated gate (hot & barrel ≥ 12% → 30.3% HR, 2.30× base
+// over 7,143 reconciled bats); the old pitch-mix/heat/HR-due/pos/neg gate was
+// unvalidatable and never cashed. Keeps the board badge in step with the combo.
 export function precisionSignal(b) {
-  const { n } = hrSetup(b)
-  return (
-    b.pitchMixEdge === true &&
-    (b.heatIndex ?? 0) >= 48 &&
-    n >= 5 &&
-    positiveReasonCount(b) >= 8 &&
-    negativeReasonCount(b) <= 3
-  )
+  return b.hot === true && (barrelOf(b) ?? 0) >= 12
 }
 
 // Sleeper — a non-PRIME bat with PRIME-adjacent form the board doesn't
@@ -143,7 +140,7 @@ export const blastMixOf = (b) => {
 // Display metadata per strategy key — the label/icon/desc the engine doesn't
 // carry (it only needs key/rank/require). Keys match combo-engine.js STRATEGIES.
 const STRAT_META = {
-  precision: { label: 'Precision',    icon: 'ScanSearch', desc: 'pitch mix ≥7 · heat ≥48 · HR due 5/6+ · 8+ positive trends · ≤3 negatives' },
+  precision: { label: 'Precision',    icon: 'ScanSearch', desc: 'hottest elite-barrel bats — power surge + barrel ≥12% · 2.3× HR lift' },
   hot:       { label: 'Hot Hand',     icon: 'Flame',      desc: 'heat-led bats on live power — best audited leg hit rate (42.9%)' },
   matchup:   { label: 'Soft Matchup', icon: 'Target',     desc: 'facing HR-prone pitchers (HR/9 ≥1.3)' },
   mix:       { label: 'Best Mix',     icon: 'Sparkles',   desc: 'grade + barrel + heat blend — best audited all-hit rate' },

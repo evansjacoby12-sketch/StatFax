@@ -170,11 +170,15 @@ export const STRATEGIES = [
   { key: 'park',      rank: (b) => (b.score ?? 0) * (b.air ?? 0),                               require: (b) => Number.isFinite(b.air) && b.air >= 1.08 },
   // Soft Matchup — batter quality × pitcher HR/9. Mid-pack: 6.3% all-hit, 31% legs.
   { key: 'matchup',   rank: (b) => (b.score ?? 0) * (b.pitcherHr9 ?? 0),                        require: (b) => Number.isFinite(b.pitcherHr9) && b.pitcherHr9 >= 1.3 },
-  // Precision — pitch mix ≥7 · heat ≥48 · HR due 5/6+ · 8+ positive trends · ≤3
-  // negatives. Tight gate, fires rarely (12 combos in 21d) and hasn't cashed —
-  // kept as a high-conviction diversifier, demoted from the top slot. Its gate
-  // is due a data-driven re-tune once more sample accrues.
-  { key: 'precision', rank: (b) => (b.positiveReasons ?? 0) - (b.negativeReasons ?? 0) + ((b.heat ?? 0) / 100), require: (b) => b.pitchMixEdge === true && (b.heat ?? 0) >= 48 && (b.hrDueScore ?? 0) >= 5 && (b.positiveReasons ?? 0) >= 8 && (b.negativeReasons ?? 0) <= 3 },
+  // Precision — the hottest elite-barrel bats: b.hot (recent-ISO power surge) AND
+  // barrel ≥ 12%. RE-TUNED 2026-07-07 on 7,143 reconciled bats. The OLD gate
+  // (pitch-mix · heat≥48 · HR-due≥5 · pos≥8 · neg≤3) was unvalidatable — HR-due
+  // logged as all-zero, and heat/pm/pos/neg weren't logged at all — and precision
+  // cashed 0/12. `hot & barrel≥12` hits 30.3% (2.30× the 13.1% base), the
+  // strongest 2-signal filter in the data, using only fields both adapters carry.
+  // Ranks on barrel to surface the elite-contact tier (distinct from hot's
+  // heat-led rank and mix's blend).
+  { key: 'precision', rank: (b) => b.barrel ?? 0, require: (b) => b.hot === true && (b.barrel ?? 0) >= 12 },
   // Edge Stack — ≥2 matchup signals converge (pitch type, zone, arsenal, platoon,
   // fly-ball). 35% legs but 0/18 all-hit — decent leg-picker, never cashed as a
   // combo. Last in order pending a re-tune; a candidate to cut if it stays cold.
@@ -262,7 +266,12 @@ function topPerGame(elig, rank) {
     const cur = byGame.get(b.gamePk)
     if (!cur || cmp(b, cur) < 0) byGame.set(b.gamePk, b)
   }
-  return [...byGame.values()].sort(cmp)
+  const sorted = [...byGame.values()].sort(cmp)
+  // Dedup by playerId: a doubleheader lists the same bat under two gamePks, which
+  // let a combo stack him as two legs. Keep his better-ranked game only, so a
+  // player can never appear twice in one combo.
+  const seen = new Set()
+  return sorted.filter((b) => (seen.has(b.playerId) ? false : (seen.add(b.playerId), true)))
 }
 
 /**
