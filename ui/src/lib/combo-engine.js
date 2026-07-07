@@ -103,6 +103,26 @@ export const signalCount = (b) => Object.keys(STACK_SIGNALS).reduce((n, k) => n 
 export const EDGE_SIGNALS = ['pitchEdge', 'zoneEdge', 'pitchMixEdge', 'hrPlatoonEdge', 'flyBallMatchup']
 export const edgeCount = (b) => EDGE_SIGNALS.reduce((n, k) => n + (b[k] ? 1 : 0), 0)
 
+// Expected plate appearances by lineup slot (MLB averages), normalized to the
+// 9-slot mean so the multiplier centers near 1.0. HR chance scales roughly
+// linearly with PAs, so a leadoff bat is worth ~+10% and a 9-hole bat ~-11% vs
+// an order-blind clone. Null / not-yet-posted order → 1.0 (neutral): before
+// lineups drop the board stays order-agnostic, then tilts toward the bats who'll
+// actually get the extra cut. Applied to the combo rank AND the leg HR prob so
+// both the pick and the all-hit % stop being lineup-blind.
+const PA_BY_SLOT = [4.65, 4.55, 4.45, 4.35, 4.25, 4.12, 4.0, 3.88, 3.76]
+const PA_MEAN = PA_BY_SLOT.reduce((s, x) => s + x, 0) / PA_BY_SLOT.length
+export function paWeight(battingOrder) {
+  const o = Math.round(battingOrder)
+  if (!Number.isFinite(o) || o < 1 || o > 9) return 1
+  return PA_BY_SLOT[o - 1] / PA_MEAN
+}
+
+// A bat is benched when its side's lineup is CONFIRMED but it has no order slot —
+// it won't hit, so it can't homer. Excluded from the combo pool. Before the
+// lineup posts (unconfirmed) everyone is eligible on the projected board.
+export const isBenched = (b) => b.lineupConfirmed === true && !Number.isFinite(b.battingOrder)
+
 const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x))
 const norm01 = (v, hi) => clamp((v ?? 0) / hi, 0, 1)
 
@@ -265,10 +285,18 @@ export function buildCombos(rows, {
   incumbents = null,
   stickMargin = 0.05,
 } = {}) {
+  // Drop benched bats (confirmed lineup, no order slot — they can't homer). The
+  // adapters precompute `benched` and `paWeight` from the (live) lineup so the
+  // freeze can't pin them: bench status + batting order are the FACTS meant to
+  // move the board as lineups post, distinct from the frozen strategy signals.
+  const usable = (rows || []).filter((r) => !r.benched)
   // Each strategy's ranked pool is size-independent — compute once, slice per size.
   const pools = STRATEGIES.map((strat) => {
-    const base = favorConsistency ? (b) => strat.rank(b) * (b.consistency ?? 1) : strat.rank
-    const elig = eligible(rows, strat.require)
+    // Tilt every strategy's rank by the leg's expected-PA weight (lineup slot),
+    // so a hot 8-hole bat doesn't beat a comparable top-of-order bat who gets an
+    // extra cut. Neutral (×1) until the order posts. Consistency lean still opt-in.
+    const base = (b) => strat.rank(b) * (b.paWeight ?? 1) * (favorConsistency ? (b.consistency ?? 1) : 1)
+    const elig = eligible(usable, strat.require)
     const inc = incumbents?.[strat.key]
     let rank = base
     if (inc && inc.size) {

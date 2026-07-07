@@ -26,6 +26,8 @@ import {
   flyBallMatchupOf,
   positiveReasonCount,
   negativeReasonCount,
+  paWeight,
+  isBenched,
 } from './combo-engine.js'
 import { hrSetup } from './scout.js'
 import { comboMarket } from './odds.js'
@@ -155,13 +157,20 @@ const STRAT_META = {
 // it differently. `consistency` feeds the optional favor-consistency lean.
 function toComboRow(b, applyLock = false) {
   const barrel = barrelOf(b)
+  // Lineup facts — stay LIVE (never frozen): drop benched bats, and scale the
+  // pick + HR prob by the batting-order PA weight so the board isn't order-blind.
+  const pw = paWeight(b.battingOrder)
+  const rawProb = Number.isFinite(b.hrProbability) ? b.hrProbability : null
   const row = {
     ref: b,
     playerId: b.playerId,
     gamePk: b.gamePk,
+    battingOrder: Number.isFinite(b.battingOrder) ? b.battingOrder : null,
+    paWeight: pw,
+    benched: isBenched(b),
     score: b.score,
     grade: b.grade?.label || b.grade || null,
-    hrProb: Number.isFinite(b.hrProbability) ? b.hrProbability : null,
+    hrProb: rawProb != null ? rawProb * pw : null,
     heat: Number.isFinite(b.heatIndex) ? b.heatIndex : 0,
     heatMult: Number.isFinite(b.hotnessMultiplier) ? b.hotnessMultiplier : 1,
     barrel,
@@ -203,15 +212,16 @@ function makeGroup({ strategy, size, legs: rows }) {
   const legs = rows.map((r) => r.ref)
   const meta = STRAT_META[strategy] || { label: strategy, icon: 'Layers', desc: '' }
   // How many legs sit on an unconfirmed (projected/roster) lineup — those bats
-  // could be benched or hit out of a run-producing slot. Display-only flag; the
-  // engine still builds + grades the combo identically (combos are lineup-blind).
+  // could still be benched or hit out of a run-producing slot before first pitch.
   const projectedLegs = legs.filter((b) => b.lineupConfirmed !== true).length
   const avgScore = legs.reduce((s, b) => s + (b.score ?? 0), 0) / legs.length
-  const allHit = allHitProb(legs.map((b) => b.hrProbability))
+  // Use the comboRow's hrProb (PA-weighted by lineup slot), NOT the raw batter
+  // prob, so the all-hit % / EV shown match the pick logic and the graded pred.
+  const allHit = allHitProb(rows.map((r) => r.hrProb))
   // Market math (de-juiced) — combined price, betting EV, and the de-vigged
   // "model vs fair line" edge. All null unless every leg has a posted book.
   const market = comboMarket(
-    legs.map((b) => ({ american: b.odds?.best?.american, decimal: b.odds?.best?.decimal, modelProb: b.hrProbability })),
+    rows.map((r) => ({ american: r.ref.odds?.best?.american, decimal: r.ref.odds?.best?.decimal, modelProb: r.hrProb })),
   )
   return {
     id: `${strategy}-${size}`,
@@ -245,9 +255,11 @@ export function mergeGroups(a, b) {
   if (new Set(legs.map((x) => x.gamePk)).size !== legs.length) return null
   const size = legs.length
   const avgScore = legs.reduce((s, x) => s + (x.score ?? 0), 0) / legs.length
-  const allHit = allHitProb(legs.map((x) => x.hrProbability))
+  // PA-weight each leg's prob by lineup slot, same as the base combos.
+  const legProb = (x) => (Number.isFinite(x.hrProbability) ? x.hrProbability * paWeight(x.battingOrder) : null)
+  const allHit = allHitProb(legs.map(legProb))
   const market = comboMarket(
-    legs.map((x) => ({ american: x.odds?.best?.american, decimal: x.odds?.best?.decimal, modelProb: x.hrProbability })),
+    legs.map((x) => ({ american: x.odds?.best?.american, decimal: x.odds?.best?.decimal, modelProb: legProb(x) })),
   )
   const anchor = shared[0].name
   return {

@@ -40,6 +40,8 @@ import {
   flyBallMatchupOf,
   positiveReasonCount,
   negativeReasonCount,
+  paWeight,
+  isBenched,
 } from '../ui/src/lib/combo-engine.js';
 
 /**
@@ -57,21 +59,29 @@ export function comboRowFromSnapshot(row) {
   const score = Number.isFinite(row.preGameScore) ? row.preGameScore : row.score;
   const grade = row.preGameGrade?.label || row.preGameGrade || row.grade?.label || row.grade || null;
   const barrel = barrelOf(row);
+  // Lineup facts — stay LIVE (never part of comboFreeze): drop benched bats and
+  // scale the pick + HR prob by the batting-order PA weight. Mirrors groups
+  // .toComboRow so the graded board and the displayed board treat lineups the same.
+  const pw = paWeight(row.battingOrder);
+  const rawProb = Number.isFinite(row.hrProbability) ? row.hrProbability : (Number.isFinite(row.simHRProb) ? row.simHRProb : null);
   const out = {
     playerId: row.playerId,
     gamePk:   row.gamePk,
     name:     row.name,
     team:     row.team,
+    battingOrder: Number.isFinite(row.battingOrder) ? row.battingOrder : null,
+    paWeight: pw,
+    benched: isBenched(row),
     score,
     grade,
     // The model's stated chance this leg homers — the CALIBRATED headline
-    // probability, matching the client adapter (groups.js toComboRow).
-    // The 2026-07-05 combo audit caught the old preference for raw simHRProb:
-    // the sim is the pre-calibration, under-confident value (the isotonic
-    // table exists to correct it), which deflated every recorded combo pred
-    // ~70x (E[all-hits] 0.3 vs 21 actual over 343 graded combos) and made the
-    // scorecard's predicted-vs-actual column meaningless.
-    hrProb:   Number.isFinite(row.hrProbability) ? row.hrProbability : (Number.isFinite(row.simHRProb) ? row.simHRProb : null),
+    // probability, matching the client adapter (groups.js toComboRow), now
+    // scaled by the lineup-slot PA weight. The 2026-07-05 combo audit caught the
+    // old preference for raw simHRProb: the sim is the pre-calibration,
+    // under-confident value (the isotonic table exists to correct it), which
+    // deflated every recorded combo pred ~70x (E[all-hits] 0.3 vs 21 actual over
+    // 343 graded combos) and made the scorecard's predicted-vs-actual meaningless.
+    hrProb:   rawProb != null ? rawProb * pw : null,
     barrel,
     // Recent (L14) barrel%, when a real sample — blended into the power rank so
     // it isn't always the same season-barrel leaders. null => fall back to season.
