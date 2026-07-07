@@ -215,6 +215,7 @@ export function buildSGPRecords(rows, { sizes = [2, 3] } = {}) {
     if (!r || r.gamePk == null) continue;
     if (!r.grade || r.grade === 'SKIP') continue;
     if (!Number.isFinite(r.hrProb)) continue;
+    if (r.benched) continue; // confirmed lineup, no order slot — won't hit
     if (!byGame.has(r.gamePk)) byGame.set(r.gamePk, []);
     byGame.get(r.gamePk).push(r);
   }
@@ -222,9 +223,11 @@ export function buildSGPRecords(rows, { sizes = [2, 3] } = {}) {
   for (const [gamePk, bats] of byGame) {
     // Rank by model SCORE (grade quality) so an SGP stacks a game's best-graded
     // bats — the PRIME/STRONG studs a user would actually stack — not whichever
-    // fringe bat carries the highest raw HR prob. HR prob breaks ties.
+    // fringe bat carries the highest raw HR prob. Tilt by the batting-order PA
+    // weight (matches the client + combo engine). HR prob breaks ties. hrProb is
+    // already PA-weighted in comboRowFromSnapshot, so `pred` reflects it too.
     const ranked = bats.slice().sort(
-      (a, b) => (b.score ?? 0) - (a.score ?? 0) || (b.hrProb ?? 0) - (a.hrProb ?? 0) || (a.playerId - b.playerId),
+      (a, b) => (b.score ?? 0) * (b.paWeight ?? 1) - (a.score ?? 0) * (a.paWeight ?? 1) || (b.hrProb ?? 0) - (a.hrProb ?? 0) || (a.playerId - b.playerId),
     );
     for (const size of sizes) {
       if (ranked.length < size) continue;

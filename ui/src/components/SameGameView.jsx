@@ -6,7 +6,7 @@ import { pct, num } from '../lib/format.js'
 import { lastFirst, consistencyFactor, legFlags, legIsBad, risingForm } from '../lib/groups.js'
 import { correlatedJoint, gameCorrelation } from '../lib/parlay.js'
 import { comboStatus, legStatus, VERDICT_META, LEG_META } from '../lib/live.js'
-import { gradeFor } from '../lib/combo-engine.js'
+import { gradeFor, paWeight, isBenched } from '../lib/combo-engine.js'
 
 const SIZES = [2, 3, 4]
 const GRADE_COLOR = { S: '#f5a623', A: '#32d74b', B: '#3b82f6', C: '#9aa6b6', D: '#6b7787' }
@@ -25,13 +25,16 @@ function sgpStars(legs, tone) {
 function buildSGP(batters, size, { favorConsistency } = {}) {
   // Rank by model score (grade quality) so an SGP stacks a game's best-graded
   // bats — the PRIME/STRONG studs you'd actually stack — matching the settled
-  // SGP record (server buildSGPRecords). HR prob breaks ties.
-  const rankVal = (b) => (b.score ?? 0) * (favorConsistency ? consistencyFactor(b) : 1)
+  // SGP record (server buildSGPRecords). Tilt by the batting-order PA weight so
+  // a top-of-order stud edges a comparable bat batting 8th. HR prob breaks ties.
+  const rankVal = (b) => (b.score ?? 0) * paWeight(b.battingOrder) * (favorConsistency ? consistencyFactor(b) : 1)
+  const legProb = (b) => (b.hrProbability ?? 0) * paWeight(b.battingOrder)
   const byGame = new Map()
   for (const b of batters || []) {
     // Show every game regardless of state (pregame / live / final).
     if ((b.grade?.label || 'SKIP') === 'SKIP') continue
     if (!Number.isFinite(b.hrProbability)) continue
+    if (isBenched(b)) continue // confirmed lineup, no order slot — won't hit
     if (!byGame.has(b.gamePk)) byGame.set(b.gamePk, { gamePk: b.gamePk, game: b.game, parkHR: b.gameParkHRFactor, bats: [] })
     byGame.get(b.gamePk).bats.push(b)
   }
@@ -42,7 +45,7 @@ function buildSGP(batters, size, { favorConsistency } = {}) {
       .sort((a, b) => rankVal(b) - rankVal(a) || (b.hrProbability ?? 0) - (a.hrProbability ?? 0) || String(a.id).localeCompare(String(b.id)))
       .slice(0, size)
     if (legs.length < size) continue
-    const probs = legs.map((b) => b.hrProbability ?? 0)
+    const probs = legs.map(legProb)
     const comboIndep = probs.reduce((p, x) => p * x, 1) // independent baseline
     // Same-game legs are positively correlated; scale up by the game's HR-env
     // tilt (avg park×weather of the legs, else the game park factor). See parlay.js.
