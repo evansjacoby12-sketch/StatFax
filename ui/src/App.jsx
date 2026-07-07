@@ -772,6 +772,7 @@ export default function App() {
                 onSelect={(b) => setSelectedId(b.id)}
                 favorConsistency={favorConsistency}
                 comboConf={comboConf}
+                sgpScorecard={data.meta?.sgpScorecard}
               />
             </div>
           </div>
