@@ -36,17 +36,13 @@ const sig = (strategy, size, legIds) => `${strategy}:${size}:${[...legIds].sort(
 
 // ─── strategy rank/require gates ──────────────────────────────────────────────
 
-test('precision gate: pitch mix ≥7, heat ≥48, hrDueScore ≥5, 8+ positives, ≤3 negatives', () => {
-  const pass = { pitchMixEdge: true, heat: 48, hrDueScore: 5, positiveReasons: 8, negativeReasons: 3 }
-  assert.equal(stratByKey.precision.require(row({ ...pass, pitchMixEdge: false })), false)
-  assert.equal(stratByKey.precision.require(row({ ...pass, heat: 47 })), false)
-  assert.equal(stratByKey.precision.require(row({ ...pass, hrDueScore: 4 })), false)
-  assert.equal(stratByKey.precision.require(row({ ...pass, positiveReasons: 7 })), false)
-  assert.equal(stratByKey.precision.require(row({ ...pass, negativeReasons: 4 })), false)
+test('precision gate: hot & barrel ≥ 12; rank = barrel (re-tuned 2026-07-07)', () => {
+  const pass = { hot: true, barrel: 12 }
+  assert.equal(stratByKey.precision.require(row({ ...pass, hot: false })), false)
+  assert.equal(stratByKey.precision.require(row({ ...pass, barrel: 11 })), false)
   assert.equal(stratByKey.precision.require(row(pass)), true)
-  // rank = positives - negatives + heat/100
-  const r = stratByKey.precision.rank(row({ positiveReasons: 10, negativeReasons: 2, heat: 60 }))
-  assert.ok(Math.abs(r - (10 - 2 + 0.60)) < 1e-9)
+  // rank = barrel (elite-contact tier)
+  assert.equal(stratByKey.precision.rank(row({ barrel: 18 })), 18)
 })
 
 test('edge gate requires 2+ matchup signals', () => {
