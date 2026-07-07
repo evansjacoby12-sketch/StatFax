@@ -5504,6 +5504,19 @@ button.th:focus-visible {
   border-color: color-mix(in srgb, var(--good) 50%, transparent);
   background: color-mix(in srgb, var(--good) 12%, transparent);
 }
+.grp-projected-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  border-radius: 5px;
+  padding: 1px 5px;
+  border: 1px solid color-mix(in srgb, var(--prime) 50%, transparent);
+  color: var(--prime);
+  background: color-mix(in srgb, var(--prime) 12%, transparent);
+}
 /* Benchmark combo whose legs span start windows — neutral blue, distinct from
    the green "lockable" LOCKED tag so the two never read as the same thing. */
 .grp-split-tag {

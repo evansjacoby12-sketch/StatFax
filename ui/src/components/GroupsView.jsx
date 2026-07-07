@@ -644,6 +644,7 @@ function GroupCard({ g, idx = 0, onSelect, selectedId, comboConf = 'off', slipSe
         : '✅ Tail — every leg is clean'
   const cashed = live.started && g.legs.length > 0 && live.hits >= g.legs.length
   const oneAway = live.started && live.code === 'live' && live.n >= 2 && live.hits === live.n - 1
+  const allConfirmed = g.legs.length > 0 && g.legs.every((b) => b.lineupConfirmed === true)
   return (
     <section
       className={`grp-card tone-${tone}${cashed ? ' cashed' : ''}${oneAway ? ' one-away' : ''}`}
@@ -669,9 +670,13 @@ function GroupCard({ g, idx = 0, onSelect, selectedId, comboConf = 'off', slipSe
           <span className="grp-split-tag" title="Benchmark combo — its legs start in different windows (>2.5h apart), so it can't be locked as one clean ticket. Shown to measure the model, not to bet as a single parlay.">
             <Icon name="Layers" size={10} /> CROSS-WINDOW
           </span>
-        ) : (
-          <span className="grp-locked-tag" title="All lineups confirmed and every leg starts together — this combo locks in as one bettable ticket, and it's the version graded for the record.">
+        ) : allConfirmed ? (
+          <span className="grp-locked-tag" title="Every leg's lineup is confirmed — this is the final combo. Frozen at the morning lock and graded for the record.">
             <Icon name="Lock" size={10} /> LOCKED
+          </span>
+        ) : (
+          <span className="grp-projected-tag" title={`Projected — ${g.legs.filter((b) => b.lineupConfirmed !== true).length} of ${g.legs.length} legs aren't in a confirmed lineup yet. The combo is frozen at the morning lock and won't drift, but a leg could still be scratched or moved down the order before first pitch.`}>
+            <Icon name="Clock" size={10} /> PROJECTED
           </span>
         )}
         {comboConf === 'stars' && (() => { const s = comboStars(g, tone); return (
