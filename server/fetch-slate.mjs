@@ -4048,9 +4048,15 @@ async function main() {
   }
 
   // 8.85) Morning score lock — one scoring pass a day.
-  // The first run at/after MORNING_LOCK_HOUR (UTC, default 13 ≈ 9am ET)
-  // freezes every pregame batter's model outputs into the persisted log;
+  // The first run at/after MORNING_LOCK_HOUR (UTC, default 14 = 10am ET in
+  // season) freezes every pregame batter's model outputs into the persisted log;
   // every later run re-publishes those frozen values instead of its own.
+  // 10am ET is the sweet spot for an afternoon bettor: starting pitchers are set
+  // the night before and the prior day's form has settled overnight (so nothing
+  // is lost vs an earlier lock), while it's late enough that the morning weather
+  // model has landed and day-game lineups (~1pm ET) are posting — the only
+  // inputs still improving. Later than ~11am ET buys nothing and shrinks the
+  // stable window.
   // What still flows intraday: lineup confirmations, batting order,
   // scratches, odds, game state, live context — the FACTS. What no longer
   // churns: score, grade, probability, reasons — the TAKES. Exception: a
@@ -4061,7 +4067,7 @@ async function main() {
   // MORNING_LOCK_HOUR. Live/final rows are skipped — the live-decay and
   // per-batter pregame-freeze passes own those.
   const MORNING_LOCK_ON = (process.env.MORNING_LOCK ?? '1') !== '0';
-  const MORNING_LOCK_HOUR = +(process.env.MORNING_LOCK_HOUR ?? 13);
+  const MORNING_LOCK_HOUR = +(process.env.MORNING_LOCK_HOUR ?? 14);
   // parkWeatherHandFactor is in the lock because it feeds the combo engine's
   // park strategy (rank score×air, gate air≥1.08): left floating, each 15-min
   // weather refresh could reorder park-combo legs all day while the scores
