@@ -468,32 +468,32 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard, g
           <button className="grp-spread-btn" onClick={() => setSpread(true)}>Spread →</button>
         </div>
       )}
-      {windowMode && windows.length > 1 ? (
-        <div className="grp-games" role="group" aria-label="Filter by start window">
-          <Select
-            multi
-            icon="Clock"
-            ariaLabel="Filter by start window"
-            title="Pick one or more start windows — same-window legs lock together"
-            value={selectedWindowIdxs}
-            onChange={onWindows}
-            options={[{ value: '', label: 'All windows' }, ...windows.map((w, i) => ({ value: i, label: `${w.label} · ${w.pks.size}g` }))]}
-          />
-        </div>
-      ) : (
-        gameList.length > 1 && (
-          <div className="grp-games" role="group" aria-label="Filter by game">
+      {(windowMode && windows.length > 1) || gameList.length > 1 ? (
+        <div className="grp-games" role="group" aria-label="Filter combos by window or game">
+          {windowMode && windows.length > 1 && (
+            <Select
+              multi
+              icon="Clock"
+              ariaLabel="Filter by start window"
+              title="Pick one or more start windows — same-window legs lock together"
+              value={selectedWindowIdxs}
+              onChange={onWindows}
+              options={[{ value: '', label: 'All windows' }, ...windows.map((w, i) => ({ value: i, label: `${w.label} · ${w.pks.size}g` }))]}
+            />
+          )}
+          {gameList.length > 1 && (
             <Select
               multi
               icon="List"
               ariaLabel="Filter by game"
+              title="Pick specific games to build combos from"
               value={new Set([...games].map(String))}
               onChange={(set) => setGames(new Set([...set].map(Number)))}
               options={[{ value: '', label: 'All games' }, ...gameList.map((g) => ({ value: g.gamePk, label: g.label }))]}
             />
-          </div>
-        )
-      )}
+          )}
+        </div>
+      ) : null}
       <div className="grp-controls" role="group" aria-label="Group size">
         {available.map((t) => (
           <button
