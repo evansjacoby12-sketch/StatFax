@@ -44,6 +44,11 @@ const AUTO_REFRESH_MS    = 60_000
 const LIVE_REFRESH_MS    = 30_000  // faster cadence while a game is actually live
 const SLATE_REFRESH_MS   = 3 * 60_000 // always-on background poll — pipeline runs every 10 min
 
+// Reopening the app after this long away resets the view + board filters to a
+// fresh Board (see staleReturn). A heartbeat keeps `lastSeenAt` current while the
+// app is open, so it only trips after a real absence, not idle time on-screen.
+const STALE_RESET_MS = 30 * 60 * 1000 // 30 min
+
 // Each view is its own page via a URL hash (#board, #pitchers, …) — bookmarkable
 // and back/forward navigable. Hash routing works as-is on static hosting.
 const VIEWS = new Set(['board', 'games', 'pitchers', 'weather', 'combos', 'results'])
@@ -72,10 +77,18 @@ function initialFilters() {
 }
 
 export default function App() {
+  // Stale-return reset: if the app was last open > STALE_RESET_MS ago (closed /
+  // backgrounded, not just idle), open fresh on the Board with default filters
+  // instead of restoring wherever you left off on yesterday's slate.
+  const staleReturn = (() => {
+    const last = store.load('lastSeenAt', 0)
+    return last > 0 && Date.now() - last > STALE_RESET_MS
+  })()
+
   const [state, setState] = useState({ status: 'loading', data: null, error: null })
   const [refreshing, setRefreshing] = useState(false)
   const [slateBuilding, setSlateBuilding] = useState(false)
-  const [filters, setFilters] = useState(initialFilters)
+  const [filters, setFilters] = useState(() => (staleReturn ? DEFAULT_FILTERS : initialFilters()))
   const [selectedId, setSelectedId] = useState(null)
   const [zoneId, setZoneId] = useState(null)
   // Opposing-pitcher card shown as a popup overlay (entry key: `${pitcherId}-${gamePk}`).
@@ -109,7 +122,7 @@ export default function App() {
   const [watchlist, setWatchlist] = useState(() => new Set(store.load('watchlist', [])))
   const [slipIds, setSlipIds] = useState(() => store.load('slip', []))
   const [autoRefresh, setAutoRefresh] = useState(() => store.load('autoRefresh', false))
-  const [view, setView] = useState(() => viewFromHash() || store.load('view', 'board'))
+  const [view, setView] = useState(() => (staleReturn ? 'board' : (viewFromHash() || store.load('view', 'board'))))
   const [liveScores, setLiveScores] = useState(() => store.load('liveScores', true))
   const [eliLevel, setEliLevel] = useState(() => store.load('eliLevel', 'eli5')) // 'eli5' | 'eli15'
   // Dismissed Pick of the Day, keyed by batter id (which embeds the gamePk, so
@@ -197,6 +210,32 @@ export default function App() {
 
   useEffect(() => {
     load()
+  }, [load])
+
+  // Track when the app was last actively open, and reset a stale return. A
+  // heartbeat marks `lastSeenAt` every minute while visible; on hide we stamp it;
+  // on becoming visible again after > STALE_RESET_MS we snap back to a fresh
+  // Board (default filters, close overlays) and reload the slate — so you don't
+  // resume hours later still parked on a filtered view of yesterday's board.
+  useEffect(() => {
+    const mark = () => { if (document.visibilityState === 'visible') store.save('lastSeenAt', Date.now()) }
+    mark()
+    const beat = setInterval(mark, 60_000)
+    const onVis = () => {
+      if (document.visibilityState === 'hidden') { store.save('lastSeenAt', Date.now()); return }
+      const last = store.load('lastSeenAt', 0)
+      if (last > 0 && Date.now() - last > STALE_RESET_MS) {
+        setView('board')
+        setFilters(DEFAULT_FILTERS)
+        setSelectedId(null)
+        setShowGroups(false)
+        setShowSGP(false)
+        load()
+      }
+      store.save('lastSeenAt', Date.now())
+    }
+    document.addEventListener('visibilitychange', onVis)
+    return () => { clearInterval(beat); document.removeEventListener('visibilitychange', onVis) }
   }, [load])
 
   // Live game state (scores, innings, "homered" tags) lives in daily.json, so it
