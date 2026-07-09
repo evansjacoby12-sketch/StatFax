@@ -3,6 +3,7 @@ import Icon from './Icon.jsx'
 import { pct, num, rate } from '../lib/format.js'
 import { gradeColor } from '../lib/badges.js'
 import { hexA } from './atoms.jsx'
+import { locationRating5, arsenalRating5 as arsenalRating5Of, combinedEdge5 } from '../lib/zoneEdge.js'
 
 const r3 = (v) => (v == null || Number.isNaN(v) ? '—' : rate(v))
 const p0 = (v) => (v == null || Number.isNaN(v) ? '—' : pct(v, 0))
@@ -213,8 +214,8 @@ export default function ZoneView({ batter: b, onClose }) {
   const bFmt = BATTER_METRICS.find((m) => m.key === bMetricEff)?.fmt || r3
   const pFmt = PITCHER_METRICS.find((m) => m.key === pMetricEff)?.fmt || r3
 
-  // Zone Rating on the requested 1–5 scale (server emits 0–10).
-  const rating5 = z?.zoneRating != null ? Math.max(0, Math.min(5, Math.round((z.zoneRating / 2) * 10) / 10)) : null
+  // Location rating (0–5) — shared helper so the drawer teaser stays in lockstep.
+  const rating5 = locationRating5(z)
 
   // Build the 9-cell strike-zone model once: per-zone batter value, pitcher
   // value, and a fused "edge" (where the batter does damage AND the pitcher
@@ -309,26 +310,23 @@ export default function ZoneView({ batter: b, onClose }) {
   const allPitches = useMemo(() => PITCHES
     .map((p) => ({ code: p.code, label: p.label, usage: mix[`${p.code}Pct`] ?? null, bSlg: arsenal[`${p.code}Slg`] ?? null }))
     .filter((p) => (p.usage ?? 0) > 0), [mix, arsenal])
-  const { arsenalRating5, blindSpot, coverage } = useMemo(() => {
-    let wSum = 0, eSum = 0, coveredUsage = 0, totalUsage = 0
+  // Arsenal rating via the shared helper (identical to the drawer teaser). Blind
+  // spot + coverage stay local — they need per-pitch detail beyond the rating.
+  const arsenalRating5 = useMemo(() => arsenalRating5Of(b), [b])
+  const { blindSpot, coverage } = useMemo(() => {
+    let coveredUsage = 0, totalUsage = 0
     for (const p of allPitches) {
       totalUsage += p.usage
-      if (Number.isFinite(p.bSlg) && LEAGUE_SLG[p.code] != null) {
-        const w = p.usage / 100
-        eSum += w * (p.bSlg - LEAGUE_SLG[p.code]); wSum += w; coveredUsage += p.usage
-      }
+      if (Number.isFinite(p.bSlg) && LEAGUE_SLG[p.code] != null) coveredUsage += p.usage
     }
-    const edge = wSum > 0 ? eSum / wSum : null
     const top = allPitches.slice().sort((a, c) => (c.usage ?? 0) - (a.usage ?? 0))[0]
     return {
-      arsenalRating5: edge != null ? +clamp(2.5 + edge * 15, 0, 5).toFixed(1) : null,
       blindSpot: top && !Number.isFinite(top.bSlg) ? top : null,
       coverage: totalUsage > 0 ? coveredUsage / totalUsage : null,
     }
   }, [allPitches])
-  // Headline = the stronger of the two edges (location vs arsenal) — surfaces the
-  // real edge even when one lens is flat, instead of hiding the cutter behind 0.3.
-  const overall5 = [rating5, arsenalRating5].filter((v) => v != null).reduce((m, v) => Math.max(m, v), null) ?? rating5
+  // Headline = the stronger of the two edges (location vs arsenal).
+  const overall5 = combinedEdge5(b) ?? rating5
 
   // One-line plain-English read: the pitch the batter feasts on + the top zone.
   const synthesis = useMemo(() => {

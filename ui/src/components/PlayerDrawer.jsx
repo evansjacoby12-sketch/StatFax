@@ -16,6 +16,7 @@ import { useEliLevel, reasonsForLevel } from '../lib/eliLevel.js'
 import { toast } from './Toast.jsx'
 import { sharePickCard } from '../lib/shareCard.js'
 import { useExplain } from '../lib/explain.js'
+import { locationRating5, arsenalRating5, combinedEdge5 } from '../lib/zoneEdge.js'
 
 const WORKER_URL = import.meta.env?.VITE_WORKER_URL || ''
 
@@ -1071,6 +1072,12 @@ function ZoneTeaser({ b, onOpen }) {
   const z = b?.zoneMatchup
   if (!z || !z.batter?.grid || !z.pitcher?.grid) return null
   const matched = z.matchedZones?.length || 0
+  // Same combined edge (stronger of location vs arsenal) the full map headlines,
+  // so the teaser and the full view never disagree. /5 scale to match.
+  const loc = locationRating5(z)
+  const ars = arsenalRating5(b)
+  const edge = combinedEdge5(b)
+  const edgeLabel = edge == null ? '' : edge >= 4 ? 'Great' : edge >= 3 ? 'Favorable' : edge >= 2 ? 'Neutral' : 'Tough'
   return (
     <Section title="Zone matchup" icon="Crosshair" id="sec-zone">
       <button onClick={() => onOpen?.(b)} aria-label="Open zone matchup" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px', padding: '14px', width: '100%', textAlign: 'left', display: 'flex', gap: '16px', alignItems: 'center' }}>
@@ -1086,11 +1093,15 @@ function ZoneTeaser({ b, onOpen }) {
         </div>
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '4px' }}>
           <div style={{ fontSize: '18px', fontWeight: '800', color: '#fff' }}>
-            <span style={{ fontFamily: 'var(--mono)', color: 'var(--accent)' }}>{num(z.zoneRating, 1)}</span>
-            <span style={{ fontSize: '11px', fontWeight: '400', marginLeft: '6px', color: 'var(--text-dim)' }}>zone rating</span>
+            <span style={{ fontFamily: 'var(--mono)', color: 'var(--accent)' }}>{edge != null ? edge : '—'}</span>
+            <span style={{ fontSize: '11px', fontWeight: '400', color: 'var(--text-faint)' }}>/5</span>
+            {edgeLabel && <span style={{ fontSize: '11px', fontWeight: '700', marginLeft: '6px', color: edge >= 3 ? 'var(--strong)' : 'var(--text-dim)' }}>{edgeLabel}</span>}
+            <span style={{ fontSize: '11px', fontWeight: '400', marginLeft: '6px', color: 'var(--text-dim)' }}>zone edge</span>
           </div>
           <div style={{ fontSize: '11px', color: 'var(--text-faint)' }}>
-            {matched} zones matched
+            {loc != null && <span>Loc {loc}</span>}
+            {ars != null && <span> · Arsenal {ars}</span>}
+            {matched > 0 && <span> · {matched} hot zone{matched > 1 ? 's' : ''}</span>}
             {z.badge === 'ZONE_MASTER' && <span style={{ background: 'var(--accent)', color: '#fff', fontSize: '9px', padding: '1px 4px', borderRadius: '3px', marginLeft: '6px', fontWeight: '800' }}>ZONE MASTER</span>}
           </div>
           <span style={{ fontSize: '11px', fontWeight: '600', color: 'var(--accent)', display: 'inline-flex', alignItems: 'center', gap: '2px', marginTop: '6px' }}>Full matchup map <Icon name="ChevronRight" size={12} /></span>
