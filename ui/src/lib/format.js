@@ -63,3 +63,14 @@ export function ordinal(n) {
   const v = n % 100
   return n + (s[(v - 20) % 10] || s[v] || s[0])
 }
+
+// Surname for compact labels — the LAST word, but skipping a generational suffix
+// so "Luis García Jr." → "García" (not "Jr.") and "Ronald Acuña Jr." → "Acuña".
+export const NAME_SUFFIXES = new Set(['jr', 'jr.', 'sr', 'sr.', 'ii', 'iii', 'iv', 'v'])
+export function surname(name) {
+  const parts = (name || '').trim().split(/\s+/).filter(Boolean)
+  if (parts.length <= 1) return parts[0] || ''
+  const last = parts[parts.length - 1]
+  if (NAME_SUFFIXES.has(last.toLowerCase())) return parts[parts.length - 2]
+  return last
+}

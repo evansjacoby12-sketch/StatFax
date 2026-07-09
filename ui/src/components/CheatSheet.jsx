@@ -11,7 +11,7 @@ const isDayGame = (b) => {
   return h >= 14 && h < 22
 }
 const live = (b) => !b.game?.isFinal
-const lastName = (n) => (n || '').trim().split(/\s+/).slice(-1)[0]
+const lastName = (n) => { const p = (n || '').trim().split(/\s+/).filter(Boolean); const l = p[p.length - 1] || ''; return /^(jr|sr|ii|iii|iv|v)\.?$/i.test(l) && p.length >= 2 ? p[p.length - 2] : l }
 
 // One leaderboard card. `items` = [{ key, name, meta, badge?, val, onClick? }].
 function LbCard({ title, sub, icon, items }) {

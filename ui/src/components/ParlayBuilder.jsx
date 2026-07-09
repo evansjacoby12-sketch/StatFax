@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import Icon from './Icon.jsx'
 import { GradeChip } from './atoms.jsx'
 import { hexA } from './atoms.jsx'
-import { pct, num, american, signedPct } from '../lib/format.js'
+import { pct, num, american, signedPct, surname } from '../lib/format.js'
 import { gradeColor } from '../lib/badges.js'
 import { buildParlay } from '../lib/parlayMath.js'
 import { buildGroups, lastFirst } from '../lib/groups.js'
@@ -266,7 +266,7 @@ export default function ParlayBuilder({ batters, legs, slipSet, onToggle, onRemo
 
   const saveSlip = () => {
     if (!legs.length) return
-    const name = legs.map((b) => b.name.split(' ').slice(-1)[0]).join(' · ')
+    const name = legs.map((b) => surname(b.name)).join(' · ')
     const entry = { id: `s${Date.now()}`, name, ids: legs.map((b) => b.id), savedAt: Date.now() }
     const next = [entry, ...saved.filter((s) => s.ids.join() !== entry.ids.join())].slice(0, 20)
     setSaved(next)

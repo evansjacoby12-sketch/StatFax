@@ -10,7 +10,7 @@ import { interpretWind } from '../lib/wind.js'
 import { useLiveMode } from '../lib/liveMode.js'
 import { hexA } from './atoms.jsx'
 
-const lastName = (n) => (n || '').trim().split(/\s+/).slice(-1)[0]
+const lastName = (n) => { const p = (n || '').trim().split(/\s+/).filter(Boolean); const l = p[p.length - 1] || ''; return /^(jr|sr|ii|iii|iv|v)\.?$/i.test(l) && p.length >= 2 ? p[p.length - 2] : l }
 
 function computeGameOfDay(batters) {
   const byGame = new Map()
@@ -234,6 +234,7 @@ function envAlert(bat, game) {
 }
 
 function ExtractorCard({ game: g, groups, idx = 0, ...ctx }) {
+  const liveMode = useLiveMode()
   const awayC = teamColor(g.awayTeam?.id)
   const homeC = teamColor(g.homeTeam?.id)
   const all = [...(groups.away || []), ...(groups.home || [])]
@@ -249,7 +250,7 @@ function ExtractorCard({ game: g, groups, idx = 0, ...ctx }) {
   const alert = envAlert(groups.away?.[0] || groups.home?.[0], g)
   if (!king) return null
   return (
-    <section className="xcard" style={{ 
+    <section className={`xcard${liveMode && g.isLive ? ' live' : ''}`} style={{
       '--i': Math.min(idx, 12),
       background: 'rgba(17, 18, 20, 0.45)',
       border: '1px solid rgba(255,255,255,0.06)',
@@ -395,7 +396,7 @@ function GameCard({ game: g, groups, idx = 0, ...ctx }) {
   const homeC = teamColor(g.homeTeam?.id)
   const showScore = liveMode && (g.isLive || g.isFinal)
   return (
-    <section className={`game-card ${g.isFinal ? 'final' : ''}`} style={{ 
+    <section className={`game-card ${g.isFinal ? 'final' : ''}${liveMode && g.isLive ? ' live' : ''}`} style={{
       '--i': Math.min(idx, 12),
       background: 'rgba(17, 18, 20, 0.45)',
       border: '1px solid rgba(255,255,255,0.06)',

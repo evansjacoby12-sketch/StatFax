@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import Icon from './Icon.jsx'
 import Select from './Select.jsx'
-import { pct } from '../lib/format.js'
+import { pct, surname } from '../lib/format.js'
 import { legStatus } from '../lib/live.js'
 import LiveCombosView from './LiveCombosView.jsx'
 
@@ -81,7 +81,7 @@ export default function CombosView({ batters, onSelect, favorConsistency = false
             if (r) status = r.homered === true ? 'hit' : 'dead'
             else if (lb) status = lb.st.code === 'hit' ? 'hit' : lb.st.code === 'dead' ? 'dead' : 'live'
             else status = 'dead'
-            return { name: name.split(' ').slice(-1)[0], homered: status === 'hit', status }
+            return { name: surname(name), homered: status === 'hit', status }
           })
           const nHit = legs.filter((l) => l.homered).length
           return { strategy: c.strategy, size: c.size, nHit, allHit: legs.length > 0 && nHit === legs.length, legs }
@@ -142,7 +142,7 @@ export default function CombosView({ batters, onSelect, favorConsistency = false
           if (r) status = r.homered === true ? 'hit' : 'dead'
           else if (lb) status = lb.st.code === 'hit' ? 'hit' : lb.st.code === 'dead' ? 'dead' : 'live'
           else status = 'dead'
-          return { name: name.split(' ').slice(-1)[0], status }
+          return { name: surname(name), status }
         })
         const nHit = legs.filter((l) => l.status === 'hit').length
         return { gamePk: s.gamePk, size: s.size, legs, nHit, allHit: legs.length > 0 && nHit === legs.length }

@@ -31,6 +31,7 @@ import {
 } from './combo-engine.js'
 import { hrSetup } from './scout.js'
 import { comboMarket } from './odds.js'
+import { NAME_SUFFIXES } from './format.js'
 
 // Re-export the engine's blast threshold for any UI that references it.
 export { BLAST_ELITE }
@@ -320,8 +321,15 @@ export function lastFirst(name) {
   if (!name) return ''
   const parts = name.trim().split(/\s+/)
   if (parts.length < 2) return name
-  const last = parts[parts.length - 1]
-  const first = parts.slice(0, -1).join(' ')
+  let last = parts[parts.length - 1]
+  let firstEnd = parts.length - 1
+  // Keep a generational suffix attached to the surname so "Luis García Jr." →
+  // "García Jr., Luis" (and its split(',')[0] shows "García Jr.", not "Jr.").
+  if (NAME_SUFFIXES.has(last.toLowerCase()) && parts.length >= 3) {
+    last = `${parts[parts.length - 2]} ${last}`
+    firstEnd = parts.length - 2
+  }
+  const first = parts.slice(0, firstEnd).join(' ')
   return `${last}, ${first}`
 }
 
