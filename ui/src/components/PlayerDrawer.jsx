@@ -861,17 +861,28 @@ function PitchMixAdvantage({ b }) {
     </Section>
   )
 
-  let totalW = 0, totalAdv = 0
+  // A pitch showing 0 SLG AND 0 whiff has no tracked book — a hitter who'd
+  // actually faced it would show *some* outcome. Treat it as missing, not as a
+  // .000 (max-tough) matchup, so a high-usage unseen pitch can't sink the rating.
+  const hasBook = (p) => p.slg != null && !(p.slg === 0 && !(p.whiff > 0))
+
+  let totalW = 0, totalAdv = 0, coveredUsage = 0, totalUsage = 0
   for (const p of splits) {
+    totalUsage += p.usage ?? 0
+    if (!hasBook(p)) continue
     const league = LEAGUE_SLG[p.key] ?? 0.330
-    const adv = p.slg != null ? p.slg - league : 0
     totalW += p.usage ?? 0
-    totalAdv += adv * (p.usage ?? 0)
+    totalAdv += (p.slg - league) * (p.usage ?? 0)
+    coveredUsage += p.usage ?? 0
   }
   const avgAdv = totalW > 0 ? totalAdv / totalW : 0
-  const rating = Math.max(0, Math.min(10, 5 + avgAdv * 25))
-  const ratingLabel = rating >= 7.5 ? 'Great' : rating >= 6 ? 'Favorable' : rating >= 5 ? 'Lean Batter' : rating >= 4 ? 'Neutral' : rating >= 2.5 ? 'Lean Pitcher' : 'Tough'
-  const ratingColor = rating >= 6 ? 'var(--strong)' : rating >= 4 ? '#fff' : 'var(--bad)'
+  const rating = totalW > 0 ? Math.max(0, Math.min(10, 5 + avgAdv * 25)) : null
+  const ratingLabel = rating == null ? 'No book' : rating >= 7.5 ? 'Great' : rating >= 6 ? 'Favorable' : rating >= 5 ? 'Lean Batter' : rating >= 4 ? 'Neutral' : rating >= 2.5 ? 'Lean Pitcher' : 'Tough'
+  const ratingColor = rating == null ? 'var(--text-faint)' : rating >= 6 ? 'var(--strong)' : rating >= 4 ? '#fff' : 'var(--bad)'
+  // Biggest unseen pitch — flagged when it's a meaningful share of the arsenal.
+  const blindSpot = splits.filter((p) => !hasBook(p)).sort((a, c) => (c.usage ?? 0) - (a.usage ?? 0))[0]
+  const bigBlind = blindSpot && (blindSpot.usage ?? 0) >= 12 ? blindSpot : null
+  const coverage = totalUsage > 0 ? Math.round((coveredUsage / totalUsage) * 100) : null
 
   return (
     <Section title="Pitch Mix Matchup Advantage" icon="BarChart2">
@@ -879,17 +890,25 @@ function PitchMixAdvantage({ b }) {
       <div style={{ marginBottom: '16px' }}>
         <div style={{ fontSize: '10px', color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>PITCH MIX RATING</div>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '8px' }}>
-          <span style={{ fontSize: '26px', fontWeight: '800', color: '#fff', fontFamily: 'var(--mono)' }}>{rating.toFixed(1)}</span>
+          <span style={{ fontSize: '26px', fontWeight: '800', color: '#fff', fontFamily: 'var(--mono)' }}>{rating != null ? rating.toFixed(1) : '—'}</span>
           <span style={{ fontSize: '11px', color: 'var(--text-faint)' }}>/ 10</span>
           <span style={{ fontSize: '13px', fontWeight: '700', color: ratingColor, marginLeft: '4px' }}>{ratingLabel}</span>
+          {coverage != null && coverage < 85 && <span style={{ fontSize: '10px', color: 'var(--text-faint)', marginLeft: 'auto' }}>{coverage}% of arsenal seen</span>}
         </div>
         <div style={{ height: '5px', background: 'rgba(255,255,255,0.06)', borderRadius: '99px', overflow: 'hidden', marginBottom: '4px' }}>
-          <div style={{ width: `${rating * 10}%`, height: '100%', background: ratingColor, borderRadius: '99px', transition: 'width 0.4s ease' }} />
+          <div style={{ width: `${(rating ?? 0) * 10}%`, height: '100%', background: ratingColor, borderRadius: '99px', transition: 'width 0.4s ease' }} />
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
           <span>Tough</span><span>Neutral</span><span>Favorable</span><span>Great</span>
         </div>
       </div>
+
+      {bigBlind && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 11px', marginBottom: '14px', borderRadius: '8px', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.22)', color: 'var(--prime)', fontSize: '11.5px', lineHeight: 1.4 }}>
+          <Icon name="TriangleAlert" size={13} style={{ flexShrink: 0 }} />
+          <span><b>No book on his {bigBlind.name?.toLowerCase() || 'top pitch'}</b> ({bigBlind.usage}% usage) — excluded from the rating. A real unknown here.</span>
+        </div>
+      )}
 
       {/* Per-pitch rows */}
       <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '12px' }}>
@@ -900,17 +919,18 @@ function PitchMixAdvantage({ b }) {
         </div>
         {splits.slice(0, 7).map(p => {
           const league = LEAGUE_SLG[p.key] ?? 0.330
-          const adv = p.slg != null ? p.slg - league : null
+          const seen = hasBook(p)
+          const adv = seen ? p.slg - league : null
           return (
-            <div key={p.key} style={{ display: 'grid', gridTemplateColumns: '1fr 36px 1fr 44px', gap: '6px 8px', alignItems: 'center', marginBottom: '10px' }}>
+            <div key={p.key} style={{ display: 'grid', gridTemplateColumns: '1fr 36px 1fr 44px', gap: '6px 8px', alignItems: 'center', marginBottom: '10px', opacity: seen ? 1 : 0.55 }}>
               <div>
                 <div style={{ fontSize: '12px', fontWeight: '600', color: '#fff' }}>{p.name}</div>
-                {p.whiff != null && <div style={{ fontSize: '10px', color: 'var(--text-faint)' }}>{num(p.whiff, 0)}% whiff</div>}
+                <div style={{ fontSize: '10px', color: 'var(--text-faint)' }}>{seen ? (p.whiff != null ? `${num(p.whiff, 0)}% whiff` : '') : 'no book'}</div>
               </div>
               <span style={{ fontSize: '11px', color: 'var(--text-dim)', textAlign: 'center', fontFamily: 'var(--mono)' }}>{p.usage}%</span>
               <PitchBar adv={adv} />
               <span style={{ fontSize: '11px', textAlign: 'right', fontWeight: '700', fontFamily: 'var(--mono)', color: adv != null && adv > 0.05 ? 'var(--strong)' : adv != null && adv < -0.05 ? 'var(--bad)' : 'var(--text-dim)' }}>
-                {p.slg != null ? rate(p.slg) : '—'}
+                {seen ? rate(p.slg) : '—'}
               </span>
             </div>
           )
