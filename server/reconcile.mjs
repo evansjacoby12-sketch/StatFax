@@ -138,6 +138,14 @@ export function extractPredictionRecord(row) {
     pk9:  num(ps?.kPer9 ?? ps?.k9),
     vdel: num(row.opposingVeloTrend?.veloDelta),     // opposing starter velo trend
     csw:  num(row.opposingVeloTrend?.seasonCswPct),  // opposing starter CSW%
+    // Matchup micro-signals — INSTRUMENTED 2026-07-09 so the zone/arsenal/stuff
+    // machinery (previously unlogged → unauditable) can be tuned like the batter
+    // badges once ~2 weeks of data accrues. Nulls when the engine didn't emit them.
+    arse: num(row.matchupSignals?.arsenalEdge),      // pitch-family SLG/RV edge (−6..+10)
+    stuff:num(row.matchupSignals?.stuffEdge),        // per-pitch velo/whiff physics (±10)
+    zone: num(row.matchupSignals?.zoneFactor),       // pitcher heart/zone/edge location (−5..+8)
+    mixf: num(row.matchupSignals?.mixFactor),        // fastball reliance × damage (−5..+8)
+    piso: num(row.matchupSignals?.pitchISOAdj),      // per-pitch-type ISO mismatch (−3..+4)
     park: num(row.gameParkHRFactor),
     vig:  num(row.vegasImpliedProb),              // Vegas implied prob (when odds present)
     ord:  num(row.battingOrder),

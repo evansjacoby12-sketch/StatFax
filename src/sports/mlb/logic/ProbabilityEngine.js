@@ -1592,11 +1592,17 @@ export function scoreBatter(
   }
 
   const _finite = (x) => (Number.isFinite(x) ? x : 0);
+  // DE-NOISED 2026-07-09 on 30d / 7,262 reconciled bats. Single-signal AUC (how
+  // well each ranks actual HRs): pitcher K/9 0.490, CSW% 0.493, velo-trend 0.500
+  // — all at/below a coin flip. They were adding jitter to a pillar whose real
+  // signal is pitcher HR/9 (AUC 0.574). Dropped from the score. The terms are
+  // still computed (kept for reasons + the instrumentation below) but no longer
+  // summed — re-add only if a future audit shows them earning their weight.
   const matchupScore = Math.min(100, Math.max(8,
-    50 + _finite(hr9Factor) + _finite(eraFactor) * 0.4 + _finite(kFactor) * 0.3 + _finite(h2hFactor)
+    50 + _finite(hr9Factor) + _finite(eraFactor) * 0.4 + _finite(h2hFactor)
     + _finite(contactFactor) + _finite(zoneFactor) + _finite(mixFactor) + _finite(ttoAdj)
     + _finite(arsenalEdge) + _finite(stuffEdge) + _finite(recentFormFactor)
-    + _finite(pitchISOAdj) + _finite(veloTrendAdj) + _finite(cswFactor)
+    + _finite(pitchISOAdj)
   ));
 
   // ── Environment (20%) ────────────────────────────────────────────────────
@@ -1617,9 +1623,15 @@ export function scoreBatter(
 
   // ── Final composite ──────────────────────────────────────────────────────
 
-  // 45/30/25: environment gets more weight vs old 50/30/20, reflecting that
-  // park + wind genuinely moves the needle for HR props.
-  const base = batterScore * 0.45 + matchupScore * 0.30 + envScore * 0.25;
+  // 52/30/18 — RE-WEIGHTED 2026-07-09 from 45/30/25. The pillars' standalone
+  // HR-ranking power on 30d / 7,262 bats: batterScore AUC 0.691, matchupScore
+  // 0.610, envScore 0.510 (env barely beats a coin flip yet held 25%). An
+  // AUC grid-search over blends rose monotonically as env fell (45/30/25 →
+  // 0.6890; 52/30/18 → 0.6929; 60/28/12 → 0.6948). Took the measured step to
+  // 52/30/18 — captures most of the gain without overfitting the 30-day optimum,
+  // and env was already trimmed by the launchPad park compression above. The
+  // daily isotonic pass re-centers calibration after the shift.
+  const base = batterScore * 0.52 + matchupScore * 0.30 + envScore * 0.18;
 
   // ── Synergy multiplier ───────────────────────────────────────────────────
   // Real HR probability isn't purely additive — when signals stack
@@ -1747,6 +1759,19 @@ export function scoreBatter(
     batterScore:  Math.round(batterScore),
     matchupScore: Math.round(matchupScore),
     envScore:     Math.round(envScore),
+    // Matchup micro-signals surfaced for INSTRUMENTATION — logged into the
+    // reconciled feat bundle so the zone/arsenal/stuff machinery (previously
+    // invisible) can finally be audited like the batter badges. Advisory only;
+    // they already feed matchupScore above, this just exposes them for tuning.
+    matchupSignals: {
+      arsenalEdge:  _finite(arsenalEdge),
+      stuffEdge:    _finite(stuffEdge),
+      zoneFactor:   _finite(zoneFactor),
+      mixFactor:    _finite(mixFactor),
+      pitchISOAdj:  _finite(pitchISOAdj),
+      recentForm:   _finite(recentFormFactor),
+      contactFactor:_finite(contactFactor),
+    },
     homeEdge,
     awayEdge,
     homeBad,
