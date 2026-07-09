@@ -862,8 +862,10 @@ export function buildZoneMatchup(batter, pitcher, { minBIPPerCell = 5 } = {}) {
   const freqGate   = meanFreq;
 
   const matchedZones = [];
-  let ratingNumerator = 0;
-  let ratingMaxPossible = 0;
+  // Location matchup accumulators. `num`/`fsum` build the pitcher-frequency-
+  // weighted ISO (the damage the pitcher's LOCATIONS actually deliver to this
+  // batter); `isoSum`/`n` build the uniform-location ISO (if he threw evenly).
+  let num = 0, fsum = 0, isoSum = 0, n = 0;
 
   for (let i = 0; i < Math.min(bGrid.length, pGrid.length); i++) {
     const bCell = bGrid[i];
@@ -878,20 +880,29 @@ export function buildZoneMatchup(batter, pitcher, { minBIPPerCell = 5 } = {}) {
     if (!Number.isFinite(iso) || !Number.isFinite(freq)) continue;
     if (bCell.count > 0 && bCell.count < minBIPPerCell) continue;
 
-    // Contribution to overall rating: a HOT batter cell where the pitcher
-    // throws OFTEN is the dream. Multiply iso × freq to get the per-cell
-    // expected-damage contribution.
-    ratingNumerator   += iso * freq;
-    ratingMaxPossible += Math.max(0.500, iso) * 0.4;   // 0.4 = aggressive pitcher concentration
+    num += iso * freq;
+    fsum += freq;
+    isoSum += iso;
+    n++;
 
     if (isHotCell(iso) && freq >= freqGate) {
       matchedZones.push(i);
     }
   }
 
-  // Scale rating to 0..10. Cap at 10 — a "perfect" matchup is theoretical.
-  const zoneRating = ratingMaxPossible > 0
-    ? Math.min(10, +(10 * ratingNumerator / ratingMaxPossible).toFixed(1))
+  // Zone (location) rating 0..10. RE-CALIBRATED 2026-07-09: the old formula
+  // normalized against an unrealistic "40% into one cell" max, so real per-cell
+  // frequency (~6%) pinned EVERY batter to ≤2.2/10 (≤1.1/5) — verified across
+  // 540 live bats. Instead, measure whether the pitcher's LOCATION tilts toward
+  // this batter's damage zones vs a neutral (uniform) baseline: 5 = neutral,
+  // higher = he feeds the batter's hot zones, lower = he pitches away from them.
+  // deliveredISO = ISO weighted by pitcher frequency; uniformISO = flat ISO.
+  // Scaled (×100) so a real location edge spans the range (neutral ≈2.6/5,
+  // strong ≈4.5/5). Display-only — not a model input.
+  const delivered = fsum > 0 ? num / fsum : 0;
+  const uniform   = n > 0 ? isoSum / n : 0;
+  const zoneRating = (fsum > 0 && n > 0)
+    ? +Math.max(0, Math.min(10, 5 + (delivered - uniform) * 100)).toFixed(1)
     : 0;
 
   const badge = matchedZones.length >= 2 ? 'ZONE_MASTER' : null;
