@@ -3,43 +3,57 @@ import Icon from './Icon.jsx'
 // Today's Slate Brief — the server-generated one-paragraph board summary
 // (slate-brief.mjs → dist/brief.json). Advisory prose over the already-scored
 // board; renders nothing when the brief wasn't generated.
+
+// The model is told "no markdown / no title", but sometimes slips a **bold**
+// title or emphasis in anyway. Clean it: drop a leading bold title line, then
+// render any remaining **bold** as real emphasis instead of raw asterisks.
+function cleanBrief(raw) {
+  let t = String(raw || '').trim()
+  // Strip a leading "**… BRIEF …**" or "**… 2026**" title line if present.
+  t = t.replace(/^\s*\*\*([^*\n]*)\*\*\s*[-–—:]*\s*/, (m, inner) =>
+    /brief|20\d\d/i.test(inner) ? '' : m,
+  ).trim()
+  return t
+}
+
+function renderInline(text) {
+  const out = []
+  const re = /\*\*([^*]+)\*\*/g
+  let last = 0, m, i = 0
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > last) out.push(text.slice(last, m.index))
+    out.push(<strong key={i++} style={{ color: '#fff', fontWeight: 700 }}>{m[1]}</strong>)
+    last = re.lastIndex
+  }
+  if (last < text.length) out.push(text.slice(last))
+  return out
+}
+
 export default function SlateBrief({ brief }) {
   if (!brief?.text) return null
+  const text = cleanBrief(brief.text)
+  if (!text) return null
 
   const prime = Number.isFinite(brief.primeCount) ? brief.primeCount : null
   const strong = Number.isFinite(brief.strongCount) ? brief.strongCount : null
+  const dateLabel = brief.date ? String(brief.date).slice(5) : null
 
   return (
-    <section
-      className="slate-brief"
-      style={{
-        background: 'linear-gradient(135deg, rgba(0,216,246,0.07) 0%, rgba(255,255,255,0.02) 100%)',
-        border: '1px solid rgba(0,216,246,0.18)',
-        borderRadius: '14px',
-        padding: '14px 16px',
-        marginBottom: '14px',
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--accent)' }}>
-          <Icon name="Sparkles" size={14} /> Today's Brief
+    <section className="slate-brief">
+      <span className="slate-brief-bar" aria-hidden="true" />
+      <div className="slate-brief-head">
+        <span className="slate-brief-title">
+          <Icon name="Sparkles" size={14} className="slate-brief-spark" /> Today's Brief
         </span>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginLeft: 'auto' }}>
-          {prime != null && (
-            <span style={{ fontSize: '10px', fontWeight: '800', padding: '2px 7px', borderRadius: '6px', background: 'rgba(245,166,35,0.14)', color: 'var(--prime)' }}>
-              {prime} PRIME
-            </span>
-          )}
-          {strong != null && (
-            <span style={{ fontSize: '10px', fontWeight: '800', padding: '2px 7px', borderRadius: '6px', background: 'rgba(16,185,129,0.12)', color: 'var(--strong)' }}>
-              {strong} STRONG
-            </span>
-          )}
+        {dateLabel && <span className="slate-brief-date">{dateLabel}</span>}
+        <span className="slate-brief-chips">
+          {prime != null && <span className="sb-chip sb-prime">{prime} PRIME</span>}
+          {strong != null && <span className="sb-chip sb-strong">{strong} STRONG</span>}
         </span>
       </div>
-      <p style={{ fontSize: '13.5px', lineHeight: '1.55', color: 'var(--text)', margin: 0 }}>{brief.text}</p>
-      <div style={{ fontSize: '9px', color: 'var(--text-faint)', marginTop: '8px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-        AI summary of the model's board · advisory only
+      <p className="slate-brief-body">{renderInline(text)}</p>
+      <div className="slate-brief-foot">
+        <Icon name="Sparkles" size={9} /> AI summary of the model's board · advisory only
       </div>
     </section>
   )

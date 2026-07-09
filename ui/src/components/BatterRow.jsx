@@ -4,7 +4,6 @@ import { pct, num, signedPct, american, ordinal } from '../lib/format.js'
 import { gradeColor } from '../lib/badges.js'
 import { teamLogo } from '../lib/teams.js'
 import { useLiveMode } from '../lib/liveMode.js'
-import { useEliLevel, topReasonForLevel } from '../lib/eliLevel.js'
 import { useExplain } from '../lib/explain.js'
 import { useState } from 'react'
 import { risingForm } from '../lib/groups.js'
@@ -31,11 +30,9 @@ export default function BatterRow({
   const g = b.grade?.label || 'SKIP'
   const color = gradeColor(g)
   const liveMode = useLiveMode()
-  const eliLevel = useEliLevel()
   const live = liveMode && b.game?.isLive
   const isFinal = b.game?.isFinal
   const hrToday = liveMode && b.liveContext?.isHRThisGame
-  const topReason = topReasonForLevel(b, eliLevel)
   const edge = b.edge
   const lean = Number.isFinite(b.matchupScore) ? Math.round(b.matchupScore - 50) : null
 
@@ -177,12 +174,6 @@ export default function BatterRow({
               {b.pitcher?.hand ? <span className="phand">({b.pitcher.hand}HP)</span> : null}
             </span>
           </div>
-          {topReason && (
-            <div className="batter-reason" title={(b.reasons || []).join(' · ')}>
-              <Icon name="Zap" size={10} style={{ color: 'var(--accent)' }} />
-              <span>{topReason}</span>
-            </div>
-          )}
           <RowWhy b={b} />
           <div className="batter-meta mono">
             {Number.isFinite(b.expectedPAs) && <span className="bm-pa">~{num(b.expectedPAs, 1)} PA</span>}

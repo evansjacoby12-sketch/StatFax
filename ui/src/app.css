@@ -8841,3 +8841,99 @@ button.th:focus-visible {
   .grp-why-text,
   .row-why > p { animation: none; }
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * Vibecode: Today's Brief card
+ * ───────────────────────────────────────────────────────────────────────── */
+.slate-brief {
+  position: relative;
+  overflow: hidden;
+  border-radius: 14px;
+  padding: 15px 16px 13px;
+  margin-bottom: 14px;
+  background:
+    radial-gradient(120% 100% at 0% 0%, rgba(0, 216, 246, 0.10) 0%, transparent 55%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.012) 100%);
+  border: 1px solid rgba(0, 216, 246, 0.18);
+  box-shadow: 0 6px 24px -14px rgba(0, 216, 246, 0.4);
+  animation: briefIn 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes briefIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+/* Animated accent hairline sweeping across the top edge. */
+.slate-brief-bar {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent), #6ad9ff, var(--accent), transparent);
+  background-size: 200% 100%;
+  opacity: 0.75;
+  animation: briefSheen 6s linear infinite;
+}
+@keyframes briefSheen {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.slate-brief-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 9px;
+}
+.slate-brief-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+}
+.slate-brief-spark {
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--accent) 70%, transparent));
+  animation: precisionPing 3s ease-in-out infinite;
+}
+.slate-brief-date {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-faint);
+  letter-spacing: 0.04em;
+}
+.slate-brief-chips {
+  display: inline-flex;
+  gap: 5px;
+  margin-left: auto;
+}
+.sb-chip {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+.sb-chip.sb-prime  { background: color-mix(in srgb, var(--prime) 15%, transparent);  color: var(--prime);  border: 1px solid color-mix(in srgb, var(--prime) 35%, transparent); }
+.sb-chip.sb-strong { background: color-mix(in srgb, var(--strong) 13%, transparent); color: var(--strong); border: 1px solid color-mix(in srgb, var(--strong) 32%, transparent); }
+.slate-brief-body {
+  font-size: 13.5px;
+  line-height: 1.58;
+  color: var(--text);
+  margin: 0;
+}
+.slate-brief-foot {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-faint);
+  margin-top: 10px;
+}
+.slate-brief-foot svg { opacity: 0.7; }
+@media (prefers-reduced-motion: reduce) {
+  .slate-brief, .slate-brief-bar, .slate-brief-spark { animation: none; }
+}
