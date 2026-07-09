@@ -19,6 +19,36 @@ import { sharePickCard } from '../lib/shareCard.js'
 const WORKER_URL = import.meta.env?.VITE_WORKER_URL || ''
 
 // ---------------------------------------------------------------------------
+// "Explain this pick" cache — lazy Haiku narration, keyed per player per day.
+// The slate rebuilds daily, so a date-stamped key auto-expires stale prose
+// without ever serving one day's explanation for another day's board. A
+// module-level Map keeps it instant within a session; sessionStorage lets it
+// survive drawer close/reopen. Both are best-effort — a miss just re-fetches.
+// ---------------------------------------------------------------------------
+
+const explainMem = new Map()
+const explainDay = () => { try { return new Date().toISOString().slice(0, 10) } catch { return 'x' } }
+const explainKey = (playerId) => `sf_explain_${playerId}_${explainDay()}`
+
+function readExplainCache(playerId) {
+  if (!playerId) return null
+  const k = explainKey(playerId)
+  if (explainMem.has(k)) return explainMem.get(k)
+  try {
+    const v = sessionStorage.getItem(k)
+    if (v) { explainMem.set(k, v); return v }
+  } catch { /* storage unavailable — fall through */ }
+  return null
+}
+
+function writeExplainCache(playerId, text) {
+  if (!playerId || !text) return
+  const k = explainKey(playerId)
+  explainMem.set(k, text)
+  try { sessionStorage.setItem(k, text) } catch { /* quota / private mode — memory cache still holds */ }
+}
+
+// ---------------------------------------------------------------------------
 // Hooks
 // ---------------------------------------------------------------------------
 
@@ -275,6 +305,7 @@ function OverviewTab({ b, color, onOpenZone, liveMode }) {
       <HeroNumbers b={b} color={color} />
       <PlateMatchup b={b} onOpenZone={onOpenZone} />
       <ScoutReport b={b} />
+      <ExplainPick b={b} />
       <PaCurve b={b} color={color} />
       <EnvSection b={b} />
       <OddsSection b={b} />
@@ -1705,6 +1736,96 @@ function LiveSection({ b }) {
         <Cell k="Run diff" v={lc.runDiff != null ? `${lc.runDiff > 0 ? '+' : ''}${lc.runDiff}` : '—'} />
         <Cell k="Pull risk" v={lc.pullRisk ? 'Yes' : 'No'} />
       </div>
+    </Section>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// ExplainPick — one-tap plain-English "why this pick", narrated by Claude Haiku
+// from the model's already-computed reason lines. Lazy (fires only on tap),
+// cached per player/day, and read-only: it explains the score, never changes
+// it. Silently absent when the worker URL isn't configured or there are no
+// reason lines to narrate.
+// ---------------------------------------------------------------------------
+
+function ExplainPick({ b }) {
+  const [status, setStatus] = useState('idle')   // idle | loading | done | error
+  const [text, setText] = useState('')
+
+  // Hydrate from cache (or reset) whenever the drawer swaps to a new player.
+  useEffect(() => {
+    const cached = readExplainCache(b.playerId)
+    if (cached) { setText(cached); setStatus('done') }
+    else { setText(''); setStatus('idle') }
+  }, [b.playerId])
+
+  if (!WORKER_URL || !b.reasons?.length) return null
+
+  const run = async () => {
+    setStatus('loading')
+    try {
+      const resp = await fetch(`${WORKER_URL}/explain`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: b.name,
+          grade: b.grade?.label,
+          hrProb: b.hrProbability,
+          batterScore: b.batterScore,
+          matchupScore: b.matchupScore,
+          envScore: b.envScore,
+          pitcher: b.pitcher?.name,
+          park: b.game?.venueName,
+          reasons: b.reasons,
+        }),
+      })
+      const data = await resp.json().catch(() => ({}))
+      if (resp.ok && data.text) {
+        setText(data.text)
+        setStatus('done')
+        writeExplainCache(b.playerId, data.text)
+      } else {
+        setStatus('error')
+      }
+    } catch {
+      setStatus('error')
+    }
+  }
+
+  return (
+    <Section title="Explain this pick" icon="Sparkles">
+      {status === 'done' && (
+        <p style={{ fontSize: '13px', lineHeight: '1.5', color: 'var(--text)', margin: 0 }}>{text}</p>
+      )}
+      {status !== 'done' && (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '8px' }}>
+          <button
+            onClick={run}
+            disabled={status === 'loading'}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: '7px',
+              background: 'rgba(0,216,246,0.08)', border: '1px solid rgba(0,216,246,0.25)',
+              color: 'var(--accent)', padding: '8px 14px', borderRadius: '9px',
+              fontSize: '13px', fontWeight: '700', cursor: status === 'loading' ? 'default' : 'pointer',
+              opacity: status === 'loading' ? 0.7 : 1,
+            }}
+          >
+            <Icon name={status === 'loading' ? 'Loader' : 'Sparkles'} size={14}
+              style={status === 'loading' ? { animation: 'spin 1s linear infinite' } : undefined} />
+            {status === 'loading' ? 'Thinking…' : 'Explain this pick'}
+          </button>
+          {status === 'error' && (
+            <span style={{ fontSize: '11px', color: 'var(--text-faint)' }}>
+              Couldn't reach the explainer — tap to retry.
+            </span>
+          )}
+          {status === 'idle' && (
+            <span style={{ fontSize: '11px', color: 'var(--text-faint)' }}>
+              Plain-English summary of why the model rates {b.name.split(' ').slice(-1)[0]} this way.
+            </span>
+          )}
+        </div>
+      )}
     </Section>
   )
 }

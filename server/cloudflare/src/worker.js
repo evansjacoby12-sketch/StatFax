@@ -46,6 +46,9 @@ export default {
     if (url.pathname === '/parse') {
       return handleParse(request, env);
     }
+    if (url.pathname === '/explain') {
+      return handleExplain(request, env);
+    }
     if (url.pathname === '/savant-bip') {
       return handleSavantBip(request, env);
     }
@@ -220,6 +223,104 @@ async function handleParse(request, env) {
   const g = (out.grades || []).filter((x) => grades.includes(x));
   const s = (out.signals || []).filter((x) => signals.includes(x));
   return jsonResponse({ grades: g, signals: s }, 200, env);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * Explain-this-pick narrator
+ * ─────────────────────────────────────────────────────────────────────────
+ * POST /explain  { name, grade, hrProb, batterScore, matchupScore, envScore,
+ *                  pitcher, park, reasons:[...] }
+ *   → { text: "two-to-three sentence plain-English explanation" }
+ *
+ * Turns the model's ALREADY-COMPUTED reason lines (from ProbabilityEngine's
+ * buildReasons) into a natural-language paragraph. It is a pure narration
+ * layer: it receives facts the engine already decided and rephrases them.
+ * It NEVER sees raw data, does math, or influences a score/grade — the
+ * number is fixed before this endpoint is ever called. Cheap (Haiku, tiny
+ * prompt, cached system block); the browser caches the result per player/day.
+ *
+ * Required Worker secret:  ANTHROPIC_API_KEY  (wrangler secret put)
+ * Optional Worker var:     ALLOW_ORIGIN       (default "*"; set to your site)
+ */
+async function handleExplain(request, env) {
+  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders(env) });
+  if (request.method !== 'POST') return jsonResponse({ error: 'POST only' }, 405, env);
+
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return jsonResponse({ error: 'bad json' }, 400, env);
+  }
+
+  const name    = String(body.name || 'This hitter').slice(0, 60).trim();
+  const grade   = String(body.grade || '').slice(0, 12).trim().toUpperCase();
+  const reasons = (Array.isArray(body.reasons) ? body.reasons : [])
+    .map((r) => String(r).slice(0, 200).trim())
+    .filter(Boolean)
+    .slice(0, 14);
+
+  if (!reasons.length) return jsonResponse({ text: '' }, 200, env);
+  if (!env.ANTHROPIC_API_KEY) return jsonResponse({ error: 'ANTHROPIC_API_KEY not set on the worker' }, 500, env);
+
+  // Optional context numbers — all pre-computed by the engine. Passed as
+  // facts to keep the model grounded, never for it to recompute anything.
+  const num = (x, d) => (Number.isFinite(x) ? x : d);
+  const facts = [
+    grade && `Grade: ${grade}`,
+    Number.isFinite(body.hrProb) && `Model HR probability today: ${(body.hrProb * 100).toFixed(1)}%`,
+    Number.isFinite(body.batterScore)  && `Bat-threat pillar: ${Math.round(num(body.batterScore))}/100`,
+    Number.isFinite(body.matchupScore) && `Matchup pillar: ${Math.round(num(body.matchupScore))}/100`,
+    Number.isFinite(body.envScore)     && `Park/weather pillar: ${Math.round(num(body.envScore))}/100`,
+    body.pitcher && `Opposing pitcher: ${String(body.pitcher).slice(0, 40)}`,
+    body.park && `Venue: ${String(body.park).slice(0, 40)}`,
+  ].filter(Boolean).join('\n');
+
+  const system =
+    `You are StatFax, a home-run betting model. In 2-3 short sentences, explain to a bettor WHY the model rates ${name} the way it does today.\n` +
+    `Rules:\n` +
+    `- Use ONLY the facts and reason lines provided. Never invent stats, names, or numbers.\n` +
+    `- Weave the strongest 3-4 signals into a flowing explanation; do not just list them.\n` +
+    `- Lead with what drives the grade (power/matchup/park), then the caveats if any.\n` +
+    `- Conversational and confident, but NEVER promise a home run or give a guarantee. No "lock", "guaranteed", "will hit".\n` +
+    `- No preamble ("Here's why…"), no markdown, no bullet points. Just the explanation prose.`;
+
+  const userContent =
+    `Player: ${name}\n${facts}\n\nModel reason lines:\n` +
+    reasons.map((r) => `- ${r}`).join('\n');
+
+  let data;
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: env.ANTHROPIC_MODEL || ANTHROPIC_MODEL,
+        max_tokens: 220,
+        // Cache the (stable) instruction block so repeat explains are cheaper.
+        system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
+        messages: [{ role: 'user', content: userContent }],
+      }),
+    });
+    if (!resp.ok) {
+      const detail = (await resp.text()).slice(0, 300);
+      return jsonResponse({ error: 'LLM error', status: resp.status, detail }, 502, env);
+    }
+    data = await resp.json();
+  } catch (e) {
+    return jsonResponse({ error: 'LLM unreachable', detail: String(e).slice(0, 200) }, 502, env);
+  }
+
+  const text = (data.content || [])
+    .filter((b) => b.type === 'text')
+    .map((b) => b.text)
+    .join('')
+    .trim();
+  return jsonResponse({ text }, 200, env);
 }
 
 /* ─────────────────────────────────────────────────────────────────────────

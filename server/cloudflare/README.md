@@ -81,6 +81,39 @@ Hit `GET /` in a browser to manually test the trigger — should return
 
 ---
 
+## HTTP endpoints
+
+Besides the cron trigger, the Worker serves a few small `fetch` routes the
+app calls directly from the browser:
+
+| Route | Method | Purpose |
+| --- | --- | --- |
+| `/` or `/trigger` | GET | Manually fire a slate refresh (returns plain text). |
+| `/parse` | POST | Natural-language → backtest filter chips (Signal Backtest UI). |
+| `/explain` | POST | Plain-English "why this pick" narration for the player card. |
+| `/savant-bip` | GET | CORS proxy for Baseball Savant batted-ball data (spray chart). |
+
+`/parse` and `/explain` call Claude Haiku, so they need an Anthropic key set
+as a Worker secret:
+
+```sh
+wrangler secret put ANTHROPIC_API_KEY
+# paste your sk-ant-... key when prompted
+```
+
+Both are **narration-only** — they translate English ↔ existing model
+output and never see raw data, do math, or influence any prediction. The
+HR scores are computed deterministically on GitHub Actions before the app
+ever loads, so the Worker cannot change a grade or probability. Optional:
+set `ANTHROPIC_MODEL` (Worker var) to override the default Haiku model, and
+`ALLOW_ORIGIN` to lock CORS to your site instead of `*`.
+
+The browser reaches these via `VITE_WORKER_URL` (set at UI build time to the
+deployed `*.workers.dev` URL). When it's unset, the app degrades gracefully:
+the Explain button and Savant spray chart simply don't render.
+
+---
+
 ## Why both schedule AND repository_dispatch?
 
 The GitHub workflow keeps its `schedule: */10 * * * *` trigger as a
