@@ -8780,3 +8780,64 @@ button.th:focus-visible {
     animation: none;
   }
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * Vibecode: combo-card action bar (Why? / Track) + board "Why?" chip
+ * ───────────────────────────────────────────────────────────────────────── */
+
+/* The bottom action row reads as a distinct bar, hairline-separated from the
+   legs above it. */
+.grp-track-row {
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  padding-top: 10px;
+}
+
+/* "Why?" button — same family as .grp-tail but softer, so Track stays the
+   primary action. Lifts on hover, presses on tap. */
+.grp-why-btn {
+  transition: background 0.15s, box-shadow 0.2s, transform 0.1s, border-color 0.15s;
+}
+.grp-why-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 16%, transparent) !important;
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent) !important;
+  box-shadow: 0 0 12px rgba(0, 216, 246, 0.22);
+}
+.grp-why-btn:active:not(:disabled) { transform: scale(0.95); }
+
+/* Tracked state gets a gentle, satisfying pulse the first paint, then rests
+   on the green fill from .grp-tail.on. */
+.grp-tail.on {
+  box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  animation: trackedPop 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes trackedPop {
+  0%   { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5); }
+  60%  { transform: scale(1.06); }
+  100% { transform: scale(1); box-shadow: 0 0 10px 0 rgba(16, 185, 129, 0.25); }
+}
+
+/* The reveal text fades + slides in under the action bar. */
+.grp-why-text,
+.row-why > p {
+  animation: whyReveal 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes whyReveal {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Board-row "Why?" chip — lift + accent on hover, matching the combo one. */
+.row-why > button {
+  transition: background 0.15s, box-shadow 0.2s, transform 0.1s, border-color 0.15s;
+}
+.row-why > button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 15%, transparent) !important;
+  box-shadow: 0 0 10px rgba(0, 216, 246, 0.2);
+}
+.row-why > button:active:not(:disabled) { transform: scale(0.94); }
+
+@media (prefers-reduced-motion: reduce) {
+  .grp-tail.on,
+  .grp-why-text,
+  .row-why > p { animation: none; }
+}
