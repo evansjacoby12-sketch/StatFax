@@ -1278,8 +1278,13 @@ export function scoreBatter(
   const exitVeloBonus = savantStats?.exitVelo >= 90
     ? Math.min(7, (savantStats.exitVelo - 88) * 1.2)
     : 0;
+  // Cap raised 9 → 12. RE-VALIDATED 2026-07-09 on 30d / 7,262 reconciled bats
+  // (`npm run lab:audit`): barrelKing (barrel ≥13%) homers +1.99pt WITHIN grade
+  // — under-credited — yet elite barrel was pinned at the old +9 cap, flattening
+  // the tail. Uncapping to +12 improved HR ranking (AUC +0.00021 on the held-out
+  // set) with no grade-purity regression.
   const barrelBonus = savantStats?.barrelPct >= 5
-    ? Math.min(9, (savantStats.barrelPct - 3) * 1.3)
+    ? Math.min(12, (savantStats.barrelPct - 3) * 1.3)
     : 0;
 
   // New: launch angle + pull rate + xSLG luck correction + iz-contact + batting order + platoon
@@ -1596,7 +1601,16 @@ export function scoreBatter(
 
   // ── Environment (20%) ────────────────────────────────────────────────────
 
-  const parkMult = carryResult.parkFactor || 1.0;
+  // Compress the park factor's pull on env by 40% (D=0.6 toward neutral).
+  // RE-VALIDATED 2026-07-09 on 30d / 7,262 bats (`npm run lab:audit`): launchPad
+  // (park ≥1.10) bats homer −3.21pt WITHIN grade — the game-park boost was
+  // over-credited on top of the grade that already prices it. Damping it lifted
+  // grade purity every graded tier (PRIME +0.26 / STRONG +0.27 / LEAN +0.30) and
+  // AUC (+0.00013). NOTE: this only softens the game-park multiplier on env; the
+  // batter's home-park stat adjustment (parkAdjustStat) is untouched, and the
+  // synergy park signal still reads the raw carryResult.parkFactor.
+  const PARK_ENV_DAMP = 0.6;
+  const parkMult = 1 + ((carryResult.parkFactor || 1.0) - 1) * PARK_ENV_DAMP;
   // Coalesce a non-finite carry score to the neutral 50 so env can't NaN the
   // composite either (same firewall rationale as matchupScore above).
   const envScore = Math.min(100, (Number.isFinite(carryResult.score) ? carryResult.score : 50) * parkMult);
