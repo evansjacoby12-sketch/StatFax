@@ -179,10 +179,11 @@ export const STRATEGIES = [
   // Ranks on barrel to surface the elite-contact tier (distinct from hot's
   // heat-led rank and mix's blend).
   { key: 'precision', rank: (b) => b.barrel ?? 0, require: (b) => b.hot === true && (b.barrel ?? 0) >= 12 },
-  // Edge Stack — ≥2 matchup signals converge (pitch type, zone, arsenal, platoon,
-  // fly-ball). 35% legs but 0/18 all-hit — decent leg-picker, never cashed as a
-  // combo. Last in order pending a re-tune; a candidate to cut if it stays cold.
-  { key: 'edge',      rank: edgeCount,                                                            require: (b) => edgeCount(b) >= 2 },
+  // Edge Stack was CUT 2026-07-09: 0-for-24 all-hit over 23 graded days, and its
+  // gate (≥2 matchup-signal booleans) isn't logged, so it can't be re-tuned on
+  // data without becoming a duplicate of precision. Dropped rather than cloned.
+  // edgeCount/EDGE_SIGNALS stay exported — the board still uses the individual
+  // edge signals as leg chips.
 ]
 
 // Keys of strategies that CURRENTLY exist — used to prune the scorecard of dead

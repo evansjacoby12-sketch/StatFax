@@ -45,10 +45,11 @@ test('precision gate: hot & barrel ≥ 12; rank = barrel (re-tuned 2026-07-07)',
   assert.equal(stratByKey.precision.rank(row({ barrel: 18 })), 18)
 })
 
-test('edge gate requires 2+ matchup signals', () => {
-  assert.equal(stratByKey.edge.require(row({ pitchEdge: true })), false)
-  assert.equal(stratByKey.edge.require(row({ pitchEdge: true, zoneEdge: true })), true)
-  assert.equal(stratByKey.edge.require(row({ pitchEdge: true, zoneEdge: true, hrPlatoonEdge: true })), true)
+test('edgeCount counts matchup signals (Edge strategy cut; helper still used for leg chips)', () => {
+  assert.equal(edgeCount(row({ pitchEdge: true })), 1)
+  assert.equal(edgeCount(row({ pitchEdge: true, zoneEdge: true })), 2)
+  assert.equal(edgeCount(row({ pitchEdge: true, zoneEdge: true, hrPlatoonEdge: true })), 3)
+  assert.equal(stratByKey.edge, undefined) // strategy removed
 })
 
 test('matchup gate at hr9 >= 1.3; rank = score × hr9', () => {
