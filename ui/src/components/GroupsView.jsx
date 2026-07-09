@@ -697,18 +697,6 @@ function GroupCard({ g, idx = 0, onSelect, selectedId, comboConf = 'off', slipSe
             <Icon name={allInSlip ? 'Check' : 'Plus'} size={12} /> Tail
           </button>
         )}
-        <button
-          className={`grp-tail${tracked ? ' on' : ''}`}
-          title={tracked ? 'Tracked as your bet — grading in My Tickets (Results → Combos). Tap to untrack.' : 'Track as my bet — pins these exact legs and grades them live + settled, even if the board re-ranks'}
-          aria-pressed={tracked}
-          onClick={(e) => {
-            e.stopPropagation()
-            const added = toggleTicket(ticket)
-            toast.success(added ? `Tracking ${g.size}-leg — see My Tickets` : 'Untracked')
-          }}
-        >
-          <Icon name={tracked ? 'Check' : 'Bookmark'} size={12} /> {tracked ? 'Tracked' : 'Track'}
-        </button>
       </header>
       <div className="grp-sub dim">
         — {g.desc} · 1 per game · all-hit {pct(g.allHit, g.allHit < 0.01 ? 2 : 1)}
@@ -776,6 +764,20 @@ function GroupCard({ g, idx = 0, onSelect, selectedId, comboConf = 'off', slipSe
           </span>
         </footer>
       )}
+      <div className="grp-track-row" style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
+        <button
+          className={`grp-tail${tracked ? ' on' : ''}`}
+          title={tracked ? 'Tracked as your bet — grading in My Tickets (Results → Combos). Tap to untrack.' : 'Track as my bet — pins these exact legs and grades them live + settled, even if the board re-ranks'}
+          aria-pressed={tracked}
+          onClick={(e) => {
+            e.stopPropagation()
+            const added = toggleTicket(ticket)
+            toast.success(added ? `Tracking ${g.size}-leg — see My Tickets` : 'Untracked')
+          }}
+        >
+          <Icon name={tracked ? 'Check' : 'Bookmark'} size={12} /> {tracked ? 'Tracked' : 'Track'}
+        </button>
+      </div>
     </section>
   )
 }
