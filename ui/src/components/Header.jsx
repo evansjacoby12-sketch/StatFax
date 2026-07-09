@@ -153,6 +153,7 @@ export default function Header({
   meta,
   counts,
   onRefresh,
+  onHoldBuild,
   onOpenModel,
   onOpenLegend,
   autoRefresh,
@@ -181,6 +182,40 @@ export default function Header({
   const brierEdge = m ? (m.baselineBrier - m.brier) / m.baselineBrier : null
   const genMs = meta.generatedAt ? Date.parse(meta.generatedAt) : NaN
   const slateStale = Number.isFinite(genMs) && Date.now() - genMs > 14 * 60_000
+
+  // Press-and-hold the refresh button for HOLD_MS → trigger a full slate
+  // rebuild (onHoldBuild). A short tap still fires onRefresh (the cheap reload).
+  // `holding` drives a progress fill that charges over the hold; when it
+  // completes we mark suppressClick so the release's synthetic click doesn't
+  // ALSO fire a reload. Keyboard activation (Enter/Space → click) keeps the tap.
+  const HOLD_MS = 10_000
+  const [holding, setHolding] = useState(false)
+  const holdTimer = useRef(null)
+  const suppressClick = useRef(false)
+  const canBuild = !!onHoldBuild && !slateBuilding
+
+  const clearHold = () => {
+    if (holdTimer.current) { clearTimeout(holdTimer.current); holdTimer.current = null }
+    setHolding(false)
+  }
+  const startHold = (e) => {
+    // Primary button / touch / pen only; ignore right-click etc.
+    if (e.button != null && e.button !== 0) return
+    if (!canBuild || refreshing) return
+    suppressClick.current = false
+    setHolding(true)
+    holdTimer.current = setTimeout(() => {
+      holdTimer.current = null
+      suppressClick.current = true   // swallow the release-click that follows
+      setHolding(false)
+      onHoldBuild?.()
+    }, HOLD_MS)
+  }
+  const handleRefreshClick = () => {
+    if (suppressClick.current) { suppressClick.current = false; return }
+    onRefresh?.()
+  }
+  useEffect(() => () => { if (holdTimer.current) clearTimeout(holdTimer.current) }, [])
 
   return (
     <header className="header">
@@ -304,16 +339,33 @@ export default function Header({
         <HelpMenu onOpenWeather={onOpenWeather} onOpenBuilder={onOpenBuilder} onOpenGroups={onOpenGroups} onOpenSGP={onOpenSGP} onOpenSplits={onOpenSplits} onOpenBacktest={onOpenBacktest} onOpenListBuilder={onOpenListBuilder} onOpenGuide={onOpenGuide} onOpenHowTo={onOpenHowTo} onOpenLegend={onOpenLegend} onOpenSettings={onOpenSettings} />
 
         <button
-          className={`icon-btn ${refreshing ? 'refreshing' : ''}`}
-          onClick={onRefresh}
-          title={slateBuilding ? 'Building fresh slate from MLB APIs…' : 'Force-fetch new slate from MLB APIs'}
-          aria-label={slateBuilding ? 'Building slate' : 'Force refresh slate'}
+          className={`icon-btn ${refreshing ? 'refreshing' : ''} ${holding ? 'holding' : ''}`}
+          onClick={handleRefreshClick}
+          onPointerDown={startHold}
+          onPointerUp={clearHold}
+          onPointerLeave={clearHold}
+          onPointerCancel={clearHold}
+          onContextMenu={(e) => { if (holding) e.preventDefault() }}
+          title={slateBuilding ? 'Building fresh slate from MLB APIs…' : canBuild ? 'Tap to reload · hold 10s to rebuild the slate' : 'Reload slate'}
+          aria-label={slateBuilding ? 'Building slate' : 'Reload slate — hold to rebuild'}
           style={{
             position: 'relative',
-            overflow: 'hidden'
+            overflow: 'hidden',
+            touchAction: 'none'   // let the hold gesture own the press (no scroll steal)
           }}
         >
-          <Icon name={slateBuilding ? 'Loader' : 'RefreshCw'} size={14} className={refreshing ? 'animate-spin' : ''} />
+          {/* Hold-progress fill — charges bottom-up over HOLD_MS while pressed,
+              snaps back on release. Behind the icon, pointer-transparent. */}
+          <span
+            aria-hidden="true"
+            style={{
+              position: 'absolute', left: 0, right: 0, bottom: 0,
+              height: holding ? '100%' : '0%',
+              background: 'var(--accent)', opacity: 0.28, pointerEvents: 'none',
+              transition: holding ? `height ${HOLD_MS}ms linear` : 'height 180ms ease',
+            }}
+          />
+          <Icon name={slateBuilding ? 'Loader' : 'RefreshCw'} size={14} className={refreshing ? 'animate-spin' : ''} style={{ position: 'relative' }} />
         </button>
       </div>
     </header>

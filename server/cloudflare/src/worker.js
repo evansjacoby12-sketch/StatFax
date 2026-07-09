@@ -62,7 +62,10 @@ export default {
         : `FAIL — ${result.status}: ${result.body}\n`,
       {
         status: result.ok ? 200 : 502,
-        headers: { 'Content-Type': 'text/plain' },
+        // CORS so the PWA's press-and-hold "build slate" button can read the
+        // result (a plain GET reaches the Worker either way — this just lets
+        // the browser see whether the dispatch succeeded).
+        headers: { 'Content-Type': 'text/plain', ...corsHeaders(env) },
       }
     );
   },

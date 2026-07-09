@@ -41,6 +41,10 @@ import Confetti from './components/Confetti.jsx'
 import Icon from './components/Icon.jsx'
 import './app.css'
 
+// Cloudflare Worker base — its /trigger endpoint fires a repository_dispatch
+// that rebuilds the slate on GitHub Actions (the press-and-hold "build" action).
+const WORKER_URL = import.meta.env?.VITE_WORKER_URL || ''
+
 const AUTO_REFRESH_MS    = 60_000
 const LIVE_REFRESH_MS    = 30_000  // faster cadence while a game is actually live
 const SLATE_REFRESH_MS   = 3 * 60_000 // always-on background poll — pipeline runs every 10 min
@@ -212,6 +216,28 @@ export default function App() {
     await load()
     toast.success('Slate refreshed')
   }, [refreshing, slateBuilding, load])
+
+  // Press-and-hold (10s) on the refresh button → kick off a full slate REBUILD
+  // on GitHub Actions via the Worker's /trigger endpoint. This is the heavy
+  // action (fetches fresh MLB + Savant data and re-scores everything, ~2-3 min),
+  // deliberately gated behind a long hold so a normal tap stays a cheap reload.
+  // On a local dev host (no Worker URL) it falls back to the local-server rebuild.
+  const buildSlate = useCallback(async () => {
+    if (!WORKER_URL) { await forceRefresh(); return }
+    try {
+      const res = await fetch(`${WORKER_URL}/trigger`, { cache: 'no-store' })
+      if (res.ok) {
+        toast.success('Rebuild kicked off — fresh slate in ~2–3 min')
+      } else {
+        toast.error(`Rebuild failed to start (${res.status})`)
+      }
+    } catch {
+      // A plain GET still reaches the Worker and dispatches even if the browser
+      // can't read the response (e.g. an older Worker without CORS), so treat an
+      // unreadable response as "requested" rather than a hard failure.
+      toast.success('Rebuild requested — fresh slate in ~2–3 min')
+    }
+  }, [forceRefresh])
 
   useEffect(() => {
     load()
@@ -579,6 +605,7 @@ export default function App() {
             shown: filtered.length,
           }}
           onRefresh={forceRefresh}
+          onHoldBuild={buildSlate}
           onOpenModel={() => setView('results')}
           onOpenLegend={() => setShowLegend(true)}
           autoRefresh={autoRefresh}
