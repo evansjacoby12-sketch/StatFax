@@ -56,6 +56,15 @@ const PITCH_FILTERS = [
 // Catcher's view, top-row = up in the zone. "Heart" = dead-center (1).
 const ZONE_NAMES = ['Up & Left', 'Up', 'Up & Right', 'Left', 'Heart', 'Right', 'Low & Left', 'Low', 'Low & Right']
 
+// League-average SLG allowed per pitch type (for the Arsenal edge rating).
+const LEAGUE_SLG = { ff: 0.382, si: 0.372, fc: 0.350, sl: 0.300, cu: 0.275, kc: 0.293, ch: 0.323, fs: 0.305, sw: 0.298, st: 0.278 }
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
+
+// Cells with fewer BIP than this are shrunk hard toward the batter's season line
+// and shown dimmed — a raw per-zone SLG on a handful of batted balls is noise.
+const MIN_CELL_BIP = 10
+const SHRINK_K = 8   // pseudo-count: cell value gets full weight only well past K BIP
+
 // Cool→hot ramp tuned for the dark theme: muted blue (cold) → red-orange (hot).
 function heatColor(t) {
   if (t == null || Number.isNaN(t)) return 'rgba(148,163,184,0.05)'
@@ -169,7 +178,7 @@ function ZoneStrike({ cells, mode, bFmt, pFmt }) {
                     <Icon name="Flame" size={9} />
                   </span>
                 )}
-                <span className="z3-val mono" style={{ fontSize: '14px', fontWeight: '800', color: '#fff', lineHeight: 1, textShadow: '0 1px 3px rgba(0,0,0,0.5)' }}>{big}</span>
+                <span className="z3-val mono" title={c.lowSample ? 'Small sample — shrunk toward season' : undefined} style={{ fontSize: '14px', fontWeight: '800', color: '#fff', lineHeight: 1, textShadow: '0 1px 3px rgba(0,0,0,0.5)', opacity: c.lowSample ? 0.5 : 1, fontStyle: c.lowSample ? 'italic' : 'normal' }}>{big}</span>
                 {sub != null && <span className="z3-sub mono" style={{ fontSize: '8.5px', fontWeight: '600', color: 'rgba(255,255,255,0.62)', lineHeight: 1 }}>{mode === 'attack' ? sub : `${sub} BIP`}</span>}
               </div>
             )
@@ -214,40 +223,66 @@ export default function ZoneView({ batter: b, onClose }) {
     const bGrid = inZone(z?.batter?.grid)
     const pGrid = inZone(z?.pitcher?.grid)
     if (!bGrid && !pGrid) return null
-    const matched = new Set((z?.matchedZones || []).filter((i) => i >= 0 && i < 9))
+
+    // Batter season baseline to shrink sparse cells toward (ISO preferred; else
+    // derive from SLG − AVG). Null → shrinkage no-ops and cells show raw.
+    const s = z?.batter?.season || {}
+    const seasonBase = Number.isFinite(s.iso) ? s.iso
+      : (Number.isFinite(s.slg) && Number.isFinite(s.avg)) ? s.slg - s.avg : null
+    // Bayesian shrink toward the season line by BIP count — a .730 on 12 balls
+    // pulls most of the way back; a value on 60+ balls barely moves.
+    const shrink = (val, count) =>
+      (val == null || seasonBase == null || !Number.isFinite(count) || count <= 0)
+        ? val
+        : (count * val + SHRINK_K * seasonBase) / (count + SHRINK_K)
+
+    const counts = (bGrid || []).map((c) => c?.count ?? null)
+    const rawIso = (bGrid || []).map((c) => c?.iso ?? c?.slg ?? null)
+    const shrunkIso = rawIso.map((v, i) => shrink(v, counts[i]))
 
     const bSel = (bGrid || []).map((c) => c?.[bMetricEff])
     const pSel = (pGrid || []).map((c) => c?.[pMetricEff])
-    const dmg = (bGrid || []).map((c) => c?.iso ?? c?.slg)
     const use = (pGrid || []).map((c) => c?.freq ?? c?.xwoba)
     const bN = normalizer(bSel)
     const pN = normalizer(pSel)
-    const dmgN = normalizer(dmg)
+    const dmgN = normalizer(shrunkIso)     // edge uses the SHRUNK damage
     const useN = normalizer(use)
 
     const base = Array.from({ length: 9 }, (_, i) => {
-      const dt = dmgN(dmg[i])
+      const dt = dmgN(shrunkIso[i])
       const ut = useN(use[i])
       return {
         i,
         name: ZONE_NAMES[i],
-        matched: matched.has(i),
         bVal: bGrid?.[i]?.[bMetricEff],
         pVal: pGrid?.[i]?.[pMetricEff],
-        iso: bGrid?.[i]?.iso ?? bGrid?.[i]?.slg ?? null,
+        iso: shrunkIso[i],
         usage: pGrid?.[i]?.freq ?? null,
-        count: bGrid?.[i]?.count ?? null,
+        count: counts[i],
+        lowSample: Number.isFinite(counts[i]) && counts[i] < MIN_CELL_BIP,
         bT: bN(bSel[i]),
         pT: pN(pSel[i]),
         edgeRaw: dt != null && ut != null ? dt * ut : null,
       }
     })
     const edgeN = normalizer(base.map((c) => c.edgeRaw))
-    base.forEach((c) => { c.edgeT = edgeN(c.edgeRaw) })
+    // ① Attack zones now come from the SAME fused edge the heatmap colors by
+    // (batter damage × pitcher location), not a separate ISO threshold — so the
+    // brightest cells are exactly the flagged ones. A cell is an attack zone when
+    // its edge is in the top band (≥0.6 of the slate's range) AND it isn't a
+    // tiny-sample cell. Capped at the top 3 to keep the callout focused.
+    const ranked = []
+    base.forEach((c) => {
+      c.edgeT = edgeN(c.edgeRaw)
+      c.matched = c.edgeT != null && c.edgeT >= 0.6 && !c.lowSample
+      if (c.matched) ranked.push(c)
+    })
+    ranked.sort((a, c) => (c.edgeT ?? 0) - (a.edgeT ?? 0))
+    ranked.slice(3).forEach((c) => { c.matched = false })  // keep only the top 3
     return base
   }, [z, bMetricEff, pMetricEff])
 
-  // Attack zones = matched in-zone cells, ranked by fused edge.
+  // Attack zones = the edge-flagged cells, strongest first.
   const attackZones = useMemo(
     () => (cells || []).filter((c) => c.matched).sort((a, c) => (c.edgeT ?? 0) - (a.edgeT ?? 0)),
     [cells],
@@ -267,6 +302,49 @@ export default function ZoneView({ batter: b, onClose }) {
     .filter((p) => pitchFilter === 'all' || p.bucket === pitchFilter)
     .sort((a, c) => (c.usage ?? 0) - (a.usage ?? 0) || String(a.code).localeCompare(String(c.code)))
   const maxUsage = Math.max(1, ...pitchRows.map((p) => p.usage ?? 0))
+
+  // ② Arsenal edge rating — usage-weighted (batter SLG − league SLG) across the
+  // pitcher's WHOLE mix (unfiltered), so the headline reflects the pitch-type
+  // edge the location rating is blind to. Same 0–5 scale.
+  const allPitches = useMemo(() => PITCHES
+    .map((p) => ({ code: p.code, label: p.label, usage: mix[`${p.code}Pct`] ?? null, bSlg: arsenal[`${p.code}Slg`] ?? null }))
+    .filter((p) => (p.usage ?? 0) > 0), [mix, arsenal])
+  const { arsenalRating5, blindSpot, coverage } = useMemo(() => {
+    let wSum = 0, eSum = 0, coveredUsage = 0, totalUsage = 0
+    for (const p of allPitches) {
+      totalUsage += p.usage
+      if (Number.isFinite(p.bSlg) && LEAGUE_SLG[p.code] != null) {
+        const w = p.usage / 100
+        eSum += w * (p.bSlg - LEAGUE_SLG[p.code]); wSum += w; coveredUsage += p.usage
+      }
+    }
+    const edge = wSum > 0 ? eSum / wSum : null
+    const top = allPitches.slice().sort((a, c) => (c.usage ?? 0) - (a.usage ?? 0))[0]
+    return {
+      arsenalRating5: edge != null ? +clamp(2.5 + edge * 15, 0, 5).toFixed(1) : null,
+      blindSpot: top && !Number.isFinite(top.bSlg) ? top : null,
+      coverage: totalUsage > 0 ? coveredUsage / totalUsage : null,
+    }
+  }, [allPitches])
+  // Headline = the stronger of the two edges (location vs arsenal) — surfaces the
+  // real edge even when one lens is flat, instead of hiding the cutter behind 0.3.
+  const overall5 = [rating5, arsenalRating5].filter((v) => v != null).reduce((m, v) => Math.max(m, v), null) ?? rating5
+
+  // One-line plain-English read: the pitch the batter feasts on + the top zone.
+  const synthesis = useMemo(() => {
+    const parts = []
+    const ranked = allPitches
+      .filter((p) => Number.isFinite(p.bSlg) && (p.usage ?? 0) >= 8)
+      .map((p) => ({ ...p, edge: p.bSlg - (LEAGUE_SLG[p.code] ?? 0.33) }))
+      .sort((a, c) => c.edge - a.edge)
+    const best = ranked[0]
+    if (best && best.edge > 0.06) parts.push(`Feasts on the ${best.label.toLowerCase()} (${r3(best.bSlg)}, ${Math.round(best.usage)}% usage)`)
+    const topZone = attackZones[0]
+    if (topZone) parts.push(`${parts.length ? 'top zone ' : 'Top zone: '}${topZone.name}`)
+    if (blindSpot) parts.push(`but no book on his #1 pitch (${Math.round(blindSpot.usage)}% ${blindSpot.label.toLowerCase()})`)
+    if (!parts.length) return null
+    return parts.join(' · ').replace(/^./, (m) => m.toUpperCase()) + '.'
+  }, [allPitches, attackZones, blindSpot])
 
   const pHand = b?.pitcher?.hand ? `${b.pitcher.hand}HP` : null
   const modeCaption =
@@ -330,8 +408,8 @@ export default function ZoneView({ batter: b, onClose }) {
             {z?.batter?.sampleBIP != null && <span> · {z.batter.sampleBIP} BIP sample</span>}
           </div>
         </div>
-        {z?.zoneRating != null && (
-          <div className="zone-rating-badge" style={{
+        {overall5 != null && (
+          <div className="zone-rating-badge" title="Best of the location and arsenal edges" style={{
             borderColor: color,
             color,
             borderWidth: '1.5px',
@@ -343,8 +421,8 @@ export default function ZoneView({ batter: b, onClose }) {
             boxShadow: `0 0 10px ${hexA(color, 0.08)}`,
             flexShrink: 0,
           }}>
-            <span className="zrb-n mono" style={{ fontSize: '18px', fontWeight: '800', display: 'block' }}>{rating5}<span style={{ fontSize: '9px', opacity: 0.6 }}>/5</span></span>
-            <span className="zrb-cap" style={{ fontSize: '7px', fontWeight: '700', letterSpacing: '0.08em', textTransform: 'uppercase' }}>ZONE</span>
+            <span className="zrb-n mono" style={{ fontSize: '18px', fontWeight: '800', display: 'block' }}>{overall5}<span style={{ fontSize: '9px', opacity: 0.6 }}>/5</span></span>
+            <span className="zrb-cap" style={{ fontSize: '7px', fontWeight: '700', letterSpacing: '0.08em', textTransform: 'uppercase' }}>EDGE</span>
           </div>
         )}
       </header>
@@ -397,15 +475,15 @@ export default function ZoneView({ batter: b, onClose }) {
 
                 <div className="z3-readout" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                   <div className="z3-edge-head">
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-                      <span className="mono" style={{ fontSize: '30px', fontWeight: '800', color: 'var(--accent)', lineHeight: 1 }}>{rating5}<span style={{ fontSize: '14px', color: 'var(--text-faint)', fontWeight: '700' }}>/5</span></span>
-                      <span style={{ fontSize: '11px', color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: '700' }}>Zone Rating</span>
+                    <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
+                      <RatingStat label="Location" value={rating5} hint="Batter's damage zones × where this pitcher lives" />
+                      <RatingStat label="Arsenal" value={arsenalRating5} hint="Batter SLG vs this pitcher's pitch types, usage-weighted" />
                     </div>
-                    <div style={{ display: 'flex', gap: '4px', marginTop: '7px' }} aria-label={`Zone rating ${rating5} of 5`}>
-                      {[1, 2, 3, 4, 5].map((n) => (
-                        <span key={n} style={{ width: '11px', height: '11px', borderRadius: '50%', background: n <= Math.round(rating5 ?? 0) ? 'var(--accent)' : 'rgba(255,255,255,0.10)', boxShadow: n <= Math.round(rating5 ?? 0) ? '0 0 6px var(--accent-glow)' : 'none' }} />
-                      ))}
-                    </div>
+                    {synthesis && (
+                      <p className="z3-synth" style={{ fontSize: '11.5px', lineHeight: 1.45, color: 'var(--text-dim)', margin: '10px 0 0' }}>
+                        <Icon name="Sparkles" size={11} style={{ color: 'var(--accent)', verticalAlign: '-1px', marginRight: '4px' }} />{synthesis}
+                      </p>
+                    )}
                   </div>
 
                   <div>
@@ -482,9 +560,17 @@ export default function ZoneView({ batter: b, onClose }) {
                   ))}
                 </div>
               </div>
-              <p className="zone-explain dim" style={{ fontSize: '12px', marginBottom: '16px', lineHeight: '1.4' }}>
+              <p className="zone-explain dim" style={{ fontSize: '12px', marginBottom: '12px', lineHeight: '1.4' }}>
                 Pitcher&apos;s usage mix vs batter stats (SLG and Whiff rate) per pitch type.
               </p>
+              {blindSpot && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '9px 12px', marginBottom: '14px', borderRadius: '8px', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.22)', color: 'var(--prime)', fontSize: '12px', lineHeight: 1.4 }}>
+                  <Icon name="TriangleAlert" size={14} style={{ flexShrink: 0 }} />
+                  <span>
+                    <b>No book on his #1 pitch</b> — {b?.name?.split(' ').slice(-1)[0] || 'the batter'} has no tracked SLG vs {b?.pitcher?.name?.split(' ').slice(-1)[0] || 'the starter'}&apos;s {blindSpot.label.toLowerCase()} ({Math.round(blindSpot.usage)}% of his pitches). A real unknown in this matchup.
+                  </span>
+                </div>
+              )}
               {pitchRows.length ? (
                 <div className="pitch-table" style={{ display: 'flex', flexDirection: 'column', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '8px', overflow: 'hidden', marginBottom: '16px' }}>
                   <div className="pitch-row pitch-row-head" style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.5fr 1fr 1fr 1fr', padding: '6px 10px', background: 'rgba(255,255,255,0.03)', fontSize: '10px', fontWeight: '700', color: 'var(--text-faint)', textTransform: 'uppercase' }}>
@@ -530,6 +616,23 @@ export default function ZoneView({ batter: b, onClose }) {
             </section>
           </>
         )}
+      </div>
+    </div>
+  )
+}
+
+function RatingStat({ label, value, hint }) {
+  const c = value == null ? 'var(--text-faint)' : value >= 3.5 ? 'var(--strong)' : value >= 2 ? 'var(--accent)' : 'var(--text-dim)'
+  return (
+    <div title={hint}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+        <span className="mono" style={{ fontSize: '28px', fontWeight: '800', color: c, lineHeight: 1 }}>{value != null ? value : '—'}<span style={{ fontSize: '13px', color: 'var(--text-faint)', fontWeight: '700' }}>/5</span></span>
+        <span style={{ fontSize: '10px', color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: '700' }}>{label}</span>
+      </div>
+      <div style={{ display: 'flex', gap: '3px', marginTop: '6px' }} aria-label={`${label} ${value ?? 0} of 5`}>
+        {[1, 2, 3, 4, 5].map((n) => (
+          <span key={n} style={{ width: '10px', height: '10px', borderRadius: '50%', background: n <= Math.round(value ?? 0) ? c : 'rgba(255,255,255,0.10)', boxShadow: n <= Math.round(value ?? 0) ? `0 0 6px ${c}` : 'none' }} />
+        ))}
       </div>
     </div>
   )
