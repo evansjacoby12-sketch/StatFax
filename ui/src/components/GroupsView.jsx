@@ -9,6 +9,7 @@ import { americanToRawImplied, bestSingleBook } from '../lib/odds.js'
 import { bookLabel } from '../lib/data.js'
 import * as store from '../lib/storage.js'
 import { toast } from './Toast.jsx'
+import { useTickets, makeTicket } from '../lib/tickets.js'
 
 const GROUP_GRADE_COLOR = { S: '#f5a623', A: '#32d74b', B: '#3b82f6', C: '#9aa6b6', D: '#6b7787' }
 const LOCK_STRAT_LABEL = { precision: 'Precision', matchup: 'Soft Matchup', mix: 'Best Mix', park: 'Park & Air', edge: 'Edge Stack' }
@@ -566,7 +567,7 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard, g
             </div>
           )}
           {shownGroups.map((g, i) => (
-            <GroupCard key={g.id} g={g} idx={i} onSelect={onSelect} selectedId={selectedId} comboConf={comboConf} slipSet={slipSet} onToggleSlip={onToggleSlip} railMax={railMax} legCount={legCount} hoverPid={hoverPid} onHoverPid={setHoverPid} />
+            <GroupCard key={g.id} g={g} idx={i} onSelect={onSelect} selectedId={selectedId} comboConf={comboConf} slipSet={slipSet} onToggleSlip={onToggleSlip} railMax={railMax} legCount={legCount} hoverPid={hoverPid} onHoverPid={setHoverPid} slateDate={slateDay} />
           ))}
           {stacks.length > 0 && (
             <>
@@ -574,7 +575,7 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard, g
                 <Icon name="GitMerge" size={12} /> Two green 2-legs share a bat — the fused 3-man
               </div>
               {stacks.map((g, i) => (
-                <GroupCard key={g.id} g={g} idx={shownGroups.length + i} onSelect={onSelect} selectedId={selectedId} comboConf={comboConf} slipSet={slipSet} onToggleSlip={onToggleSlip} railMax={railMax} legCount={legCount} hoverPid={hoverPid} onHoverPid={setHoverPid} />
+                <GroupCard key={g.id} g={g} idx={shownGroups.length + i} onSelect={onSelect} selectedId={selectedId} comboConf={comboConf} slipSet={slipSet} onToggleSlip={onToggleSlip} railMax={railMax} legCount={legCount} hoverPid={hoverPid} onHoverPid={setHoverPid} slateDate={slateDay} />
               ))}
             </>
           )}
@@ -590,7 +591,10 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard, g
   )
 }
 
-function GroupCard({ g, idx = 0, onSelect, selectedId, comboConf = 'off', slipSet = null, onToggleSlip = null, railMax = null, legCount = null, hoverPid = null, onHoverPid = null }) {
+function GroupCard({ g, idx = 0, onSelect, selectedId, comboConf = 'off', slipSet = null, onToggleSlip = null, railMax = null, legCount = null, hoverPid = null, onHoverPid = null, slateDate = null }) {
+  const { toggle: toggleTicket, isTracked } = useTickets()
+  const ticket = makeTicket({ legs: g.legs, date: slateDate, strategy: g.strategy, label: g.label, size: g.size, allHit: g.allHit, american: g.american })
+  const tracked = isTracked(ticket.id)
   const allInSlip = !!slipSet && g.legs.length > 0 && g.legs.every((b) => slipSet.has(b.id))
   // Best one-ticket price: the headline `pays` multiplies each leg's best price
   // across different books; this is the best single book that prices every leg.
@@ -693,6 +697,18 @@ function GroupCard({ g, idx = 0, onSelect, selectedId, comboConf = 'off', slipSe
             <Icon name={allInSlip ? 'Check' : 'Plus'} size={12} /> Tail
           </button>
         )}
+        <button
+          className={`grp-tail${tracked ? ' on' : ''}`}
+          title={tracked ? 'Tracked as your bet — grading in My Tickets (Results → Combos). Tap to untrack.' : 'Track as my bet — pins these exact legs and grades them live + settled, even if the board re-ranks'}
+          aria-pressed={tracked}
+          onClick={(e) => {
+            e.stopPropagation()
+            const added = toggleTicket(ticket)
+            toast.success(added ? `Tracking ${g.size}-leg — see My Tickets` : 'Untracked')
+          }}
+        >
+          <Icon name={tracked ? 'Check' : 'Bookmark'} size={12} /> {tracked ? 'Tracked' : 'Track'}
+        </button>
       </header>
       <div className="grp-sub dim">
         — {g.desc} · 1 per game · all-hit {pct(g.allHit, g.allHit < 0.01 ? 2 : 1)}

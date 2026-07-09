@@ -4,6 +4,7 @@ import Select from './Select.jsx'
 import { pct, surname } from '../lib/format.js'
 import { legStatus } from '../lib/live.js'
 import LiveCombosView from './LiveCombosView.jsx'
+import MyTickets from './MyTickets.jsx'
 
 // Dedicated Combos page: live combo tracking (today, in progress) + the settled
 // day-by-day combo scorecard graded off the backtest log. Split out of the
@@ -152,8 +153,18 @@ export default function CombosView({ batters, onSelect, favorConsistency = false
     return { comboDates, activeComboDay, board, boardOptions, dayCombos, comboWeek, dayTally, sgpDay, sgpCashed, isStale, latestDate, daysBehind }
   })()
 
+  const slateDate = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' })
+
   return (
     <div className="results">
+      <section className="results-card" style={CARD}>
+        <h3 className="section-title" style={H3}>
+          <Icon name="Bookmark" size={14} style={{ color: 'var(--accent)' }} /> My tickets
+          <span style={{ fontWeight: '400', textTransform: 'none', marginLeft: '6px', fontSize: '12px', color: 'var(--text-faint)' }}>· combos you tracked, graded as your bets</span>
+        </h3>
+        <MyTickets batters={batters} slateDate={slateDate} onSelect={onSelect} />
+      </section>
+
       {batters && (
         <section className="results-card" style={CARD}>
           <h3 className="section-title" style={H3}>
