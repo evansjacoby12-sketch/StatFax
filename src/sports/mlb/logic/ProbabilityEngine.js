@@ -1329,15 +1329,21 @@ export function scoreBatter(
     const hasEnoughSample = homeAB >= 50 && awayAB >= 50;
     if (hasEnoughSample && homeISO != null && awayISO != null) {
       const diff = isHomeGame ? (homeISO - awayISO) : (awayISO - homeISO);
-      // Up-weighted tiers (5→7, 3→5). VALIDATED 2026-06-20 on 27d / 6441 bats
-      // (`npm run lab:audit`): homeEdge univariate 1.50x (z=5.3) and beats its
-      // grademates in 3 of 4 grades (+4.1 STRONG / +3.0 LEAN / +5.6 SKIP; PRIME
-      // ~flat at -1.7, n275) — net under-credited, so the up-weight holds.
+      // ASYMMETRIC home vs away — RE-VALIDATED 2026-07-09 on 30d / 7,262 bats
+      // (`npm run lab:audit`). The old symmetric +7/+5 came from a 27d audit
+      // where homeEdge beat its grademates; that has since DECAYED. Current data:
+      //   awayEdge  within-grade +3.68pt (n-wtd; STRONG +5.5, LEAN +4.1) — real
+      //   homeEdge  within-grade +0.05pt (STRONG -0.4, SKIP -0.2)        — ~zero
+      // So away keeps the full tiers; home is cut to a token bonus (was over-
+      // crediting a dead signal). Offline grade-purity sim (home -2pts) held or
+      // improved every tier (PRIME +0.16, STRONG +0.04, LEAN +0.21) — no
+      // regression. The -2 "bad split" penalty stays symmetric.
+      const [hi, lo] = isHomeGame ? [3, 2] : [7, 5];
       if (diff >= 0.045) {
-        homeAwayAdj = 7;
+        homeAwayAdj = hi;
         if (isHomeGame) homeEdge = true; else awayEdge = true;
       } else if (diff >= 0.025) {
-        homeAwayAdj = 5;
+        homeAwayAdj = lo;
         if (isHomeGame) homeEdge = true; else awayEdge = true;
       } else if (diff <= -0.025) {
         homeAwayAdj = -2;
