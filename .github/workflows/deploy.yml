@@ -80,6 +80,15 @@ jobs:
           key: context-${{ github.run_id }}
           restore-keys: context-
 
+      # Carry the prior Slate Brief across runs so its same-day staleness guard
+      # can reuse a recent result instead of re-paying the API on every tick.
+      - name: Restore slate brief
+        uses: actions/cache@v4
+        with:
+          path: dist/brief.json
+          key: brief-${{ github.run_id }}
+          restore-keys: brief-
+
       # Intraday combo-board history — accumulates this day's per-run snapshots so
       # we can measure how the board shifts morning → first pitch. Same unique-key-
       # saves / restore-by-prefix pattern (rolls over in-file on date change).
@@ -165,6 +174,15 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           CONTEXT_MODEL: ${{ vars.CONTEXT_MODEL || 'claude-haiku-4-5-20251001' }}
         run: npm run context || true
+
+      # Daily one-paragraph board summary → dist/brief.json. Reads the scored
+      # board (+ the context flags above) and narrates it; advisory only, never
+      # touches predictions. Skips without the key; `|| true` never blocks deploy.
+      - name: Slate brief (Claude)
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          BRIEF_MODEL: ${{ vars.BRIEF_MODEL || 'claude-haiku-4-5-20251001' }}
+        run: npm run brief || true
 
       - name: Build UI
         env:

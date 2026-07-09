@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback, useRef, useLayoutEffect } from 'react'
-import { loadSlate, forceSlateRefresh, normName } from './lib/data.js'
+import { loadSlate, loadBrief, forceSlateRefresh, normName } from './lib/data.js'
 import { GRADE_ORDER, BADGES } from './lib/badges.js'
 import { HOT_HEAT, DESC_BY_DEFAULT, DEFAULT_FILTERS, SORTS } from './lib/constants.js'
 import { risingForm, precisionSignal, sleeperSignal } from './lib/groups.js'
@@ -10,6 +10,7 @@ import { EliLevelContext, nextEliLevel } from './lib/eliLevel.js'
 import Header from './components/Header.jsx'
 import Filters from './components/Filters.jsx'
 import BatterTable from './components/BatterTable.jsx'
+import SlateBrief from './components/SlateBrief.jsx'
 import GamesView from './components/GamesView.jsx'
 import PitchersView, { PitcherCard } from './components/PitchersView.jsx'
 import { groupPitchers } from './lib/pitchers.js'
@@ -86,6 +87,7 @@ export default function App() {
   })()
 
   const [state, setState] = useState({ status: 'loading', data: null, error: null })
+  const [brief, setBrief] = useState(null)
   const [refreshing, setRefreshing] = useState(false)
   const [slateBuilding, setSlateBuilding] = useState(false)
   const [filters, setFilters] = useState(() => (staleReturn ? DEFAULT_FILTERS : initialFilters()))
@@ -187,6 +189,9 @@ export default function App() {
     try {
       const data = await loadSlate()
       setState({ status: 'ready', data, error: null })
+      // Fire-and-forget: the brief is advisory and must never block or fail the
+      // board load. Refreshes alongside each slate load (a few times a day).
+      loadBrief().then(setBrief).catch(() => {})
     } catch (e) {
       setState((s) => (s.data ? s : { status: 'error', data: null, error: e.message }))
     } finally {
@@ -654,6 +659,7 @@ export default function App() {
               rating={data.meta?.dayRating}
               estHRs={data.batters?.reduce((s, b) => s + (Number.isFinite(b.hrProbability) ? b.hrProbability : 0), 0) ?? null}
             />}
+            <SlateBrief brief={brief} />
             {pick && pick.id !== podDismissedId && (
               <PickOfDay
                 batter={pick}
