@@ -94,3 +94,70 @@ export function useExplain(b) {
 
   return { status, text, run, available }
 }
+
+// ── Combo "Why?" — the same narration for a parlay ──────────────────────────
+// Reuses the /explain endpoint with a combo-shaped payload: the "player" is the
+// parlay and the "reasons" are its strategy + per-leg lines. Cached per combo
+// (sorted leg ids + date) so it survives re-opens and board re-ranks the same
+// way the player narration does.
+
+function comboKey(group, date) {
+  const ids = (group?.legs || []).map((b) => b.playerId).filter((x) => x != null).slice().sort((a, b) => a - b).join('-')
+  return `combo_${date || '?'}_${ids}`
+}
+
+function comboPayload(group) {
+  const legLine = (b) => {
+    const g = b.grade?.label || b.grade || '?'
+    const prob = Number.isFinite(b.hrProbability) ? ` ${(b.hrProbability * 100).toFixed(0)}% HR` : ''
+    const why = b.reasons?.[0] ? ` — ${String(b.reasons[0]).slice(0, 90)}` : ''
+    return `${b.name} (${g}${prob}, vs ${b.pitcher?.name || '?'})${why}`
+  }
+  return {
+    name: `${group.size}-leg ${group.label} parlay`,
+    grade: group.grade,
+    reasons: [
+      `Strategy: ${group.label}${group.desc ? ` — ${group.desc}` : ''}`,
+      `Every leg must homer to cash; model all-hit ${((group.allHit ?? 0) * 100).toFixed(1)}%`,
+      ...(group.legs || []).map(legLine),
+    ],
+  }
+}
+
+export function useComboExplain(group, slateDate) {
+  const key = comboKey(group, slateDate)
+  const [status, setStatus] = useState('idle')
+  const [text, setText] = useState('')
+
+  useEffect(() => {
+    const cached = readExplainCache(key)
+    if (cached) { setText(cached); setStatus('done') }
+    else { setText(''); setStatus('idle') }
+  }, [key])
+
+  const available = !!WORKER_URL && (group?.legs?.length ?? 0) >= 2
+
+  const run = async () => {
+    if (!available) return
+    setStatus('loading')
+    try {
+      const resp = await fetch(`${WORKER_URL}/explain`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(comboPayload(group)),
+      })
+      const data = await resp.json().catch(() => ({}))
+      if (resp.ok && data.text) {
+        setText(data.text)
+        setStatus('done')
+        writeExplainCache(key, data.text)
+      } else {
+        setStatus('error')
+      }
+    } catch {
+      setStatus('error')
+    }
+  }
+
+  return { status, text, run, available }
+}

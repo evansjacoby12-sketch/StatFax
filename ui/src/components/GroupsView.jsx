@@ -10,6 +10,7 @@ import { bookLabel } from '../lib/data.js'
 import * as store from '../lib/storage.js'
 import { toast } from './Toast.jsx'
 import { useTickets, makeTicket } from '../lib/tickets.js'
+import { useComboExplain } from '../lib/explain.js'
 
 const GROUP_GRADE_COLOR = { S: '#f5a623', A: '#32d74b', B: '#3b82f6', C: '#9aa6b6', D: '#6b7787' }
 const LOCK_STRAT_LABEL = { precision: 'Precision', matchup: 'Soft Matchup', mix: 'Best Mix', park: 'Park & Air', edge: 'Edge Stack' }
@@ -595,6 +596,15 @@ function GroupCard({ g, idx = 0, onSelect, selectedId, comboConf = 'off', slipSe
   const { toggle: toggleTicket, isTracked } = useTickets()
   const ticket = makeTicket({ legs: g.legs, date: slateDate, strategy: g.strategy, label: g.label, size: g.size, allHit: g.allHit, american: g.american })
   const tracked = isTracked(ticket.id)
+  const why = useComboExplain(g, slateDate)
+  const [whyOpen, setWhyOpen] = useState(false)
+  const onWhy = (e) => {
+    e.stopPropagation()
+    if (why.status === 'loading') return
+    if (why.status === 'done') { setWhyOpen((o) => !o); return }
+    setWhyOpen(true)
+    why.run()
+  }
   const allInSlip = !!slipSet && g.legs.length > 0 && g.legs.every((b) => slipSet.has(b.id))
   // Best one-ticket price: the headline `pays` multiplies each leg's best price
   // across different books; this is the best single book that prices every leg.
@@ -764,7 +774,26 @@ function GroupCard({ g, idx = 0, onSelect, selectedId, comboConf = 'off', slipSe
           </span>
         </footer>
       )}
-      <div className="grp-track-row" style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
+      <div className="grp-track-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
+        {why.available ? (
+          <button
+            className="grp-why-btn"
+            title="Why these legs? — plain-English read on the parlay"
+            aria-expanded={whyOpen && why.status === 'done'}
+            onClick={onWhy}
+            disabled={why.status === 'loading'}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '11px', fontWeight: '700',
+              padding: '4px 10px', borderRadius: '7px', background: 'rgba(0,216,246,0.08)',
+              border: '1px solid rgba(0,216,246,0.22)', color: 'var(--accent)',
+              cursor: why.status === 'loading' ? 'default' : 'pointer',
+            }}
+          >
+            <Icon name={why.status === 'loading' ? 'Loader' : 'Sparkles'} size={11}
+              style={why.status === 'loading' ? { animation: 'spin 1s linear infinite' } : undefined} />
+            {why.status === 'loading' ? 'Thinking…' : why.status === 'error' ? 'Retry' : why.status === 'done' && whyOpen ? 'Hide' : 'Why?'}
+          </button>
+        ) : <span />}
         <button
           className={`grp-tail${tracked ? ' on' : ''}`}
           title={tracked ? 'Tracked as your bet — grading in My Tickets (Results → Combos). Tap to untrack.' : 'Track as my bet — pins these exact legs and grades them live + settled, even if the board re-ranks'}
@@ -778,6 +807,9 @@ function GroupCard({ g, idx = 0, onSelect, selectedId, comboConf = 'off', slipSe
           <Icon name={tracked ? 'Check' : 'Bookmark'} size={12} /> {tracked ? 'Tracked' : 'Track'}
         </button>
       </div>
+      {whyOpen && why.status === 'done' && (
+        <p className="grp-why-text" style={{ fontSize: '11.5px', lineHeight: 1.5, color: 'var(--text-dim)', margin: '8px 2px 0' }}>{why.text}</p>
+      )}
     </section>
   )
 }
