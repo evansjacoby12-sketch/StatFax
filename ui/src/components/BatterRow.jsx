@@ -5,6 +5,8 @@ import { gradeColor } from '../lib/badges.js'
 import { teamLogo } from '../lib/teams.js'
 import { useLiveMode } from '../lib/liveMode.js'
 import { useEliLevel, topReasonForLevel } from '../lib/eliLevel.js'
+import { useExplain } from '../lib/explain.js'
+import { useState } from 'react'
 import { risingForm } from '../lib/groups.js'
 import { useSwipeActions } from '../lib/useSwipeActions.js'
 import { hexA } from './atoms.jsx'
@@ -181,6 +183,7 @@ export default function BatterRow({
               <span>{topReason}</span>
             </div>
           )}
+          <RowWhy b={b} />
           <div className="batter-meta mono">
             {Number.isFinite(b.expectedPAs) && <span className="bm-pa">~{num(b.expectedPAs, 1)} PA</span>}
             {b.battingOrder ? <span className="bm-slot">Batting {ordinal(b.battingOrder)}</span> : null}
@@ -318,6 +321,52 @@ export default function BatterRow({
           <Icon name="ChevronRight" size={16} className="row-chev" style={{ opacity: 0.5 }} />
         </div>
       </div>
+    </div>
+  )
+}
+
+// Compact "Why?" expander on the board row — same Haiku narration as the
+// drawer's Explain card, sharing its per-player/day cache (a tap here fills
+// the drawer too, and vice-versa). Lazy: no call until tapped. stopPropagation
+// keeps taps from opening the drawer. Absent when the worker URL is unset.
+function RowWhy({ b }) {
+  const { status, text, run, available } = useExplain(b)
+  const [open, setOpen] = useState(false)
+  if (!available) return null
+
+  const onTap = (e) => {
+    e.stopPropagation()
+    if (status === 'loading') return
+    if (status === 'done') { setOpen((o) => !o); return }
+    setOpen(true)
+    run()
+  }
+
+  const label = status === 'loading' ? 'Thinking…'
+    : status === 'error' ? 'Retry'
+    : status === 'done' && open ? 'Hide'
+    : 'Why?'
+
+  return (
+    <div className="row-why" onClick={(e) => e.stopPropagation()} style={{ marginTop: '4px' }}>
+      <button
+        type="button"
+        onClick={onTap}
+        disabled={status === 'loading'}
+        style={{
+          display: 'inline-flex', alignItems: 'center', gap: '4px',
+          fontSize: '10px', fontWeight: '700', padding: '2px 8px', borderRadius: '6px',
+          background: 'rgba(0,216,246,0.08)', border: '1px solid rgba(0,216,246,0.22)',
+          color: 'var(--accent)', cursor: status === 'loading' ? 'default' : 'pointer',
+        }}
+      >
+        <Icon name={status === 'loading' ? 'Loader' : 'Sparkles'} size={10}
+          style={status === 'loading' ? { animation: 'spin 1s linear infinite' } : undefined} />
+        {label}
+      </button>
+      {open && status === 'done' && (
+        <p style={{ fontSize: '11px', lineHeight: '1.45', color: 'var(--text-dim)', margin: '6px 0 0' }}>{text}</p>
+      )}
     </div>
   )
 }
