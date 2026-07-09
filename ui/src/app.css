@@ -5139,6 +5139,20 @@ button.th:focus-visible {
   filter: grayscale(0.5);
   transition: opacity 0.15s, filter 0.15s;
 }
+/* A game in progress breathes a soft accent glow so it stands out from the slate. */
+.game-card.live,
+.xcard.live {
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent) !important;
+  animation: gameLiveGlow 2.4s ease-in-out infinite;
+}
+@keyframes gameLiveGlow {
+  0%, 100% { box-shadow: var(--glass-shadow), 0 0 0 0 rgba(0, 216, 246, 0); }
+  50% { box-shadow: var(--glass-shadow), 0 0 16px 1px rgba(0, 216, 246, 0.22); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .game-card.live,
+  .xcard.live { animation: none; }
+}
 .pcard.final:hover,
 .game-card.final:hover {
   opacity: 0.78;
@@ -8205,17 +8219,41 @@ button.th:focus-visible {
   .wxcard { transition: none; }
 }
 
-/* ─── Day Rating: stars pop in ───────────────────────────────────────────── */
+/* ─── Day Rating: stars pop in + tone glow + factor bars grow ────────────── */
 .dr-star.on {
   display: inline-block;
   animation: starPop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
   animation-delay: calc(var(--i, 0) * 80ms);
+  text-shadow: 0 0 6px rgba(245, 166, 35, 0.4);
 }
 @keyframes starPop {
   from { transform: scale(0) rotate(-72deg); opacity: 0; }
 }
+/* A great slate breathes a soft green glow — a nudge to lean in. */
+.day-rating.tone-great {
+  animation: drGreatGlow 2.6s ease-in-out infinite;
+}
+.day-rating.tone-great .dr-star.on { text-shadow: 0 0 9px rgba(245, 166, 35, 0.75); }
+@keyframes drGreatGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+  50% { box-shadow: 0 0 14px 1px rgba(16, 185, 129, 0.22); }
+}
+/* Factor bars take the day's verdict color and grow in when expanded. */
+.day-rating.tone-great .dr-fill { background: var(--good); }
+.day-rating.tone-good .dr-fill { background: color-mix(in srgb, var(--good) 80%, #f5a623); }
+.day-rating.tone-soft .dr-fill { background: var(--warn, #ffb02e); }
+.day-rating.tone-skip .dr-fill { background: var(--bad); }
+.day-rating[open] .dr-fill {
+  animation: drFillGrow 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+  transform-origin: left center;
+}
+.day-rating[open] .dr-row:nth-child(2) .dr-fill { animation-delay: 90ms; }
+.day-rating[open] .dr-row:nth-child(3) .dr-fill { animation-delay: 180ms; }
+@keyframes drFillGrow { from { transform: scaleX(0); } }
 @media (prefers-reduced-motion: reduce) {
-  .dr-star.on { animation: none; }
+  .dr-star.on,
+  .day-rating.tone-great,
+  .day-rating[open] .dr-fill { animation: none; }
 }
 
 /* ─── Board: top-3 rank medals ───────────────────────────────────────────── */
