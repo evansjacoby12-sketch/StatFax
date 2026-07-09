@@ -127,15 +127,21 @@ export function hrSetup(b) {
 
 const PITCH_LEAGUE_SLG = { FF: 0.382, SI: 0.372, FC: 0.350, SL: 0.300, CU: 0.275, KC: 0.293, CH: 0.323, FS: 0.305, SW: 0.298, ST: 0.278 }
 
+// A pitch with 0 SLG AND 0 whiff has no tracked book — a hitter who'd faced it
+// would show *some* outcome. Treat it as missing, not as a real .000 (max-tough)
+// matchup, so a high-usage unseen pitch can't drag the score down. (Same fix as
+// the drawer's PitchMixAdvantage + the zone view.)
+const hasPitchBook = (p) => p.slg != null && !(p.slg === 0 && !(p.whiff > 0))
+
 export function pitchMixScore(b) {
   const splits = b.pitchTypeSplits
   if (!splits?.length) return null
   let totalW = 0, totalAdv = 0
   for (const p of splits) {
+    if (!hasPitchBook(p)) continue
     const league = PITCH_LEAGUE_SLG[p.key] ?? 0.330
-    const adv = p.slg != null ? p.slg - league : 0
     totalW += p.usage ?? 0
-    totalAdv += adv * (p.usage ?? 0)
+    totalAdv += (p.slg - league) * (p.usage ?? 0)
   }
   return totalW > 0 ? Math.max(0, Math.min(10, 5 + (totalAdv / totalW) * 25)) : null
 }
