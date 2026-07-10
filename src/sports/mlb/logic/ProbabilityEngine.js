@@ -1413,9 +1413,24 @@ export function scoreBatter(
   // Cap at 88 instead of 100 so matchup + environment always matter.
   // Even a Judge-level batter (powerBase ~58) + all bonuses maxes around 88,
   // leaving meaningful room for a bad matchup or pitchers-park to pull him down.
+  // ── RECENCY UP-WEIGHT (env-gated, OFF by default) ──────────────────────────
+  // DRAFTED 2026-07-09, NOT yet enabled. The full-feature AUC scan found heat/
+  // recency is the strongest signal the model UNDER-prices: among bats the model
+  // grades EQUALLY, high-heat bats homered +9.2pt (high-score) / +12.6pt (low-
+  // score) — ~2.8σ on 1,062 reconciled bats. This scales the two live-form terms
+  // (hot-ISO surge + recent barrel) so the score leans harder on current form.
+  //
+  // RECENCY_BOOST defaults to 1.0 → batterScore is BYTE-IDENTICAL to before, so
+  // shipping this is a no-op in production. To VALIDATE before enabling, A/B it
+  // on the frozen inputs corpus (CI has it): baseline `npm run lab:score` vs
+  // `RECENCY_BOOST=1.4 npm run lab:score` and compare reconciled AUC/Brier/hit-
+  // rate. Only if it improves, enable in production by setting RECENCY_BOOST on
+  // the slate step in .github/workflows/deploy.yml. Never flip it on unvalidated.
+  const RECENCY_BOOST = Number(process.env.RECENCY_BOOST) || 1.0;
+
   const batterScore = Math.min(88, Math.max(0,
     powerBase
-    + hotScore
+    + hotScore * RECENCY_BOOST
     - coldPenalty                // graduated: -5 to -18 based on slump depth
     + dueBonus
     + dueAndHotBonus
@@ -1431,7 +1446,7 @@ export function scoreBatter(
     + orderAdj
     + platoonAdj
     + homeAwayAdj
-    + recentBarrelAdj
+    + recentBarrelAdj * RECENCY_BOOST
   ));
 
   // ── Matchup (30%) ────────────────────────────────────────────────────────
