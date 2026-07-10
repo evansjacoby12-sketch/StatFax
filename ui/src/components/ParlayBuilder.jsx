@@ -81,7 +81,7 @@ function LiveTag({ code, text, meta, size = 'sm' }) {
 }
 
 // ── Live summary header ───────────────────────────────────────────────────────
-function Summary({ p, live, correlate, onToggleCorr, wager, onWager }) {
+function Summary({ p, live, wager, onWager }) {
   const gColor = p.grade ? GRADE_COLOR[p.grade.letter] : 'var(--text-faint)'
   const payDecimal = p.allPriced ? p.decimal : p.fairDecimal
   const wagerNum = parseFloat(wager)
@@ -102,19 +102,14 @@ function Summary({ p, live, correlate, onToggleCorr, wager, onWager }) {
           )}
         </span>
         {p.sameGame && (
-          <button
-            className="pb-corr-toggle"
-            onClick={onToggleCorr}
-            title="Same-game legs are correlated — toggle between the correlation-adjusted all-hit and the plain independent product."
-            style={{ fontSize: '10px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.04em', color: correlate ? 'var(--accent)' : 'var(--text-dim)', border: `1px solid ${correlate ? 'var(--accent)' : 'var(--border)'}`, background: correlate ? hexA('#00d8f6', 0.08) : 'transparent', borderRadius: '6px', padding: '3px 8px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-          >
-            <Icon name="GitBranch" size={11} /> {correlate ? 'Correlated' : 'Independent'}
-          </button>
+          <span className="pb-corr-toggle" title="Same-game legs use the independent all-hit estimate; no correlation uplift is applied." style={{ fontSize: '10px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-dim)', border: '1px solid var(--border)', background: 'transparent', borderRadius: '6px', padding: '3px 8px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+            <Icon name="GitBranch" size={11} /> Independent
+          </span>
         )}
       </div>
 
       <div className="pb-metrics" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(92px, 1fr))', gap: '10px' }}>
-        <Metric k="All-hit" v={p.n ? pct(p.modelAllHit, p.modelAllHit < 0.01 ? 2 : 1) : '—'} color="var(--accent)" sub={p.sameGame && correlate ? `indep ${pct(p.independent, p.independent < 0.01 ? 2 : 1)}` : null} />
+        <Metric k="All-hit" v={p.n ? pct(p.modelAllHit, p.modelAllHit < 0.01 ? 2 : 1) : '—'} color="var(--accent)" sub={p.sameGame ? 'independent estimate' : null} />
         <Metric k={p.allPriced ? 'Parlay odds' : 'Fair odds'} v={p.allPriced ? od(p.american) : od(p.fairAmerican)} color="#fff" sub={!p.allPriced && p.n ? `${p.priced}/${p.n} priced` : null} />
         <Metric k="EV / $1" v={p.ev != null ? signedPct(p.ev, 0) : '—'} color={evColor} sub={p.ev != null ? (p.ev >= 0 ? 'value' : 'overpriced') : 'need odds'} />
         <Metric k="Edge vs fair" v={p.edge != null ? signedPct(p.edge, 1) : '—'} color={p.edge == null ? 'var(--text-faint)' : p.edge >= 0 ? 'var(--strong)' : 'var(--bad)'} />
@@ -175,7 +170,6 @@ function LegRow({ b, perLeg, weak, onSelect, onRemove }) {
 }
 
 export default function ParlayBuilder({ batters, legs, slipSet, onToggle, onRemove, onClear, onReplace, onSelect, onClose, favorConsistency = false, scorecard = null }) {
-  const [correlate, setCorrelate] = useState(true)
   const [wager, setWager] = useState('10')
   const [tab, setTab] = useState('legs') // legs | build | saved
   const [autoSize, setAutoSize] = useState(3)
@@ -213,13 +207,13 @@ export default function ParlayBuilder({ batters, legs, slipSet, onToggle, onRemo
     setQbBuilt(picked.length >= 2 ? picked : [])
   }
 
-  const p = useMemo(() => buildParlay(legs, { correlate }), [legs, correlate])
+  const p = useMemo(() => buildParlay(legs, { correlate: false }), [legs])
   const perLegById = useMemo(() => new Map(p.perLeg.map((l) => [l.id, l])), [p])
   // Live tracking — grade the slip + resolve saved slips against in-progress HRs.
   const live = useMemo(() => comboStatus(legs), [legs])
   const byId = useMemo(() => new Map((batters || []).map((b) => [b.id, b])), [batters])
 
-  // Same-game groups with ≥2 legs (the correlated subsets) for the badge note.
+  // Same-game groups with ≥2 legs for the independent-estimate note.
   const sgGroups = useMemo(() => p.byGame.filter((g) => g.legs.length >= 2), [p])
 
   // Auto-suggest single legs: strongest board bats not already in the slip and
@@ -258,11 +252,11 @@ export default function ParlayBuilder({ batters, legs, slipSet, onToggle, onRemo
     }
     const cands = [...perGame.values()].sort((a, b) => (b.score ?? 0) - (a.score ?? 0)).slice(0, 8)
     const items = kCombos(cands, need)
-      .map((fills) => ({ fills, p: buildParlay([...legs, ...fills], { correlate }) }))
+      .map((fills) => ({ fills, p: buildParlay([...legs, ...fills], { correlate: false }) }))
       .sort((a, b) => (b.p.ev ?? -Infinity) - (a.p.ev ?? -Infinity) || (b.p.modelAllHit ?? 0) - (a.p.modelAllHit ?? 0))
       .slice(0, 6)
     return { mode: 'complete', need, items }
-  }, [batters, autoSize, favorConsistency, legs, slipSet, correlate])
+  }, [batters, autoSize, favorConsistency, legs, slipSet])
 
   const saveSlip = () => {
     if (!legs.length) return
@@ -296,12 +290,12 @@ export default function ParlayBuilder({ batters, legs, slipSet, onToggle, onRemo
 
   return (
     <div className="pb" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <Summary p={p} live={live} correlate={correlate} onToggleCorr={() => setCorrelate((c) => !c)} wager={wager} onWager={setWager} />
+      <Summary p={p} live={live} wager={wager} onWager={setWager} />
 
-      {sgGroups.length > 0 && correlate && (
+      {sgGroups.length > 0 && (
         <div className="pb-sg-note" style={{ fontSize: '11px', color: 'var(--b-plat)', background: hexA('#8b5cf6', 0.08), border: `1px solid ${hexA('#8b5cf6', 0.25)}`, borderRadius: '8px', padding: '7px 10px', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
           <Icon name="GitBranch" size={12} />
-          <span>{sgGroups.length === 1 ? 'One same-game group' : `${sgGroups.length} same-game groups`} — all-hit lifted for shared HR conditions. Books discount SGP payouts, so treat the price as directional.</span>
+          <span>{sgGroups.length === 1 ? 'One same-game group' : `${sgGroups.length} same-game groups`} — independent all-hit estimate, with no correlation uplift applied.</span>
         </div>
       )}
 

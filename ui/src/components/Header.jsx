@@ -87,8 +87,8 @@ function HelpMenu({ onOpenWeather, onOpenBuilder, onOpenGroups, onOpenSGP, onOpe
       items: [
         { label: 'Weather', desc: 'Park factors, wind & game-time conditions', icon: 'Wind', fn: onOpenWeather },
         { label: 'Parlay Combos', desc: 'Auto-built chalk, value, lottery combos', icon: 'Layers', fn: onOpenGroups },
-        { label: 'Parlay Builder', desc: 'Build your own slip — live odds, EV & correlation', icon: 'Sparkles', fn: onOpenBuilder },
-        { label: 'Same-Game Parlays', desc: 'Best correlated 2–4 leg SGPs', icon: 'Zap', fn: onOpenSGP },
+        { label: 'Parlay Builder', desc: 'Build your own slip — live odds, EV & all-hit', icon: 'Sparkles', fn: onOpenBuilder },
+        { label: 'Same-Game Parlays', desc: 'Confirmed-lineup 2–4 leg SGPs', icon: 'Zap', fn: onOpenSGP },
       ],
     },
     {

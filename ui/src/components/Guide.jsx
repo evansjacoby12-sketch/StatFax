@@ -7,20 +7,19 @@ const VIEWS = [
   ['LayoutGrid', 'Games', 'The slate as game cards — team colors, starters, live score, and each lineup split into two silos.'],
   ['Crosshair', 'Pitchers', 'One card per starter: a 0–100 vulnerability score, the lineup ranked as HR targets, pitch mix, and splits.'],
   ['Wind', 'Weather', 'One card per game ranked by the air — real wind OUT/IN verdict, temp, park factor, and who it helps.'],
-  ['Layers', 'Parlay Combos', 'Auto-built cross-game parlays — one bat per game across 7 strategies and 2–4 legs. The betting workhorse.'],
-  ['Layers', 'Same-Game Parlays', 'Multi-leg parlays within a single game (2–4 legs), with the correlation caveat spelled out.'],
+  ['Layers', 'Parlay Combos', 'Auto-built cross-game parlays — one bat per game across six live strategies and 2–4 legs.'],
+  ['GitBranch', 'Same-Game Parlays', 'Confirmed-lineup 2–4 leg tickets from one game. All-hit uses the independent product with no correlation uplift.'],
   ['Activity', 'Results', 'The model’s track record — AUC, top-decile hit rate, calibration — plus the exact graded combos per day.'],
 ]
 
-// The 7 parlay-combo strategies (server/parlay-combos.mjs · ui/lib/groups.js).
+// Current parlay-combo strategies (server/parlay-combos.mjs · ui/lib/groups.js).
 const STRATEGIES = [
-  ['Top Picks', 'The single highest-graded bat in each game — pure chalk.'],
-  ['Best Mix', 'Blends grade + barrel + heat so an elite-overall bat and an elite-barrel bat can share a combo. Usually the sharpest single board.'],
-  ['Signal Stack', 'Bats lighting up the SAME proven HR signals (hot, barrel king, home/road edge, pen edge).'],
   ['Hot Hand', 'Riding current form — heat index × the recent-form multiplier.'],
-  ['Power Bats', 'Raw thump — season barrel + recent barrel + blast rate (bat tracking).'],
-  ['Soft Matchup', 'A quality bat × a homer-prone starter (high HR/9).'],
+  ['Best Mix', 'Blends grade + barrel + heat so overall quality and live power both matter.'],
   ['Park & Air', 'A quality bat × a hitter-friendly park and wind.'],
+  ['Soft Matchup', 'A quality bat × a homer-prone starter (high HR/9).'],
+  ['Precision', 'Hot bats with elite barrel contact; ranks the qualified pool by barrel rate.'],
+  ['Value', 'Live-only combinations where model HR probability beats the available fair market price.'],
 ]
 
 // Glows + guards on each combo card.
@@ -67,11 +66,12 @@ export default function Guide({ onClose }) {
             <Icon name="Lock" size={14} /> Scores lock in the morning
           </span>
           <span className="dim">
-            The board's scores, grades and combos <b>freeze at the morning lock</b> (look for the 🔒 chip in the
-            header) — they won't drift during the day, so you can bet the board any time. The only things that
+            The board's scores, grades and cross-game combos <b>freeze at the morning lock</b> (look for the lock chip in the
+            header) — they won't drift during the day. The only things that
             update after the lock are <b>lineup confirmations</b> (green dot) and <b>scratched players</b>; if a
             starting pitcher changes, that bat is re-scored and tagged <b>NEW ARM</b>. A parlay still{' '}
             <b>locks at its earliest leg's first pitch</b>, so keep a combo's legs in the same start window.
+            Same-game benchmarks freeze separately after the complete game lineup is confirmed.
           </span>
         </div>
 
@@ -110,8 +110,9 @@ export default function Guide({ onClose }) {
           <Icon name="Layers" size={14} /> Parlay Combos
         </h3>
         <p className="guide-p dim">
-          Seven strategies each pick <b>one bat per game</b> and build 2-, 3-, and 4-leg parlays (4-leg is the lottery
-          tier). Combos cash only when <i>every</i> leg homers, so the glows tell you the risk at a glance:
+          Six live strategies each pick <b>one bat per game</b> and build 2-, 3-, and 4-leg parlays (4-leg is the lottery
+          tier). Five are tracked in the frozen scorecard; Value is live-only because it needs market prices. Combos
+          cash only when <i>every</i> leg homers, so the glows tell you the risk at a glance:
         </p>
         <div className="guide-list">
           {STRATEGIES.map(([name, desc]) => (
@@ -138,12 +139,22 @@ export default function Guide({ onClose }) {
         </p>
 
         <h3 className="section-title" style={{ marginTop: 18 }}>
+          <Icon name="GitBranch" size={14} /> Same-Game Parlays
+        </h3>
+        <p className="guide-p dim">
+          SGPs stack 2–4 hitters from one game. StatFax defaults to <b>confirmed lineups</b>; projected tickets are
+          available only as an early preview. The shown all-hit chance is the <b>independent product</b> of the
+          calibrated leg rates—there is no unvalidated same-game uplift. Start with two legs; three and four legs
+          are lottery plays. The rolling SGP record settles from official player-and-game box-score outcomes.
+        </p>
+
+        <h3 className="section-title" style={{ marginTop: 18 }}>
           <Icon name="Zap" size={14} /> Blast rate
         </h3>
         <p className="guide-p dim">
           A <b>blast</b> is a swing that’s both fast and squared-up — the most HR-predictive slice of Statcast bat
           tracking. The board shows a bat’s recent blast rate, and on a leg you’ll see cuts <b>vs the pitcher’s hand</b>
-          and <b>vs his exact pitch mix</b>. Blast drives the Power Bats combo and the BLAST badge. (It’s an advisory
+          and <b>vs his exact pitch mix</b>. Blast supports the player profile and BLAST badge. (It’s an advisory
           signal — it doesn’t move the calibrated HR probability unless it earns it in forward testing.)
         </p>
 

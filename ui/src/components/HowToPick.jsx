@@ -58,6 +58,16 @@ const STEPS = [
       'Cautionary: Cold, Home/Road Drag (weak split). Use the Signals filter to surface, e.g., “Pitch Edge + WX Edge” bats.',
     ],
   },
+  {
+    icon: 'GitBranch',
+    title: '7 · Build parlays last',
+    points: [
+      'Start with singles, then combine only the legs that survive the checklist. Every parlay leg must homer, so probabilities multiply instead of adding.',
+      'For SGPs, keep the confirmed-lineup default on and begin with two legs. Projected tickets are previews, not finished bets.',
+      'StatFax currently uses the independent product for same-game all-hit probability. No correlation boost is applied until settled results prove one.',
+      'Treat three- and four-leg SGPs as lottery plays. More legs increase payout, not reliability.',
+    ],
+  },
 ]
 
 const CHECKLIST = [
@@ -67,6 +77,7 @@ const CHECKLIST = [
   'Bandbox / favorable park + wind out or hot',
   'Real power (ISO / barrel%) and not Cold',
   'Two or more signals stacked',
+  'For SGPs: confirmed lineup, two legs, independent all-hit understood',
 ]
 
 export default function HowToPick({ onClose }) {

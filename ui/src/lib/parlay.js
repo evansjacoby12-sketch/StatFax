@@ -1,5 +1,5 @@
 // Backward-compatible facade over the unified parlayMath core. Existing callers
-// (SameGameView, the old ParlaySlip) import correlation + grade helpers from
+// Legacy callers import parlay + grade helpers from
 // here; they now resolve to the single source in ./parlayMath.js. New code
 // should import buildParlay/parlayAllHit from ./parlayMath.js directly.
 
@@ -8,8 +8,8 @@ import { buildParlay } from './parlayMath.js'
 export { parlayGrade, gameCorrelation, correlatedJoint, parlayAllHit, buildParlay } from './parlayMath.js'
 
 // Legacy shape used by the old quick-slip summary. Independent (cross-game)
-// product by default to preserve prior behavior; new surfaces use buildParlay
-// with same-game correlation on.
+// product by default to preserve prior behavior. All current surfaces use the
+// same independent all-hit estimate.
 export function computeParlay(legs) {
   const p = buildParlay(legs, { correlate: false })
   return {

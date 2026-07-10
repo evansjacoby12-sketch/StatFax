@@ -1,4 +1,4 @@
-// parlayMath.js — the single, correlation-aware parlay math core.
+// parlayMath.js — the single parlay probability and market-math core.
 //
 // Every parlay surface consumes THIS module so the numbers never drift:
 //   • ParlayBuilder.jsx  — the unified builder (hand-pick + auto-suggest)
@@ -7,12 +7,9 @@
 //   • groups.js          — auto Parlay Combos market math (via comboMarket)
 //
 // What the rework fixes vs the old fragmented code:
-//   1. ONE all-hit model. The manual slip used a pure independent product and
-//      ignored same-game correlation; the SGP view had its own correlation
-//      math; the combo cards had a third copy. Now a single parlayAllHit groups
-//      legs by game, applies same-game correlation WITHIN each game, and
-//      multiplies independent games together — so a mixed parlay (some legs
-//      sharing a game, others not) is finally priced correctly.
+//   1. ONE all-hit model. Every surface uses the independent product of the
+//      calibrated leg rates. Same-game grouping is retained for disclosure and
+//      for a future uplift only after it is fitted on settled outcomes.
 //   2. De-vigged market everywhere. The slip showed a raw book price with no
 //      vig removed; now every surface gets the fair (de-juiced) line, betting
 //      EV, and the probability edge vs a fair market.
@@ -68,11 +65,10 @@ export function groupByGame(legs) {
 }
 
 /**
- * Correlation-aware all-hit probability for an arbitrary parlay.
+ * All-hit probability for an arbitrary parlay.
  *
- * Groups legs by game: legs sharing a game combine via correlatedJoint (rho from
- * that game's HR environment); independent games multiply. correlate=false
- * forces the plain independent product (the honest cross-game baseline).
+ * Groups legs by game for disclosure. The fitted correlation cap is currently
+ * zero, so every group uses the independent product.
  *
  * Returns { modelAllHit, independent, sameGame, allFinite, byGame } where byGame
  * carries each game's { gamePk, legs, rho, joint, indep } for display.
@@ -107,7 +103,7 @@ export function parlayAllHit(legs, { correlate = true } = {}) {
 }
 
 /**
- * Market figures for a parlay's legs against a (correlation-aware) modelAllHit.
+ * Market figures for a parlay's legs against modelAllHit.
  * De-vigs each leg, multiplies the book decimals, and derives betting EV + the
  * probability edge vs a fair line. Reads each leg's posted odds from
  * b.odds.best. Returns market fields + a perLeg breakdown.
@@ -175,11 +171,9 @@ export function weakestLeg(legs) {
 }
 
 /**
- * One-stop parlay summary consumed by every surface. Combines the correlation-
- * aware all-hit, de-vigged market, fair price, grade, and weak link.
- *
- * `correlate` (default true) toggles same-game correlation; the builder exposes
- * this so a user can compare the independent baseline to the correlated read.
+ * One-stop parlay summary consumed by every surface. Combines all-hit,
+ * de-vigged market, fair price, grade, and weak link. `correlate` remains in the
+ * contract for a future validated model; with the current zero cap it adds no uplift.
  */
 export function buildParlay(legs, { correlate = true } = {}) {
   const list = legs || []
