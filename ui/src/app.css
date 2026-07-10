@@ -2149,7 +2149,7 @@ button.th:focus-visible {
 }
 
 /* ============ Parlay slip ============ */
-.slip {
+.parlay-slip {
   position: fixed;
   z-index: 38;
   right: 24px;
@@ -2227,10 +2227,10 @@ button.th:focus-visible {
 }
 
 .slip-panel {
-  margin-bottom: 10px;
+  margin-bottom: 8px;
   border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.04);
-  background: rgba(255, 255, 255, 0.02);
+  background: rgba(8, 10, 13, 0.96);
   box-shadow: var(--shadow-lg);
   overflow: hidden;
   animation: slipUp 0.2s cubic-bezier(0.22, 1, 0.36, 1);
@@ -2245,39 +2245,92 @@ button.th:focus-visible {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 15px;
+  gap: 12px;
+  padding: 10px 12px;
   border-bottom: 1px solid var(--border-soft);
+}
+.slip-head-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
 }
 .slip-panel-title {
   display: flex;
   align-items: center;
-  gap: 7px;
-  font-size: 12px;
-  font-weight: 700;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  color: var(--accent);
+}
+.slip-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+.slip-build,
+.slip-copy,
+.slip-clear {
+  min-height: 32px;
+  padding: 6px 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  font-size: 11px;
+  font-weight: 750;
+  white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.slip-build {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 28%, transparent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+.slip-copy {
   color: var(--text-dim);
 }
 .slip-clear {
-  border: none;
-  background: none;
   color: var(--text-faint);
-  font-size: 12px;
-  font-weight: 600;
 }
 .slip-clear:hover {
   color: var(--bad);
 }
 .slip-legs {
-  max-height: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 180px;
   overflow-y: auto;
-  padding: 6px;
+  padding: 0 12px 12px;
 }
 .slip-summary {
-  padding: 9px 15px 4px;
-  font-size: 12.5px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 10px 12px 8px;
+  font-size: 12px;
   line-height: 1.4;
   color: var(--text-dim);
+}
+.slip-summary-copy {
+  color: var(--text-dim);
+}
+.slip-weak-note {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--warn);
+}
+.slip-weak-note svg {
+  flex: none;
 }
 .slip-leg {
   display: grid;
@@ -2286,20 +2339,24 @@ button.th:focus-visible {
   gap: 8px;
   padding: 7px 9px;
   border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.018);
 }
 .slip-leg:hover {
   background: var(--card);
 }
 .slip-grade {
-  margin: 0 auto 0 8px;
-  width: 22px;
-  height: 22px;
-  display: grid;
-  place-items: center;
-  border: 1.5px solid;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 24px;
+  padding: 3px 7px;
+  border: 1px solid;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: 10.5px;
   font-weight: 800;
+  white-space: nowrap;
 }
 .slip-bar-grade {
   margin-left: 7px;
@@ -2324,32 +2381,46 @@ button.th:focus-visible {
   text-align: left;
 }
 .slip-leg-grade {
-  width: 7px;
-  height: 22px;
-  border-radius: 3px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
   flex-shrink: 0;
 }
 .slip-leg-name {
+  flex: 1 1 auto;
+  min-width: 0;
   font-weight: 600;
-  font-size: 13.5px;
+  font-size: 12px;
+  color: #fff;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .slip-leg-team {
-  font-size: 11px;
+  flex: none;
+  font-size: 10px;
   color: var(--text-faint);
   font-weight: 700;
 }
-.slip-leg-prob {
-  font-size: 13px;
-  font-weight: 600;
+.slip-leg-prov {
+  flex: none;
+  display: inline-flex;
   color: var(--prime);
 }
-.slip-leg-odds {
-  font-size: 12px;
+.slip-leg-weak-icon {
+  flex: none;
+  color: var(--b-hot);
+}
+.slip-leg-prob {
+  font-size: 11px;
+  font-weight: 600;
   color: var(--text-dim);
-  min-width: 44px;
+}
+.slip-leg-odds {
+  width: 40px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
   text-align: right;
 }
 .slip-leg-remove {
@@ -2368,14 +2439,131 @@ button.th:focus-visible {
 }
 
 @media (max-width: 560px) {
-  .slip {
-    right: 12px;
-    left: 12px;
+  .parlay-slip {
+    right: 8px;
+    left: 8px;
     bottom: 12px;
     width: auto;
   }
+  .slip-panel {
+    border-radius: 14px;
+  }
+  .slip-panel-head {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+    padding: 8px 10px 10px;
+  }
+  .slip-head-main {
+    min-height: 36px;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .slip-panel-title {
+    font-size: 12.5px;
+  }
+  .slip-grade {
+    min-height: 24px;
+    margin: 0 !important;
+    padding: 3px 7px;
+    gap: 4px;
+    border-width: 1px;
+    border-style: solid;
+    border-radius: 6px;
+    font-size: 10.5px;
+    font-weight: 800;
+    animation: none !important;
+    box-shadow: none !important;
+  }
+  .slip-actions {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    gap: 8px !important;
+    width: 100%;
+    margin: 0;
+  }
+  .slip-build,
+  .slip-copy,
+  .slip-clear {
+    width: 100%;
+    min-height: 44px;
+    padding: 0 8px !important;
+    border-color: rgba(255, 255, 255, 0.07);
+    background: rgba(255, 255, 255, 0.025);
+    font-size: 11.5px;
+  }
+  .slip-build {
+    color: var(--accent);
+    border-color: color-mix(in srgb, var(--accent) 38%, transparent);
+    background: color-mix(in srgb, var(--accent) 10%, transparent);
+  }
+  .slip .slip-summary {
+    gap: 4px;
+    padding: 8px 12px 7px;
+    font-size: 11.5px;
+    line-height: 1.35;
+  }
+  .slip-weak-note {
+    font-size: 10.5px;
+  }
+  .slip .slip-wager {
+    min-height: 54px;
+    margin: 0 10px 8px;
+    padding: 5px 10px;
+    gap: 8px;
+  }
+  .slip .slip-wager-field {
+    min-height: 44px;
+    justify-content: center;
+  }
+  .slip .slip-wager-input {
+    height: 24px;
+  }
+  .slip-legs {
+    gap: 4px;
+    max-height: 152px;
+    padding: 0 10px 10px;
+  }
+  .slip-leg {
+    grid-template-columns: minmax(0, 1fr) auto auto 44px;
+    gap: 5px;
+    min-height: 48px;
+    padding: 0 0 0 9px;
+  }
+  .slip-leg-main {
+    min-height: 44px;
+    gap: 5px;
+  }
+  .slip-leg .grade-chip {
+    padding: 2px 5px;
+    border-radius: 6px;
+    font-size: 8.5px;
+  }
+  .slip-leg .grade-score {
+    margin-left: 3px;
+    padding-left: 3px;
+  }
+  .slip-leg-odds,
+  .slip-leg-prov,
+  .slip-leg-weak-icon {
+    display: none;
+  }
+  .slip-leg-remove {
+    width: 44px;
+    height: 44px;
+  }
   .slip-bar-stats {
     gap: 11px;
+  }
+}
+
+@media (max-width: 360px) {
+  .slip-leg-team {
+    display: none;
+  }
+  .slip .slip-leg-name {
+    font-size: 12px;
   }
 }
 
@@ -6308,19 +6496,27 @@ button.th:focus-visible {
     justify-content: flex-end;
     margin-top: 8px;
   }
-  /* Parlay slip: a centered, content-width floating pill (not a full-width bar). */
-  .slip {
+  /* Keep the collapsed slip as a centered pill; expand the open ticket so its
+     controls and player rows use the full mobile canvas. */
+  .parlay-slip {
     left: 0;
     right: 0;
     margin-inline: auto;
     width: fit-content;
     max-width: calc(100vw - 24px);
   }
+  .parlay-slip.open {
+    left: 8px;
+    right: 8px;
+    width: auto;
+    max-width: none;
+    margin-inline: 0;
+  }
   .slip-summary { font-size: 12px; }
-  .slip-leg-name { font-size: 13px; }
+  .slip .slip-leg-name { font-size: 12px; }
   /* When the slip is open, pad the board so the last picks clear the fixed
      bottom bar instead of hiding behind it (only when a slip exists). */
-  .app:has(.slip) .main {
+  .app:has(.parlay-slip) .main {
     padding-bottom: 96px;
   }
 }
@@ -6531,35 +6727,43 @@ button.th:focus-visible {
 .slip-wager {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 10px;
-  padding: 8px 15px 4px;
+  margin: 0 12px 10px;
+  padding: 7px 11px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.18);
 }
 .slip-wager-field {
   display: flex;
-  align-items: baseline;
-  gap: 7px;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.slip-wager-field.is-payout {
+  align-items: flex-end;
 }
 .slip-wager-k {
-  font-size: 10.5px;
+  font-size: 9px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
   color: var(--text-faint);
   white-space: nowrap;
 }
 .slip-wager-input {
-  width: 64px;
-  padding: 4px 8px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--card);
-  color: var(--text);
-  font-size: 13px;
-  font-weight: 600;
+  width: 80px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
 }
 .slip-wager-input:focus {
   outline: none;
-  border-color: var(--accent);
+  color: var(--accent);
 }
 /* hide number-input spinners — the field is tiny */
 .slip-wager-input::-webkit-outer-spin-button,
@@ -6577,9 +6781,9 @@ button.th:focus-visible {
   place-items: center;
 }
 .slip-wager-payout {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 800;
-  color: var(--good);
+  color: var(--strong);
 }
 
 /* Combo scorecard (Parlay Combos header) — rolling graded hit rate */
@@ -7350,11 +7554,11 @@ button.th:focus-visible {
   }
   
   /* Floating elements adjustments */
-  .slip {
+  .parlay-slip {
     bottom: calc(74px + env(safe-area-inset-bottom, 0px)) !important;
   }
   
-  .app:has(.slip) .main {
+  .app:has(.parlay-slip) .main {
     padding-bottom: calc(146px + env(safe-area-inset-bottom, 0px)) !important;
   }
   
@@ -7811,21 +8015,24 @@ button.th:focus-visible {
   50% { box-shadow: 0 0 8px 1px rgba(16, 185, 129, 0.28); }
 }
 .slip-panel-title { white-space: nowrap; }
-.slip-panel-head > div { gap: 4px !important; }
 .slip-grade {
   display: inline-flex;
   align-items: center;
+  gap: 4px;
   white-space: nowrap;
   flex-shrink: 0;
   margin: 0 8px;
+  padding: 3px 7px;
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 6px;
+  font-size: 10.5px;
+  font-weight: 800;
 }
 .slip-build,
 .slip-copy,
 .slip-clear {
-  padding: 3px 6px !important;
-  border-radius: 7px;
   white-space: nowrap;
-  transition: background 0.15s, color 0.15s;
 }
 .slip-build:hover { background: rgba(0, 216, 246, 0.12); }
 .slip-copy:hover { background: rgba(255, 255, 255, 0.07); color: #fff !important; }

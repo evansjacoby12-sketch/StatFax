@@ -40,19 +40,17 @@ function buildCopyText(legs, p) {
   return [header, ...items].join('\n')
 }
 
-function parlaySummary(p, pg) {
+function parlaySummary(p) {
   if (!p.n) return ''
-  const size = p.n === 1 ? 'single-leg parlay' : `${p.n}-leg parlay`
   const hit = pct(p.modelProb, p.modelProb < 0.01 ? 2 : 1)
-  const who = p.n === 1 ? 'it' : `all ${p.n} legs`
-  const grade = pg ? `Grade ${pg.letter} · ` : ''
-  let s = `${grade}${size} — model gives ${who} a ${hit} chance to cash.`
+  const size = `${p.n} ${p.n === 1 ? 'leg' : 'legs'}`
+  let s = `${size} · ${hit} to cash`
   if (p.allPriced) {
-    s += ` Pays ${american(p.american)}`
-    s += p.edge != null ? `, a ${signedPct(p.edge, 0)} edge vs market.` : '.'
+    s += ` · Pays ${american(p.american)}`
+    s += p.edge != null ? ` · ${signedPct(p.edge, 0)} edge` : ''
   } else {
-    s += ` Fair price ${american(p.fairAmerican)}`
-    s += p.n > 1 && p.priced > 0 ? ` (${p.priced}/${p.n} legs priced).` : '.'
+    s += ` · Fair price ${american(p.fairAmerican)}`
+    s += p.n > 1 && p.priced > 0 ? ` · ${p.priced}/${p.n} priced` : ''
   }
   return s
 }
@@ -75,7 +73,7 @@ export default function ParlaySlip({ legs, onRemove, onClear, onSelect, onOpenBu
   const weakId = weak?.id
 
   return (
-    <div className={`slip ${open ? 'open' : ''}`} style={{
+    <div className={`slip parlay-slip ${open ? 'open' : ''}`} style={{
       /* Geometry (position/bottom/right/width/z-index) is owned by app.css —
          base .slip for desktop, the @560 rules for the mobile bottom-sheet
          placement above the nav. Inline geometry here used to override the
@@ -89,36 +87,33 @@ export default function ParlaySlip({ legs, onRemove, onClear, onSelect, onOpenBu
       transition: 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
     }}>
       {open && (
-        <div className="slip-panel" style={{ padding: '16px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-          <div className="slip-panel-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-            <span className="slip-panel-title" style={{ fontSize: '13px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Icon name="Layers" size={14} /> Parlay ·{' '}
-              <span key={p.n} className="slip-legs-bump">{p.n} {p.n === 1 ? 'leg' : 'legs'}</span>
-            </span>
-            {pg && (
-              <span className={`slip-grade grade-glow-${pg.letter}`} style={{
-                color: gColor,
-                borderColor: hexA(gColor, 0.4),
-                borderWidth: '1px',
-                borderStyle: 'solid',
-                borderRadius: '6px',
-                padding: '2px 8px',
-                fontSize: '11px',
-                fontWeight: '800',
-                background: hexA(gColor, 0.08),
-                whiteSpace: 'nowrap',
-              }} title={`Avg leg score ${Math.round(pg.avgScore)}${pg.letter === 'S' ? ' — the cream' : ''}`}>
-                {pg.letter === 'S' && <Icon name="Trophy" size={10} style={{ marginRight: '3px', verticalAlign: '-1px' }} />}
-                Grade {pg.letter}
+        <div className="slip-panel">
+          <div className="slip-panel-head">
+            <div className="slip-head-main">
+              <span className="slip-panel-title">
+                <Icon name="Layers" size={14} /> Parlay
+                <span aria-hidden="true">·</span>
+                <span key={p.n} className="slip-legs-bump">{p.n} {p.n === 1 ? 'leg' : 'legs'}</span>
               </span>
-            )}
-            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+              {pg && (
+                <span className={`slip-grade grade-glow-${pg.letter}`} style={{
+                  color: gColor,
+                  borderColor: hexA(gColor, 0.4),
+                  background: hexA(gColor, 0.08),
+                }} title={`Avg leg score ${Math.round(pg.avgScore)}${pg.letter === 'S' ? ' — the cream' : ''}`}>
+                  {pg.letter === 'S' && <Icon name="Trophy" size={11} />}
+                  Grade {pg.letter}
+                </span>
+              )}
+            </div>
+            <div className="slip-actions" role="group" aria-label="Parlay actions">
               {onOpenBuilder && (
-                <button className="slip-build" onClick={onOpenBuilder} title="Open the full parlay builder" style={{ fontSize: '11px', color: 'var(--accent)', fontWeight: '800', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                  <Icon name="Sparkles" size={12} /> Build
+                <button type="button" className="slip-build" onClick={onOpenBuilder} title="Open the full parlay builder">
+                  <Icon name="Sparkles" size={14} /> Build
                 </button>
               )}
               <button
+                type="button"
                 className="slip-copy"
                 title="Copy parlay to clipboard"
                 onClick={() => {
@@ -126,38 +121,28 @@ export default function ParlaySlip({ legs, onRemove, onClear, onSelect, onOpenBu
                     toast.success('Parlay copied!')
                   }).catch(() => toast.warn('Copy failed'))
                 }}
-                style={{ fontSize: '11px', color: 'var(--text-dim)', fontWeight: '700', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
               >
-                <Icon name="Copy" size={12} /> Copy
+                <Icon name="Copy" size={14} /> Copy
               </button>
-              <button className="slip-clear" onClick={onClear} title="Remove every leg" style={{ fontSize: '11px', color: 'var(--text-faint)', fontWeight: '600' }}>
-                Clear
+              <button type="button" className="slip-clear" onClick={onClear} title="Remove every leg">
+                <Icon name="Trash2" size={14} /> Clear
               </button>
             </div>
           </div>
           
-          <div className="slip-summary" style={{ fontSize: '12px', color: 'var(--text-dim)', marginBottom: '14px', lineHeight: '1.4' }}>
-            {parlaySummary(p, pg)}
+          <div className="slip-summary">
+            <span className="slip-summary-copy">{parlaySummary(p)}</span>
             {weak && (
-              <span className="slip-weak-note" style={{ display: 'flex', marginTop: '6px', color: 'var(--b-hot)', alignItems: 'center', gap: '4px', fontSize: '11px' }}>
-                <Icon name="TriangleAlert" size={11} />
+              <span className="slip-weak-note">
+                <Icon name="TriangleAlert" size={12} />
                 <span>Weak link: <b>{weak.name}</b> ({pct(weak.hrProbability, 2)})</span>
               </span>
             )}
           </div>
 
-          <div className="slip-wager" style={{ 
-            display: 'flex', 
-            justifyContent: 'space-between', 
-            alignItems: 'center', 
-            background: 'rgba(0,0,0,0.15)',
-            border: '1px solid rgba(255,255,255,0.04)',
-            borderRadius: '10px',
-            padding: '8px 12px',
-            marginBottom: '14px'
-          }}>
-            <label className="slip-wager-field" style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-              <span className="slip-wager-k" style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-faint)' }}>Wager $</span>
+          <div className="slip-wager">
+            <label className="slip-wager-field">
+              <span className="slip-wager-k">Wager $</span>
               <input
                 className="slip-wager-input mono"
                 type="number"
@@ -167,63 +152,39 @@ export default function ParlaySlip({ legs, onRemove, onClear, onSelect, onOpenBu
                 value={wager}
                 onChange={(e) => setWager(e.target.value)}
                 aria-label="Wager"
-                style={{
-                  border: 'none',
-                  background: 'transparent',
-                  color: '#fff',
-                  fontSize: '15px',
-                  fontWeight: '700',
-                  outline: 'none',
-                  width: '80px'
-                }}
               />
             </label>
-            <span className="slip-wager-arrow" aria-hidden="true" style={{ color: 'var(--text-faint)' }}>
+            <span className="slip-wager-arrow" aria-hidden="true">
               <Icon name="ChevronRight" size={14} />
             </span>
-            <span className="slip-wager-field" style={{ display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'flex-end' }}>
-              <span className="slip-wager-k" style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-faint)' }}>Payout{p.allPriced ? '' : ' (fair)'}</span>
-              <span className="slip-wager-payout mono" style={{ fontSize: '15px', fontWeight: '800', color: 'var(--strong)' }}>{shownPayout != null && Number.isFinite(shownPayout) ? `$${shownPayout >= 100 ? Math.round(shownPayout) : shownPayout.toFixed(2)}` : '—'}</span>
+            <span className="slip-wager-field is-payout">
+              <span className="slip-wager-k">Payout{p.allPriced ? '' : ' (fair)'}</span>
+              <span className="slip-wager-payout mono">{shownPayout != null && Number.isFinite(shownPayout) ? `$${shownPayout >= 100 ? Math.round(shownPayout) : shownPayout.toFixed(2)}` : '—'}</span>
             </span>
           </div>
 
-          <div className="slip-legs" style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '180px', overflowY: 'auto' }}>
+          <div className="slip-legs">
             {legs.map((b) => (
-              <div className={`slip-leg ${b.id === weakId ? 'weak' : ''}`} key={b.id} style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '6px 8px',
-                background: 'rgba(255,255,255,0.01)',
-                border: `1px solid ${b.id === weakId ? 'rgba(249,115,22,0.15)' : 'rgba(255,255,255,0.04)'}`,
-                borderRadius: '8px'
-              }}>
-                <button className="slip-leg-main" onClick={() => onSelect(b)} title="Open detail" style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  flex: '1',
-                  textAlign: 'left',
-                  minWidth: '0'
-                }}>
-                  <span className="slip-leg-grade" style={{ background: gradeColor(b.grade?.label), width: '6px', height: '6px', borderRadius: '50%', flexShrink: 0 }} />
+              <div className={`slip-leg ${b.id === weakId ? 'weak' : ''}`} key={b.id}>
+                <button type="button" className="slip-leg-main" onClick={() => onSelect(b)} title="Open detail">
+                  <span className="slip-leg-grade" style={{ background: gradeColor(b.grade?.label) }} />
                   {/* Name owns the flexible space and ellipsizes; the team + weak
                       tag are fixed-size so they can't squeeze the name to nothing. */}
-                  <span className="slip-leg-name" style={{ flex: '1 1 auto', minWidth: 0, fontSize: '12px', fontWeight: '600', color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.name}</span>
-                  <span className="slip-leg-team" style={{ flexShrink: 0, fontSize: '10px', color: 'var(--text-faint)' }}>{b.team}</span>
+                  <span className="slip-leg-name">{b.name}</span>
+                  <span className="slip-leg-team">{b.team}</span>
                   {b.lineupConfirmed !== true && (
-                    <span className="slip-leg-prov" title="Lineup not posted — this leg can still change" style={{ flexShrink: 0, color: 'var(--prime)', display: 'inline-flex' }}>
+                    <span className="slip-leg-prov" title="Lineup not posted — this leg can still change">
                       <Icon name="Clock" size={10} />
                     </span>
                   )}
                   {b.id === weakId && (
-                    <Icon name="TriangleAlert" size={10} style={{ flexShrink: 0, color: 'var(--b-hot)' }} title="Weakest leg" />
+                    <Icon className="slip-leg-weak-icon" name="TriangleAlert" size={10} title="Weakest leg" />
                   )}
                 </button>
                 <GradeChip grade={b.grade} size="sm" score={b.score} />
-                <span className="slip-leg-prob mono" style={{ fontSize: '11px', color: 'var(--text-dim)' }}>{pct(b.hrProbability, 1)}</span>
-                <span className="slip-leg-odds mono" style={{ fontSize: '11px', color: '#fff', fontWeight: '600', width: '40px', textAlign: 'right' }}>{b.odds?.best ? american(b.odds.best.american) : '—'}</span>
-                <button className="slip-leg-remove" onClick={() => onRemove(b.id)} aria-label={`Remove ${b.name}`} style={{ color: 'var(--text-faint)', display: 'grid', placeItems: 'center' }}>
+                <span className="slip-leg-prob mono">{pct(b.hrProbability, 1)}</span>
+                <span className="slip-leg-odds mono">{b.odds?.best ? american(b.odds.best.american) : '—'}</span>
+                <button type="button" className="slip-leg-remove" onClick={() => onRemove(b.id)} aria-label={`Remove ${b.name}`}>
                   <Icon name="X" size={13} />
                 </button>
               </div>
