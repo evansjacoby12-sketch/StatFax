@@ -104,7 +104,12 @@ export default function BatterRow({
             <strong title={b.name}>{b.name}</strong>
             <small>{b.batSide}</small>
             {b.battingOrder && <small className="mono">#{b.battingOrder}</small>}
-            {mom && <span className={`mobile-momentum ${mom.cls}`}><Icon name={mom.icon} size={10} />{mom.label}</span>}
+            {mom && (
+              <span className={`mobile-momentum ${mom.cls}`}>
+                {mom.cls === 'hot' ? <span className="mobile-heat-dot" aria-hidden="true" /> : <Icon name={mom.icon} size={9} />}
+                {mom.label}
+              </span>
+            )}
           </span>
           <span className="mobile-board-matchup">
             <b>{b.team}</b><span>{b.opponent?.abbr || '—'}</span><span>vs</span>
@@ -116,7 +121,8 @@ export default function BatterRow({
             <GradeChip grade={b.grade} size="sm" score={b.score} />
             {strongestSignal && (
               <span className={`mobile-board-signal ${strongestSignal.tone}`}>
-                <Icon name={strongestSignal.icon} size={10} />{strongestSignal.label}
+                {strongestSignal.tone === 'hot' ? <span className="mobile-heat-dot" aria-hidden="true" /> : <Icon name={strongestSignal.icon} size={10} />}
+                {strongestSignal.label}
               </span>
             )}
           </span>

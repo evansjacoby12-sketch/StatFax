@@ -9816,9 +9816,10 @@ button.th:focus-visible {
   .mobile-board-name-line > strong { flex: 1 1 auto; min-width: 0; overflow: hidden; color: var(--text); font-family: var(--display); font-size: 13px; line-height: 1.1; text-overflow: ellipsis; white-space: nowrap; }
   .mobile-board-name-line > small { flex: none; color: var(--text-faint); font-family: var(--mono); font-size: 8px; font-weight: 800; }
   .mobile-board-name-line > small:first-of-type { display: none; }
-  .mobile-momentum { flex: none; display: inline-flex; align-items: center; gap: 2px; padding: 2px 4px; border: 1px solid currentColor; border-radius: 999px; font-size: 7.5px; font-weight: 800; line-height: 1; }
+  .mobile-momentum { flex: none; display: inline-flex; align-items: center; gap: 3px; padding: 2px 5px; border: 1px solid currentColor; border-radius: 999px; font-size: 7.5px; font-weight: 800; line-height: 1; }
   .mobile-momentum.hot { color: var(--b-hot); background: color-mix(in srgb, var(--b-hot) 10%, transparent); }
   .mobile-momentum.rising { color: var(--good); background: color-mix(in srgb, var(--good) 10%, transparent); }
+  .mobile-heat-dot { flex: none; width: 5px; height: 5px; border-radius: 50%; background: currentColor; box-shadow: 0 0 4px currentColor; }
   .mobile-board-matchup { min-width: 0; display: flex; align-items: center; gap: 5px; overflow: hidden; color: var(--text-faint); font-size: 10px; white-space: nowrap; }
   .mobile-board-matchup > b { color: var(--text-dim); }
   .mobile-board-matchup > span:nth-child(2)::before { content: '›'; margin-right: 5px; opacity: 0.5; }
