@@ -9249,6 +9249,485 @@ button.th:focus-visible {
   .mobile-roster-more:active { color: var(--accent); background: rgba(0, 216, 246, 0.07); }
 }
 
+/* Parlay Combos builder: keep desktop density, then reshape the modal into a
+   touch-first full-screen workspace on phones. */
+.grp-size-controls,
+.grp-secondary-controls,
+.grp-leg-signals { display: contents; }
+
+.grp-filter-toggle { display: none; }
+
+@media (max-width: 560px) {
+  .modal.groups-modal[aria-label='Parlay Combos'] {
+    inset: 0;
+    width: 100%;
+    max-width: none;
+    height: 100dvh;
+    max-height: none;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transform: none;
+    border: 0 !important;
+    border-radius: 0;
+    background: #050607 !important;
+    box-shadow: none !important;
+    animation: none;
+  }
+
+  .groups-modal[aria-label='Parlay Combos'] > .drawer-close {
+    top: 6px;
+    right: 8px;
+    z-index: 3;
+    width: 44px;
+    height: 44px;
+  }
+
+  .groups-modal[aria-label='Parlay Combos'] > .groups-modal-head {
+    flex: 0 0 56px;
+    min-height: 56px;
+    margin: 0;
+    padding: 0 58px 0 14px;
+    border-bottom: 1px solid var(--border-soft);
+    background: rgba(5, 6, 7, 0.96);
+  }
+
+  .groups-modal[aria-label='Parlay Combos'] > .groups-modal-head h2 {
+    font-size: 16px;
+  }
+
+  .groups-modal[aria-label='Parlay Combos'] > .groups-modal-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 10px 12px calc(24px + env(safe-area-inset-bottom));
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .groups-modal[aria-label='Parlay Combos'] .combo-sc {
+    margin: 0 0 8px;
+    border-radius: 11px;
+  }
+
+  .groups-modal[aria-label='Parlay Combos'] .combo-sc-sum {
+    min-height: 46px;
+    padding: 5px 10px;
+    display: grid;
+    grid-template-columns: 14px minmax(0, 1fr) auto 14px;
+    gap: 7px;
+  }
+
+  .groups-modal[aria-label='Parlay Combos'] .combo-sc-head {
+    min-width: 0;
+    font-size: 11px;
+    line-height: 1.25;
+  }
+
+  .groups-modal[aria-label='Parlay Combos'] .combo-sc-sub {
+    margin: 0;
+    font-size: 10px;
+    line-height: 1.2;
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  .groups-modal[aria-label='Parlay Combos'] .combo-sc-body { padding: 0 10px 10px; }
+
+  .groups-modal[aria-label='Parlay Combos'] .grp-mode {
+    min-height: 48px;
+    margin: 0 0 8px;
+    padding: 7px 9px;
+    align-items: flex-start;
+    font-size: 10.5px;
+    line-height: 1.4;
+    border-radius: 11px;
+  }
+
+  .groups-modal[aria-label='Parlay Combos'] .grp-mode > span {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .groups-modal[aria-label='Parlay Combos'] .grp-overlap {
+    min-height: 48px;
+    margin-bottom: 8px;
+    padding: 7px 9px;
+    font-size: 10.5px;
+  }
+
+  .groups-modal[aria-label='Parlay Combos'] .grp-spread-btn {
+    min-height: 44px;
+    padding-inline: 12px;
+  }
+
+  .groups-modal[aria-label='Parlay Combos'] .grp-games {
+    margin: 0 0 8px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .groups-modal[aria-label='Parlay Combos'] .grp-sel {
+    min-width: 0;
+    gap: 4px;
+  }
+
+  .groups-modal[aria-label='Parlay Combos'] .grp-sel-lbl {
+    padding-left: 1px;
+    font-size: 9px;
+  }
+
+  .groups-modal[aria-label='Parlay Combos'] .grp-sel .sel,
+  .groups-modal[aria-label='Parlay Combos'] .grp-sel .sel-btn {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .groups-modal[aria-label='Parlay Combos'] .grp-sel .sel-btn {
+    min-height: 44px;
+    padding-inline: 9px;
+    border-radius: 10px;
+    font-size: 11px;
+  }
+
+  .groups-modal[aria-label='Parlay Combos'] .grp-sel .sel-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .groups-modal[aria-label='Parlay Combos'] .grp-controls,
+  .groups-modal[aria-label='Parlay Combos'] .groups-modal-body .grp-controls {
+    margin-top: 0;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .groups-modal[aria-label='Parlay Combos'] .grp-size-controls {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .groups-modal[aria-label='Parlay Combos'] .grp-size-controls > .badge-toggle {
+    min-width: 0;
+    min-height: 44px;
+    padding: 0 5px;
+    justify-content: center;
+    border-radius: 10px;
+    font-size: 10px;
+    line-height: 1.15;
+    text-align: center;
+    touch-action: manipulation;
+  }
+
+  .groups-modal[aria-label='Parlay Combos'] .grp-filter-toggle {
+    width: 100%;
+    min-height: 44px;
+    padding: 0 11px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-dim);
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.025);
+    font-size: 11px;
+    font-weight: 750;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+
+  .groups-modal[aria-label='Parlay Combos'] .grp-filter-toggle > span:nth-child(2) {
+    flex: 1;
+    text-align: left;
+  }
+
+  .groups-modal[aria-label='Parlay Combos'] .grp-filter-toggle.on {
+    color: var(--accent);
+    border-color: color-mix(in srgb, var(--accent) 38%, var(--border));
+    background: color-mix(in srgb, var(--accent) 8%, transparent);
+  }
+
+  .groups-modal[aria-label='Parlay Combos'] .grp-filter-count {
+    min-width: 22px;
+    height: 22px;
+    display: grid;
+    place-items: center;
+    color: var(--accent);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--accent) 13%, transparent);
+    font-size: 10px;
+  }
+
+  .groups-modal[aria-label='Parlay Combos'] .grp-ctrl-sep { display: none; }
+
+  .groups-modal[aria-label='Parlay Combos'] .grp-secondary-controls { display: none; }
+
+  .groups-modal[aria-label='Parlay Combos'] .grp-secondary-controls.open {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .groups-modal[aria-label='Parlay Combos'] .grp-secondary-controls > .badge-toggle {
+    min-width: 0;
+    min-height: 44px;
+    padding: 0 8px;
+    justify-content: center;
+    border-radius: 10px;
+    font-size: 10px;
+    touch-action: manipulation;
+  }
+
+  .groups-modal[aria-label='Parlay Combos'] .grp-list,
+  .groups-modal[aria-label='Parlay Combos'] .groups-modal-body .grp-list {
+    margin-top: 10px;
+    gap: 12px;
+  }
+
+  .groups-modal[aria-label='Parlay Combos'] .grp-trim {
+    min-height: 44px;
+    padding: 7px 10px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 2px 4px;
+    font-size: 10px;
+    line-height: 1.3;
+  }
+
+  .groups-modal[aria-label='Parlay Combos'] .grp-trim-link {
+    min-height: 44px;
+    padding-inline: 6px;
+  }
+
+  .groups-modal[aria-label='Parlay Combos'] .grp-card {
+    padding: 0;
+    overflow: hidden;
+    border-radius: 16px;
+    background: linear-gradient(180deg, color-mix(in srgb, var(--gc) 7%, transparent), transparent 72px), rgba(12, 13, 15, 0.96);
+  }
+
+  .groups-modal[aria-label='Parlay Combos'] .grp-head {
+    min-width: 0;
+    min-height: 82px;
+    padding: 9px 10px 7px;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    grid-template-rows: 30px 44px;
+    align-items: center;
+    gap: 3px 6px;
+  }
+
+  .groups-modal[aria-label='Parlay Combos'] .grp-legbadge {
+    grid-column: 1;
+    grid-row: 1;
+    padding: 2px 6px;
+    font-size: 9.5px;
+  }
+
+  .groups-modal[aria-label='Parlay Combos'] .grp-strategy {
+    grid-column: 2;
+    grid-row: 1;
+    overflow: hidden;
+    font-size: 13px;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+  }
+
+  .groups-modal[aria-label='Parlay Combos'] .grp-live-tag,
+  .groups-modal[aria-label='Parlay Combos'] .grp-split-tag,
+  .groups-modal[aria-label='Parlay Combos'] .grp-locked-tag,
+  .groups-modal[aria-label='Parlay Combos'] .grp-projected-tag {
+    grid-column: 3;
+    grid-row: 1;
+    white-space: nowrap;
+    font-size: 8px;
+  }
+
+  .groups-modal[aria-label='Parlay Combos'] .grp-conf { display: none; }
+
+  .groups-modal[aria-label='Parlay Combos'] .grp-grade {
+    grid-column: 4;
+    grid-row: 1;
+    width: 30px;
+    height: 30px;
+  }
+
+  .groups-modal[aria-label='Parlay Combos'] .grp-copy {
+    grid-column: 3;
+    grid-row: 2;
+    justify-self: end;
+    width: 44px;
+    height: 44px;
+    opacity: 1;
+    touch-action: manipulation;
+  }
+
+  .groups-modal[aria-label='Parlay Combos'] .grp-head > .grp-tail {
+    grid-column: 4;
+    grid-row: 2;
+    min-width: 60px;
+    height: 44px;
+    justify-content: center;
+    touch-action: manipulation;
+  }
+
+  .groups-modal[aria-label='Parlay Combos'] .grp-sub {
+    min-height: 42px;
+    margin: 0;
+    padding: 7px 10px 5px;
+    display: -webkit-box;
+    overflow: hidden;
+    border-top: 1px solid var(--border-soft);
+    font-size: 10px;
+    line-height: 1.35;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .groups-modal[aria-label='Parlay Combos'] .grp-hitrail {
+    min-height: 24px;
+    margin: 0;
+    padding: 1px 10px 5px;
+  }
+
+  .groups-modal[aria-label='Parlay Combos'] .grp-hitrail-cap { font-size: 9px; }
+
+  .groups-modal[aria-label='Parlay Combos'] .grp-legs {
+    border-top: 1px solid var(--border-soft);
+  }
+
+  .groups-modal[aria-label='Parlay Combos'] .grp-leg {
+    min-height: 78px;
+    padding: 7px 10px;
+    gap: 8px;
+    border-radius: 0;
+    touch-action: manipulation;
+  }
+
+  .groups-modal[aria-label='Parlay Combos'] .grp-ord {
+    width: 24px;
+    height: 24px;
+    font-size: 10px;
+  }
+
+  .groups-modal[aria-label='Parlay Combos'] .grp-leg-l1 {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 2px 5px;
+  }
+
+  .groups-modal[aria-label='Parlay Combos'] .grp-leg-name {
+    min-width: 0;
+    font-size: 13px;
+    line-height: 1.2;
+    white-space: normal;
+  }
+
+  .groups-modal[aria-label='Parlay Combos'] .grp-team { font-size: 9px; }
+
+  .groups-modal[aria-label='Parlay Combos'] .grp-leg-signals {
+    grid-column: 1 / -1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    overflow: hidden;
+  }
+
+  .groups-modal[aria-label='Parlay Combos'] .grp-leg-signals:empty { display: none; }
+
+  .groups-modal[aria-label='Parlay Combos'] .grp-leg-signals .grp-fire,
+  .groups-modal[aria-label='Parlay Combos'] .grp-leg-signals .grp-chip.rising,
+  .groups-modal[aria-label='Parlay Combos'] .grp-leg-signals .grp-chip.blast,
+  .groups-modal[aria-label='Parlay Combos'] .grp-leg-signals .grp-chip.pitch,
+  .groups-modal[aria-label='Parlay Combos'] .grp-leg-signals .grp-chip.good,
+  .groups-modal[aria-label='Parlay Combos'] .grp-leg-signals .grp-chip.bad {
+    display: none;
+  }
+
+  .groups-modal[aria-label='Parlay Combos'] .grp-chip {
+    flex: 0 0 auto;
+    padding: 1px 4px;
+    font-size: 8px;
+    white-space: nowrap;
+  }
+
+  .groups-modal[aria-label='Parlay Combos'] .grp-leg-l2 {
+    min-width: 0;
+    margin-top: 3px;
+    display: block;
+    overflow: hidden;
+    font-size: 10px;
+    line-height: 1.25;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .groups-modal[aria-label='Parlay Combos'] .grp-leg-secondary,
+  .groups-modal[aria-label='Parlay Combos'] .grp-leg-lock { display: none; }
+
+  .groups-modal[aria-label='Parlay Combos'] .grp-leg-right { gap: 2px; }
+  .groups-modal[aria-label='Parlay Combos'] .grp-mult { font-size: 8px; }
+  .groups-modal[aria-label='Parlay Combos'] .grp-prob { font-size: 16px; }
+
+  .groups-modal[aria-label='Parlay Combos'] .grp-foot {
+    min-height: 28px;
+    margin: 0;
+    padding: 6px 10px;
+    display: flex;
+    align-items: center;
+    border-top: 1px solid var(--border-soft);
+    font-size: 9px;
+  }
+
+  .groups-modal[aria-label='Parlay Combos'] .grp-track-row {
+    min-height: 56px;
+    margin-top: 0 !important;
+    padding: 6px 10px !important;
+    justify-content: flex-end !important;
+    border-top: 1px solid var(--border-soft);
+  }
+
+  .groups-modal[aria-label='Parlay Combos'] .grp-track-row > span:empty { display: none; }
+
+  .groups-modal[aria-label='Parlay Combos'] .grp-track-row > button {
+    min-height: 44px !important;
+    padding: 0 14px !important;
+    justify-content: center;
+    font-size: 11px !important;
+    touch-action: manipulation;
+  }
+
+  .groups-modal[aria-label='Parlay Combos'] .grp-track-row > .grp-tail { min-width: 86px; }
+
+  .groups-modal[aria-label='Parlay Combos'] .grp-why-text {
+    margin: 0 !important;
+    padding: 8px 10px 10px;
+    border-top: 1px solid var(--border-soft);
+  }
+}
+
+@media (max-width: 350px) {
+  .groups-modal[aria-label='Parlay Combos'] > .groups-modal-body { padding-inline: 10px; }
+  .groups-modal[aria-label='Parlay Combos'] .grp-strategy { font-size: 12px; }
+  .groups-modal[aria-label='Parlay Combos'] .grp-projected-tag,
+  .groups-modal[aria-label='Parlay Combos'] .grp-locked-tag,
+  .groups-modal[aria-label='Parlay Combos'] .grp-split-tag { font-size: 7px; }
+  .groups-modal[aria-label='Parlay Combos'] .grp-size-controls > .badge-toggle { font-size: 9px; }
+}
+
 @media (max-width: 350px) {
   .mobile-target-row { grid-template-columns: 21px minmax(0, 1fr) auto 14px; }
   .mobile-target-row .grade-chip { display: none; }

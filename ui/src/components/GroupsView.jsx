@@ -280,6 +280,7 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard, g
   const [spread, setSpread] = useState(false) // de-correlated subset (min bat overlap)
   const [valueSort, setValueSort] = useState(false) // sort by EV when books are posted
   const [showAll, setShowAll] = useState(false)
+  const [filtersOpen, setFiltersOpen] = useState(false)
   // windowMode (start-window grouping) is an app-level setting — see Settings.
 
   // Distinct, still-playable games in the pool — for the game selector.
@@ -395,6 +396,7 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard, g
   const overConc = exposure.top[0] && exposure.top[0][1] >= Math.max(4, Math.ceil(exposure.total * 0.35))
   // Whether any shown combo is fully priced — only then is a Value/EV sort useful.
   const anyPriced = groups.some((g) => g.ev != null)
+  const activeFilterCount = Number(hideStarted) + Number(confirmedOnly) + Number(spread) + Number(anyPriced && valueSort)
   // EV-desc: priced combos first (best EV on top); unpriced fall back to all-hit.
   const byValue = (a, b) => {
     if (a.ev != null && b.ev != null) return b.ev - a.ev
@@ -502,7 +504,8 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard, g
           )}
         </div>
       ) : null}
-      <div className="grp-controls" role="group" aria-label="Group size">
+      <div className="grp-controls">
+        <div className="grp-size-controls" role="group" aria-label="Combo size">
         {available.map((t) => (
           <button
             key={t.k}
@@ -514,7 +517,21 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard, g
             {t.label}
           </button>
         ))}
+        </div>
+        <button
+          className={`grp-filter-toggle${filtersOpen ? ' on' : ''}`}
+          type="button"
+          aria-expanded={filtersOpen}
+          aria-controls="combo-more-filters"
+          onClick={() => setFiltersOpen((v) => !v)}
+        >
+          <Icon name="SlidersHorizontal" size={14} />
+          <span>More filters</span>
+          {activeFilterCount > 0 && <span className="grp-filter-count mono">{activeFilterCount}</span>}
+          <Icon name={filtersOpen ? 'ChevronUp' : 'ChevronDown'} size={14} />
+        </button>
         <span className="grp-ctrl-sep" aria-hidden="true" />
+        <div id="combo-more-filters" className={`grp-secondary-controls${filtersOpen ? ' open' : ''}`} role="group" aria-label="Combo filters">
         <button
           className={`badge-toggle ${hideStarted ? 'on' : ''}`}
           onClick={() => setHideStarted((v) => !v)}
@@ -549,6 +566,7 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard, g
             <Icon name="Percent" size={12} /> Value
           </button>
         )}
+        </div>
       </div>
       {available.length ? (
         <div className="grp-list">
@@ -679,6 +697,7 @@ function GroupCard({ g, idx = 0, onSelect, selectedId, comboConf = 'off', slipSe
         <span className={`grp-grade grade-glow-${g.grade}`} style={{ color: gc, borderColor: gc }}>{g.grade}</span>
         <button
           className="grp-copy"
+          aria-label="Copy combo"
           title="Copy this combo as text"
           onClick={(e) => {
             e.stopPropagation()
@@ -855,6 +874,7 @@ function GroupLeg({ b, idx, onSelect, selected, bad, weakest, reasons, unconfirm
         <div className="grp-leg-l1">
           <span className={`grp-leg-name ${hrToday ? 'hr-glow' : ''}`}>{lastFirst(b.name)}</span>
           <span className="grp-team">{b.team}</span>
+          <span className="grp-leg-signals">
           {dupCount >= 2 && (
             <span className="grp-chip dup" title={`In ${dupCount} of the shown combos — tailing several tickets is re-betting this bat, not diversifying. Hover to light him up across cards.`}>
               ×{dupCount}
@@ -908,6 +928,7 @@ function GroupLeg({ b, idx, onSelect, selected, bad, weakest, reasons, unconfirm
               <Icon name="Crosshair" size={10} />
             </span>
           )}
+          </span>
         </div>
         <div className="grp-leg-l2 dim">
           vs {b.pitcher?.name || 'TBD'}
@@ -918,12 +939,12 @@ function GroupLeg({ b, idx, onSelect, selected, bad, weakest, reasons, unconfirm
             </>
           )}
           {barrel != null && (
-            <>
+            <span className="grp-leg-secondary">
               {' · '}
               <Icon name="Crosshair" size={10} /> {num(barrel, 0)}% barrel
-            </>
+            </span>
           )}
-          {iso != null && <> · ISO {rate(iso)}</>}
+          {iso != null && <span className="grp-leg-secondary"> · ISO {rate(iso)}</span>}
           {lockTime && (
             <span
               className={`grp-leg-lock ${legLocked ? 'locked' : unconfirmed ? 'pending' : ''}`}
