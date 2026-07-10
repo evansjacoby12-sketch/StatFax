@@ -133,6 +133,15 @@ export function extractPredictionRecord(row) {
     ev:   num(row.exitVelo),
     hh:   num(row.hardHitPct),
     la:   num(row.launchAngle),
+    // Ceiling inputs + advisory scores — INSTRUMENTED 2026-07-10 so the
+    // barrelScore/formScore ceiling metrics can be forward-validated by
+    // shortlist hit-rate (see model-lab/validate-ceil.mjs) before anything
+    // built on them ships. Advisory only — none of these feed the HR score.
+    mxev: num(row.maxEV),                         // max exit velo
+    ss:   num(row.sweetSpotPct),                  // sweet-spot%
+    hrd:  num(row.hrDistance),                    // avg HR distance
+    ceil: num(row.ceilScore),                     // barrelScore ceiling 0-100
+    form: num(row.formScore),                     // formScore 0-100
     phr9: num(ps?.hrPer9 ?? ps?.hr9),             // opposing starter HR/9
     pera: num(ps?.era),
     pk9:  num(ps?.kPer9 ?? ps?.k9),

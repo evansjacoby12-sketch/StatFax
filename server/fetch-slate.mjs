@@ -654,6 +654,7 @@ import { fetchCatcherFraming } from './catcherFraming.mjs';
 import { fetchRecentBatterBarrelsMultiWindow, fetchRecentPitcherVelo } from './statcastRecent.mjs';
 import { applySimResolution } from './lib/simResolution.mjs';
 import { fetchHROdds } from './lib/theOddsApi.mjs';
+import { advisoryBarrel } from './lib/barrelScore.mjs';
 import { pitchMixScore } from '../ui/src/lib/scout.js';
 
 // ─── HTTP helpers ────────────────────────────────────────────────────────────
@@ -1385,6 +1386,13 @@ async function fetchSavantBatterStatsAll(year = SEASON) {
           pullPct:      pf(p.pull_percent),
           izContactPct: pf(p.iz_contact_percent),
           xSlg:         pf(p.xslg),
+          // Ceiling (top-end power) inputs — the raw-power signals a "how far
+          // when squared up" projection needs, distinct from the averages the
+          // main score already uses. Not on the percentile endpoint; backfilled
+          // from the statcast CSV below (same call that backfills LA + hardHit).
+          maxEV:        null,   // max_hit_speed — top exit velo
+          sweetSpotPct: null,   // anglesweetspotpercent — batted balls in the HR launch window
+          hrDistance:   null,   // avg_hr_distance — how far this batter's HRs travel
         };
       }
       if (Object.keys(out).length) {
@@ -1410,6 +1418,10 @@ async function fetchSavantBatterStatsAll(year = SEASON) {
             // hardHitPctAllowed) — this is the field `hh` in the calibration
             // feature vector. Backfill only when the percentile pass left it null.
             if (out[id].hardHitPct == null) out[id].hardHitPct = pf(p.hard_hit_percent);
+            // Ceiling inputs live only on the statcast CSV — always backfill.
+            if (out[id].maxEV == null)        out[id].maxEV        = pf(p.max_hit_speed);
+            if (out[id].sweetSpotPct == null) out[id].sweetSpotPct = pf(p.anglesweetspotpercent);
+            if (out[id].hrDistance == null)   out[id].hrDistance   = pf(p.avg_hr_distance);
           }
         } catch { /* leaderboard backfill is best-effort */ }
         return out;
@@ -1452,6 +1464,10 @@ async function fetchSavantBatterStatsAll(year = SEASON) {
         pullPct:     pf(p.pull_percent) ?? null,
         izContactPct: pf(p.iz_contact_percent) ?? null,
         xSlg:        null,
+        // Ceiling (top-end power) inputs — present on this statcast CSV.
+        maxEV:        pf(p.max_hit_speed),
+        sweetSpotPct: pf(p.anglesweetspotpercent),
+        hrDistance:   pf(p.avg_hr_distance),
       };
     }
     for (const p of xRows) {
@@ -1465,6 +1481,7 @@ async function fetchSavantBatterStatsAll(year = SEASON) {
           exitVelo: null, hardHitPct: null, barrelPct: null,
           launchAngle: null, whiffPct: null, pullPct: null,
           izContactPct: null, xSlg,
+          maxEV: null, sweetSpotPct: null, hrDistance: null,
         };
       }
     }
@@ -3325,6 +3342,14 @@ async function main() {
           // savant blob but wasn't surfaced on the row; now exposed for the
           // matchup view. Null when the savant sample is missing.
           pullPct: savantStats?.pullPct ?? null,
+          // Ceiling (top-end power) inputs — max exit velo, sweet-spot%, and
+          // avg HR distance. These measure a batter's UPSIDE when squared up
+          // (distinct from the averages scoreBatter uses), and feed the
+          // advisory barrelScore/formScore below. Logged for forward
+          // validation; they never touch the HR score/probability.
+          maxEV:        savantStats?.maxEV        ?? null,
+          sweetSpotPct: savantStats?.sweetSpotPct ?? null,
+          hrDistance:   savantStats?.hrDistance   ?? null,
           // Primary-pitch edge (derived above) — compact "does this batter
           // mash the pitcher's bread-and-butter?" signal for Heat Index.
           // Null when we don't have both arsenals to compute it.
@@ -3358,6 +3383,16 @@ async function main() {
           hrStreak:          hrStreakMap[id] ?? 0,
           ...safeResult,
         };
+        // ADVISORY ceiling + form (barrelScore/formScore) — computed off the
+        // row's now-populated power fields. Display/shortlist signals ONLY:
+        // deliberately set AFTER scoreBatter and never read back into score,
+        // grade, or hrProbability. Logged so validate-ceil can forward-test the
+        // shortlist hit-rate before anything ships to the board.
+        {
+          const adv = advisoryBarrel(row);
+          row.ceilScore = adv.ceil;   // 0-100 raw-power ceiling (null when < 3 inputs)
+          row.formScore = adv.form;   // 0-100 recent-power form (null when no window)
+        }
         // Apply umpire HR factor on the env contribution of the composite.
         // No-op when the factor is 1.0 (default for any ump not in the
         // umpire-factors.json table). When the table is populated with

@@ -19,7 +19,8 @@
     "lab:blast": "node model-lab/blast-audit.mjs",
     "lab:blast-model": "node model-lab/blast-model.mjs",
     "lab:board": "node model-lab/board-evolution.mjs",
-    "lab:matchup": "node model-lab/matchup-model.mjs"
+    "lab:matchup": "node model-lab/matchup-model.mjs",
+    "lab:validate-ceil": "node model-lab/validate-ceil.mjs"
   },
   "devDependencies": {
     "esbuild": "^0.28.0"
