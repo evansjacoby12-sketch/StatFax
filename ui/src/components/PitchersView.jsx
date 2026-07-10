@@ -150,6 +150,8 @@ function KBrainView({ pitchers, liveKsByPitcher = {} }) {
   const [confFilter, setConfFilter] = useState('all')
   const [sortBy, setSortBy] = useState('k')
   const [h2hOpen, setH2hOpen] = useState({})
+  const [detailsOpen, setDetailsOpen] = useState({})
+  const [showAllArms, setShowAllArms] = useState(false)
   const [kLog, setKLog] = useState(null)
 
   useEffect(() => {
@@ -186,19 +188,21 @@ function KBrainView({ pitchers, liveKsByPitcher = {} }) {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+    <div className="kbrain-view" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
       {/* Filter bar */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '10px 12px', background: 'rgba(16,24,48,0.4)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '10px' }}>
+      <div className="kbrain-filters" style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '10px 12px', background: 'rgba(16,24,48,0.4)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '10px' }}>
         {/* Search */}
         <input
+          className="kbrain-search"
           type="text"
+          aria-label="Search pitcher or team"
           placeholder="Search pitcher or team…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           style={{ width: '100%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '5px 10px', color: '#fff', fontSize: '12px', boxSizing: 'border-box' }}
         />
         {/* Filter chips row */}
-        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+        <div className="kbrain-filter-row" style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
           <span style={{ fontSize: '10px', color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', marginRight: '2px' }}>Min K</span>
           {[0, 4.5, 5.5, 6.5, 7.5].map((v) => (
             <button key={v} style={filterBtnStyle(minK === v)} onClick={() => setMinK(v)}>
@@ -216,7 +220,7 @@ function KBrainView({ pitchers, liveKsByPitcher = {} }) {
           <button style={filterBtnStyle(sortBy === 'time')} onClick={() => setSortBy('time')}>Game Time</button>
         </div>
         {/* Result count */}
-        <div style={{ fontSize: '10px', color: 'var(--text-faint)' }}>
+        <div className="kbrain-result-count" style={{ fontSize: '10px', color: 'var(--text-faint)' }}>
           {arms.length} pitcher{arms.length !== 1 ? 's' : ''} · Poisson K distribution · enter the book line to see edge
         </div>
       </div>
@@ -227,6 +231,7 @@ function KBrainView({ pitchers, liveKsByPitcher = {} }) {
         </div>
       )}
 
+      <div className={`kbrain-list ${showAllArms ? 'show-all' : ''}`}>
       {arms.map((e) => {
         const ek = e.estK
         const oppTeam = e.targets[0]?.team || '?'
@@ -237,9 +242,9 @@ function KBrainView({ pitchers, liveKsByPitcher = {} }) {
         const liveK = liveKsByPitcher[e.key]
 
         return (
-          <div key={e.key} style={{ background: 'rgba(16,24,48,0.45)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '12px', padding: '14px 16px' }}>
+          <div key={e.key} className={`kbrain-card ${detailsOpen[e.key] ? 'is-expanded' : ''}`} style={{ background: 'rgba(16,24,48,0.45)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '12px', padding: '14px 16px' }}>
             {/* Header */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px', flexWrap: 'wrap' }}>
+            <div className="kbrain-card-head" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px', flexWrap: 'wrap' }}>
               <img src={playerHeadshot(e.pitcher.id, 60)} alt="" loading="lazy" style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover', background: 'rgba(255,255,255,0.04)', flexShrink: 0 }} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: '800', fontSize: '14px', color: '#fff' }}>{e.pitcher.name}</div>
@@ -265,7 +270,7 @@ function KBrainView({ pitchers, liveKsByPitcher = {} }) {
             </div>
 
             {/* Environment + model adjustment chips */}
-            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '8px' }}>
+            <div className="kbrain-adjustments" style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '8px' }}>
               {ek.tempF != null && (
                 <span style={{ fontSize: '10px', padding: '2px 7px', borderRadius: '4px', background: 'rgba(255,255,255,0.05)', color: ek.tempAdj < 0.97 ? 'var(--bad)' : ek.tempAdj > 1.02 ? 'var(--strong)' : 'var(--text-faint)' }}>
                   {Math.round(ek.tempF)}°F{ek.tempAdj < 0.97 ? ' ❄ cold' : ek.tempAdj > 1.02 ? ' ☀ warm' : ''}
@@ -294,14 +299,14 @@ function KBrainView({ pitchers, liveKsByPitcher = {} }) {
             </div>
 
             {/* K-over probability bars */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginBottom: '10px' }}>
+            <div className="kbrain-lines" style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginBottom: '10px' }}>
               {showLines.map((line) => {
                 const p = ek.probs[line]
                 if (p == null) return null
                 const pct100 = p * 100
                 const barColor = pct100 >= 60 ? 'var(--strong)' : pct100 >= 40 ? '#f59e0b' : 'var(--bad)'
                 return (
-                  <div key={line} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px' }}>
+                  <div className="kbrain-line" key={line} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px' }}>
                     <span className="mono" style={{ width: '32px', color: 'var(--text-dim)', flexShrink: 0 }}>{line}+</span>
                     <div style={{ flex: 1, height: '6px', background: 'rgba(255,255,255,0.06)', borderRadius: '99px', overflow: 'hidden' }}>
                       <div style={{ height: '100%', width: `${pct100}%`, background: barColor, borderRadius: '99px', transition: 'width 0.3s' }} />
@@ -318,7 +323,7 @@ function KBrainView({ pitchers, liveKsByPitcher = {} }) {
             </div>
 
             {/* Sportsbook line input */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div className="kbrain-book" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{ fontSize: '11px', color: 'var(--text-faint)', flexShrink: 0 }}>Book line:</span>
               <input
                 type="number"
@@ -343,9 +348,24 @@ function KBrainView({ pitchers, liveKsByPitcher = {} }) {
               open={!!h2hOpen[e.key]}
               onToggle={() => setH2hOpen((prev) => ({ ...prev, [e.key]: !prev[e.key] }))}
             />
+            <button
+              className="kbrain-card-toggle"
+              onClick={() => setDetailsOpen((prev) => ({ ...prev, [e.key]: !prev[e.key] }))}
+              aria-expanded={!!detailsOpen[e.key]}
+            >
+              {detailsOpen[e.key] ? 'Show less' : 'More lines & matchup'}
+              <Icon name={detailsOpen[e.key] ? 'ChevronUp' : 'ChevronDown'} size={14} />
+            </button>
           </div>
         )
       })}
+      </div>
+      {arms.length > 8 && (
+        <button className="kbrain-list-toggle" onClick={() => setShowAllArms((open) => !open)} aria-expanded={showAllArms}>
+          {showAllArms ? 'Show top 8 pitchers' : `Show all ${arms.length} pitchers`}
+          <Icon name={showAllArms ? 'ChevronUp' : 'ChevronDown'} size={14} />
+        </button>
+      )}
 
       {/* K-prop results scorecard */}
       {(() => {
@@ -363,15 +383,17 @@ function KBrainView({ pitchers, liveKsByPitcher = {} }) {
           }
         }
         return (
-          <div style={{ marginTop: '20px', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '16px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+          <details className="kbrain-record" style={{ marginTop: '20px', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '16px' }}>
+            <summary className="kbrain-record-summary" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
               <span style={{ fontSize: '12px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-faint)' }}>K-prop record</span>
               {totalGraded > 0 && (
                 <span style={{ fontSize: '11px', color: totalHits / totalGraded >= 0.65 ? 'var(--strong)' : totalHits / totalGraded >= 0.45 ? '#f59e0b' : 'var(--bad)' }}>
                   {totalHits}/{totalGraded} within range ({(totalHits / totalGraded * 100).toFixed(0)}% hit rate)
                 </span>
               )}
-            </div>
+              <Icon className="kbrain-record-chevron" name="ChevronDown" size={14} />
+            </summary>
+            <div className="kbrain-record-body">
             {dates.map((d) => {
               const rows = (resultsByDate[d] || []).filter(e => e.actualK != null)
               if (!rows.length) return null
@@ -386,7 +408,7 @@ function KBrainView({ pitchers, liveKsByPitcher = {} }) {
                           <span style={{ flex: 1, fontWeight: '600', color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{e.name}</span>
                           <span className="mono" style={{ color: 'var(--text-faint)', flexShrink: 0 }}>est {e.lo}–{e.hi}</span>
                           <span className="mono" style={{ color: '#fff', fontWeight: '700', flexShrink: 0 }}>actual {e.actualK}</span>
-                          <span style={{ flexShrink: 0 }}>{hit ? '✅' : '❌'}</span>
+                          <Icon name={hit ? 'Check' : 'X'} size={13} style={{ flexShrink: 0, color: hit ? 'var(--strong)' : 'var(--bad)' }} aria-label={hit ? 'within range' : 'outside range'} />
                         </div>
                       )
                     })}
@@ -394,7 +416,8 @@ function KBrainView({ pitchers, liveKsByPitcher = {} }) {
                 </div>
               )
             })}
-          </div>
+            </div>
+          </details>
         )
       })()}
     </div>
@@ -431,8 +454,9 @@ function KBrainH2H({ targets, open, onToggle }) {
   const lowK   = rows.filter((r) => r.h2hKPct <= 0.12).length
 
   return (
-    <div style={{ marginTop: '10px', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '10px' }}>
+    <div className="kbrain-h2h" style={{ marginTop: '10px', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '10px' }}>
       <button
+        className="kbrain-h2h-trigger"
         onClick={onToggle}
         style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', padding: '0', cursor: 'pointer', width: '100%', textAlign: 'left' }}
       >
@@ -601,7 +625,7 @@ function PitcherPreview({ pitchers, onSelect }) {
               <span className="pvp-tier-n dim" style={{ marginLeft: 'auto', background: 'rgba(255,255,255,0.05)', padding: '1px 6px', borderRadius: '4px', fontSize: '11px' }}>{rows.length}</span>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
-              {rows.map((e) => <PvpRow key={e.key} e={e} onSelect={onSelect} />)}
+              {rows.map((e) => <PvpRow key={e.key} e={e} tier={t} onSelect={onSelect} />)}
             </div>
           </div>
         )
@@ -658,7 +682,7 @@ function SgpCombo({ legs, prob, onSelect }) {
   )
 }
 
-function PvpRow({ e, onSelect }) {
+function PvpRow({ e, tier, onSelect }) {
   const [open, setOpen] = useState(false)
   const p = e.pitcher
   const s = p.season || {}
@@ -670,10 +694,17 @@ function PvpRow({ e, onSelect }) {
   const sgp3 = sgpLegs(e.targets, 3)
   return (
     <div className="pvp-row" style={{ flexWrap: 'wrap' }}>
-      <div className="pvp-p" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-        <span className="pvp-name" style={{ color: '#fff', fontWeight: '600' }}>{p.name}</span>
-        <span className="pvp-hand dim"> ({p.hand})</span>
-        <span className="pvp-vs dim"> vs {oppTeam}</span>
+      <div className="pvp-card-head">
+        <img className="pvp-mobile-photo" src={playerHeadshot(p.id, 72)} alt={p.name} loading="lazy" />
+        <div className="pvp-p" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          <span className="pvp-name" style={{ color: '#fff', fontWeight: '600' }}>{p.name}</span>
+          <span className="pvp-hand dim"> ({p.hand})</span>
+          <span className="pvp-vs dim"> vs {oppTeam}</span>
+        </div>
+        <span className="pvp-vuln-score" style={{ '--tier-color': tier?.color }}>
+          <b className="mono">{Math.round(e.vuln?.score ?? 0)}</b>
+          <small>{tier?.key || 'tier'}</small>
+        </span>
       </div>
       <div className="pvp-stats mono">
         <span><b style={{ color: '#fff' }}>{num(s.hrPer9, 2)}</b> HR/9</span>

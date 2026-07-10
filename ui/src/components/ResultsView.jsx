@@ -34,8 +34,15 @@ const RESULTS_TABS = [
 // now (combos was folded back in here), switched by a sub-toggle.
 export default function ResultsView({ meta, batters, onSelect, favorConsistency = false, initialTab = 'model' }) {
   const [tab, setTab] = useState(initialTab)
+  useEffect(() => setTab(initialTab), [initialTab])
   return (
     <div className="results-wrap">
+      {tab === 'model' && (
+        <div className="mobile-page-kicker results-mobile-kicker">
+          <span><Icon name="BarChart3" size={14} /> Results center</span>
+          <small className="mono">Model performance</small>
+        </div>
+      )}
       <div className="results-subnav" style={{ display: 'flex', gap: '6px', marginBottom: '20px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
         {RESULTS_TABS.map((t) => (
           <button key={t.id} onClick={() => setTab(t.id)} aria-pressed={tab === t.id} style={{
@@ -62,6 +69,8 @@ function ModelResults({ meta }) {
   const [log, setLog] = useState(null)
   const [err, setErr] = useState(null)
   const [hrDay, setHrDay] = useState(null)
+  const [chartTab, setChartTab] = useState('grades')
+  const [showAllHRs, setShowAllHRs] = useState(false)
 
   useEffect(() => {
     let alive = true
@@ -160,8 +169,13 @@ function ModelResults({ meta }) {
         {m && <Kpi label="Brier vs baseline" value={m.brier.toFixed(4)} sub={`${pct((m.baselineBrier - m.brier) / m.baselineBrier, 0)} better`} accent="var(--accent)" />}
       </div>
 
+      <div className="results-chart-tabs" role="tablist" aria-label="Results analysis">
+        <button role="tab" aria-selected={chartTab === 'grades'} className={chartTab === 'grades' ? 'on' : ''} onClick={() => setChartTab('grades')}>Grades</button>
+        <button role="tab" aria-selected={chartTab === 'calibration'} className={chartTab === 'calibration' ? 'on' : ''} onClick={() => setChartTab('calibration')}>Calibration</button>
+      </div>
+
       <div className="results-cols" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px', flexWrap: 'wrap' }}>
-        <section className="results-card" style={{
+        <section className={`results-card results-grade-card ${chartTab === 'grades' ? 'is-mobile-active' : ''}`} style={{
           background: 'rgba(17, 18, 20, 0.45)',
           border: '1px solid rgba(255,255,255,0.06)',
           borderRadius: '12px',
@@ -192,7 +206,7 @@ function ModelResults({ meta }) {
           <p className="chart-cap dim" style={{ fontSize: '11px', marginTop: '16px' }}>Share of each grade that homered. A well-calibrated model shows a staircase slope.</p>
         </section>
 
-        <section className="results-card" style={{
+        <section className={`results-card results-reliability-card ${chartTab === 'calibration' ? 'is-mobile-active' : ''}`} style={{
           background: 'rgba(17, 18, 20, 0.45)',
           border: '1px solid rgba(255,255,255,0.06)',
           borderRadius: '12px',
@@ -250,7 +264,7 @@ function ModelResults({ meta }) {
           </div>
         )}
         {shownHRs.length ? (
-          <ul className="hr-feed" style={{ listStyle: 'none', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '10px' }}>
+          <ul className={`hr-feed ${showAllHRs ? 'show-all' : ''}`} style={{ listStyle: 'none', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '10px' }}>
             {shownHRs.map((r, i) => (
               <li className="hr-feed-row" key={`${r.playerId}-${r.date}-${i}`} style={{
                 display: 'flex',
@@ -274,6 +288,12 @@ function ModelResults({ meta }) {
           </ul>
         ) : (
           <p className="chart-cap dim">No PRIME/STRONG picks homered yet.</p>
+        )}
+        {shownHRs.length > 8 && (
+          <button className="results-feed-toggle" onClick={() => setShowAllHRs((open) => !open)} aria-expanded={showAllHRs}>
+            {showAllHRs ? 'Show fewer home runs' : `Show all ${shownHRs.length} home runs`}
+            <Icon name={showAllHRs ? 'ChevronUp' : 'ChevronDown'} size={14} />
+          </button>
         )}
       </section>
 
@@ -304,12 +324,12 @@ function ModelResults({ meta }) {
             <div className="daily-row" key={d.date} style={{ padding: '8px 10px', borderBottom: '1px solid rgba(255,255,255,0.02)', fontSize: '12px' }}>
               {/* Six values stay DIRECT children — .daily-row's own CSS grid
                   (64px + 5 columns) aligns them under the header row. */}
-              <span className="mono" style={{ color: '#fff' }}>{d.date.slice(5)}</span>
-              <span className="mono">{d.n}</span>
-              <span className="mono">{d.hits}</span>
-              <span className="mono">{d.n ? pct(d.hits / d.n, 0) : '—'}</span>
-              <span className="mono dim">{d.topN}</span>
-              <span className={`mono ${d.topN && d.topHits / d.topN > base ? 'pos' : ''}`} style={d.topN && d.topHits / d.topN > base ? { color: 'var(--strong)', fontWeight: '700' } : {}}>{d.topN ? pct(d.topHits / d.topN, 0) : '—'}</span>
+              <span className="mono daily-date" style={{ color: '#fff' }}>{d.date.slice(5)}</span>
+              <span className="mono daily-stat" data-label="Picks">{d.n}</span>
+              <span className="mono daily-stat" data-label="HR">{d.hits}</span>
+              <span className="mono daily-stat" data-label="Hit rate">{d.n ? pct(d.hits / d.n, 0) : '—'}</span>
+              <span className="mono dim daily-stat" data-label="Tier picks">{d.topN}</span>
+              <span className={`mono daily-stat ${d.topN && d.topHits / d.topN > base ? 'pos' : ''}`} data-label="Tier hit" style={d.topN && d.topHits / d.topN > base ? { color: 'var(--strong)', fontWeight: '700' } : {}}>{d.topN ? pct(d.topHits / d.topN, 0) : '—'}</span>
               {d.dots.length > 0 && (
                 // Every tier pick gets a dot (no cap) — smaller and tighter so
                 // a 140-pick day still reads as one or two clean lines.

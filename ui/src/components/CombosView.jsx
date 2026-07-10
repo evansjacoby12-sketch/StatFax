@@ -23,6 +23,8 @@ export default function CombosView({ batters, onSelect, favorConsistency = false
   const [comboBoard, setComboBoard] = useState('full')
   const [comboSize, setComboSize] = useState(0)
   const [winnersOnly, setWinnersOnly] = useState(false)
+  const [comboSection, setComboSection] = useState('live')
+  const [historyExpanded, setHistoryExpanded] = useState(false)
 
   useEffect(() => {
     let alive = true
@@ -157,7 +159,29 @@ export default function CombosView({ batters, onSelect, favorConsistency = false
 
   return (
     <div className="results">
-      <section className="results-card" style={CARD}>
+      <div className="mobile-page-kicker combo-mobile-kicker">
+        <span><Icon name="Layers" size={14} /> Parlay center</span>
+        <small className="mono">Live + graded</small>
+      </div>
+      <div className="combo-mobile-tabs" role="tablist" aria-label="Parlay combo sections">
+        {[
+          { id: 'live', label: 'Live', icon: 'Activity' },
+          { id: 'tickets', label: 'Tickets', icon: 'Bookmark' },
+          { id: 'history', label: 'History', icon: 'Clock' },
+        ].map((item) => (
+          <button
+            key={item.id}
+            role="tab"
+            aria-selected={comboSection === item.id}
+            className={comboSection === item.id ? 'on' : ''}
+            onClick={() => setComboSection(item.id)}
+          >
+            <Icon name={item.icon} size={13} /> {item.label}
+          </button>
+        ))}
+      </div>
+
+      <section className={`results-card combo-workspace-section combo-section-tickets ${comboSection === 'tickets' ? 'is-mobile-active' : ''}`} style={CARD}>
         <h3 className="section-title" style={H3}>
           <Icon name="Bookmark" size={14} style={{ color: 'var(--accent)' }} /> My tickets
           <span style={{ fontWeight: '400', textTransform: 'none', marginLeft: '6px', fontSize: '12px', color: 'var(--text-faint)' }}>· combos you tracked, graded as your bets</span>
@@ -166,7 +190,7 @@ export default function CombosView({ batters, onSelect, favorConsistency = false
       </section>
 
       {batters && (
-        <section className="results-card" style={CARD}>
+        <section className={`results-card combo-workspace-section combo-section-live ${comboSection === 'live' ? 'is-mobile-active' : ''}`} style={CARD}>
           <h3 className="section-title" style={H3}>
             <Icon name="Activity" size={14} style={{ color: 'var(--accent)' }} /> Live combos
             <span style={{ fontWeight: '400', textTransform: 'none', marginLeft: '6px', fontSize: '12px', color: 'var(--text-faint)' }}>· today, in progress</span>
@@ -183,7 +207,7 @@ export default function CombosView({ batters, onSelect, favorConsistency = false
       ) : !log ? (
         <div className="results-loading" style={{ display: 'flex', justifyContent: 'center', padding: '48px', color: 'var(--text-dim)', fontWeight: '600' }}>Loading combo record…</div>
       ) : settled && settled.comboDates.length > 0 ? (
-        <>
+        <div className={`combo-history-wrap combo-workspace-section ${comboSection === 'history' ? 'is-mobile-active' : ''}`}>
         {settled.isStale && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', marginBottom: '12px', borderRadius: '8px', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', color: 'rgb(245,158,11)', fontSize: '12px' }}>
             <Icon name="TriangleAlert" size={14} />
@@ -226,7 +250,7 @@ export default function CombosView({ batters, onSelect, favorConsistency = false
           {shownCombos.length === 0 ? (
             <div className="dim" style={{ fontSize: '12px', padding: '14px', textAlign: 'center' }}>{winnersOnly ? 'No cross-game combos cashed this day.' : 'No combos for this board.'}</div>
           ) : (
-          <ul className="combo-res" style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <ul className={`combo-res combo-history-list ${historyExpanded ? 'show-all' : ''}`} style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {shownCombos.map((c, i) => (
               <li className={`combo-res-row ${c.allHit ? 'hit' : 'miss'}`} key={`${c.strategy}-${c.size}-${i}`} style={{
                 display: 'flex', alignItems: 'center', gap: '12px',
@@ -234,13 +258,15 @@ export default function CombosView({ batters, onSelect, favorConsistency = false
                 border: `1px solid ${c.allHit ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255,255,255,0.04)'}`,
                 padding: '10px 14px', borderRadius: '8px'
               }}>
-                <span className="combo-res-badge" style={{ fontSize: '16px' }}>{c.allHit ? '🎯' : `${c.nHit}/${c.size}`}</span>
+                <span className="combo-res-badge" style={{ fontSize: '16px' }}>{c.allHit ? <Icon name="Check" size={15} /> : `${c.nHit}/${c.size}`}</span>
                 <span className="combo-res-strat" style={{ fontWeight: '700', fontSize: '13px', color: '#fff', width: '100px' }}>{STRAT_LABEL[c.strategy] || c.strategy}</span>
                 <span className="combo-res-size dim" style={{ fontSize: '11px', width: '50px' }}>{c.size}-leg</span>
                 <span className="combo-res-legs" style={{ fontSize: '12px', flex: '1' }}>
                   {c.legs.map((l, j) => (
-                    <span key={j} style={{ color: l.status === 'hit' ? 'var(--strong)' : l.status === 'live' ? 'var(--accent)' : 'var(--text-dim)', fontWeight: l.status === 'hit' ? '700' : '400' }}>
-                      {l.name} {l.status === 'hit' ? '✅' : l.status === 'live' ? '⏳' : '❌'}{j < c.legs.length - 1 ? ' · ' : ''}
+                    <span key={j} className="combo-leg" style={{ color: l.status === 'hit' ? 'var(--strong)' : l.status === 'live' ? 'var(--accent)' : 'var(--text-dim)', fontWeight: l.status === 'hit' ? '700' : '400' }}>
+                      {l.name}
+                      <Icon className="combo-leg-status" name={l.status === 'hit' ? 'Check' : l.status === 'live' ? 'Clock' : 'X'} size={10} aria-label={l.status} />
+                      {j < c.legs.length - 1 ? <span className="combo-leg-sep">·</span> : null}
                     </span>
                   ))}
                 </span>
@@ -257,7 +283,7 @@ export default function CombosView({ batters, onSelect, favorConsistency = false
                   · <b style={{ color: 'var(--strong)' }}>{settled.sgpCashed}</b>/{settled.sgpDay.length} cashed {settled.activeComboDay ? `on ${settled.activeComboDay.slice(5)}` : ''} · best bats per game
                 </span>
               </h3>
-              <ul className="combo-res" style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <ul className={`combo-res combo-history-list combo-sgp-history ${historyExpanded ? 'show-all' : ''}`} style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {shownSgp.map((s, i) => (
                   <li className={`combo-res-row ${s.allHit ? 'hit' : 'miss'}`} key={`sgp-${s.gamePk}-${s.size}-${i}`} style={{
                     display: 'flex', alignItems: 'center', gap: '12px',
@@ -265,12 +291,14 @@ export default function CombosView({ batters, onSelect, favorConsistency = false
                     border: `1px solid ${s.allHit ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255,255,255,0.04)'}`,
                     padding: '10px 14px', borderRadius: '8px'
                   }}>
-                    <span className="combo-res-badge" style={{ fontSize: '16px' }}>{s.allHit ? '🎯' : `${s.nHit}/${s.size}`}</span>
+                    <span className="combo-res-badge" style={{ fontSize: '16px' }}>{s.allHit ? <Icon name="Check" size={15} /> : `${s.nHit}/${s.size}`}</span>
                     <span className="combo-res-size dim" style={{ fontSize: '11px', width: '74px' }}>{s.size}-leg SGP</span>
                     <span className="combo-res-legs" style={{ fontSize: '12px', flex: '1' }}>
                       {s.legs.map((l, j) => (
-                        <span key={j} style={{ color: l.status === 'hit' ? 'var(--strong)' : l.status === 'live' ? 'var(--accent)' : 'var(--text-dim)', fontWeight: l.status === 'hit' ? '700' : '400' }}>
-                          {l.name} {l.status === 'hit' ? '✅' : l.status === 'live' ? '⏳' : '❌'}{j < s.legs.length - 1 ? ' · ' : ''}
+                        <span key={j} className="combo-leg" style={{ color: l.status === 'hit' ? 'var(--strong)' : l.status === 'live' ? 'var(--accent)' : 'var(--text-dim)', fontWeight: l.status === 'hit' ? '700' : '400' }}>
+                          {l.name}
+                          <Icon className="combo-leg-status" name={l.status === 'hit' ? 'Check' : l.status === 'live' ? 'Clock' : 'X'} size={10} aria-label={l.status} />
+                          {j < s.legs.length - 1 ? <span className="combo-leg-sep">·</span> : null}
                         </span>
                       ))}
                     </span>
@@ -279,11 +307,21 @@ export default function CombosView({ batters, onSelect, favorConsistency = false
               </ul>
             </>
           )}
+          {(shownCombos.length > 6 || shownSgp.length > 8) && (
+            <button
+              className="combo-history-toggle"
+              onClick={() => setHistoryExpanded((open) => !open)}
+              aria-expanded={historyExpanded}
+            >
+              {historyExpanded ? 'Show less' : 'Show all history'}
+              <Icon name={historyExpanded ? 'ChevronUp' : 'ChevronDown'} size={14} />
+            </button>
+          )}
           </>
           )
           })()}
         </section>
-        </>
+        </div>
       ) : (
         <div className="empty-note" style={{ padding: '32px', textAlign: 'center', color: 'var(--text-faint)' }}>No graded combo days yet.</div>
       )}
