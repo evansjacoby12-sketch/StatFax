@@ -1413,19 +1413,23 @@ export function scoreBatter(
   // Cap at 88 instead of 100 so matchup + environment always matter.
   // Even a Judge-level batter (powerBase ~58) + all bonuses maxes around 88,
   // leaving meaningful room for a bad matchup or pitchers-park to pull him down.
-  // ── RECENCY UP-WEIGHT (env-gated, OFF by default) ──────────────────────────
-  // DRAFTED 2026-07-09, NOT yet enabled. The full-feature AUC scan found heat/
-  // recency is the strongest signal the model UNDER-prices: among bats the model
-  // grades EQUALLY, high-heat bats homered +9.2pt (high-score) / +12.6pt (low-
-  // score) — ~2.8σ on 1,062 reconciled bats. This scales the two live-form terms
-  // (hot-ISO surge + recent barrel) so the score leans harder on current form.
-  //
-  // RECENCY_BOOST defaults to 1.0 → batterScore is BYTE-IDENTICAL to before, so
-  // shipping this is a no-op in production. To VALIDATE before enabling, A/B it
-  // on the frozen inputs corpus (CI has it): baseline `npm run lab:score` vs
-  // `RECENCY_BOOST=1.4 npm run lab:score` and compare reconciled AUC/Brier/hit-
-  // rate. Only if it improves, enable in production by setting RECENCY_BOOST on
-  // the slate step in .github/workflows/deploy.yml. Never flip it on unvalidated.
+  // ── RECENCY UP-WEIGHT (env-gated, VALIDATED-NEGATIVE — leave OFF) ───────────
+  // Drafted 2026-07-09 after a coarse-bin AUC scan suggested heat/recency was
+  // UNDER-priced (high-heat bats homered +9.2pt / +12.6pt within score bins).
+  // VALIDATED 2026-07-10 on 6,297 reconciled bats (831 HR) — the finding did NOT
+  // survive finer measurement:
+  //   • A UNIFORM boost DEGRADES ranking: score AUC 0.6986 → falls monotonically
+  //     as recency weight rises (−1.6‰ at the smallest step, −21.6‰ at the top).
+  //   • Score-DECILE lift shows why: recency helps mid-tier bats (D2–D6: +4 to
+  //     +8pt) but REVERSES in the top tier (D8 −10.7pt, D9 −5.9pt, D10 −13.8pt) —
+  //     among elite-score bats, "hot" flags mean-reversion, not upside. The coarse
+  //     LOW/HIGH bins averaged over that reversal, which is what made it look good.
+  //   • A CONDITIONAL (mid-tier-only) boost recovers at most +0.5‰ AUC — ~1/20th
+  //     of a standard error. Noise. Not worth the added complexity.
+  // Conclusion: the composite already captures recency about as well as it should
+  // for ranking. Do NOT enable RECENCY_BOOST. Kept inert (default 1.0 → batterScore
+  // BYTE-IDENTICAL) as a documented dead-end + a hook in case a richer live `heat`
+  // feature ever changes the verdict via a real corpus-joined CI A/B.
   const RECENCY_BOOST = Number(process.env.RECENCY_BOOST) || 1.0;
 
   const batterScore = Math.min(88, Math.max(0,
