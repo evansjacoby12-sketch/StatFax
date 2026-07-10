@@ -120,7 +120,7 @@ export async function fetchRecentBatterBarrels(season, { windowDays = 14, endDat
   const iLA     = header.indexOf('launch_angle');
   if (iBatter < 0 || iEV < 0 || iLA < 0) return out;
 
-  const agg = new Map(); // id -> { bbe, barrels, evSum }
+  const agg = new Map(); // id -> { bbe, barrels, evSum, evs: [] }
   for (const r of rows) {
     const id = Number(r[iBatter]);
     if (!id) continue;
@@ -128,17 +128,24 @@ export async function fetchRecentBatterBarrels(season, { windowDays = 14, endDat
     const la = parseFloat(r[iLA]);
     if (!Number.isFinite(ev)) continue;   // no contact reading → not a true BBE
     let a = agg.get(id);
-    if (!a) { a = { bbe: 0, barrels: 0, evSum: 0 }; agg.set(id, a); }
+    if (!a) { a = { bbe: 0, barrels: 0, evSum: 0, evs: [] }; agg.set(id, a); }
     a.bbe++;
     a.evSum += ev;
+    a.evs.push(ev);
     if (isBarrel(ev, la)) a.barrels++;
   }
 
   for (const [id, a] of agg) {
     if (a.bbe < minBBE) continue;
+    // Robust high-end EV: mean of the 5 hardest batted balls. A single max EV
+    // is one noisy sample; the top-5 mean is a stable "raw-power ceiling" (what
+    // this batter does when he squares one up) and doubles as a recent-form
+    // power read. Falls back to fewer than 5 when the window is thin.
+    const topN = a.evs.slice().sort((x, y) => y - x).slice(0, Math.min(5, a.evs.length));
     out[id] = {
       recentBarrelPct: +(100 * a.barrels / a.bbe).toFixed(1),
       recentEV:        +(a.evSum / a.bbe).toFixed(1),
+      recentEVHi:      +(topN.reduce((s, x) => s + x, 0) / topN.length).toFixed(1),
       recentBBE:       a.bbe,
     };
   }

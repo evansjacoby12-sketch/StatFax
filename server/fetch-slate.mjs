@@ -1390,9 +1390,10 @@ async function fetchSavantBatterStatsAll(year = SEASON) {
           // when squared up" projection needs, distinct from the averages the
           // main score already uses. Not on the percentile endpoint; backfilled
           // from the statcast CSV below (same call that backfills LA + hardHit).
-          maxEV:        null,   // max_hit_speed — top exit velo
+          maxEV:        null,   // max_hit_speed — top exit velo (DISPLAY only; noisy single sample)
           sweetSpotPct: null,   // anglesweetspotpercent — batted balls in the HR launch window
-          hrDistance:   null,   // avg_hr_distance — how far this batter's HRs travel
+          hrDistance:   null,   // avg_hr_distance — how far this batter's HRs travel (DISPLAY only)
+          bbe:          null,   // season batted-ball events (sample size for the ceiling)
         };
       }
       if (Object.keys(out).length) {
@@ -1422,6 +1423,7 @@ async function fetchSavantBatterStatsAll(year = SEASON) {
             if (out[id].maxEV == null)        out[id].maxEV        = pf(p.max_hit_speed);
             if (out[id].sweetSpotPct == null) out[id].sweetSpotPct = pf(p.anglesweetspotpercent);
             if (out[id].hrDistance == null)   out[id].hrDistance   = pf(p.avg_hr_distance);
+            if (out[id].bbe == null)          out[id].bbe          = pf(p.attempts);
           }
         } catch { /* leaderboard backfill is best-effort */ }
         return out;
@@ -1468,6 +1470,7 @@ async function fetchSavantBatterStatsAll(year = SEASON) {
         maxEV:        pf(p.max_hit_speed),
         sweetSpotPct: pf(p.anglesweetspotpercent),
         hrDistance:   pf(p.avg_hr_distance),
+        bbe:          attempts,
       };
     }
     for (const p of xRows) {
@@ -1481,7 +1484,7 @@ async function fetchSavantBatterStatsAll(year = SEASON) {
           exitVelo: null, hardHitPct: null, barrelPct: null,
           launchAngle: null, whiffPct: null, pullPct: null,
           izContactPct: null, xSlg,
-          maxEV: null, sweetSpotPct: null, hrDistance: null,
+          maxEV: null, sweetSpotPct: null, hrDistance: null, bbe: null,
         };
       }
     }
@@ -3350,6 +3353,7 @@ async function main() {
           maxEV:        savantStats?.maxEV        ?? null,
           sweetSpotPct: savantStats?.sweetSpotPct ?? null,
           hrDistance:   savantStats?.hrDistance   ?? null,
+          seasonBBE:    savantStats?.bbe          ?? null,   // ceiling sample size
           // Primary-pitch edge (derived above) — compact "does this batter
           // mash the pitcher's bread-and-butter?" signal for Heat Index.
           // Null when we don't have both arsenals to compute it.

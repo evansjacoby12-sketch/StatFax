@@ -137,9 +137,13 @@ export function extractPredictionRecord(row) {
     // barrelScore/formScore ceiling metrics can be forward-validated by
     // shortlist hit-rate (see model-lab/validate-ceil.mjs) before anything
     // built on them ships. Advisory only — none of these feed the HR score.
-    mxev: num(row.maxEV),                         // max exit velo
+    mxev: num(row.maxEV),                         // max exit velo (display/noisy — not in composite)
+    evhi: num(row.recentBarrel?.recentEVHi),      // robust high-end EV: mean of 5 hardest recent balls
     ss:   num(row.sweetSpotPct),                  // sweet-spot%
-    hrd:  num(row.hrDistance),                    // avg HR distance
+    rev:  num(row.recentBarrel?.recentEV),        // recent avg EV (form input)
+    hrd:  num(row.hrDistance),                    // avg HR distance (descriptive only)
+    bbe:  num(row.seasonBBE),                     // season batted-ball events (ceiling sample size)
+    rbbe: num(row.recentBarrel?.recentBBE),       // recent BBE (form sample size)
     ceil: num(row.ceilScore),                     // barrelScore ceiling 0-100
     form: num(row.formScore),                     // formScore 0-100
     phr9: num(ps?.hrPer9 ?? ps?.hr9),             // opposing starter HR/9

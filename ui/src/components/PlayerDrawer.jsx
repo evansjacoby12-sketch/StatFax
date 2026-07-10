@@ -405,13 +405,11 @@ function BetaCeiling({ b }) {
         {big('Ceiling', ceil)}
         {big('Form', form)}
       </div>
-      {(b.maxEV != null || b.sweetSpotPct != null || b.hrDistance != null) && (
-        <>
-          {b.maxEV != null      && <KV k="Max exit velo"  v={`${b.maxEV.toFixed(1)} mph`} />}
-          {b.sweetSpotPct != null && <KV k="Sweet-spot %" v={`${b.sweetSpotPct.toFixed(1)}%`} />}
-          {b.hrDistance != null && <KV k="Avg HR distance" v={`${Math.round(b.hrDistance)} ft`} />}
-        </>
-      )}
+      {b.recentBarrel?.recentEVHi != null && <KV k="Top-5 EV (robust)" v={`${b.recentBarrel.recentEVHi.toFixed(1)} mph`} accent="var(--strong)" />}
+      {b.sweetSpotPct != null && <KV k="Sweet-spot %" v={`${b.sweetSpotPct.toFixed(1)}%`} />}
+      {b.hardHitPct != null   && <KV k="Hard-hit %" v={`${b.hardHitPct.toFixed(1)}%`} />}
+      {b.maxEV != null      && <KV k="Peak EV (display)"   v={`${b.maxEV.toFixed(1)} mph`} />}
+      {b.hrDistance != null && <KV k="Avg HR distance (display)" v={`${Math.round(b.hrDistance)} ft`} />}
       {ceil == null && (
         <p style={{ fontSize: 11, color: 'var(--text-faint)', margin: '8px 0 0' }}>
           No ceiling data on this row yet — populates on the next slate rebuild.

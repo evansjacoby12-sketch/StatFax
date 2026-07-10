@@ -110,18 +110,24 @@ export const SHALLOW_FEATURE_NAMES = ['score', ...BADGE_KEYS.map(k=>`badge_${k}`
 
 // ── Rich stacker feature schema ───────────────────────────────────────────────
 // Raw signals only — no rule-model sub-scores (bs/ms/es create double-counting
-// and add 36% structural nulls from early log entries that lacked sub-scores).
-// hh (hard-hit%) is 100% null in the current log — omitted entirely.
-// vig (Vegas prob) is 98% null — omitted until odds API is live.
-// Missingness indicators for features with >40% null rates so the model knows
+// and add 36% structural nulls from early log entries that lacked sub-scores),
+// and NO ceiling/form COMPOSITES (ceil/form) — we feed their raw ingredients
+// instead so the stacker learns the weighting rather than trusting a hand-built
+// score. vig (Vegas prob) is 98% null — omitted until odds API is live.
+// Missingness indicators for features with high null rates so the model knows
 // when a value is imputed vs. observed.
 const RAW_FEAT_KEYS = [
   'iso', 'xiso', 'brl', 'rbrl', 'ev', 'la',
   'phr9', 'pera', 'pk9', 'vdel', 'csw',
   'park', 'ord', 'hot', 'due',
+  // Ceiling/form raw ingredients — INSTRUMENTED 2026-07-10. ~100% null until a
+  // week of slates accrue, at which point fitTransform (impute-to-mean + z-score,
+  // std||1) auto-activates them with no code change. hh was historically null
+  // but is now fetched, so it re-enters here too.
+  'hh', 'ss', 'evhi', 'rev',
 ];
-// These four each have ~56% null rate → add _miss indicator
-const MISS_KEYS = ['xiso', 'brl', 'ev', 'la'];
+// High null-rate columns → add _miss indicator (imputed-vs-observed flag).
+const MISS_KEYS = ['xiso', 'brl', 'ev', 'la', 'hh', 'ss', 'evhi', 'rev'];
 
 export const RICH_FEATURE_NAMES = [
   'score_norm',           // rule model composite — one of many inputs, not a dominant one

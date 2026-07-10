@@ -29,15 +29,33 @@ const unit = (x, lo, hi) => {
 // Anchors centered so the LEAGUE-AVERAGE value maps to ~0.5 (lo/hi straddle the
 // MLB mean), elite tops out near 1.0, below-replacement floors near 0 → the
 // composite reads ~50 avg / ~95 elite / ~10 weak.
+//
+// Design notes (per the 2026-07-10 model review):
+//  • maxEV is a SINGLE noisy batted ball → NOT in the composite. We use a robust
+//    high-end EV instead: recentBarrel.recentEVHi = mean of the 5 hardest recent
+//    balls (statcastRecent.mjs). maxEV stays on the row for DISPLAY only.
+//  • avg HR distance is conditional on already homering (survivorship + tiny
+//    sample) → DISPLAY only, dropped from the composite.
+//  • sweet-spot × hard-contact is the headline term (repeatable HR-friendly
+//    launch AT real impact) — handled specially below as a geometric mean.
 const CEIL_TERMS = [
-  { key: 'maxEV',        w: 1.4, lo: 103,   hi: 115,   get: b => b?.maxEV },              // mph (avg ~109)
-  { key: 'barrelPctBBE', w: 1.3, lo: 3,     hi: 13,    get: b => b?.barrelPctBBE },       // %   (avg ~8)
-  { key: 'xISO',         w: 1.1, lo: 0.080, hi: 0.240, get: b => b?.xStats?.xISO },       // pts (avg ~.160)
-  { key: 'hrDistance',   w: 1.0, lo: 385,   hi: 415,   get: b => b?.hrDistance },         // ft  (avg ~400)
+  { key: 'barrelPctBBE', w: 1.3, lo: 3,     hi: 13,    get: b => b?.barrelPctBBE },          // % (avg ~8)
+  { key: 'xISO',         w: 1.1, lo: 0.080, hi: 0.240, get: b => b?.xStats?.xISO },          // pts (avg ~.160)
+  { key: 'recentEVHi',   w: 1.0, lo: 100,   hi: 111,   get: b => b?.recentBarrel?.recentEVHi }, // mph, top-5 mean
   { key: 'blastPct',     w: 0.9, lo: 6,     hi: 20,    get: b => b?.batTracking?.blastPct }, // % (avg ~13)
-  { key: 'sweetSpotPct', w: 0.8, lo: 27,    hi: 39,    get: b => b?.sweetSpotPct },       // %   (avg ~33)
-  { key: 'hardHitPct',   w: 0.7, lo: 30,    hi: 50,    get: b => b?.hardHitPct },         // %   (avg ~40)
 ];
+
+// Headline term: sweet-spot% × hard-hit% as a geometric mean of their units, so
+// BOTH must be high (repeatable HR launch angle AND hard contact) to score well.
+// Partial credit (lower weight) when only one of the two is present.
+function ssHardTerm(b) {
+  const ss = unit(b?.sweetSpotPct, 27, 39);
+  const hh = unit(b?.hardHitPct, 30, 50);
+  if (ss != null && hh != null) return { u: Math.sqrt(ss * hh), w: 1.5 };
+  if (ss != null) return { u: ss, w: 0.8 };
+  if (hh != null) return { u: hh, w: 0.8 };
+  return null;
+}
 
 /**
  * Ceiling score 0-100 (~50 avg, 75+ strong, 85+ elite). Null if <3 inputs known.
@@ -45,6 +63,8 @@ const CEIL_TERMS = [
  */
 export function barrelScore(b) {
   let sw = 0, acc = 0, n = 0;
+  const ssh = ssHardTerm(b);
+  if (ssh) { acc += ssh.u * ssh.w; sw += ssh.w; n++; }
   for (const t of CEIL_TERMS) {
     const u = unit(t.get(b), t.lo, t.hi);
     if (u == null) continue;
