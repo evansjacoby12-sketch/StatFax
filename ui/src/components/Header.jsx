@@ -33,7 +33,7 @@ function FirstPitchCountdown({ games = [] }) {
 }
 
 // Help dropdown anchored to the header info button
-function HelpMenu({ onOpenWeather, onOpenBuilder, onOpenGroups, onOpenSGP, onOpenSplits, onOpenBacktest, onOpenListBuilder, onOpenGuide, onOpenHowTo, onOpenLegend, onOpenSettings }) {
+function HelpMenu({ onOpenWeather, onOpenBuilder, onOpenGroups, onOpenSGP, onOpenSplits, onOpenBacktest, onOpenListBuilder, onOpenGuide, onOpenHowTo, onOpenLegend, onOpenSettings, onOpenModel, liveScores, onToggleLive, eliLevel, onCycleEli, refreshing, onRefresh }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
   
@@ -82,6 +82,10 @@ function HelpMenu({ onOpenWeather, onOpenBuilder, onOpenGroups, onOpenSGP, onOpe
     {
       title: 'App',
       items: [
+        { label: 'Model Performance', desc: 'Accuracy, calibration and recent results', icon: 'Gauge', fn: onOpenModel, mobileOnly: true },
+        { label: liveScores ? 'Live Scores On' : 'Pregame View', desc: liveScores ? 'Tap to pause live scores and innings' : 'Tap to enable live scores and innings', icon: liveScores ? 'Activity' : 'Clock', fn: onToggleLive, mobileOnly: true },
+        { label: eliLevel === 'eli5' ? 'Plain Explanations' : 'Stats Explanations', desc: 'Switch explanation depth', icon: eliLevel === 'eli5' ? 'Sparkles' : 'BarChart3', fn: onCycleEli, mobileOnly: true },
+        { label: refreshing ? 'Refreshing Slate…' : 'Refresh Slate', desc: 'Reload the latest model board', icon: refreshing ? 'Loader' : 'RefreshCw', fn: onRefresh, mobileOnly: true },
         { label: 'Settings', desc: 'Live updates, refresh rate, combo window', icon: 'SlidersHorizontal', fn: onOpenSettings },
       ],
     },
@@ -94,14 +98,15 @@ function HelpMenu({ onOpenWeather, onOpenBuilder, onOpenGroups, onOpenSGP, onOpe
         onClick={() => setOpen((o) => !o)}
         aria-haspopup="menu"
         aria-expanded={open}
-        title="Help & Tools Menu"
-        aria-label="Help"
+        title="Menu"
+        aria-label="Menu"
         style={{
           background: open ? 'var(--hover)' : 'var(--card)',
           borderColor: open ? 'var(--accent)' : 'var(--border)'
         }}
       >
-        <Icon name="ChevronDown" size={16} style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+        <Icon name="ChevronDown" size={16} className="help-chevron" style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+        <Icon name="Ellipsis" size={18} className="help-ellipsis" />
       </button>
       {open && (
         <div className="view-menu-pop" role="menu">
@@ -126,11 +131,12 @@ function HelpMenu({ onOpenWeather, onOpenBuilder, onOpenGroups, onOpenSGP, onOpe
                 <button
                   key={it.label}
                   role="menuitem"
-                  className="vm-item"
+                  className={`vm-item${it.mobileOnly ? ' mobile-menu-only' : ''}`}
                   onClick={() => {
-                    it.fn()
+                    it.fn?.()
                     setOpen(false)
                   }}
+                  disabled={it.mobileOnly && it.label.startsWith('Refreshing')}
                 >
                   <div className="vm-icon-box">
                     <Icon name={it.icon} size={15} />
@@ -336,7 +342,26 @@ export default function Header({
           <Icon name={eliLevel === 'eli5' ? 'Sparkles' : 'BarChart3'} size={14} style={{ color: 'var(--accent)' }} />
         </button>
 
-        <HelpMenu onOpenWeather={onOpenWeather} onOpenBuilder={onOpenBuilder} onOpenGroups={onOpenGroups} onOpenSGP={onOpenSGP} onOpenSplits={onOpenSplits} onOpenBacktest={onOpenBacktest} onOpenListBuilder={onOpenListBuilder} onOpenGuide={onOpenGuide} onOpenHowTo={onOpenHowTo} onOpenLegend={onOpenLegend} onOpenSettings={onOpenSettings} />
+        <HelpMenu
+          onOpenWeather={onOpenWeather}
+          onOpenBuilder={onOpenBuilder}
+          onOpenGroups={onOpenGroups}
+          onOpenSGP={onOpenSGP}
+          onOpenSplits={onOpenSplits}
+          onOpenBacktest={onOpenBacktest}
+          onOpenListBuilder={onOpenListBuilder}
+          onOpenGuide={onOpenGuide}
+          onOpenHowTo={onOpenHowTo}
+          onOpenLegend={onOpenLegend}
+          onOpenSettings={onOpenSettings}
+          onOpenModel={onOpenModel}
+          liveScores={liveScores}
+          onToggleLive={onToggleLive}
+          eliLevel={eliLevel}
+          onCycleEli={onCycleEli}
+          refreshing={refreshing}
+          onRefresh={handleRefreshClick}
+        />
 
         <button
           className={`icon-btn ${refreshing ? 'refreshing' : ''} ${holding ? 'holding' : ''}`}

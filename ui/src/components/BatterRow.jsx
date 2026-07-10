@@ -2,7 +2,7 @@ import Icon from './Icon.jsx'
 import { GradeChip, ProbRing, BadgeRow } from './atoms.jsx'
 import { pct, num, signedPct, american, ordinal } from '../lib/format.js'
 import { gradeColor } from '../lib/badges.js'
-import { teamLogo } from '../lib/teams.js'
+import { teamLogo, playerHeadshot } from '../lib/teams.js'
 import { useLiveMode } from '../lib/liveMode.js'
 import { useExplain } from '../lib/explain.js'
 import { useState } from 'react'
@@ -51,29 +51,89 @@ export default function BatterRow({
   const air = Number.isFinite(b.parkWeatherHandFactor) ? b.parkWeatherHandFactor : null
   const airTone = air == null ? null : air >= 1.05 ? 'good' : air <= 0.95 ? 'bad' : 'mut'
 
-  const { innerRef, leftRef, rightRef, swipedRef, onPointerDown } = useSwipeActions({
+  const mobileSwipe = useSwipeActions({
     onRight: () => onToggleWatch?.(b),
     onLeft: () => onToggleSlip?.(b),
   })
 
+  const strongestSignal = pmScore >= 7
+    ? { label: `Pitch ${pmScore.toFixed(1)}`, tone: 'good', icon: 'Target' }
+    : dueSetup.n >= 4
+      ? { label: `Due ${dueSetup.n}/${dueSetup.checks.length}`, tone: 'warn', icon: 'Hourglass' }
+      : airTone === 'good'
+        ? { label: `Air ${signedPct(air - 1, 0)}`, tone: 'good', icon: 'Wind' }
+        : mom
+          ? { label: mom.label, tone: mom.cls, icon: mom.icon }
+          : null
+
   return (
     <div className="board-swipe" data-flip-id={b.id}>
       <div className="board-swipe-actions" aria-hidden="true">
-        <span ref={leftRef} className={`bsa bsa-watch ${watched ? 'on' : ''}`}>
+        <span ref={mobileSwipe.leftRef} className={`bsa bsa-watch ${watched ? 'on' : ''}`}>
           <Icon name="Star" size={16} />
         </span>
-        <span ref={rightRef} className={`bsa bsa-slip ${inSlip ? 'on' : ''}`}>
+        <span ref={mobileSwipe.rightRef} className={`bsa bsa-slip ${inSlip ? 'on' : ''}`}>
           <Icon name={inSlip ? 'Check' : 'Plus'} size={16} />
         </span>
       </div>
       <div
-        ref={innerRef}
+        ref={mobileSwipe.innerRef}
+        className={`mobile-board-row ${selected ? 'selected' : ''} ${isFinal ? 'final' : ''} row-grade-${g.toLowerCase()}`}
+        role="button"
+        tabIndex={0}
+        onPointerDown={mobileSwipe.onPointerDown}
+        onClick={() => {
+          if (mobileSwipe.swipedRef.current) return
+          onSelect(b)
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            onSelect(b)
+          }
+        }}
+        style={{ '--mobile-row-color': color }}
+      >
+        <span className={`mobile-board-rank mono${rank <= 3 ? ` rank-medal rank-${rank}` : ''}`}>{rank}</span>
+        <span className="mobile-board-avatar-wrap">
+          <img className="mobile-board-avatar" src={playerHeadshot(b.playerId, 96)} alt="" loading="lazy" />
+          <span className={`mobile-lineup-dot${b.lineupConfirmed ? ' confirmed' : ''}`} title={b.lineupConfirmed ? 'Confirmed lineup' : 'Projected lineup'} />
+        </span>
+        <span className="mobile-board-main">
+          <span className="mobile-board-name-line">
+            <strong title={b.name}>{b.name}</strong>
+            <small>{b.batSide}</small>
+            {b.battingOrder && <small className="mono">#{b.battingOrder}</small>}
+            {mom && <span className={`mobile-momentum ${mom.cls}`}><Icon name={mom.icon} size={10} />{mom.label}</span>}
+          </span>
+          <span className="mobile-board-matchup">
+            <b>{b.team}</b><span>{b.opponent?.abbr || '—'}</span><span>vs</span>
+            {canOpenPitcher ? (
+              <button onClick={(e) => { e.stopPropagation(); onOpenPitcher(b.pitcher.id, b.gamePk) }}>{b.pitcher.name}</button>
+            ) : <span>{b.pitcher?.name || 'TBD'}</span>}
+          </span>
+          <span className="mobile-board-tags">
+            <GradeChip grade={b.grade} size="sm" score={b.score} />
+            {strongestSignal && (
+              <span className={`mobile-board-signal ${strongestSignal.tone}`}>
+                <Icon name={strongestSignal.icon} size={10} />{strongestSignal.label}
+              </span>
+            )}
+          </span>
+        </span>
+        <span className="mobile-board-prob"><b className="mono">{pct(b.hrProbability, 1)}</b><small>HR PROB</small></span>
+        <button className={`mobile-board-action${watched ? ' on watch' : ''}`} onClick={stop(onToggleWatch)} aria-label={watched ? `Remove ${b.name} from watchlist` : `Watch ${b.name}`}>
+          <Icon name="Star" size={17} style={{ fill: watched ? 'currentColor' : 'none' }} />
+        </button>
+        <button className={`mobile-board-action${inSlip ? ' on slip' : ''}`} onClick={stop(onToggleSlip)} aria-label={inSlip ? `Remove ${b.name} from parlay` : `Add ${b.name} to parlay`}>
+          <Icon name={inSlip ? 'Check' : 'Plus'} size={18} />
+        </button>
+      </div>
+      <div
         className={`board-row ${selected ? 'selected' : ''} ${isFinal ? 'final' : ''} ${b.precision ? 'row-precision' : ''} row-grade-${g.toLowerCase()}`}
         role="button"
         tabIndex={0}
-        onPointerDown={onPointerDown}
         onClick={() => {
-          if (swipedRef.current) return
           onSelect(b)
         }}
         onKeyDown={(e) => {

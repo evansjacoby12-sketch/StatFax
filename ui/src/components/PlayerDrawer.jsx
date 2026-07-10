@@ -2,7 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Icon from './Icon.jsx'
 import { GradeChip, BadgeRow, KV, hexA, ScoreRing } from './atoms.jsx'
-import { eli5IconName, toneColor, gradeColor } from '../lib/badges.js'
+import { activeBadges, eli5IconName, toneColor, gradeColor } from '../lib/badges.js'
 import { pct, rate, num, signedPct, american, decimalToAmerican, ordinal } from '../lib/format.js'
 import { bookLabel } from '../lib/data.js'
 import { compass, skyLabel } from '../lib/weather.js'
@@ -163,6 +163,10 @@ const TABS = [
 ]
 
 function TabBar({ active, onChange }) {
+  const [mobileMoreOpen, setMobileMoreOpen] = useState(false)
+  const primaryTabs = TABS.slice(0, 3)
+  const moreTabs = TABS.slice(3)
+  const moreActive = moreTabs.some((t) => t.id === active)
   // Sliding underline: one absolute bar measured off the active tab so it
   // glides between tabs (same motion language as the board's view toggle).
   const wrapRef = useRef(null)
@@ -186,17 +190,66 @@ function TabBar({ active, onChange }) {
     return () => ro.disconnect()
   }, [active])
   return (
-    <div className="drawer-tabs" ref={wrapRef}>
-      <span className="drawer-tab-ind" ref={indRef} aria-hidden="true" />
-      {TABS.map(t => (
-        <button
-          key={t.id}
-          data-tab={t.id}
-          className={`drawer-tab ${active === t.id ? 'active' : ''}`}
-          onClick={() => onChange(t.id)}
-        >{t.label}</button>
-      ))}
-    </div>
+    <>
+      <div className="drawer-tabs desktop-drawer-tabs" ref={wrapRef}>
+        <span className="drawer-tab-ind" ref={indRef} aria-hidden="true" />
+        {TABS.map(t => (
+          <button
+            key={t.id}
+            data-tab={t.id}
+            className={`drawer-tab ${active === t.id ? 'active' : ''}`}
+            onClick={() => onChange(t.id)}
+          >{t.label}</button>
+        ))}
+      </div>
+      <div className="mobile-drawer-tabs" role="tablist" aria-label="Player detail sections">
+        {primaryTabs.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={active === t.id}
+            className={`mobile-drawer-tab${active === t.id ? ' active' : ''}`}
+            onClick={() => {
+              setMobileMoreOpen(false)
+              onChange(t.id)
+            }}
+          >
+            {t.label}
+          </button>
+        ))}
+        <div className="mobile-tab-more">
+          <button
+            type="button"
+            className={`mobile-drawer-tab mobile-more-trigger${moreActive ? ' active' : ''}`}
+            onClick={() => setMobileMoreOpen((open) => !open)}
+            aria-haspopup="menu"
+            aria-expanded={mobileMoreOpen}
+          >
+            More · 4 <Icon name="ChevronDown" size={11} />
+          </button>
+          {mobileMoreOpen && (
+            <div className="mobile-tab-menu" role="menu">
+              {moreTabs.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  role="menuitem"
+                  className={active === t.id ? 'active' : ''}
+                  onClick={() => {
+                    onChange(t.id)
+                    setMobileMoreOpen(false)
+                  }}
+                >
+                  <span>{t.label}</span>
+                  {active === t.id && <Icon name="Check" size={13} />}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </>
   )
 }
 
@@ -247,6 +300,7 @@ export default function PlayerDrawer({ batter: b, batters, onClose, watched, inS
         ref={trapRef}
       >
         <button className="drawer-grab" onClick={onClose} aria-label="Close" title="Close" />
+        <MobileDrawerHeader b={b} color={color} onClose={onClose} watched={watched} inSlip={inSlip} onToggleWatch={onToggleWatch} onToggleSlip={onToggleSlip} />
         <DrawerHeader b={b} color={color} onClose={onClose} watched={watched} inSlip={inSlip} onToggleWatch={onToggleWatch} onToggleSlip={onToggleSlip} />
         <TabBar active={tab} onChange={setTab} />
         {/* key={tab} remounts the pane on tab change so the section-stagger
@@ -634,6 +688,79 @@ function DrawerHeader({ b, color, onClose, watched, inSlip, onToggleWatch, onTog
   )
 }
 
+function MobileDrawerHeader({ b, color, onClose, watched, inSlip, onToggleWatch, onToggleSlip }) {
+  const allSignals = activeBadges(b)
+  const shownSignals = allSignals.slice(0, 3)
+  const signalOverflow = Math.max(0, allSignals.length - shownSignals.length)
+  const market = b.vegasImpliedProb
+  const hasMarket = Number.isFinite(market)
+  const edge = hasMarket && Number.isFinite(b.hrProbability) ? b.hrProbability - market : null
+
+  const share = () => {
+    toast.info('Rendering card…', 1500)
+    sharePickCard(b)
+      .then((how) => { if (how !== 'cancelled') toast.success(how === 'shared' ? 'Card shared' : 'Card downloaded') })
+      .catch(() => toast.warn("Couldn't render the card"))
+  }
+
+  return (
+    <div className="mobile-player-head" style={{ '--player-accent': color }}>
+      <div className="mobile-player-identity">
+        <img className="mobile-player-avatar" src={playerHeadshot(b.playerId, 120)} alt={b.name} />
+        <div className="mobile-player-who">
+          <div className="mobile-player-name-line">
+            <strong>{b.name}</strong>
+            <span>{b.batSide}HB</span>
+          </div>
+          <div className="mobile-player-matchup">
+            <b>{b.team}</b><span>› {b.opponent?.abbr || b.opponent?.name || '—'}</span><span>· vs {b.pitcher?.name || 'TBD'}</span>
+          </div>
+          <div className="mobile-player-chips">
+            <GradeChip grade={b.grade} size="sm" score={b.score} />
+            {b.hot && <span className="mobile-player-hot"><Icon name="Flame" size={9} /> Hot</span>}
+          </div>
+        </div>
+        <div className="mobile-player-prob">
+          <b className="mono">{pct(b.hrProbability, 1)}</b>
+          <small>HR PROB</small>
+        </div>
+        <button className="mobile-player-close" onClick={onClose} aria-label="Close player details">
+          <Icon name="X" size={17} />
+        </button>
+      </div>
+
+      <div className="mobile-player-metrics">
+        <span><small>Score</small><b className="mono">{Math.round(b.score ?? 0)}</b></span>
+        <span><small>xHR</small><b className="mono">{num(b.expectedHRs, 3)}</b></span>
+        <span><small>{hasMarket ? 'Market' : 'Sim'}</small><b className="mono">{hasMarket ? pct(market, 1) : pct(b.simHRProb, 1)}</b></span>
+        <span><small>{hasMarket ? 'Edge' : 'Ens'}</small><b className={`mono${edge != null && edge >= 0 ? ' good' : edge != null ? ' bad' : ''}`}>{hasMarket ? signedPct(edge, 1) : num(b.ensembleScore)}</b></span>
+      </div>
+
+      <div className="mobile-player-signals" aria-label="Top player signals">
+        {shownSignals.map((signal) => (
+          <span key={signal.key} style={{ '--signal-color': signal.color }}>
+            <i />{signal.label}
+          </span>
+        ))}
+        {signalOverflow > 0 && <span className="more">+{signalOverflow}</span>}
+      </div>
+
+      <div className="mobile-player-actions">
+        <button className={`mobile-player-add${inSlip ? ' on' : ''}`} onClick={() => onToggleSlip(b)}>
+          <Icon name={inSlip ? 'Check' : 'Plus'} size={15} />
+          {inSlip ? 'In parlay' : 'Add to parlay'}
+        </button>
+        <button className={`mobile-player-icon-action${watched ? ' on' : ''}`} onClick={() => onToggleWatch(b)} aria-label={watched ? `Stop watching ${b.name}` : `Watch ${b.name}`}>
+          <Icon name="Star" size={16} style={{ fill: watched ? 'currentColor' : 'none' }} />
+        </button>
+        <button className="mobile-player-icon-action" onClick={share} aria-label={`Share ${b.name} pick`}>
+          <Icon name="Share2" size={16} />
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ---------------------------------------------------------------------------
 // HeroNumbers (Overview tab)
 // ---------------------------------------------------------------------------
@@ -655,7 +782,7 @@ function HeroNumbers({ b, color }) {
   const shownProb = useCountUp(b.hrProbability)
   const shownScore = useCountUp(b.score ?? 0)
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', rowGap: '10px', flexWrap: 'wrap', padding: '12px 16px', marginBottom: '16px', borderRadius: '12px', border: `1px solid ${hexA(color, 0.25)}`, background: `linear-gradient(135deg, ${hexA(color, 0.07)} 0%, rgba(255,255,255,0.01) 100%)` }}>
+    <div className="player-hero-numbers" style={{ display: 'flex', alignItems: 'center', gap: '16px', rowGap: '10px', flexWrap: 'wrap', padding: '12px 16px', marginBottom: '16px', borderRadius: '12px', border: `1px solid ${hexA(color, 0.25)}`, background: `linear-gradient(135deg, ${hexA(color, 0.07)} 0%, rgba(255,255,255,0.01) 100%)` }}>
       <div title={`raw score ${num(b.rawScore)}`}>
         <div style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-dim)', marginBottom: '3px' }}>HR Probability</div>
         <div style={{ color, fontSize: '27px', fontWeight: '800', lineHeight: 1, fontFamily: 'var(--mono)' }}>{pct(shownProb, 2)}</div>
@@ -692,7 +819,7 @@ function PillarBar({ label, value, hint }) {
   const v = Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : null
   const tone = v == null ? '' : v >= 67 ? 'good' : v >= 45 ? 'mid' : 'bad'
   return (
-    <div title={hint} style={{ marginBottom: '10px' }}>
+    <div className="pm-pillar" title={hint} style={{ marginBottom: '10px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
         <span style={{ color: 'var(--text-dim)' }}>{label}</span>
         <span style={{ fontWeight: '700', fontFamily: 'var(--mono)' }}>{v == null ? '—' : Math.round(v)}</span>
@@ -717,8 +844,8 @@ function PlateMatchup({ b, onOpenZone }) {
     { label: 'Pitcher', icon: 'Shield', go: jump('sec-pitcher') },
   ]
   return (
-    <section style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+    <section className="plate-matchup-card" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
+      <div className="pm-card-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
         <span style={{ fontSize: '12px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-dim)', display: 'flex', alignItems: 'center', gap: '6px' }}>
           <Icon name="Target" size={14} /> Plate Matchup
         </span>
@@ -726,19 +853,19 @@ function PlateMatchup({ b, onOpenZone }) {
           <Icon name="Zap" size={10} /> HR Signal
         </span>
       </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', borderRadius: '8px', marginBottom: '14px', background: pm.tone === 'good' ? 'rgba(16,185,129,0.05)' : pm.tone === 'bad' ? 'rgba(239,68,68,0.05)' : 'rgba(255,255,255,0.02)', border: `1px solid ${pm.tone === 'good' ? 'rgba(16,185,129,0.15)' : pm.tone === 'bad' ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.04)'}` }}>
+      <div className="pm-verdict-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', borderRadius: '8px', marginBottom: '14px', background: pm.tone === 'good' ? 'rgba(16,185,129,0.05)' : pm.tone === 'bad' ? 'rgba(239,68,68,0.05)' : 'rgba(255,255,255,0.02)', border: `1px solid ${pm.tone === 'good' ? 'rgba(16,185,129,0.15)' : pm.tone === 'bad' ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.04)'}` }}>
         <div>
           <span style={{ fontSize: '15px', fontWeight: '800', color: '#fff', display: 'block' }}>{pm.verdict}</span>
           <span style={{ fontSize: '11px', color: 'var(--text-dim)' }}>batter vs {b.pitcher?.name || 'TBD'}</span>
         </div>
         <span style={{ fontSize: '20px', fontWeight: '800', fontFamily: 'var(--mono)', color: pm.tone === 'good' ? 'var(--strong)' : pm.tone === 'bad' ? 'var(--bad)' : '#fff' }}>{pm.lean > 0 ? '+' : ''}{pm.lean}</span>
       </div>
-      <div style={{ marginBottom: '14px' }}>
+      <div className="pm-pillars" style={{ marginBottom: '14px' }}>
         <PillarBar label="Bat threat" value={b.batterScore} hint="Hitter's own HR threat." />
         <PillarBar label="Matchup fit" value={b.matchupScore} hint="This batter vs this starter." />
         <PillarBar label="Park / Weather" value={b.envScore} hint="Venue HR factors." />
       </div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '14px' }}>
+      <div className="pm-chip-row" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '14px' }}>
         {Number.isFinite(blast) && (
           <span className={`pm-chip ${blast >= LG_BLAST ? 'good' : ''}`}>
             <Icon name="Zap" size={10} /> Blast {num(blast, 0)}%
@@ -748,7 +875,7 @@ function PlateMatchup({ b, onOpenZone }) {
         {Number.isFinite(barrel) && <span className={`pm-chip ${barrel >= LG_BARREL ? 'good' : ''}`}><Icon name="Crosshair" size={10} /> Barrel {num(barrel, 0)}%</span>}
         {Number.isFinite(hr9) && <span className={`pm-chip ${hr9 >= LG_HR9 ? 'good' : 'bad'}`}><Icon name="Flame" size={10} /> Arm {num(hr9, 2)} HR/9</span>}
       </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', borderTop: '1px solid rgba(255,255,255,0.04)', paddingTop: '12px' }}>
+      <div className="pm-card-foot" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', borderTop: '1px solid rgba(255,255,255,0.04)', paddingTop: '12px' }}>
         <span style={{ fontSize: '11px', color: 'var(--text-dim)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
           <Icon name="List" size={11} />
           {slot ? <> Batting <b>{ordinal(slot)}</b></> : <> Lineup <b>{b.lineupConfirmed ? 'set' : 'projected'}</b></>}
@@ -780,13 +907,13 @@ function ScoutReport({ b }) {
   if (b.batterScore == null && b.matchupScore == null) return null
   const grades = toolGrades(b)
   return (
-    <Section title="Scout report" icon="Crosshair">
-      <div style={{ fontSize: '14px', fontWeight: '600', color: '#fff', marginBottom: '14px', lineHeight: '1.4' }}>{scoutVerdict(b)}</div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+    <Section title="Why this play" icon="Crosshair" className="scout-report-card">
+      <div className="scout-verdict" style={{ fontSize: '14px', fontWeight: '600', color: '#fff', marginBottom: '14px', lineHeight: '1.4' }}>{scoutVerdict(b)}</div>
+      <div className="scout-tool-list" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
         {SCOUT_TOOLS.map(t => {
           const gv = grades[t.key]
           return (
-            <div key={t.key} title={`${t.label} grade ${gv}/80`}>
+            <div className="scout-tool-row" key={t.key} title={`${t.label} grade ${gv}/80`}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
                 <span style={{ color: 'var(--text-dim)' }}>{t.label}</span>
                 <span style={{ color: t.color, fontWeight: '700', fontFamily: 'var(--mono)' }}>{gv}<span style={{ fontSize: '10px', color: 'var(--text-faint)' }}> · {gradeLabel(gv)}</span></span>
@@ -1852,9 +1979,9 @@ function SplitChips({ b }) {
 // Utility components
 // ---------------------------------------------------------------------------
 
-function Section({ title, icon, children, id }) {
+function Section({ title, icon, children, id, className = '' }) {
   return (
-    <section id={id} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
+    <section id={id} className={`drawer-section-card${className ? ` ${className}` : ''}`} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
       <h3 style={{ fontSize: '12px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-dim)', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '14px', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: '8px' }}>
         <Icon name={icon} size={14} style={{ color: 'var(--accent)' }} /> {title}
       </h3>

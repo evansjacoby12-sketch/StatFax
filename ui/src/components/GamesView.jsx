@@ -174,6 +174,10 @@ export default function GamesView({ games, batters, onSelect, selectedId, watchl
   const ctx = { onSelect, selectedId, watchlist, slip, onToggleWatch, onToggleSlip, onOpenPitcher }
   const god = computeGameOfDay(batters)
   const [view, setView] = useState('extractor')
+  const topTargets = [...batters]
+    .filter((b) => !b.game?.isFinal && (b.grade?.label || 'SKIP') !== 'SKIP')
+    .sort((a, b) => (b.hrProbability ?? 0) - (a.hrProbability ?? 0) || (b.score ?? 0) - (a.score ?? 0))
+    .slice(0, 3)
 
   return (
     <>
@@ -202,17 +206,260 @@ export default function GamesView({ games, batters, onSelect, selectedId, watchl
           Detail Silos
         </button>
       </div>
-      <GameOfDay god={god} onSelect={onSelect} onOpenPitcher={onOpenPitcher} />
-      <div className="games-grid">
+      <div className="games-desktop-layout">
+        <GameOfDay god={god} onSelect={onSelect} onOpenPitcher={onOpenPitcher} />
+        <div className="games-grid">
+          {ordered.map((g, i) =>
+            view === 'extractor' ? (
+              <ExtractorCard key={g.gamePk} game={g} groups={byGame.get(g.gamePk)} idx={i} {...ctx} />
+            ) : (
+              <GameCard key={g.gamePk} game={g} groups={byGame.get(g.gamePk)} idx={i} {...ctx} />
+            ),
+          )}
+        </div>
+      </div>
+      <div className="games-mobile-layout">
+        <MobileGameOfDay god={god} />
+        <MobileTopTargets targets={topTargets} onSelect={onSelect} />
+        <div className="mobile-slate-head">
+          <span>Matchups</span>
+          <span>{ordered.length} games</span>
+        </div>
+        <div className="mobile-matchups">
         {ordered.map((g, i) =>
           view === 'extractor' ? (
-            <ExtractorCard key={g.gamePk} game={g} groups={byGame.get(g.gamePk)} idx={i} {...ctx} />
+            <MobileMatchupCard key={g.gamePk} game={g} groups={byGame.get(g.gamePk)} idx={i} {...ctx} />
           ) : (
-            <GameCard key={g.gamePk} game={g} groups={byGame.get(g.gamePk)} idx={i} {...ctx} />
+            <MobileDetailCard key={g.gamePk} game={g} groups={byGame.get(g.gamePk)} idx={i} {...ctx} />
           ),
         )}
+        </div>
       </div>
     </>
+  )
+}
+
+function MobileGameOfDay({ god }) {
+  if (!god) return null
+  const g = god.game
+  return (
+    <section className="mobile-god" aria-label="Game of the Day">
+      <span className="mobile-god-icon"><Icon name="Flame" size={17} /></span>
+      <span className="mobile-god-copy">
+        <span className="mobile-god-kicker">Game of the Day</span>
+        <strong>{g?.awayTeam?.abbr || '—'} @ {g?.homeTeam?.abbr || '—'}</strong>
+        <span>{gameTime(g?.gameDate) || 'TBD'}</span>
+      </span>
+      <span className="mobile-god-xhr"><small>EXP HR</small><b>{num(god.xhr, 1)}</b></span>
+    </section>
+  )
+}
+
+function MobileTopTargets({ targets, onSelect }) {
+  if (!targets.length) return null
+  return (
+    <section className="mobile-targets" aria-labelledby="mobile-targets-title">
+      <div className="mobile-targets-head">
+        <span id="mobile-targets-title"><Icon name="TrendingUp" size={14} /> Top Targets Today</span>
+        <span>Model HR%</span>
+      </div>
+      {targets.map((b, i) => {
+        const color = gradeColor(b.grade?.label)
+        const away = b.game?.awayTeam?.abbr
+        const home = b.game?.homeTeam?.abbr
+        return (
+          <button key={b.id} className="mobile-target-row" onClick={() => onSelect?.(b)} style={{ '--target-color': color }}>
+            <span className="mobile-target-rank mono">{i + 1}</span>
+            <span className="mobile-target-main">
+              <strong>{b.name}</strong>
+              <small>{away && home ? `${away} @ ${home}` : b.team}{b.battingOrder ? ` · #${b.battingOrder}` : ''}</small>
+            </span>
+            <GradeChip grade={b.grade} size="sm" score={b.score} />
+            <span className="mobile-target-prob mono">{pct(b.hrProbability, 1)}</span>
+            <Icon name="ChevronRight" size={15} className="mobile-target-chev" />
+          </button>
+        )
+      })}
+    </section>
+  )
+}
+
+function MobileMatchupCard({ game: g, groups, idx = 0, onSelect, onOpenPitcher }) {
+  const [open, setOpen] = useState(idx === 0)
+  const away = [...(groups.away || [])].filter((b) => (b.grade?.label || 'SKIP') !== 'SKIP').sort((a, b) => (b.hrProbability ?? 0) - (a.hrProbability ?? 0))[0]
+  const home = [...(groups.home || [])].filter((b) => (b.grade?.label || 'SKIP') !== 'SKIP').sort((a, b) => (b.hrProbability ?? 0) - (a.hrProbability ?? 0))[0]
+  const sample = groups.away?.[0] || groups.home?.[0]
+  const env = Number.isFinite(sample?.envScore) ? Math.round(sample.envScore) : null
+  const envTone = env == null ? '' : env >= 70 ? 'good' : env <= 45 ? 'bad' : ''
+  const status = g.isFinal ? 'Final' : g.isLive ? `${(g.inningHalf || '').slice(0, 3)} ${g.currentInning || ''}`.trim() : gameTime(g.gameDate) || 'TBD'
+  return (
+    <section className={`mobile-matchup${open ? ' open' : ''}${g.isLive ? ' live' : ''}`} style={{ '--i': Math.min(idx, 12) }}>
+      <div className="mobile-matchup-scoreboard">
+        <MobileTeam team={g.awayTeam} pitcher={g.awayPitcher} score={g.awayScore} live={g.isLive || g.isFinal} onOpenPitcher={onOpenPitcher} gamePk={g.gamePk} />
+        <div className="mobile-matchup-center">
+          <span className={`mobile-game-status${g.isLive ? ' live' : ''}`}>{status}</span>
+          <span className={`mobile-env-score ${envTone}`}><Icon name="Gauge" size={12} />{env ?? '—'}</span>
+        </div>
+        <MobileTeam team={g.homeTeam} pitcher={g.homePitcher} score={g.homeScore} live={g.isLive || g.isFinal} onOpenPitcher={onOpenPitcher} gamePk={g.gamePk} />
+      </div>
+      <GameChips sample={sample} game={g} />
+      <div className="mobile-matchup-leaders">
+        <MobileLeader b={away} icon="Crown" onSelect={onSelect} />
+        <MobileLeader b={home} icon="Target" onSelect={onSelect} />
+      </div>
+      {open && (
+        <div className="mobile-matchup-detail">
+          {[away, home].filter(Boolean).map((b) => (
+            <div key={b.id} className="mobile-reasons">
+              <strong>{lastName(b.name)} signals</strong>
+              {(b.eli5Reasons || []).slice(0, 2).map((r, i) => (
+                <span key={i}><Icon name={eli5IconName(r.icon)} size={12} style={{ color: toneColor(r.tone) }} />{r.text}</span>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+      <button className="mobile-matchup-toggle" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
+        {open ? 'Hide matchup details' : 'View reasons & data'}
+        <Icon name={open ? 'ChevronUp' : 'ChevronDown'} size={16} />
+      </button>
+    </section>
+  )
+}
+
+function MobileTeam({ team, pitcher, score, live, onOpenPitcher, gamePk }) {
+  return (
+    <div className="mobile-score-team">
+      <strong>{team?.abbr || '—'}</strong>
+      {live && <b className="mono">{score ?? 0}</b>}
+      {pitcher?.id && onOpenPitcher ? (
+        <button onClick={() => onOpenPitcher(pitcher.id, gamePk)}>{lastName(pitcher.name)}</button>
+      ) : <span>{lastName(pitcher?.name) || 'TBD'}</span>}
+    </div>
+  )
+}
+
+function MobileLeader({ b, icon, onSelect }) {
+  if (!b) return <div className="mobile-leader empty">No qualified target</div>
+  const color = gradeColor(b.grade?.label)
+  return (
+    <button className="mobile-leader" onClick={() => onSelect?.(b)} style={{ '--leader-color': color }}>
+      <Icon name={icon} size={16} />
+      <span><strong>{b.name}</strong><small>{b.team}{b.battingOrder ? ` · #${b.battingOrder}` : ''}</small></span>
+      <GradeChip grade={b.grade} size="sm" />
+      <b className="mono">{pct(b.hrProbability, 1)}</b>
+    </button>
+  )
+}
+
+function MobileDetailCard({ game: g, groups, idx = 0, onSelect, selectedId, watchlist, slip, onToggleWatch, onToggleSlip, onOpenPitcher }) {
+  const [side, setSide] = useState('away')
+  const [showAll, setShowAll] = useState(false)
+  const sample = groups.away?.[0] || groups.home?.[0]
+  const env = Number.isFinite(sample?.envScore) ? Math.round(sample.envScore) : null
+  const envTone = env == null ? '' : env >= 70 ? 'good' : env <= 45 ? 'bad' : ''
+  const status = g.isFinal ? 'Final' : g.isLive ? `${(g.inningHalf || '').slice(0, 3)} ${g.currentInning || ''}`.trim() : gameTime(g.gameDate) || 'TBD'
+  const sortBats = (list) => [...(list || [])].sort((a, b) => (b.hrProbability ?? 0) - (a.hrProbability ?? 0) || (b.score ?? 0) - (a.score ?? 0))
+  const awayBats = sortBats(groups.away)
+  const homeBats = sortBats(groups.home)
+  const activeBats = side === 'away' ? awayBats : homeBats
+  const visibleBats = showAll ? activeBats : activeBats.slice(0, 4)
+  const switchSide = (next) => {
+    setSide(next)
+    setShowAll(false)
+  }
+  return (
+    <section className={`mobile-detail-card${g.isLive ? ' live' : ''}`} style={{ '--i': Math.min(idx, 12) }}>
+      <div className="mobile-matchup-scoreboard">
+        <MobileTeam team={g.awayTeam} pitcher={g.awayPitcher} score={g.awayScore} live={g.isLive || g.isFinal} onOpenPitcher={onOpenPitcher} gamePk={g.gamePk} />
+        <div className="mobile-matchup-center">
+          <span className={`mobile-game-status${g.isLive ? ' live' : ''}`}>{status}</span>
+          <span className={`mobile-env-score ${envTone}`}><Icon name="Gauge" size={12} />{env ?? '—'}</span>
+        </div>
+        <MobileTeam team={g.homeTeam} pitcher={g.homePitcher} score={g.homeScore} live={g.isLive || g.isFinal} onOpenPitcher={onOpenPitcher} gamePk={g.gamePk} />
+      </div>
+      <GameChips sample={sample} game={g} />
+      <div className="mobile-team-switcher" role="tablist" aria-label={`${g.awayTeam?.abbr} and ${g.homeTeam?.abbr} hitters`}>
+        <MobileTeamTab side="away" active={side === 'away'} team={g.awayTeam} batters={awayBats} onClick={() => switchSide('away')} />
+        <MobileTeamTab side="home" active={side === 'home'} team={g.homeTeam} batters={homeBats} onClick={() => switchSide('home')} />
+      </div>
+      <div className="mobile-roster" role="tabpanel" aria-label={`${side === 'away' ? g.awayTeam?.abbr : g.homeTeam?.abbr} hitters`}>
+        {visibleBats.map((b) => (
+          <MobileDetailRow
+            key={b.id}
+            b={b}
+            selected={selectedId === b.id}
+            watched={watchlist.has(b.id)}
+            inSlip={slip.has(b.id)}
+            onSelect={onSelect}
+            onToggleWatch={onToggleWatch}
+            onToggleSlip={onToggleSlip}
+          />
+        ))}
+        {!activeBats.length && <div className="mobile-roster-empty">No matching hitters</div>}
+      </div>
+      {activeBats.length > 4 && (
+        <button className="mobile-roster-more" onClick={() => setShowAll((v) => !v)} aria-expanded={showAll}>
+          {showAll ? 'Show top four' : `Show all hitters (${activeBats.length - 4} more)`}
+          <Icon name={showAll ? 'ChevronUp' : 'ChevronDown'} size={16} />
+        </button>
+      )}
+    </section>
+  )
+}
+
+function MobileTeamTab({ side, active, team, batters, onClick }) {
+  const max = batters[0]?.hrProbability
+  return (
+    <button
+      className={`mobile-team-tab${active ? ' active' : ''}`}
+      role="tab"
+      aria-selected={active}
+      data-side={side}
+      onClick={onClick}
+    >
+      <span><strong>{team?.abbr || '—'}</strong><small>{batters.length}</small></span>
+      <b className="mono">{max != null ? `${pct(max, 1)} max` : 'No targets'}</b>
+    </button>
+  )
+}
+
+function MobileDetailRow({ b, selected, watched, inSlip, onSelect, onToggleWatch, onToggleSlip }) {
+  const color = gradeColor(b.grade?.label)
+  const stop = (fn) => (e) => {
+    e.stopPropagation()
+    fn(b)
+  }
+  return (
+    <div
+      className={`mobile-detail-row${selected ? ' selected' : ''}`}
+      role="button"
+      tabIndex={0}
+      onClick={() => onSelect?.(b)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onSelect?.(b)
+        }
+      }}
+      style={{ '--detail-color': color }}
+    >
+      <span className="mobile-detail-avatar-wrap">
+        <img src={playerHeadshot(b.playerId, 96)} alt="" loading="lazy" className="mobile-detail-avatar" />
+        {b.battingOrder && <small className="mono">#{b.battingOrder}</small>}
+      </span>
+      <span className="mobile-detail-player">
+        <span><strong>{b.name}</strong><small>{b.batSide}</small></span>
+        <span><GradeChip grade={b.grade} size="sm" score={b.score} /></span>
+      </span>
+      <span className="mobile-detail-prob"><b className="mono">{pct(b.hrProbability, 1)}</b><small>HR PROB</small></span>
+      <button className={`mobile-detail-action${watched ? ' on watch' : ''}`} onClick={stop(onToggleWatch)} aria-label={watched ? `Remove ${b.name} from watchlist` : `Watch ${b.name}`}>
+        <Icon name="Star" size={17} style={{ fill: watched ? 'currentColor' : 'none' }} />
+      </button>
+      <button className={`mobile-detail-action${inSlip ? ' on slip' : ''}`} onClick={stop(onToggleSlip)} aria-label={inSlip ? `Remove ${b.name} from parlay` : `Add ${b.name} to parlay`}>
+        <Icon name={inSlip ? 'Check' : 'Plus'} size={18} />
+      </button>
+    </div>
   )
 }
 

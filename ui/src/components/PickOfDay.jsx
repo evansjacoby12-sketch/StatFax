@@ -11,7 +11,7 @@ import { useLiveMode } from '../lib/liveMode.js'
 
 function heatTag(h) {
   if (h == null) return null
-  if (h >= 70) return 'On fire 🔥'
+  if (h >= 70) return 'On fire'
   if (h >= 58) return 'Hot'
   if (h >= 45) return 'Warm'
   return 'Cool'
@@ -34,6 +34,54 @@ export default function PickOfDay({ batter: b, onSelect, watched, inSlip, onTogg
   }
 
   return (
+    <>
+    <section
+      className={`mobile-potd-row${hrToday ? ' potd-cashed' : ''}`}
+      style={{ '--mobile-potd-color': color }}
+      role="button"
+      tabIndex={0}
+      onClick={() => onSelect(b)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onSelect(b)
+        }
+      }}
+    >
+      <span className="mobile-potd-mark" aria-hidden="true">
+        <Icon name="Trophy" size={16} />
+        <small>POTD</small>
+      </span>
+      <span className="mobile-potd-main">
+        <span className="mobile-potd-name-line">
+          <strong title={b.name}>{b.name}</strong>
+          <GradeChip grade={b.grade} size="sm" />
+          {hrToday ? <span className="mobile-potd-live">HR</span> : live ? <span className="mobile-potd-live">LIVE</span> : null}
+        </span>
+        <span className="mobile-potd-matchup">
+          <b>{b.team}</b>
+          <span>{b.opponent?.abbr || '—'}</span>
+          <span>vs</span>
+          {canOpenPitcher ? (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                onOpenPitcher(b.pitcher.id, b.gamePk)
+              }}
+              title={`Open ${b.pitcher.name}'s pitcher card`}
+            >
+              {b.pitcher.name}
+            </button>
+          ) : <span>{b.pitcher?.name || 'TBD'}</span>}
+        </span>
+      </span>
+      <span className="mobile-potd-prob">
+        <b className="mono">{pct(b.hrProbability, 1)}</b>
+        <small>PROB</small>
+      </span>
+      <Icon name="ChevronRight" size={15} className="mobile-potd-chev" />
+    </section>
+
     <section
       className={`potd${hrToday ? ' potd-cashed' : ''}`}
       style={{
@@ -331,5 +379,6 @@ export default function PickOfDay({ batter: b, onSelect, watched, inSlip, onTogg
         </button>
       </div>
     </section>
+    </>
   )
 }

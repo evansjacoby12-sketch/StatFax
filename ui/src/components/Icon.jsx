@@ -66,6 +66,10 @@ import {
   Loader,
   Users,
   Moon,
+  Crown,
+  Ellipsis,
+  Grid3x3,
+  BarChart2,
 } from 'lucide-react'
 
 const REGISTRY = {
@@ -136,6 +140,10 @@ const REGISTRY = {
   Loader,
   Users,
   Moon,
+  Crown,
+  Ellipsis,
+  Grid3x3,
+  BarChart2,
 }
 
 export default function Icon({ name, size = 16, ...rest }) {
