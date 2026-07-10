@@ -89,6 +89,10 @@ export function comboRowFromSnapshot(row) {
     recentBarrel: recentBarrelOf(row),
     // park × weather × hand — the Park & Air strategy ranks on this.
     air: Number.isFinite(row.parkWeatherHandFactor) ? row.parkWeatherHandFactor : null,
+    // Market edge (Value strategy) — null server-side: no live prices at freeze
+    // time, so Value produces nothing in the frozen graded record (it's a live
+    // board aid only). The client adapter fills this from row.edge when priced.
+    edge: null,
     // Blast rate (bat tracking) — recent-preferred, folded into the power rank.
     blast: blastRate(row),
     // Opposing-pitcher HR/9. Fall back to a league-average prior (~1.25) for an

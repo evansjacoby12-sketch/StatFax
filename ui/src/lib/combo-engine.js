@@ -179,6 +179,15 @@ export const STRATEGIES = [
   // Ranks on barrel to surface the elite-contact tier (distinct from hot's
   // heat-led rank and mix's blend).
   { key: 'precision', rank: (b) => b.barrel ?? 0, require: (b) => b.hot === true && (b.barrel ?? 0) >= 12 },
+  // Value — the +EV pairing. Ranks on each leg's market edge (model HR prob −
+  // the de-vigged "fair" line, i.e. row.edge), so the combo stacks the bats the
+  // market most UNDERprices. To first order this maximizes the parlay's edge vs
+  // the posted price (the card's shown EV confirms it net of parlay vig). Gated
+  // to legs the market genuinely underprices (edge > 0). ODDS-ONLY: the server
+  // has no live prices at freeze time so row.edge is null there — this strategy
+  // yields nothing in the frozen graded record and exists purely as a live board
+  // aid (track a value combo via Live Combos / My Tickets, not the scorecard).
+  { key: 'value',     rank: (b) => b.edge ?? -Infinity, require: (b) => Number.isFinite(b.edge) && b.edge > 0 },
   // Edge Stack was CUT 2026-07-09: 0-for-24 all-hit over 23 graded days, and its
   // gate (≥2 matchup-signal booleans) isn't logged, so it can't be re-tuned on
   // data without becoming a duplicate of precision. Dropped rather than cloned.

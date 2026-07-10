@@ -146,6 +146,7 @@ const STRAT_META = {
   matchup:   { label: 'Soft Matchup', icon: 'Target',     desc: 'facing HR-prone pitchers (HR/9 ≥1.3)' },
   mix:       { label: 'Best Mix',     icon: 'Sparkles',   desc: 'grade + barrel + heat blend — best audited all-hit rate' },
   park:      { label: 'Park & Air',   icon: 'Wind',       desc: 'park × weather × hand boosts HR' },
+  value:     { label: 'Value',        icon: 'DollarSign', desc: 'the +EV pairing — bats the market underprices (model HR% > the fair line)' },
   edge:      { label: 'Edge Stack',   icon: 'Zap',        desc: '2+ matchup signals converge (pitch type, zones, platoon, fly-ball)' },
 }
 
@@ -178,6 +179,9 @@ function toComboRow(b, applyLock = false) {
       ? b.pitcher.season.hrPer9
       : b.pitcher?.id != null ? 1.25 : null,
     air: Number.isFinite(b.parkWeatherHandFactor) ? b.parkWeatherHandFactor : null,
+    // Market edge (model HR prob − de-vigged fair line) — the Value strategy
+    // ranks on this to pair the bats the market most underprices. Null pre-odds.
+    edge: Number.isFinite(b.edge) ? b.edge : null,
     hot: b.hot === true,
     homeEdge: b.homeEdge === true,
     awayEdge: b.awayEdge === true,
