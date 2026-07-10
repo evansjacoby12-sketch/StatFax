@@ -627,6 +627,22 @@ function GroupCard({ g, idx = 0, onSelect, selectedId, comboConf = 'off', slipSe
   // Best one-ticket price: the headline `pays` multiplies each leg's best price
   // across different books; this is the best single book that prices every leg.
   const oneBook = bestSingleBook(g.legs)
+  const copyCombo = (e) => {
+    e.stopPropagation()
+    const legsTxt = g.legs.map((b) => `${lastFirst(b.name).split(',')[0]}${b.odds?.best?.american ? ` ${american(b.odds.best.american)}` : ''}`).join(' + ')
+    const line = `${g.size}-leg ${g.label}: ${legsTxt} — all-hit ${pct(g.allHit, g.allHit < 0.01 ? 2 : 1)}${oneBook ? ` · ${bookLabel(oneBook.book)} one-ticket ${american(oneBook.american)}` : g.american ? ` · pays ${american(g.american)}` : ''} (StatFax)`
+    navigator.clipboard?.writeText(line).then(() => toast.success('Combo copied')).catch(() => toast.warn('Copy failed'))
+  }
+  const tailCombo = (e) => {
+    e.stopPropagation()
+    const missing = g.legs.filter((b) => !slipSet?.has(b.id))
+    if (!missing.length) {
+      toast.info('Already in your slip')
+      return
+    }
+    missing.forEach((b) => onToggleSlip(b))
+    toast.success(`${missing.length} leg${missing.length > 1 ? 's' : ''} → parlay slip`)
+  }
   const implied = americanToRawImplied(g.american)
   const gc = GROUP_GRADE_COLOR[g.grade] || '#6b7787'
   const { legs: legInfo, weakestIdx, tone } = assessCombo(g)
@@ -696,32 +712,18 @@ function GroupCard({ g, idx = 0, onSelect, selectedId, comboConf = 'off', slipSe
         )}
         <span className={`grp-grade grade-glow-${g.grade}`} style={{ color: gc, borderColor: gc }}>{g.grade}</span>
         <button
-          className="grp-copy"
+          className="grp-copy grp-head-copy"
           aria-label="Copy combo"
           title="Copy this combo as text"
-          onClick={(e) => {
-            e.stopPropagation()
-            const legsTxt = g.legs.map((b) => `${lastFirst(b.name).split(',')[0]}${b.odds?.best?.american ? ` ${american(b.odds.best.american)}` : ''}`).join(' + ')
-            const line = `${g.size}-leg ${g.label}: ${legsTxt} — all-hit ${pct(g.allHit, g.allHit < 0.01 ? 2 : 1)}${oneBook ? ` · ${bookLabel(oneBook.book)} one-ticket ${american(oneBook.american)}` : g.american ? ` · pays ${american(g.american)}` : ''} (StatFax)`
-            navigator.clipboard?.writeText(line).then(() => toast.success('Combo copied')).catch(() => toast.warn('Copy failed'))
-          }}
+          onClick={copyCombo}
         >
           <Icon name="Copy" size={12} />
         </button>
         {onToggleSlip && (
           <button
-            className={`grp-tail${allInSlip ? ' on' : ''}`}
+            className={`grp-tail grp-head-tail${allInSlip ? ' on' : ''}`}
             title={allInSlip ? 'Every leg is already in your parlay slip' : 'Tail — drop every leg into your parlay slip'}
-            onClick={(e) => {
-              e.stopPropagation()
-              const missing = g.legs.filter((b) => !slipSet?.has(b.id))
-              if (!missing.length) {
-                toast.info('Already in your slip')
-                return
-              }
-              missing.forEach((b) => onToggleSlip(b))
-              toast.success(`${missing.length} leg${missing.length > 1 ? 's' : ''} → parlay slip`)
-            }}
+            onClick={tailCombo}
           >
             <Icon name={allInSlip ? 'Check' : 'Plus'} size={12} /> Tail
           </button>
@@ -813,6 +815,20 @@ function GroupCard({ g, idx = 0, onSelect, selectedId, comboConf = 'off', slipSe
             {why.status === 'loading' ? 'Thinking…' : why.status === 'error' ? 'Retry' : why.status === 'done' && whyOpen ? 'Hide' : 'Why?'}
           </button>
         ) : <span />}
+        <span className="grp-mobile-card-actions">
+          <button className="grp-copy" aria-label="Copy combo" title="Copy this combo as text" onClick={copyCombo}>
+            <Icon name="Copy" size={13} />
+          </button>
+          {onToggleSlip && (
+            <button
+              className={`grp-tail${allInSlip ? ' on' : ''}`}
+              title={allInSlip ? 'Every leg is already in your parlay slip' : 'Tail — drop every leg into your parlay slip'}
+              onClick={tailCombo}
+            >
+              <Icon name={allInSlip ? 'Check' : 'Plus'} size={13} /> Tail
+            </button>
+          )}
+        </span>
         <button
           className={`grp-tail${tracked ? ' on' : ''}`}
           title={tracked ? 'Tracked as your bet — grading in My Tickets (Results → Combos). Tap to untrack.' : 'Track as my bet — pins these exact legs and grades them live + settled, even if the board re-ranks'}
