@@ -178,14 +178,32 @@ function envLabel(f) {
   return { label: 'Neutral', tone: '' }
 }
 
-function WindDial({ wind }) {
+function WindDial({ wind, compact = false, direction = null }) {
   const rot = wind?.arrowRotation ?? 0
   const tint = wind?.tint || 'var(--text-faint)'
+  const size = compact ? 44 : 56
+  const mph = Number.isFinite(wind?.mph) ? Math.round(wind.mph) : null
+  const ariaLabel = compact
+    ? `${mph != null ? `${mph} mph ` : ''}wind${direction ? ` from ${direction}` : ''}; ${wind?.caption || 'light wind'}`
+    : undefined
   return (
-    <svg viewBox="0 0 64 64" className="wind-dial" aria-hidden="true" style={{ width: '56px', height: '56px', flexShrink: '0', overflow: 'visible' }}>
-      <circle cx="32" cy="32" r="28" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="1.5" />
-      <text x="32" y="10" fill="var(--text-faint)" fontSize="7" fontWeight="800" textAnchor="middle">CF</text>
-      <text x="32" y="58" fill="var(--text-faint)" fontSize="7" fontWeight="800" textAnchor="middle">HP</text>
+    <svg
+      viewBox="0 0 64 64"
+      className={`wind-dial ${compact ? 'wind-dial-mobile' : ''}`}
+      role={compact ? 'img' : undefined}
+      aria-label={ariaLabel}
+      aria-hidden={compact ? undefined : true}
+      style={{ width: `${size}px`, height: `${size}px`, flexShrink: '0', overflow: 'visible' }}
+    >
+      <circle className="wind-dial-ring" cx="32" cy="32" r="28" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="1.5" />
+      <text className="wind-dial-label" x="32" y="10" fill="var(--text-faint)" fontSize="7" fontWeight="800" textAnchor="middle">CF</text>
+      <text className="wind-dial-label" x="32" y="58" fill="var(--text-faint)" fontSize="7" fontWeight="800" textAnchor="middle">HP</text>
+      {compact && (
+        <>
+          <text className="wind-dial-label" x="5" y="34" fill="var(--text-faint)" fontSize="6" fontWeight="800" textAnchor="start">LF</text>
+          <text className="wind-dial-label" x="59" y="34" fill="var(--text-faint)" fontSize="6" fontWeight="800" textAnchor="end">RF</text>
+        </>
+      )}
       {/* Outer g: CSS-transitioned heading (eases when a refresh shifts the wind).
           Inner g: gentle idle sway so the arrow reads as live air, not a print. */}
       <g style={{ transform: `rotate(${rot}deg)`, transformOrigin: '32px 32px', transition: 'transform 0.8s cubic-bezier(0.22, 1, 0.36, 1)' }}>
@@ -248,15 +266,31 @@ function WeatherCard({ g, onSelect, selectedId }) {
 
       <div className="wxcard-mobile-impact">
         <div className="wx-mobile-wind">
-          <span className="wx-mobile-wind-k"><Icon name={closed ? 'House' : 'Wind'} size={12} /> Carry</span>
-          <b className="mono">
-            {closed
-              ? (isDome ? 'DOME' : 'CLOSED')
-              : wind
-                ? `${w?.windSpeedMph != null ? Math.round(w.windSpeedMph) : '—'} mph ${wind.verdict}`
-                : 'CALM'}
-          </b>
-          <span>{closed ? 'no air carry' : (wind?.caption || 'light wind')}</span>
+          {closed ? (
+            <span className="wx-mobile-compass-fallback" role="img" aria-label={`${isDome ? 'Dome' : 'Closed roof'}; no wind effect`}>
+              <Icon name="House" size={18} />
+            </span>
+          ) : wind ? (
+            <WindDial wind={wind} compact direction={compass(w?.windDirDeg)} />
+          ) : (
+            <span className="wx-mobile-compass-fallback" role="img" aria-label="Calm wind">
+              <Icon name="Wind" size={18} />
+            </span>
+          )}
+          <div className="wx-mobile-wind-copy">
+            <span className="wx-mobile-wind-k">
+              <Icon name={closed ? 'House' : 'Wind'} size={12} /> Carry
+              {!closed && compass(w?.windDirDeg) && <em>{compass(w.windDirDeg)}</em>}
+            </span>
+            <b className="mono">
+              {closed
+                ? (isDome ? 'DOME' : 'CLOSED')
+                : wind
+                  ? `${w?.windSpeedMph != null ? Math.round(w.windSpeedMph) : '—'} mph ${wind.verdict}`
+                  : 'CALM'}
+            </b>
+            <span>{closed ? 'no air carry' : (wind?.caption || 'light wind')}</span>
+          </div>
         </div>
         <div className="wx-mobile-metric">
           <small>Temp</small>

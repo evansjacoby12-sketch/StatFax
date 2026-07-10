@@ -11045,10 +11045,39 @@ button.th:focus-visible {
   .wx-mobile-wind {
     min-width: 0;
     padding-right: 8px;
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr);
+    align-items: center;
+    gap: 7px;
+    border-right: 1px solid var(--border-soft);
+  }
+  .wind-dial-mobile {
+    width: 44px !important;
+    height: 44px !important;
+    filter: drop-shadow(0 0 7px rgba(0, 216, 246, 0.08));
+  }
+  .wind-dial-mobile .wind-dial-ring {
+    fill: rgba(0, 0, 0, 0.18);
+    stroke: rgba(255, 255, 255, 0.11);
+  }
+  .wind-dial-mobile .wind-dial-label {
+    fill: var(--text-dim);
+  }
+  .wx-mobile-compass-fallback {
+    width: 44px;
+    height: 44px;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.18);
+    color: var(--text-faint);
+  }
+  .wx-mobile-wind-copy {
+    min-width: 0;
     display: flex;
     flex-direction: column;
     justify-content: center;
-    border-right: 1px solid var(--border-soft);
   }
   .wx-mobile-wind-k {
     display: inline-flex;
@@ -11059,7 +11088,14 @@ button.th:focus-visible {
     font-weight: 850;
     text-transform: uppercase;
   }
-  .wx-mobile-wind > b {
+  .wx-mobile-wind-k em {
+    margin-left: 2px;
+    color: var(--accent);
+    font-family: var(--mono);
+    font-size: 8px;
+    font-style: normal;
+  }
+  .wx-mobile-wind-copy > b {
     margin-top: 4px;
     overflow: hidden;
     color: var(--accent);
@@ -11068,7 +11104,7 @@ button.th:focus-visible {
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .wx-mobile-wind > span:last-child {
+  .wx-mobile-wind-copy > span:last-child {
     margin-top: 2px;
     overflow: hidden;
     color: var(--text-dim);
@@ -11476,10 +11512,10 @@ button.th:focus-visible {
 
 @media (max-width: 350px) {
   .wxcard-mobile-impact {
-    grid-template-columns: minmax(104px, 1.2fr) repeat(3, minmax(0, 0.65fr));
+    grid-template-columns: minmax(138px, 1.5fr) repeat(3, minmax(0, 0.5fr));
     gap: 5px;
   }
-  .wx-mobile-wind > b { font-size: 13px; }
+  .wx-mobile-wind-copy > b { font-size: 13px; }
   .wx-mobile-metric b { font-size: 11px; }
   .pitcher-mode-tabs .badge-toggle { padding-inline: 4px !important; font-size: 9px; }
   .pcard-attack .pa-hand { padding-inline: 5px; }
