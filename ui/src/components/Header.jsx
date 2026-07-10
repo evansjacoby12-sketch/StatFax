@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import Icon from './Icon.jsx'
 import { timeAgo, pct } from '../lib/format.js'
 import { GRADE_ORDER, gradeColor } from '../lib/badges.js'
@@ -36,18 +37,45 @@ function FirstPitchCountdown({ games = [] }) {
 function HelpMenu({ onOpenWeather, onOpenBuilder, onOpenGroups, onOpenSGP, onOpenSplits, onOpenBacktest, onOpenListBuilder, onOpenGuide, onOpenHowTo, onOpenLegend, onOpenSettings, onOpenModel, liveScores, onToggleLive, eliLevel, onCycleEli, refreshing, onRefresh }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
+  const triggerRef = useRef(null)
+  const mobileSheetRef = useRef(null)
+
+  const closeMobileMenu = () => {
+    setOpen(false)
+    requestAnimationFrame(() => triggerRef.current?.focus())
+  }
   
   useEffect(() => {
     if (!open) return
     const onDoc = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
+      if (ref.current?.contains(e.target) || mobileSheetRef.current?.contains(e.target)) return
+      setOpen(false)
     }
-    const onKey = (e) => e.key === 'Escape' && setOpen(false)
+    const mobile = window.matchMedia('(max-width: 560px)').matches
+    const app = mobile ? document.querySelector('.app') : null
+    const previousOverflow = app?.style.overflowY || ''
+    if (app) app.style.overflowY = 'hidden'
+
+    const onKey = (e) => {
+      if (e.key === 'Escape') {
+        closeMobileMenu()
+        return
+      }
+      if (!mobile || e.key !== 'Tab') return
+      const focusable = [...(mobileSheetRef.current?.querySelectorAll('button:not(:disabled)') || [])]
+      if (!focusable.length) return
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus() }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus() }
+    }
     document.addEventListener('mousedown', onDoc)
     document.addEventListener('keydown', onKey)
+    if (mobile) requestAnimationFrame(() => mobileSheetRef.current?.querySelector('.mobile-tools-close')?.focus())
     return () => {
       document.removeEventListener('mousedown', onDoc)
       document.removeEventListener('keydown', onKey)
+      if (app) app.style.overflowY = previousOverflow
     }
   }, [open])
 
@@ -94,6 +122,7 @@ function HelpMenu({ onOpenWeather, onOpenBuilder, onOpenGroups, onOpenSGP, onOpe
   return (
     <div className="help-menu" ref={ref} style={{ position: 'relative' }}>
       <button
+        ref={triggerRef}
         className={`icon-btn ${open ? 'on' : ''}`}
         onClick={() => setOpen((o) => !o)}
         aria-haspopup="menu"
@@ -109,7 +138,7 @@ function HelpMenu({ onOpenWeather, onOpenBuilder, onOpenGroups, onOpenSGP, onOpe
         <Icon name="Ellipsis" size={18} className="help-ellipsis" />
       </button>
       {open && (
-        <div className="view-menu-pop" role="menu">
+        <div className="view-menu-pop desktop-tools-menu" role="menu">
           {sections.map((sec, si) => (
             <div key={sec.title} role="group" aria-label={sec.title}>
               <div
@@ -150,6 +179,77 @@ function HelpMenu({ onOpenWeather, onOpenBuilder, onOpenGroups, onOpenSGP, onOpe
             </div>
           ))}
         </div>
+      )}
+      {open && typeof document !== 'undefined' && createPortal(
+        <>
+          <button
+            type="button"
+            className="mobile-tools-scrim"
+            aria-label="Close tools menu"
+            tabIndex={-1}
+            onMouseDown={(event) => {
+              event.stopPropagation()
+              closeMobileMenu()
+            }}
+          />
+          <section
+            ref={mobileSheetRef}
+            className="mobile-tools-sheet"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="mobile-tools-title"
+          >
+            <header className="mobile-tools-head">
+              <div className="mobile-tools-title">
+                <span className="mobile-tools-mark" aria-hidden="true">
+                  <Icon name="Ellipsis" size={18} />
+                </span>
+                <span>
+                  <b id="mobile-tools-title">Tools &amp; settings</b>
+                  <small>StatFax navigation</small>
+                </span>
+              </div>
+              <button
+                type="button"
+                className="mobile-tools-close"
+                onClick={closeMobileMenu}
+                aria-label="Close tools menu"
+              >
+                <Icon name="X" size={18} />
+              </button>
+            </header>
+
+            <div className="mobile-tools-body">
+              {sections.map((sec) => (
+                <div className="vm-group" key={sec.title} role="group" aria-label={sec.title}>
+                  <div className="vm-section">{sec.title}</div>
+                  {sec.items.map((it) => (
+                    <button
+                      key={it.label}
+                      type="button"
+                      className={`vm-item${it.mobileOnly ? ' mobile-menu-only' : ''}`}
+                      onClick={() => {
+                        it.fn?.()
+                        setOpen(false)
+                      }}
+                      disabled={it.mobileOnly && it.label.startsWith('Refreshing')}
+                    >
+                      <span className="vm-icon-box" aria-hidden="true">
+                        <Icon name={it.icon} size={16} />
+                      </span>
+                      <span className="vm-txt">
+                        <b>{it.label}</b>
+                        <span className="dim">{it.desc}</span>
+                      </span>
+                      <Icon name="ChevronRight" size={15} className="mobile-tools-chevron" aria-hidden="true" />
+                    </button>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </section>
+        </>,
+        document.body,
       )}
     </div>
   )
