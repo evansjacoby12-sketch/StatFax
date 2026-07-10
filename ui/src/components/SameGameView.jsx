@@ -2,9 +2,8 @@ import { useMemo, useState } from 'react'
 import Icon from './Icon.jsx'
 import { GradeChip } from './atoms.jsx'
 import { toast } from './Toast.jsx'
-import { pct, num } from '../lib/format.js'
+import { pct } from '../lib/format.js'
 import { lastFirst, consistencyFactor, legFlags, legIsBad, risingForm } from '../lib/groups.js'
-import { correlatedJoint, gameCorrelation } from '../lib/parlay.js'
 import { comboStatus, legStatus, VERDICT_META, LEG_META } from '../lib/live.js'
 import { gradeFor, paWeight, isBenched } from '../lib/combo-engine.js'
 
@@ -13,7 +12,7 @@ const GRADE_COLOR = { S: '#f5a623', A: '#32d74b', B: '#3b82f6', C: '#9aa6b6', D:
 
 // Same-Game Parlays: the best `size` bats from ONE game stacked together.
 // Honors the same consistency lean as the combos page.
-function buildSGP(batters, size, { favorConsistency } = {}) {
+function buildSGP(batters, size, { favorConsistency, confirmedOnly = true } = {}) {
   // Rank by model score (grade quality) so an SGP stacks a game's best-graded
   // bats — the PRIME/STRONG studs you'd actually stack — matching the settled
   // SGP record (server buildSGPRecords). Tilt by the batting-order PA weight so
@@ -26,6 +25,7 @@ function buildSGP(batters, size, { favorConsistency } = {}) {
     if ((b.grade?.label || 'SKIP') === 'SKIP') continue
     if (!Number.isFinite(b.hrProbability)) continue
     if (isBenched(b)) continue // confirmed lineup, no order slot — won't hit
+    if (confirmedOnly && b.lineupConfirmed !== true) continue
     if (!byGame.has(b.gamePk)) byGame.set(b.gamePk, { gamePk: b.gamePk, game: b.game, parkHR: b.gameParkHRFactor, bats: [] })
     byGame.get(b.gamePk).bats.push(b)
   }
@@ -38,24 +38,26 @@ function buildSGP(batters, size, { favorConsistency } = {}) {
     if (legs.length < size) continue
     const probs = legs.map(legProb)
     const comboIndep = probs.reduce((p, x) => p * x, 1) // independent baseline
-    // Same-game legs are positively correlated; scale up by the game's HR-env
-    // tilt (avg park×weather of the legs, else the game park factor). See parlay.js.
-    const facs = legs.map((b) => b.parkWeatherHandFactor).filter(Number.isFinite)
-    const envTilt = facs.length ? facs.reduce((s, x) => s + x, 0) / facs.length : (Number.isFinite(g.parkHR) ? g.parkHR : 1)
-    const rho = gameCorrelation(envTilt)
-    const combo = correlatedJoint(probs, rho) // correlation-adjusted all-hit (headline)
+    // Use the independent product until residual SGP correlation is validated.
+    const combo = comboIndep
     const avg = legs.reduce((s, b) => s + (b.score ?? 0), 0) / legs.length
     // Weakness + lineup-confirmation (same guards as the combos page).
     const legInfo = legs.map((b) => { const flags = legFlags(b); return { flags, bad: legIsBad(b, flags), unconfirmed: b.lineupConfirmed !== true, rising: risingForm(b) } })
     const tone = legInfo.some((l) => l.bad) ? 'risk' : legInfo.some((l) => l.flags.length) ? 'caution' : 'tail'
-    out.push({ ...g, legs, legInfo, combo, comboIndep, rho, envTilt, grade: gradeFor(avg), avg, tone })
+    out.push({ ...g, legs, legInfo, combo, comboIndep, rho: 0, grade: gradeFor(avg), avg, tone })
   }
   return out.sort((a, b) => b.combo - a.combo || (a.gamePk ?? 0) - (b.gamePk ?? 0))
 }
 
 export default function SameGameView({ batters, onSelect, favorConsistency = false, comboConf = 'off', sgpScorecard = null }) {
   const [size, setSize] = useState(2)
-  const sgps = useMemo(() => buildSGP(batters, size, { favorConsistency }), [batters, size, favorConsistency])
+  const [includeProjected, setIncludeProjected] = useState(false)
+  const { confirmedSgps, allSgps } = useMemo(() => ({
+    confirmedSgps: buildSGP(batters, size, { favorConsistency, confirmedOnly: true }),
+    allSgps: buildSGP(batters, size, { favorConsistency, confirmedOnly: false }),
+  }), [batters, size, favorConsistency])
+  const sgps = includeProjected ? allSgps : confirmedSgps
+  const projectedGames = Math.max(0, allSgps.length - confirmedSgps.length)
   const scOv = sgpScorecard?.overall
   return (
     <div className="sgp-view">
@@ -68,16 +70,15 @@ export default function SameGameView({ batters, onSelect, favorConsistency = fal
         </div>
       )}
       <p className="sgp-intro dim">
-        Every leg from the <b>same game</b> — a "this game goes off" bet. Same‑game HR legs are{' '}
-        <b>correlated</b> (shared park, weather, opposing pitcher), so they cash together more than the
-        independent odds suggest — but they're a <b>long shot</b>: same-game stacks have cashed far less
-        than cross-game combos (see the record above). Best used as a small-stake lottery on high‑HR parks.
+        Every leg must homer in the same game. The headline is the independent
+        product of each calibrated leg rate, with no unvalidated correlation boost.
+        Wait for confirmed lineups and treat three- and four-leg tickets as lottery plays.
       </p>
       <div className="sgp-mobile-brief">
         <Icon name="GitBranch" size={16} />
         <span>
-          <b>One game. Shared conditions.</b>
-          <small>Correlated HR legs · lottery stake</small>
+          <b>Confirmed lineups first.</b>
+          <small>Independent estimate · every leg must homer</small>
         </span>
       </div>
       <div className="sgp-size-bar">
@@ -90,12 +91,32 @@ export default function SameGameView({ batters, onSelect, favorConsistency = fal
           ))}
         </div>
       </div>
+      <div className="sgp-lineup-policy">
+        <span>
+          <Icon name={includeProjected ? 'Clock' : 'UserCheck'} size={15} />
+          <span>
+            <b>{includeProjected ? 'Projected lineups included' : 'Confirmed lineups only'}</b>
+            <small>{includeProjected ? 'Preview mode · verify before betting' : 'Safer default · starters verified'}</small>
+          </span>
+        </span>
+        <button
+          type="button"
+          onClick={() => setIncludeProjected((value) => !value)}
+          aria-pressed={includeProjected}
+        >
+          {includeProjected ? 'Hide projections' : `Show projections${projectedGames ? ` ${projectedGames}` : ''}`}
+        </button>
+      </div>
       <div className="sgp-mobile-list-meta">
         <span><b className="mono">{sgps.length}</b> games</span>
         <span>Best all-hit first</span>
       </div>
       {sgps.length === 0 ? (
-        <div className="empty-note">No game has {size} eligible bats right now.</div>
+        <div className="empty-note">
+          {includeProjected
+            ? `No game has ${size} eligible bats right now.`
+            : `No fully confirmed ${size}-leg SGPs yet. Use Show projections only for an early preview.`}
+        </div>
       ) : (
         <div className="grp-list">
           {sgps.map((g, idx) => {
@@ -132,7 +153,7 @@ export default function SameGameView({ batters, onSelect, favorConsistency = fal
                     onClick={(e) => {
                       e.stopPropagation()
                       const legsTxt = g.legs.map((b) => lastFirst(b.name).split(',')[0]).join(' + ')
-                      const line = `${size}-leg SGP ${matchup}: ${legsTxt} — all-hit ≈ ${pct(g.combo, g.combo < 0.01 ? 2 : 1)} corr-adj (StatFax)`
+                      const line = `${size}-leg SGP ${matchup}: ${legsTxt} — independent all-hit ≈ ${pct(g.combo, g.combo < 0.01 ? 2 : 1)} (StatFax)`
                       navigator.clipboard?.writeText(line).then(() => toast.success('SGP copied')).catch(() => toast.warn('Copy failed'))
                     }}
                   >
@@ -144,13 +165,7 @@ export default function SameGameView({ batters, onSelect, favorConsistency = fal
                     <small>Model all-hit</small>
                     <b className="mono">{pct(g.combo, g.combo < 0.01 ? 2 : 1)}</b>
                   </span>
-                  {g.rho > 0 ? (
-                    <span className="sgp-hit-detail" title={`Correlation-adjusted for this game's HR environment (park × weather ${num(g.envTilt, 2)}×). Independent product is ${pct(g.comboIndep, g.comboIndep < 0.01 ? 2 : 1)}; books still apply a correlation discount to the payout.`}>
-                      Corr-adjusted · indep {pct(g.comboIndep, g.comboIndep < 0.01 ? 2 : 1)}
-                    </span>
-                  ) : (
-                    <span className="sgp-hit-detail">Independent · neutral park</span>
-                  )}
+                  <span className="sgp-hit-detail">Independent estimate · no uplift</span>
                 </div>
                 <ul className="grp-legs">
                   {g.legs.map((b, i) => {

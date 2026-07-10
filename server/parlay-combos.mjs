@@ -71,6 +71,7 @@ export function comboRowFromSnapshot(row) {
     name:     row.name,
     team:     row.team,
     battingOrder: Number.isFinite(row.battingOrder) ? row.battingOrder : null,
+    lineupConfirmed: row.lineupConfirmed === true,
     paWeight: pw,
     benched: isBenched(row),
     score,
@@ -206,6 +207,32 @@ export function gradeCombos(combos, homerers) {
   });
 }
 
+// Increment when the SGP settlement contract changes. Stored rows keep this
+// marker so the rolling window can be regraded once, then skip repeat box-score
+// fetches on later cron runs.
+export const SGP_GRADE_VERSION = 2;
+
+/** Grade SGPs against official outcomes for the ticket's exact game. */
+export function gradeSGPRecords(records, outcomes = {}) {
+  const byGame = outcomes.homerersByKey instanceof Set ? outcomes.homerersByKey : null;
+  const byPlayer = outcomes.homerers instanceof Set ? outcomes.homerers : new Set();
+  return (records || []).map((s) => {
+    const legs = Array.isArray(s.legs) ? s.legs : [];
+    const didHomer = (pid) => (
+      s.gamePk != null && byGame
+        ? byGame.has(`${Number(pid)}-${s.gamePk}`)
+        : byPlayer.has(Number(pid))
+    );
+    const nHit = legs.filter(didHomer).length;
+    return {
+      ...s,
+      nHit,
+      allHit: legs.length > 0 && nHit === legs.length,
+      gradeVersion: SGP_GRADE_VERSION,
+    };
+  });
+}
+
 /**
  * Same-game parlay records — for each game, the best `size` bats stacked (top by
  * frozen pregame HR prob, score as tiebreak). One SGP per game per size. The
@@ -214,30 +241,32 @@ export function gradeCombos(combos, homerers) {
  * page grade SGPs against actual HRs the same way it grades combos.
  * Returns [{ gamePk, size, legs: [playerId, …], pred }].
  */
-export function buildSGPRecords(rows, { sizes = [2, 3] } = {}) {
+export function buildSGPRecords(rows, { sizes = [2, 3], confirmedOnly = true } = {}) {
   const byGame = new Map();
   for (const r of rows || []) {
     if (!r || r.gamePk == null) continue;
-    if (!r.grade || r.grade === 'SKIP') continue;
-    if (!Number.isFinite(r.hrProb)) continue;
     if (r.benched) continue; // confirmed lineup, no order slot — won't hit
     if (!byGame.has(r.gamePk)) byGame.set(r.gamePk, []);
     byGame.get(r.gamePk).push(r);
   }
   const out = [];
   for (const [gamePk, bats] of byGame) {
+    if (confirmedOnly && bats.some((r) => r.lineupConfirmed !== true)) continue;
+    const eligible = bats.filter((r) => (
+      r.grade && r.grade !== 'SKIP' && Number.isFinite(r.hrProb)
+    ));
     // Rank by model SCORE (grade quality) so an SGP stacks a game's best-graded
     // bats — the PRIME/STRONG studs a user would actually stack — not whichever
     // fringe bat carries the highest raw HR prob. Tilt by the batting-order PA
     // weight (matches the client + combo engine). HR prob breaks ties. hrProb is
     // already PA-weighted in comboRowFromSnapshot, so `pred` reflects it too.
-    const ranked = bats.slice().sort(
+    const ranked = eligible.slice().sort(
       (a, b) => (b.score ?? 0) * (b.paWeight ?? 1) - (a.score ?? 0) * (a.paWeight ?? 1) || (b.hrProb ?? 0) - (a.hrProb ?? 0) || (a.playerId - b.playerId),
     );
     for (const size of sizes) {
       if (ranked.length < size) continue;
       const legs = ranked.slice(0, size);
-      out.push({ gamePk, size, legs: legs.map((l) => l.playerId), pred: allHitProb(legs.map((l) => l.hrProb)) });
+      out.push({ gamePk, size, legs: legs.map((l) => l.playerId), pred: allHitProb(legs.map((l) => l.hrProb)), selectionVersion: 2 });
     }
   }
   return out;

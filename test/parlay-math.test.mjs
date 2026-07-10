@@ -38,20 +38,19 @@ test('parlayAllHit: cross-game legs multiply independently', () => {
   assert.equal(r.sameGame, false)
 })
 
-test('parlayAllHit: same-game legs in a launch pad lift above independent', () => {
+test('parlayAllHit: same-game legs stay independent while uplift is disabled', () => {
   const r = parlayAllHit([leg(0.2, 1, null, 1.3), leg(0.25, 1, null, 1.3)])
   assert.equal(r.sameGame, true)
-  assert.ok(r.modelAllHit > r.independent, 'correlation raises the joint')
-  assert.ok(r.modelAllHit <= 0.2, 'never above the weakest leg')
+  assert.ok(approx(r.modelAllHit, r.independent))
 })
 
-test('parlayAllHit: mixed parlay correlates WITHIN a game, independent across', () => {
+test('parlayAllHit: mixed parlay remains independent with uplift disabled', () => {
   // Two legs share game 1 (launch pad); a third is in game 2.
   const sameGame = [leg(0.2, 1, null, 1.3), leg(0.25, 1, null, 1.3)]
   const r = parlayAllHit([...sameGame, leg(0.3, 2, null, 1.0)])
   const innerJoint = parlayAllHit(sameGame).modelAllHit
   assert.ok(approx(r.modelAllHit, innerJoint * 0.3), 'game-1 joint × game-2 leg')
-  assert.ok(r.modelAllHit > r.independent)
+  assert.ok(approx(r.modelAllHit, r.independent))
 })
 
 test('parlayAllHit: correlate=false forces the independent product', () => {
@@ -81,11 +80,11 @@ test('parlayMarket: one unpriced leg → not all priced, no EV', () => {
   assert.equal(m.decimal, null)
 })
 
-test('buildParlay: full summary with correlation on by default', () => {
+test('buildParlay: full summary identifies same-game legs without an uplift', () => {
   const p = buildParlay([leg(0.2, 1, 6, 1.3), leg(0.25, 1, 6, 1.3)])
   assert.equal(p.n, 2)
   assert.equal(p.sameGame, true)
-  assert.ok(p.modelAllHit > p.independent)
+  assert.ok(approx(p.modelAllHit, p.independent))
   assert.ok(p.allPriced)
   assert.ok(p.grade && typeof p.grade.letter === 'string')
   assert.ok(Number.isFinite(p.fairDecimal))

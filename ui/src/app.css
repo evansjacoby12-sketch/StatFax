@@ -7126,6 +7126,50 @@ button.th:focus-visible {
 .sgp-mobile-list-meta,
 .sgp-size-label { display: none; }
 .sgp-size-bar { display: contents; }
+.sgp-lineup-policy {
+  min-height: 48px;
+  margin: 10px 0 4px;
+  padding: 6px 7px 6px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid color-mix(in srgb, var(--strong) 28%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--strong) 6%, transparent);
+}
+.sgp-lineup-policy > span,
+.sgp-lineup-policy > span > span {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sgp-lineup-policy > span > svg { flex: none; color: var(--strong); }
+.sgp-lineup-policy > span > span {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+}
+.sgp-lineup-policy b { font-size: 11px; }
+.sgp-lineup-policy small { color: var(--text-faint); font-size: 9px; }
+.sgp-lineup-policy > button {
+  min-height: 34px;
+  flex: none;
+  padding: 0 10px;
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 800;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+  cursor: pointer;
+}
+.sgp-lineup-policy > button[aria-pressed="true"] {
+  color: var(--prime);
+  border-color: color-mix(in srgb, var(--prime) 38%, transparent);
+  background: color-mix(in srgb, var(--prime) 8%, transparent);
+}
 .sgp-card-head { flex-wrap: nowrap; }
 .sgp-card-title {
   flex: 1 1 auto;
@@ -12386,6 +12430,23 @@ button.th:focus-visible {
     padding: 0 6px;
     justify-content: center;
     border-radius: 10px;
+  }
+
+  .groups-modal[aria-label="Same-Game Parlays"] .sgp-lineup-policy {
+    min-height: 56px;
+    margin: 0 0 8px;
+    padding: 6px 6px 6px 10px;
+  }
+
+  .groups-modal[aria-label="Same-Game Parlays"] .sgp-lineup-policy > button {
+    min-width: 118px;
+    min-height: 44px;
+    padding: 0 8px;
+  }
+
+  .groups-modal[aria-label="Same-Game Parlays"] .sgp-lineup-policy > button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
   }
 
   .groups-modal[aria-label="Same-Game Parlays"] .sgp-mobile-list-meta {

@@ -24,13 +24,9 @@ import { americanToDecimal, dejuicedImpliedProb, dejuicedEdge } from './odds.js'
 import { gradeFor } from './combo-engine.js'
 
 // ── Same-game correlation ────────────────────────────────────────────────────
-// Same-game HR legs are positively correlated — a shared park, weather, and
-// "this game goes off" state lift every bat together — so the true all-hit
-// chance is HIGHER than the independent product. Scale the independent joint up
-// by a factor that grows with the game's HR environment and the leg count,
-// capped so it can never exceed the least-likely single leg (P(all) ≤ P(any)).
-// A transparent, environment-scaled ESTIMATE, not a fitted model.
-export const SGP_CORR_MAX = 0.3
+// Disabled until a positive residual SGP correlation is fitted and validated
+// on settled tickets. Shared park/weather are already known model inputs.
+export const SGP_CORR_MAX = 0
 
 // HR-environment tilt (park×weather multiplier, 1.0 = neutral) → correlation
 // strength in [0, SGP_CORR_MAX]. Neutral / pitcher's parks → ~0 (independent);
@@ -100,9 +96,9 @@ export function parlayAllHit(legs, { correlate = true } = {}) {
     let rho = 0
     let joint = indep
     if (gl.length >= 2) {
+      sameGame = true
       rho = gameCorrelation(envTiltOf(gl))
       joint = correlatedJoint(ps, rho)
-      if (rho > 0) sameGame = true
     }
     model *= joint
     byGame.push({ gamePk, legs: gl, rho, joint, indep })

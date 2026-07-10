@@ -42,13 +42,12 @@ test('mixed pricing → not all priced, fair odds from model', () => {
 
 // ─── same-game correlation (SGP) ──────────────────────────────────────────────
 
-test('gameCorrelation: neutral/pitcher park → 0, launch pad → capped max, monotone', () => {
-  assert.equal(gameCorrelation(1.0), 0) // neutral
-  assert.equal(gameCorrelation(0.9), 0) // pitcher's park → no negative correlation
-  assert.ok(gameCorrelation(1.15) > 0)
-  assert.ok(gameCorrelation(1.3) > gameCorrelation(1.15))
-  assert.ok(approx(gameCorrelation(1.3), 0.3)) // (1.3-1)/0.3 = 1 → × MAX (0.30)
-  assert.ok(approx(gameCorrelation(1.6), 0.3)) // clamped at the max
+test('gameCorrelation stays disabled until SGP uplift is fitted', () => {
+  assert.equal(gameCorrelation(1.0), 0)
+  assert.equal(gameCorrelation(0.9), 0)
+  assert.equal(gameCorrelation(1.15), 0)
+  assert.equal(gameCorrelation(1.3), 0)
+  assert.equal(gameCorrelation(1.6), 0)
   assert.equal(gameCorrelation(NaN), 0)
 })
 

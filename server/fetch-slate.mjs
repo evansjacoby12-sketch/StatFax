@@ -253,6 +253,8 @@ import {
   comboRowFromSnapshot,
   buildComboRecords,
   buildSGPRecords,
+  gradeSGPRecords,
+  SGP_GRADE_VERSION,
   gradeCombos,
   bestAvailableCombo,
   appendComboDay,
@@ -2318,30 +2320,28 @@ async function main() {
     console.warn(`[combo] scorecard skipped: ${e?.message}`);
   }
 
-  // Same-game parlays were STORED as predictions but never graded — no settled
-  // SGP record existed. Grade every ungraded day's stored SGPs against that day's
-  // reconciled HR outcomes (log.records) — grades the legs that were actually
-  // shown, and backfills the whole ~2wk window at once instead of drip-feeding.
+  // Grade or regrade the rolling SGP window from official game-specific box
+  // scores. The version marker makes this a one-time migration for old rows and
+  // keeps doubleheaders safe by joining on playerId + gamePk.
   try {
     const sgpBy = backtestLog?.combos?.sgpByDate;
     if (sgpBy && typeof sgpBy === 'object') {
       let gradedN = 0, gradedDays = 0;
       for (const d of Object.keys(sgpBy)) {
+        if (d === date) continue;
         const stored = sgpBy[d];
         if (!Array.isArray(stored) || !stored.length) continue;
-        if (stored.some((s) => typeof s.allHit === 'boolean')) continue; // already graded
-        const recs = backtestLog?.records?.[d];
-        if (!Array.isArray(recs) || !recs.length) continue; // no outcomes for this day yet
-        const homerers = new Set(recs.filter((r) => r.homered === true).map((r) => Number(r.playerId)));
-        sgpBy[d] = stored.map((s) => {
-          const nHit = (s.legs || []).filter((pid) => homerers.has(Number(pid))).length;
-          return { ...s, nHit, allHit: nHit === (s.legs || []).length };
-        });
+        if (stored.every((s) => s.gradeVersion === SGP_GRADE_VERSION)) continue;
+        const outcomes = d === yesterdayCT && yesterdayOutcomes
+          ? yesterdayOutcomes
+          : await fetchHomerersForDate(d);
+        if (!outcomes?.allFinal) continue;
+        sgpBy[d] = gradeSGPRecords(stored, outcomes);
         gradedN += sgpBy[d].length; gradedDays += 1;
       }
       const sk = Object.keys(sgpBy).sort();
       for (const d of sk.slice(0, -14)) delete sgpBy[d];
-      if (gradedDays) console.log(`[sgp] graded ${gradedN} SGPs across ${gradedDays} day(s) from reconcile records`);
+      if (gradedDays) console.log(`[sgp] graded ${gradedN} SGPs across ${gradedDays} day(s) from official game outcomes`);
     }
   } catch (e) {
     console.warn(`[sgp] grading skipped: ${e?.message}`);
@@ -4593,25 +4593,45 @@ async function main() {
     const seenS = new Set();
     const sgpCr = [];
     for (const r of Object.values(payload.scoredBatters || {})) {
-      if (r.playerId == null || seenS.has(r.playerId)) continue;
-      seenS.add(r.playerId);
+      if (!r || r.playerId == null) continue;
+      const key = `${r.playerId}-${r.gamePk}`;
+      if (seenS.has(key)) continue;
+      seenS.add(key);
       const x = comboRowFromSnapshot(r);
       if (x) sgpCr.push(x);
     }
-    const sgps = buildSGPRecords(sgpCr, { sizes: [2, 3] });
-    if (sgps.length) {
-      backtestLog.combos = backtestLog.combos || {};
-      backtestLog.combos.sgpByDate = backtestLog.combos.sgpByDate || {};
-      // Freeze-once: first run of the day captures pregame picks. Later runs
-      // (in-game, post-game) don't overwrite so the scorecard reflects actual
-      // pregame selections, not mid-game board shifts.
-      if (!backtestLog.combos.sgpByDate[date]) {
-        backtestLog.combos.sgpByDate[date] = sgps;
-        const sk = Object.keys(backtestLog.combos.sgpByDate).sort();
-        for (const d of sk.slice(0, -14)) delete backtestLog.combos.sgpByDate[d]; // keep ~2 weeks
-        console.log(`[sgp] ${date}: froze ${sgps.length} same-game parlays (pregame)`);
-      }
+    const pregameGames = new Set(
+      (payload.games || [])
+        .filter((g) => !g.isLive && !g.isFinal && !/postponed|cancelled|suspended/i.test(g.status || ''))
+        .map((g) => g.gamePk),
+    );
+    const sgps = buildSGPRecords(sgpCr, { sizes: [2, 3] })
+      .filter((s) => pregameGames.has(s.gamePk));
+    backtestLog.combos = backtestLog.combos || {};
+    backtestLog.combos.sgpByDate = backtestLog.combos.sgpByDate || {};
+    const prior = Array.isArray(backtestLog.combos.sgpByDate[date])
+      ? backtestLog.combos.sgpByDate[date]
+      : [];
+    // Migrate away from the old early-projection freeze, then append each game
+    // only after its complete lineup is confirmed. Later cron runs add newly
+    // confirmed games without changing tickets already offered.
+    const merged = new Map(
+      prior
+        .filter((s) => s.selectionVersion === 2)
+        .map((s) => [`${s.gamePk}-${s.size}`, s]),
+    );
+    const before = merged.size;
+    for (const s of sgps) {
+      const key = `${s.gamePk}-${s.size}`;
+      if (!merged.has(key)) merged.set(key, s);
     }
+    const nextSgps = [...merged.values()];
+    if (prior.length !== nextSgps.length || before !== merged.size) {
+      backtestLog.combos.sgpByDate[date] = nextSgps;
+      console.log(`[sgp] ${date}: froze ${merged.size - before} newly confirmed SGPs (${nextSgps.length} total)`);
+    }
+    const sk = Object.keys(backtestLog.combos.sgpByDate).sort();
+    for (const d of sk.slice(0, -14)) delete backtestLog.combos.sgpByDate[d]; // keep ~2 weeks
   } catch (e) { console.warn(`[sgp] freeze skipped (non-fatal): ${e?.message}`); }
 
   // K-prop scorecard: freeze today's K estimates so we can grade them tomorrow

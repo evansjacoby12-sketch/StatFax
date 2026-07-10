@@ -13,7 +13,14 @@ import {
   blastRate,
 } from '../ui/src/lib/combo-engine.js'
 import { buildGroups } from '../ui/src/lib/groups.js'
-import { comboRowFromSnapshot, buildComboRecords, gradeCombos } from '../server/parlay-combos.mjs'
+import {
+  comboRowFromSnapshot,
+  buildComboRecords,
+  buildSGPRecords,
+  gradeCombos,
+  gradeSGPRecords,
+  SGP_GRADE_VERSION,
+} from '../server/parlay-combos.mjs'
 import { heatIndex } from '../ui/src/lib/scout.js'
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
@@ -274,4 +281,33 @@ test('gradeCombos marks allHit only when every leg homered', () => {
   assert.equal(graded[0].allHit, true)
   assert.equal(graded[1].nHit, 1)
   assert.equal(graded[1].allHit, false)
+})
+
+test('gradeSGPRecords settles by player + game and is doubleheader-safe', () => {
+  const records = [
+    { gamePk: 100, size: 2, legs: [1, 2], pred: 0.05 },
+    { gamePk: 101, size: 2, legs: [1, 2], pred: 0.05 },
+  ]
+  const outcomes = {
+    homerers: new Set([1, 2]),
+    homerersByKey: new Set(['1-100', '2-100', '1-101']),
+  }
+  const graded = gradeSGPRecords(records, outcomes)
+  assert.equal(graded[0].allHit, true)
+  assert.equal(graded[0].nHit, 2)
+  assert.equal(graded[1].allHit, false)
+  assert.equal(graded[1].nHit, 1)
+  assert.equal(graded[0].gradeVersion, SGP_GRADE_VERSION)
+})
+
+test('buildSGPRecords waits for complete confirmed game lineups', () => {
+  const ready = [
+    row({ playerId: 1, gamePk: 100, score: 80, grade: 'PRIME', hrProb: 0.25, lineupConfirmed: true }),
+    row({ playerId: 2, gamePk: 100, score: 70, grade: 'PRIME', hrProb: 0.2, lineupConfirmed: true }),
+  ]
+  assert.equal(buildSGPRecords(ready, { sizes: [2] }).length, 1)
+  assert.equal(
+    buildSGPRecords([{ ...ready[0], lineupConfirmed: false }, ready[1]], { sizes: [2] }).length,
+    0,
+  )
 })
