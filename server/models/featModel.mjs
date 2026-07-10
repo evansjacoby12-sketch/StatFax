@@ -4,7 +4,7 @@
  * The production "ensemble" stacker (ensemble.mjs) only sees the rule model's
  * OUTPUTS (score + badges + grade one-hots), so it can't out-rank the rule
  * score — it's essentially a re-calibration of it. This model instead fits an
- * L2-regularized logistic regression directly on the 20-dim FEATURE vector that
+ * L2-regularized logistic regression directly on the FEATURE vector that
  * reconcile.mjs logs (`feat`), which empirically separates HR/no-HR better
  * (5-fold CV AUC ~0.77 vs the rule score's ~0.73 on the first ~430 reconciled
  * rows with features).
@@ -25,6 +25,14 @@
 export const FEAT_KEYS = [
   'bs', 'ms', 'es', 'iso', 'xiso', 'brl', 'rbrl', 'ev', 'hh', 'la',
   'phr9', 'pera', 'pk9', 'vdel', 'csw', 'park', 'vig', 'ord', 'hot', 'due',
+  // Ceiling/form raw ingredients — ADDED 2026-07-10. 100% null until slates
+  // accrue, so they're constant-0 columns → L2 drives their weight to 0 →
+  // predictions are BYTE-IDENTICAL today. As data lands, each retrain (5-fold
+  // CV-AUC gated, L2-reg, blend sized by the measured AUC edge) learns their
+  // weight ONLY to the extent they lift cross-validated AUC — auto-earning,
+  // self-limiting, no hand-tuned multiplier. Raw ingredients, not the ceil/form
+  // composites, so the model learns the weighting itself (no double-count).
+  'ss', 'evhi', 'rev',
 ]
 
 const MIN_N = 300
