@@ -11,6 +11,7 @@ export default function Settings({
   comboConf, onSetComboConf,
   comboLock, onToggleComboLock,
   eliLevel, onSetEli,
+  betaCeil, onToggleBetaCeil,
   onClose,
 }) {
   const groups = [
@@ -84,6 +85,18 @@ export default function Settings({
           desc: 'Pin the combo board to its morning-lock picks (heat, park, edge signals frozen), so the legs don’t re-rank through the day. Off = the board rebuilds live from current signals. Takes effect from the next morning lock; a pitcher change still re-ranks that bat.',
           on: comboLock,
           toggle: onToggleComboLock,
+        },
+      ],
+    },
+    {
+      title: 'Beta (unvalidated)',
+      rows: [
+        {
+          icon: 'Sparkles',
+          label: 'Ceiling & Form',
+          desc: 'Preview the experimental raw-power Ceiling and recent-Form scores in the player drawer (Statcast tab). NOT a betting signal — it never affects any pick, grade, or probability, and is being forward-tested against real HR results. It only joins the real board if it beats the base rate.',
+          on: betaCeil,
+          toggle: onToggleBetaCeil,
         },
       ],
     },

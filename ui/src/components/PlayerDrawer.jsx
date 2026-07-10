@@ -17,6 +17,7 @@ import { toast } from './Toast.jsx'
 import { sharePickCard } from '../lib/shareCard.js'
 import { useExplain } from '../lib/explain.js'
 import { locationRating5, arsenalRating5, combinedEdge5 } from '../lib/zoneEdge.js'
+import * as store from '../lib/storage.js'
 
 const WORKER_URL = import.meta.env?.VITE_WORKER_URL || ''
 
@@ -374,10 +375,53 @@ function SplitsTab({ b }) {
 function StatcastTab({ b }) {
   return (
     <>
+      <BetaCeiling b={b} />
       <StatcastSection b={b} />
       <RollingWindows b={b} />
       <PercentileSection b={b} />
     </>
+  )
+}
+
+// PRIVATE BETA — hidden unless the user flips "Beta: Ceiling & Form" in Settings
+// (localStorage 'statfax:betaCeil', default off), so it never reaches anyone
+// else's board. Renders the ADVISORY barrelScore/formScore + their raw top-end
+// power inputs, loudly labeled UNVALIDATED. These never touch the HR score/prob;
+// they only ship to the real board if lab:validate-ceil earns the hit-rate.
+function BetaCeiling({ b }) {
+  if (!store.load('betaCeil', false)) return null
+  const ceil = b.ceilScore, form = b.formScore
+  const tone = (s) => s == null ? 'var(--text-faint)'
+    : s >= 75 ? 'var(--strong)' : s >= 50 ? 'var(--prime)' : 'var(--text-dim)'
+  const big = (label, v) => (
+    <div style={{ flex: 1, textAlign: 'center', padding: '10px 4px', background: 'rgba(255,255,255,0.02)', borderRadius: 10 }}>
+      <div style={{ fontSize: 26, fontWeight: 800, fontFamily: 'var(--mono)', color: tone(v), lineHeight: 1 }}>{v ?? '—'}</div>
+      <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-dim)', marginTop: 6 }}>{label}</div>
+    </div>
+  )
+  return (
+    <Section title="Ceiling & Form · BETA" icon="Sparkles">
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+        {big('Ceiling', ceil)}
+        {big('Form', form)}
+      </div>
+      {(b.maxEV != null || b.sweetSpotPct != null || b.hrDistance != null) && (
+        <>
+          {b.maxEV != null      && <KV k="Max exit velo"  v={`${b.maxEV.toFixed(1)} mph`} />}
+          {b.sweetSpotPct != null && <KV k="Sweet-spot %" v={`${b.sweetSpotPct.toFixed(1)}%`} />}
+          {b.hrDistance != null && <KV k="Avg HR distance" v={`${Math.round(b.hrDistance)} ft`} />}
+        </>
+      )}
+      {ceil == null && (
+        <p style={{ fontSize: 11, color: 'var(--text-faint)', margin: '8px 0 0' }}>
+          No ceiling data on this row yet — populates on the next slate rebuild.
+        </p>
+      )}
+      <p style={{ fontSize: 11, color: 'var(--bad)', margin: '10px 0 0', lineHeight: 1.5 }}>
+        <b>UNVALIDATED</b> — not a betting signal. Being forward-tested by reconciled
+        shortlist hit-rate; joins the real board only if it beats the base rate.
+      </p>
+    </Section>
   )
 }
 
