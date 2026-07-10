@@ -387,7 +387,8 @@ function StatcastTab({ b }) {
 // (localStorage 'statfax:betaCeil', default off), so it never reaches anyone
 // else's board. Renders the ADVISORY barrelScore/formScore + their raw top-end
 // power inputs, loudly labeled UNVALIDATED. These never touch the HR score/prob;
-// they only ship to the real board if lab:validate-ceil earns the hit-rate.
+// qualifying rows may carry the filterable POWER READY beta signal while the
+// exact shortlist definition accrues forward results.
 function BetaCeiling({ b }) {
   if (!store.load('betaCeil', false)) return null
   const ceil = b.ceilScore, form = b.formScore
@@ -416,8 +417,8 @@ function BetaCeiling({ b }) {
         </p>
       )}
       <p style={{ fontSize: 11, color: 'var(--bad)', margin: '10px 0 0', lineHeight: 1.5 }}>
-        <b>UNVALIDATED</b> — not a betting signal. Being forward-tested by reconciled
-        shortlist hit-rate; joins the real board only if it beats the base rate.
+        <b>UNVALIDATED BETA</b> — not a probability bonus or standalone betting signal.
+        POWER READY qualifying rows are logged for forward shortlist validation.
       </p>
     </Section>
   )

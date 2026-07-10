@@ -3,10 +3,9 @@
  *
  * These quantify a batter's raw-power CEILING (how much damage when squared up)
  * and current FORM (recent contact quality), modeled on how sharps read HR
- * props. They are DISPLAY/SHORTLIST signals only — they NEVER feed scoreBatter,
- * the HR probability, the grade, or any prediction. They exist to be logged and
- * forward-validated (see model-lab/validate-ceil.mjs); nothing ships to the
- * board off them until the reconciled shortlist hit-rate earns it.
+ * props. They never feed scoreBatter or add a probability bonus. The combined
+ * POWER READY beta signal is display/filter/logging only while its forward
+ * shortlist hit-rate accrues (see model-lab/validate-ceil.mjs).
  *
  * Design: fixed MLB reference anchors (not pool z-scores) so a single batter's
  * score is stable run-to-run and interpretable (~50 = league avg, 70+ = strong,

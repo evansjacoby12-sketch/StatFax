@@ -655,6 +655,7 @@ import { fetchRecentBatterBarrelsMultiWindow, fetchRecentPitcherVelo } from './s
 import { applySimResolution } from './lib/simResolution.mjs';
 import { fetchHROdds } from './lib/theOddsApi.mjs';
 import { advisoryBarrel } from './lib/barrelScore.mjs';
+import { powerReadySignal } from '../ui/src/lib/powerReady.js';
 import { pitchMixScore } from '../ui/src/lib/scout.js';
 
 // ─── HTTP helpers ────────────────────────────────────────────────────────────
@@ -3388,14 +3389,17 @@ async function main() {
           ...safeResult,
         };
         // ADVISORY ceiling + form (barrelScore/formScore) — computed off the
-        // row's now-populated power fields. Display/shortlist signals ONLY:
+        // row's now-populated power fields. Display/filter/logging signals ONLY:
         // deliberately set AFTER scoreBatter and never read back into score,
         // grade, or hrProbability. Logged so validate-ceil can forward-test the
-        // shortlist hit-rate before anything ships to the board.
+        // shortlist hit-rate before the beta signal is promoted as validated.
         {
           const adv = advisoryBarrel(row);
           row.ceilScore = adv.ceil;   // 0-100 raw-power ceiling (null when < 3 inputs)
           row.formScore = adv.form;   // 0-100 recent-power form (null when no window)
+          // Advisory/filterable beta signal only. This boolean is intentionally
+          // assigned after scoring and is never fed back into score/probability.
+          row.powerReady = powerReadySignal(row);
         }
         // Apply umpire HR factor on the env contribution of the composite.
         // No-op when the factor is 1.0 (default for any ump not in the

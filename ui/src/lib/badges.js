@@ -17,6 +17,7 @@ export function gradeColor(label) {
 // `lucide` field is the lucide-react icon name; tone drives color.
 export const BADGES = [
   { key: 'precision', label: 'Precision', lucide: 'Sparkles', color: 'var(--accent)', tone: 'good', desc: 'Meets every precision gate: pitch mix ≥7, heat ≥48, HR due 5/6+, 8+ positive trends, ≤3 negatives' },
+  { key: 'powerReady', label: 'Power Ready β', lucide: 'Gauge', color: '#22d3ee', tone: 'warn', desc: 'Beta advisory signal: ceiling ≥75, matchup ≥60 and form ≥35 with a real recent contact sample. Logged for forward validation; it does not add a probability bonus.' },
   { key: 'sleeper', label: 'Sleeper', lucide: 'Moon', color: '#8b5cf6', tone: 'good', desc: 'Under-the-radar value: STRONG/LEAN grade but PRIME-adjacent form — heat ≥48, HR setup 3/6+, hot or rising power. Hit 21% over the 14-day validation window at non-chalk prices' },
   { key: 'hot', label: 'Hot', lucide: 'Flame', color: 'var(--b-hot)', tone: 'good', desc: 'On a hot streak — recent power surge' },
   { key: 'rising', label: 'Rising', lucide: 'TrendingUp', color: 'var(--good)', tone: 'good', desc: 'Recent ~14-day barrel rate surging above the season rate — heating up right now (the recency edge sharps ride)' },

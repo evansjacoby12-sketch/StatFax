@@ -1,6 +1,7 @@
 // Loads the brain's scored slate (dist/daily.json) and shapes it for the board.
 
 import { heatIndex, pitchMixScore } from './scout.js'
+import { powerReadySignal } from './powerReady.js'
 
 // Relative to the app's base URL so it works at any deploy path (root host or
 // a GitHub Pages project subpath) as well as the dev server. Guarded so the
@@ -179,6 +180,10 @@ export async function loadSlate() {
       weather: d.weatherByGame?.[b.gamePk] || null,
       h2h: pitcherId ? h2hMap[`${b.playerId}-${pitcherId}`] || null : null,
       heatIndex: heatIndex(b),
+      // Re-derive client-side for the current cached slate; the server also
+      // freezes this boolean on new snapshots so reconciliation logs the exact
+      // signal users saw before first pitch.
+      powerReady: b.powerReady === true || powerReadySignal(b),
       // Opposing team's bullpen HR/9 — the pen this batter attacks once the
       // starter exits. Drives the Cheat Sheet "Bullpen Targets" board.
       opposingBullpenHR9: d.bullpenHR9?.[opp?.id] ?? null,

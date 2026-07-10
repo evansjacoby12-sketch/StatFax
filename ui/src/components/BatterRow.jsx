@@ -56,8 +56,10 @@ export default function BatterRow({
     onLeft: () => onToggleSlip?.(b),
   })
 
-  const strongestSignal = pmScore >= 7
-    ? { label: `Pitch ${pmScore.toFixed(1)}`, tone: 'good', icon: 'Target' }
+  const strongestSignal = b.powerReady
+    ? { label: 'Power Ready β', tone: 'warn', icon: 'Gauge' }
+    : pmScore >= 7
+      ? { label: `Pitch ${pmScore.toFixed(1)}`, tone: 'good', icon: 'Target' }
     : dueSetup.n >= 4
       ? { label: `Due ${dueSetup.n}/${dueSetup.checks.length}`, tone: 'warn', icon: 'Hourglass' }
       : airTone === 'good'

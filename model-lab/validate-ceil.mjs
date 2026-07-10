@@ -9,8 +9,8 @@
  * The ceiling fields (feat.ceil/form/mxev/ss/hrd) were instrumented 2026-07-10,
  * so until a week or so of reconciled slates accrue this prints a coverage notice
  * and exits 0 (nothing to validate yet). Once ~200+ reconciled bats carry `ceil`
- * it renders the shortlist table + a SHIP / NO-SHIP read. Advisory metrics never
- * touch the HR score — this only decides whether they're worth SHOWING.
+ * it renders the shortlist table + a GRADUATE / HOLD read. Advisory metrics never
+ * touch the HR score — this decides whether POWER READY can lose its beta label.
  */
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
@@ -36,7 +36,13 @@ for (const recs of Object.values(log.records || {})) {
     if (r.actuallyPlayed === false) continue;
     if (typeof r.homered !== 'boolean') continue;
     const f = r.feat || {};
-    bats.push({ ceil: f.ceil, form: f.form, ms: f.ms, hr: r.homered ? 1 : 0 });
+    bats.push({
+      ceil: f.ceil,
+      form: f.form,
+      ms: f.ms,
+      powerReady: Array.isArray(r.badges) && r.badges.includes('powerReady'),
+      hr: r.homered ? 1 : 0,
+    });
   }
 }
 const N = bats.length, HR = bats.reduce((s, b) => s + b.hr, 0);
@@ -47,8 +53,8 @@ const withCeil = bats.filter(b => Number.isFinite(b.ceil));
 console.log(`ceiling coverage: ${withCeil.length}/${N} bats carry feat.ceil (instrumented 2026-07-10)`);
 if (withCeil.length < 200) {
   console.log(`\n⏳ Not enough accrued yet to validate (need ~200+, have ${withCeil.length}). Let the new`);
-  console.log(`   ceiling fields log for ~a week of slates, then re-run. Nothing ships off CEIL/FORM`);
-  console.log(`   until the shortlist hit-rate below clears the base rate on real outcomes.`);
+  console.log(`   ceiling fields log for ~a week of slates, then re-run. POWER READY stays an`);
+  console.log(`   advisory beta until its shortlist clears the base rate on real outcomes.`);
   process.exit(0);
 }
 
@@ -68,6 +74,7 @@ console.log(`\nAUC vs HR — ceil ${auc(withCeil, 'ceil').toFixed(4)} · form ${
 const rate = a => a.length ? 100 * a.reduce((s, b) => s + b.hr, 0) / a.length : NaN;
 const lift = r => `${(r - 100 * base >= 0 ? '+' : '')}${(r - 100 * base).toFixed(1)}pt`;
 const SHORTLISTS = [
+  { label: 'POWER READY β (exact board signal)',    pred: b => b.powerReady === true },
   { label: 'CEIL ≥ 65',                          pred: b => b.ceil >= 65 },
   { label: 'CEIL ≥ 70 + FORM ≥ 60',              pred: b => b.ceil >= 70 && b.form >= 60 },
   { label: 'CEIL ≥ 75 + Matchup ≥ 60 (Elite)',   pred: b => b.ceil >= 75 && b.ms >= 60 },
@@ -84,5 +91,5 @@ for (const s of SHORTLISTS) {
   console.log(`  ${s.label.padEnd(40)} ${r.toFixed(1)}%  (n=${c.length}, ${lift(r)})${win ? '  ✓' : ''}`);
 }
 console.log(`\nVERDICT: ${anyWin
-  ? '✅ SHIP — at least one shortlist clears the base rate with a real edge. Surface CEIL/FORM + the winning shortlist as a board signal.'
-  : '❌ HOLD — no shortlist beats the base rate convincingly. Do not surface; keep logging or rethink the construction.'}`);
+  ? '✅ GRADUATE — at least one shortlist clears the base rate with a real edge. Review sample confidence, then remove the POWER READY beta label.'
+  : '❌ HOLD BETA — no shortlist beats the base rate convincingly. Keep the signal advisory, keep logging, or rethink the construction.'}`);
