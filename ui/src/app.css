@@ -11802,7 +11802,48 @@ button.th:focus-visible {
     font-size: 9px !important;
     line-height: 1.35;
   }
-  .results-grade-card { min-height: 290px; }
+  .results-grade-card.is-mobile-active {
+    min-height: 0;
+    flex-direction: column;
+  }
+  .results-grade-card > .section-title {
+    width: 100%;
+    flex: none;
+  }
+  .results-grade-card .grade-hits {
+    width: 100%;
+    gap: 12px !important;
+  }
+  .results-grade-card .grade-hit {
+    width: 100%;
+    display: grid;
+    grid-template-rows: auto 7px;
+    gap: 5px;
+  }
+  .results-grade-card .grade-hit-head {
+    margin-bottom: 0 !important;
+    align-items: baseline;
+    gap: 12px;
+  }
+  .results-grade-card .grade-hit-head > span:first-child {
+    font-size: 11px;
+    letter-spacing: 0.02em;
+  }
+  .results-grade-card .grade-hit-head > span:last-child {
+    margin-left: auto;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+  .results-grade-card .grade-hit-track {
+    width: 100%;
+    height: 7px !important;
+  }
+  .results-grade-card > .chart-cap {
+    width: 100%;
+    margin: 13px 0 0 !important;
+    font-size: 10px !important;
+    line-height: 1.45;
+  }
   .results-reliability-card { min-height: 300px; }
   .hr-days {
     margin-bottom: 10px !important;
