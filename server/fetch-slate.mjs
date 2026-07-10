@@ -484,7 +484,10 @@ function computeKDist(pitcher, targets, { weather, umpire, parkFactorK } = {}) {
   const lo = Math.max(0, _ssFindQuantile(lambda, 0.10));
   const hi = _ssFindQuantile(lambda, 0.90);
 
-  return { k: lambda, lo, hi, lambda, probs, tempAdj, umpireAdj, parkKAdj: pAdj, tempF: weather?.tempF ?? null, tttoPenalty, vegasTrim };
+  // expBF (post vegasTrim) ÷ BF/IP = the expected innings that actually drive λ —
+  // logged so the IP model can be graded directly against actualIP.
+  const expIP = expBF > 0 ? +(expBF / _SS_BF_PER_IP).toFixed(2) : null;
+  return { k: lambda, lo, hi, lambda, probs, expIP, oppK, tempAdj, umpireAdj, parkKAdj: pAdj, tempF: weather?.tempF ?? null, tttoPenalty, vegasTrim };
 }
 
 // Intraday board history — append a compact snapshot of TODAY's canonical combos
@@ -4633,6 +4636,14 @@ async function main() {
               hi: kd.hi,
               lambda: kd.lambda,
               probs: kd.probs,
+              // INSTRUMENTED 2026-07-09: the +0.56 K over-projection was traced
+              // 100% to IP over-estimation (implied 5.66 vs actual 5.09 IP), so
+              // logging expIP lets us grade the IP model DIRECTLY against
+              // actualIP next — and refine the projection at the mechanism
+              // instead of the blanket λ recenter (which over-trims deep-outing
+              // horses). oppK/conf carried for context.
+              expIP: Number.isFinite(kd.expIP) ? kd.expIP : null,
+              oppK:  Number.isFinite(kd.oppK) ? +kd.oppK.toFixed(3) : null,
             };
           });
         const dk = Object.keys(backtestLog.kProps.estByDate).sort();
