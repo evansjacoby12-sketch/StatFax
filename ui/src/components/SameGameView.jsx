@@ -58,7 +58,7 @@ export default function SameGameView({ batters, onSelect, favorConsistency = fal
   const sgps = useMemo(() => buildSGP(batters, size, { favorConsistency }), [batters, size, favorConsistency])
   const scOv = sgpScorecard?.overall
   return (
-    <>
+    <div className="sgp-view">
       {scOv && scOv.combos > 0 && (
         <div className="sgp-record" title="Settled same-game parlays graded against actual home runs.">
           <Icon name="Activity" size={13} />
@@ -73,12 +73,26 @@ export default function SameGameView({ batters, onSelect, favorConsistency = fal
         independent odds suggest — but they're a <b>long shot</b>: same-game stacks have cashed far less
         than cross-game combos (see the record above). Best used as a small-stake lottery on high‑HR parks.
       </p>
-      <div className="grp-controls" role="group" aria-label="Legs per SGP">
-        {SIZES.map((s) => (
-          <button key={s} className={`badge-toggle ${size === s ? 'on' : ''}`} onClick={() => setSize(s)}>
-            {s}-leg
-          </button>
-        ))}
+      <div className="sgp-mobile-brief">
+        <Icon name="GitBranch" size={16} />
+        <span>
+          <b>One game. Shared conditions.</b>
+          <small>Correlated HR legs · lottery stake</small>
+        </span>
+      </div>
+      <div className="sgp-size-bar">
+        <span className="sgp-size-label">Ticket size</span>
+        <div className="grp-controls" role="group" aria-label="Legs per SGP">
+          {SIZES.map((s) => (
+            <button type="button" key={s} className={`badge-toggle ${size === s ? 'on' : ''}`} onClick={() => setSize(s)} aria-pressed={size === s}>
+              {s}-leg
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="sgp-mobile-list-meta">
+        <span><b className="mono">{sgps.length}</b> games</span>
+        <span>Best all-hit first</span>
       </div>
       {sgps.length === 0 ? (
         <div className="empty-note">No game has {size} eligible bats right now.</div>
@@ -91,13 +105,16 @@ export default function SameGameView({ batters, onSelect, favorConsistency = fal
             const lv = VERDICT_META[live.code]
             const cashed = live.started && g.legs.length > 0 && live.hits >= g.legs.length
             return (
-              <section className={`grp-card sgp-card tone-${g.tone}${cashed ? ' cashed' : ''}`} key={g.gamePk} style={{ '--gc': c, '--i': Math.min(idx, 8) }} title={cashed ? '💰 CASHED — every leg homered' : undefined}>
-                <header className="grp-head">
-                  <span className="grp-legbadge">{size}-LEG SGP</span>
-                  <span className="grp-strategy">
-                    {matchup}
-                    {g.parkHR != null && <span className="dim"> · park {g.parkHR.toFixed(2)}×</span>}
-                  </span>
+              <section className={`grp-card sgp-card tone-${g.tone}${cashed ? ' cashed' : ''}`} key={g.gamePk} style={{ '--gc': c, '--i': Math.min(idx, 8) }} title={cashed ? 'Cashed — every leg homered' : undefined}>
+                <header className="grp-head sgp-card-head">
+                  <div className="sgp-card-title">
+                    <span className="grp-legbadge">{size}-LEG SGP</span>
+                    <span className="grp-strategy">
+                      {matchup}
+                      {g.parkHR != null && <span className="dim"> · park {g.parkHR.toFixed(2)}×</span>}
+                    </span>
+                  </div>
+                  <div className="sgp-card-state">
                   {live.started ? (
                     <span className="grp-live-tag" title={`Live: ${live.hits}/${live.n} legs homered`} style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '10px', fontWeight: '800', color: lv.color, background: `color-mix(in srgb, ${lv.color} 12%, transparent)`, border: `1px solid color-mix(in srgb, ${lv.color} 35%, transparent)`, borderRadius: '5px', padding: '1px 6px' }}>
                       <Icon name={lv.icon} size={10} className={live.code === 'live' ? 'spin-pulse' : ''} /> {lv.label} {live.hits}/{live.n}
@@ -107,8 +124,10 @@ export default function SameGameView({ batters, onSelect, favorConsistency = fal
                   )}
                   {comboConf === 'percent' && <span className="grp-conf pct">{pct(g.combo, g.combo < 0.01 ? 2 : 1)}</span>}
                   <span className={`grp-grade grade-glow-${g.grade}`} style={{ color: c, borderColor: c }}>{g.grade}</span>
+                  </div>
                   <button
-                    className="grp-copy"
+                    type="button"
+                    className="grp-copy sgp-copy"
                     title="Copy this SGP as text"
                     onClick={(e) => {
                       e.stopPropagation()
@@ -120,14 +139,17 @@ export default function SameGameView({ batters, onSelect, favorConsistency = fal
                     <Icon name="Copy" size={12} />
                   </button>
                 </header>
-                <div className="grp-sub dim">
-                  all‑hit ≈ <b className="mono">{pct(g.combo, g.combo < 0.01 ? 2 : 1)}</b>
+                <div className="grp-sub dim sgp-card-prob">
+                  <span className="sgp-hit-main">
+                    <small>Model all-hit</small>
+                    <b className="mono">{pct(g.combo, g.combo < 0.01 ? 2 : 1)}</b>
+                  </span>
                   {g.rho > 0 ? (
-                    <span title={`Correlation-adjusted for this game's HR environment (park × weather ${num(g.envTilt, 2)}×). Independent product is ${pct(g.comboIndep, g.comboIndep < 0.01 ? 2 : 1)}; books still apply a correlation discount to the payout.`}>
-                      {' '}· corr-adj (indep {pct(g.comboIndep, g.comboIndep < 0.01 ? 2 : 1)})
+                    <span className="sgp-hit-detail" title={`Correlation-adjusted for this game's HR environment (park × weather ${num(g.envTilt, 2)}×). Independent product is ${pct(g.comboIndep, g.comboIndep < 0.01 ? 2 : 1)}; books still apply a correlation discount to the payout.`}>
+                      Corr-adjusted · indep {pct(g.comboIndep, g.comboIndep < 0.01 ? 2 : 1)}
                     </span>
                   ) : (
-                    <span> · independent (neutral park)</span>
+                    <span className="sgp-hit-detail">Independent · neutral park</span>
                   )}
                 </div>
                 <ul className="grp-legs">
@@ -136,10 +158,23 @@ export default function SameGameView({ batters, onSelect, favorConsistency = fal
                     const st = legStatus(b)
                     const sm = LEG_META[st.code]
                     return (
-                      <li className={`sgp-leg ${info.bad ? 'weak-leg' : ''}`} key={b.id} onClick={() => onSelect(b)} role="button" tabIndex={0} style={st.code === 'hit' ? { background: 'color-mix(in srgb, var(--strong) 7%, transparent)' } : st.code === 'dead' ? { opacity: 0.6 } : undefined}>
+                      <li
+                        className={`sgp-leg ${info.bad ? 'weak-leg' : ''}`}
+                        key={b.id}
+                        onClick={() => onSelect(b)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            onSelect(b)
+                          }
+                        }}
+                        role="button"
+                        tabIndex={0}
+                        style={st.code === 'hit' ? { background: 'color-mix(in srgb, var(--strong) 7%, transparent)' } : st.code === 'dead' ? { opacity: 0.6 } : undefined}
+                      >
                         <span className="sgp-leg-ord mono">{i + 1}</span>
                         <div className="sgp-leg-body">
-                          <span className="sgp-leg-name">{lastFirst(b.name)}</span>
+                          <span className="sgp-leg-name">{b.name}</span>
                           {st.code !== 'pending' && (
                             <span className="grp-chip" style={{ color: sm.color, background: `color-mix(in srgb, ${sm.color} 12%, transparent)`, borderColor: 'transparent' }} title={st.code === 'hit' ? 'Homered' : st.code === 'dead' ? 'Game final — no HR' : 'Game in progress'}>
                               <Icon name={sm.icon} size={10} className={st.code === 'live' ? 'spin-pulse' : ''} /> {st.code === 'hit' ? 'HR' : st.code === 'dead' ? 'no HR' : st.label}
@@ -160,6 +195,6 @@ export default function SameGameView({ batters, onSelect, favorConsistency = fal
           })}
         </div>
       )}
-    </>
+    </div>
   )
 }
