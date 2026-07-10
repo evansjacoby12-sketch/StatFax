@@ -732,12 +732,15 @@ function DrawerHeader({ b, color, onClose, watched, inSlip, onToggleWatch, onTog
 }
 
 function MobileDrawerHeader({ b, color, onClose, watched, inSlip, onToggleWatch, onToggleSlip }) {
+  const [signalsOpen, setSignalsOpen] = useState(false)
   const allSignals = activeBadges(b)
-  const shownSignals = allSignals.slice(0, 3)
-  const signalOverflow = Math.max(0, allSignals.length - shownSignals.length)
+  const hiddenSignalCount = Math.max(0, allSignals.length - 3)
+  const shownSignals = signalsOpen ? allSignals : allSignals.slice(0, 3)
   const market = b.vegasImpliedProb
   const hasMarket = Number.isFinite(market)
   const edge = hasMarket && Number.isFinite(b.hrProbability) ? b.hrProbability - market : null
+
+  useEffect(() => setSignalsOpen(false), [b.id])
 
   const share = () => {
     toast.info('Rendering card…', 1500)
@@ -779,13 +782,30 @@ function MobileDrawerHeader({ b, color, onClose, watched, inSlip, onToggleWatch,
         <span><small>{hasMarket ? 'Edge' : 'Ens'}</small><b className={`mono${edge != null && edge >= 0 ? ' good' : edge != null ? ' bad' : ''}`}>{hasMarket ? signedPct(edge, 1) : num(b.ensembleScore)}</b></span>
       </div>
 
-      <div className="mobile-player-signals" aria-label="Top player signals">
+      <div
+        id="mobile-player-signal-list"
+        className={`mobile-player-signals${signalsOpen ? ' expanded' : ''}`}
+        aria-label={signalsOpen ? 'All player signals' : 'Top player signals'}
+        aria-live="polite"
+      >
         {shownSignals.map((signal) => (
           <span key={signal.key} style={{ '--signal-color': signal.color }}>
             <i />{signal.label}
           </span>
         ))}
-        {signalOverflow > 0 && <span className="more">+{signalOverflow}</span>}
+        {hiddenSignalCount > 0 && (
+          <button
+            type="button"
+            className="more"
+            onClick={() => setSignalsOpen((open) => !open)}
+            aria-expanded={signalsOpen}
+            aria-controls="mobile-player-signal-list"
+            aria-label={signalsOpen ? 'Hide additional player signals' : `Show ${hiddenSignalCount} more player signals`}
+          >
+            <span>{signalsOpen ? 'Less' : `+${hiddenSignalCount}`}</span>
+            <Icon name="ChevronDown" size={11} />
+          </button>
+        )}
       </div>
 
       <div className="mobile-player-actions">

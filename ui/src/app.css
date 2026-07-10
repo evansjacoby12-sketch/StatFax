@@ -10379,10 +10379,15 @@ button.th:focus-visible {
   .mobile-player-metrics b.good { color: var(--strong); }
   .mobile-player-metrics b.bad { color: var(--bad); }
 
-  .mobile-player-signals { height: 30px; padding: 0 12px 7px; display: flex; gap: 5px; overflow: hidden; }
+  .mobile-player-signals { min-height: 44px; padding: 0 12px 7px; display: flex; align-items: center; gap: 5px; overflow: hidden; }
   .mobile-player-signals > span { height: 23px; min-width: 0; padding: 0 8px; display: inline-flex; align-items: center; gap: 4px; overflow: hidden; color: var(--signal-color, var(--text-dim)); border: 1px solid color-mix(in srgb, var(--signal-color, var(--text-dim)) 26%, transparent); border-radius: 7px; background: color-mix(in srgb, var(--signal-color, var(--text-dim)) 7%, transparent); font-size: 7.5px; font-weight: 800; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
   .mobile-player-signals i { flex: none; width: 5px; height: 5px; border-radius: 50%; background: currentColor; box-shadow: 0 0 6px currentColor; }
-  .mobile-player-signals > .more { flex: none; color: var(--text-faint); border-color: var(--border-soft); background: rgba(255,255,255,0.025); }
+  .mobile-player-signals > .more { min-width: 44px; height: 44px; flex: none; display: inline-flex; align-items: center; justify-content: center; gap: 2px; color: var(--text-dim); border: 1px solid var(--border-soft); border-radius: 8px; background: rgba(255,255,255,0.025); font-size: 8px; font-weight: 900; text-transform: uppercase; touch-action: manipulation; cursor: pointer; }
+  .mobile-player-signals > .more svg { transition: transform 0.18s ease; }
+  .mobile-player-signals > .more[aria-expanded='true'] svg { transform: rotate(180deg); }
+  .mobile-player-signals > .more:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .mobile-player-signals.expanded { max-height: 132px; padding-top: 5px; flex-wrap: wrap; align-content: flex-start; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; }
+  .mobile-player-signals.expanded > span { flex: none; max-width: calc(100% - 10px); }
 
   .mobile-player-actions { height: 52px; padding: 0 12px 8px; display: grid; grid-template-columns: minmax(0, 1fr) 44px 44px; gap: 8px; }
   .mobile-player-add,
