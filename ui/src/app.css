@@ -10178,3 +10178,615 @@ button.th:focus-visible {
 @media (max-width: 560px) and (prefers-reduced-motion: reduce) {
   .mobile-tools-sheet { animation: none; }
 }
+
+/* Mobile Weather + Pitcher Cards: approved scan-first hierarchy. */
+.mobile-page-kicker,
+.wx-sort-select,
+.wxcard-mobile-impact,
+.wx-mobile-details,
+.wx-mobile-disclosure,
+.pitcher-cards-label,
+.pa-mobile-copy,
+.pcard-scout-toggle {
+  display: none;
+}
+
+.pitcher-mode-tabs,
+.pitcher-sort-row {
+  display: contents;
+}
+
+@media (max-width: 560px) {
+  .mobile-page-kicker {
+    min-height: 39px;
+    padding: 0 1px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .mobile-page-kicker > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    color: var(--text-dim);
+    font-size: 11px;
+    font-weight: 850;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .mobile-page-kicker > span svg { color: var(--accent); }
+  .mobile-page-kicker > small {
+    color: var(--text-faint);
+    font-size: 9px;
+    font-weight: 700;
+  }
+
+  /* Weather controls */
+  .wx-controls {
+    width: 100%;
+    margin-bottom: 12px !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center !important;
+    gap: 8px !important;
+  }
+  .wx-sort-select {
+    min-width: 0;
+    height: 44px;
+    padding: 0 11px;
+    display: grid;
+    grid-template-columns: 16px minmax(0, 1fr) 16px;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    border-radius: 11px;
+    background: var(--card);
+  }
+  .wx-sort-select select {
+    width: 100%;
+    min-width: 0;
+    height: 42px;
+    padding: 0;
+    overflow: hidden;
+    color: var(--text-dim);
+    border: 0;
+    outline: 0;
+    background: transparent;
+    appearance: none;
+    font: 750 12px var(--font, Inter, sans-serif);
+    text-overflow: ellipsis;
+    cursor: pointer;
+  }
+  .wx-sort-select:focus-within {
+    border-color: rgba(0, 216, 246, 0.5);
+    box-shadow: 0 0 0 2px rgba(0, 216, 246, 0.12);
+  }
+  .wx-sorts { display: none !important; }
+  .wx-filters {
+    width: auto !important;
+    display: grid !important;
+    grid-template-columns: repeat(2, 44px);
+    gap: 8px !important;
+  }
+  .wx-filters .badge-toggle {
+    width: 44px !important;
+    min-width: 44px !important;
+    height: 44px !important;
+    padding: 0 !important;
+    display: grid !important;
+    place-items: center;
+    border-radius: 11px !important;
+  }
+  .wx-filters .badge-toggle svg { width: 17px; height: 17px; }
+  .wx-filter-label { display: none; }
+
+  /* Weather impact card */
+  .wx-games { gap: 12px !important; }
+  .wxcard {
+    padding: 0 !important;
+    gap: 0 !important;
+    overflow: hidden;
+    border-radius: 16px !important;
+    background-color: rgba(13, 14, 16, 0.9) !important;
+    box-shadow: 0 14px 35px -28px rgba(0, 0, 0, 0.96) !important;
+  }
+  .wxcard-head {
+    min-height: 60px;
+    padding: 9px 11px;
+    display: grid !important;
+    grid-template-columns: 38px minmax(0, 1fr) auto;
+    gap: 9px !important;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .wxcard-logo {
+    width: 36px !important;
+    height: 36px !important;
+    padding: 3px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.035);
+  }
+  .wxcard-matchup { font-size: 15px !important; }
+  .wxcard-sub {
+    margin-top: 3px !important;
+    overflow: hidden;
+    font-size: 10px !important;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .wxcard-env {
+    min-width: 66px;
+    padding: 5px 7px !important;
+    display: grid;
+    justify-items: center;
+    gap: 2px;
+    border: 1px solid var(--border-soft);
+    border-radius: 9px !important;
+    font-size: 9px !important;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .wxcard-env b {
+    display: block;
+    font-size: 11px;
+    letter-spacing: 0;
+  }
+  .wxcard-body { display: none !important; }
+  .wxcard-mobile-impact {
+    min-height: 78px;
+    padding: 10px 11px;
+    display: grid;
+    grid-template-columns: minmax(116px, 1.35fr) repeat(3, minmax(0, 0.65fr));
+    gap: 7px;
+    border-bottom: 1px solid var(--border-soft);
+    background: linear-gradient(110deg, rgba(0, 216, 246, 0.065), transparent 52%, rgba(50, 215, 75, 0.045));
+  }
+  .wx-mobile-wind {
+    min-width: 0;
+    padding-right: 8px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    border-right: 1px solid var(--border-soft);
+  }
+  .wx-mobile-wind-k {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--text-faint);
+    font-size: 8px;
+    font-weight: 850;
+    text-transform: uppercase;
+  }
+  .wx-mobile-wind > b {
+    margin-top: 4px;
+    overflow: hidden;
+    color: var(--accent);
+    font-size: 15px;
+    font-weight: 850;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .wx-mobile-wind > span:last-child {
+    margin-top: 2px;
+    overflow: hidden;
+    color: var(--text-dim);
+    font-size: 9px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .wx-mobile-metric {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+  .wx-mobile-metric small {
+    color: var(--text-faint);
+    font-size: 8px;
+    font-weight: 800;
+    text-transform: uppercase;
+  }
+  .wx-mobile-metric b {
+    margin-top: 5px;
+    font-size: 12px;
+    font-weight: 800;
+  }
+  .wx-mobile-metric.tone-good b { color: var(--good); }
+  .wx-mobile-metric.tone-bad b { color: var(--bad); }
+  .wxcard-helped {
+    padding-top: 0 !important;
+    border-top: 0 !important;
+  }
+  .wxcard-helped .pcard-h4 {
+    min-height: 35px;
+    margin: 0 !important;
+    padding: 0 11px;
+    border-bottom: 1px solid var(--border-soft);
+    font-size: 9px !important;
+    letter-spacing: 0.07em !important;
+  }
+  .wxcard .ptarget-list { gap: 0 !important; }
+  .wxcard .ptarget {
+    min-height: 46px;
+    padding: 6px 10px !important;
+    gap: 7px !important;
+    border: 0 !important;
+    border-bottom: 1px solid var(--border-soft) !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    touch-action: manipulation;
+  }
+  .wxcard .ptarget:hover,
+  .wxcard .ptarget.selected { background: rgba(0, 216, 246, 0.045) !important; }
+  .wxcard .ptarget-name > span:first-child { font-size: 12px; }
+  .wxcard .ptarget-prob { display: none !important; }
+  .wxcard .grade-score { display: none; }
+  .wxcard:not(.is-expanded) .ptarget:nth-child(n+4) { display: none !important; }
+  .wxcard.is-expanded .ptarget:nth-child(n+4) { display: flex !important; }
+  .wx-mobile-details {
+    padding: 9px 10px;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 7px;
+    border-top: 1px solid var(--border-soft);
+  }
+  .wx-mobile-details > div {
+    min-width: 0;
+    padding: 8px;
+    border: 1px solid var(--border-soft);
+    border-radius: 9px;
+    background: rgba(255, 255, 255, 0.018);
+  }
+  .wx-mobile-details small {
+    display: block;
+    color: var(--text-faint);
+    font-size: 8px;
+    font-weight: 800;
+    text-transform: uppercase;
+  }
+  .wx-mobile-details b {
+    margin-top: 4px;
+    display: block;
+    overflow: hidden;
+    color: var(--text-dim);
+    font-size: 10px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .wx-mobile-disclosure,
+  .pcard-scout-toggle {
+    width: 100%;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    color: var(--text-faint);
+    border: 0;
+    background: rgba(255, 255, 255, 0.018);
+    font-size: 10px;
+    font-weight: 850;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    touch-action: manipulation;
+  }
+  .wx-mobile-disclosure:active,
+  .pcard-scout-toggle:active,
+  .wx-mobile-disclosure[aria-expanded='true'],
+  .pcard-scout-toggle[aria-expanded='true'] {
+    color: var(--accent);
+    background: rgba(0, 216, 246, 0.045);
+  }
+
+  /* Pitcher page controls */
+  .pitchers-controls {
+    width: 100%;
+    margin-bottom: 8px !important;
+    display: flex !important;
+    flex-direction: column;
+    align-items: stretch !important;
+    gap: 8px !important;
+  }
+  .pitcher-mode-tabs {
+    width: 100%;
+    min-height: 50px;
+    padding: 3px;
+    display: grid;
+    grid-template-columns: 1.25fr 1fr 0.82fr;
+    gap: 3px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--card);
+  }
+  .pitcher-mode-tabs .pitchers-controls-k { display: none; }
+  .pitcher-mode-tabs .badge-toggle {
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
+    padding: 0 7px !important;
+    justify-content: center;
+    border: 0 !important;
+    border-radius: 9px !important;
+    font-size: 10px;
+  }
+  .pitcher-mode-tabs .badge-toggle.on {
+    color: var(--accent) !important;
+    background: rgba(0, 216, 246, 0.08) !important;
+    box-shadow: inset 0 0 0 1px rgba(0, 216, 246, 0.2);
+  }
+  .pitcher-detail-label { display: none; }
+  .pitcher-cards-label { display: inline; }
+  .pitcher-sort-row {
+    width: 100%;
+    display: grid;
+    grid-template-columns: auto repeat(2, minmax(0, 1fr));
+    align-items: center;
+    gap: 8px;
+  }
+  .pitcher-sort-row .pitchers-controls-k {
+    margin-left: 0 !important;
+    font-size: 9px !important;
+  }
+  .pitcher-sort-row .badge-toggle {
+    min-width: 0;
+    min-height: 44px;
+    padding: 0 9px;
+    justify-content: center;
+  }
+  .k-parlay-section {
+    margin-bottom: 12px !important;
+    border-radius: 11px !important;
+    background: var(--card) !important;
+  }
+  .k-parlay-trigger {
+    min-height: 44px;
+    padding: 0 11px !important;
+    touch-action: manipulation;
+  }
+  .k-parlay-trigger > span:nth-of-type(1) { font-size: 10px !important; }
+  .k-parlay-trigger > span:nth-of-type(2) {
+    min-width: 0;
+    overflow: hidden;
+    font-size: 9px !important;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Reusable pitcher card: page and drawer share these rules. */
+  .pitchers { gap: 12px !important; }
+  .pcard {
+    padding: 0 !important;
+    overflow: hidden;
+    border-radius: 16px !important;
+    box-shadow: 0 14px 35px -28px rgba(0, 0, 0, 0.96) !important;
+  }
+  .pcard-head {
+    min-height: 76px;
+    margin-bottom: 0 !important;
+    padding: 10px;
+    display: grid !important;
+    grid-template-columns: 48px minmax(0, 1fr) auto;
+    gap: 9px !important;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .pcard-photo {
+    width: 48px !important;
+    height: 48px !important;
+    border: 1px solid color-mix(in srgb, var(--tc) 30%, transparent);
+  }
+  .pcard-name {
+    overflow: hidden;
+    font-size: 15px !important;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .pcard-sub {
+    margin-top: 4px !important;
+    gap: 3px !important;
+    font-size: 9.5px !important;
+    line-height: 1.3;
+  }
+  .pcard-logo { display: none; }
+  .pcard-vuln {
+    flex-direction: column-reverse;
+    gap: 2px !important;
+  }
+  .pcard-vgrade { font-size: 8px !important; }
+  .pcard-stats {
+    margin-bottom: 0 !important;
+    padding: 9px 10px;
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 7px !important;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .pcard-stats .stat {
+    min-width: 0;
+    min-height: 62px;
+    padding: 7px 5px;
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.018);
+    text-align: center;
+  }
+  .pcard-stats .stat:nth-child(2),
+  .pcard-stats .stat:nth-child(n+5) { display: none; }
+  .pcard-stats .stat-label {
+    font-size: 8px;
+    font-weight: 800;
+    text-transform: uppercase;
+  }
+  .pcard-stats .stat-value {
+    margin-top: 4px;
+    font-size: 16px;
+    font-weight: 850;
+  }
+  .pcard-stats .stat-sub { margin-top: 2px; font-size: 8px; }
+  .pcard-attack {
+    min-height: 49px;
+    margin-bottom: 0 !important;
+    padding: 7px 10px !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 8px !important;
+    border-width: 0 0 1px !important;
+    border-radius: 0 !important;
+    background: linear-gradient(90deg, rgba(245, 166, 35, 0.07), transparent) !important;
+  }
+  .pcard-attack .pa-cap,
+  .pcard-attack .pa-unit { display: none !important; }
+  .pa-mobile-copy {
+    min-width: 0;
+    display: block;
+  }
+  .pa-mobile-copy small {
+    display: block;
+    color: var(--text-faint);
+    font-size: 8px;
+    font-weight: 850;
+    text-transform: uppercase;
+  }
+  .pa-mobile-copy b {
+    margin-top: 3px;
+    display: block;
+    color: var(--prime);
+    font-size: 12px;
+  }
+  .pcard-attack .pa-hand {
+    padding: 5px 7px;
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.018);
+    font-size: 9px;
+    white-space: nowrap;
+  }
+  .pcard-attack .pa-hand.on { border-color: rgba(245, 166, 35, 0.2); }
+  .pcard-cols {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 0 !important;
+  }
+  .pcard-targets .pcard-h4 {
+    min-height: 35px;
+    margin: 0 !important;
+    padding: 0 11px;
+    border-bottom: 1px solid var(--border-soft);
+    font-size: 9px !important;
+    letter-spacing: 0.07em !important;
+  }
+  .pcard-targets .ptarget-list { gap: 0 !important; }
+  .pcard-targets .ptarget {
+    min-height: 46px;
+    padding: 6px 10px !important;
+    gap: 7px !important;
+    border: 0 !important;
+    border-bottom: 1px solid var(--border-soft) !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    font-size: 11px !important;
+    touch-action: manipulation;
+  }
+  .pcard-targets .ptarget:hover,
+  .pcard-targets .ptarget.selected { background: rgba(0, 216, 246, 0.045) !important; }
+  .pcard-targets .ptarget-name > span:first-child { font-size: 12px; }
+  .pcard-targets .grade-score { display: none; }
+  .pcard:not(.scouting-open) .pcard-targets .ptarget:nth-child(n+4) { display: none !important; }
+  .pcard.scouting-open .pcard-targets .ptarget:nth-child(n+4) { display: flex !important; }
+  .pcard-sgp-toggle { display: none !important; }
+  .pcard-side {
+    display: none !important;
+    padding: 10px;
+    border-top: 1px solid var(--border-soft);
+    background: rgba(0, 0, 0, 0.1);
+  }
+  .pcard.scouting-open .pcard-side { display: flex !important; }
+  .pcard-side .pcard-h4 { margin-bottom: 8px !important; }
+  .pcard-side .mix-label { width: 60px !important; }
+  .pcard-side .mix-row { min-height: 24px; }
+  .pcard-scout-toggle { position: relative; z-index: 2; }
+
+  /* Vulnerability preview cards */
+  .pvp-cap { margin-bottom: 12px !important; line-height: 1.45; }
+  .pvp-tier {
+    padding: 0 !important;
+    overflow: hidden;
+    border-radius: 14px !important;
+  }
+  .pvp-tier-head {
+    min-height: 44px;
+    margin-bottom: 0 !important;
+    padding: 0 11px;
+    border-bottom: 1px solid var(--border-soft);
+    font-size: 12px !important;
+  }
+  .pvp-tier-head .dim { font-size: 10px !important; }
+  .pvp-row {
+    padding: 10px 11px !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 7px !important;
+    border-radius: 0 !important;
+  }
+  .pvp-p { min-width: 0; }
+  .pvp-name { font-size: 13px; }
+  .pvp-stats { gap: 4px 10px !important; font-size: 10px !important; }
+  .pvp-bats {
+    width: 100%;
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) 44px;
+    gap: 6px !important;
+  }
+  .pvp-bat {
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
+    padding: 0 7px !important;
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    touch-action: manipulation;
+  }
+  .pvp-bat:nth-child(n+4) { display: none; }
+  .pvp-chevron {
+    width: 44px;
+    min-height: 44px;
+    justify-content: center;
+    border: 1px solid var(--border-soft) !important;
+    border-radius: 9px;
+    touch-action: manipulation;
+  }
+
+  .wxcard button:focus-visible,
+  .pitchers-controls button:focus-visible,
+  .k-parlay-trigger:focus-visible,
+  .pcard button:focus-visible,
+  .pvp button:focus-visible {
+    position: relative;
+    z-index: 3;
+    outline: 2px solid var(--accent);
+    outline-offset: -3px;
+  }
+}
+
+@media (max-width: 350px) {
+  .wxcard-mobile-impact {
+    grid-template-columns: minmax(104px, 1.2fr) repeat(3, minmax(0, 0.65fr));
+    gap: 5px;
+  }
+  .wx-mobile-wind > b { font-size: 13px; }
+  .wx-mobile-metric b { font-size: 11px; }
+  .pitcher-mode-tabs .badge-toggle { padding-inline: 4px !important; font-size: 9px; }
+  .pcard-attack .pa-hand { padding-inline: 5px; }
+}
+
+@media (max-width: 560px) and (prefers-reduced-motion: reduce) {
+  .wxcard,
+  .pcard,
+  .pvp-row { transition: none !important; }
+}

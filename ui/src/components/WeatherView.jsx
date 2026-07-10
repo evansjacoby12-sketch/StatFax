@@ -45,7 +45,18 @@ export default function WeatherView({ batters, onSelect, selectedId }) {
 
   return (
     <>
+      <div className="mobile-page-kicker wx-mobile-kicker">
+        <span><Icon name="Cloud" size={14} /> Weather impact</span>
+        <small className="mono">{games.length} matchups</small>
+      </div>
       <div className="wx-controls" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' }}>
+        <label className="wx-sort-select">
+          <Icon name="ArrowUpDown" size={15} />
+          <select value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort weather games">
+            {WX_SORTS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
+          </select>
+          <Icon name="ChevronDown" size={15} />
+        </label>
         <div className="wx-sorts" role="group" aria-label="Sort games by" style={{ display: 'flex', gap: '6px' }}>
           {WX_SORTS.map((s) => (
             <button
@@ -89,7 +100,7 @@ export default function WeatherView({ batters, onSelect, selectedId }) {
             }}
           >
             <Icon name="Sun" size={11} />
-            Outdoor only
+            <span className="wx-filter-label">Outdoor only</span>
           </button>
           <button
             className={`badge-toggle ${favorableOnly ? 'on' : ''}`}
@@ -109,7 +120,7 @@ export default function WeatherView({ batters, onSelect, selectedId }) {
             }}
           >
             <Icon name="Flame" size={11} />
-            Favorable
+            <span className="wx-filter-label">Favorable</span>
           </button>
         </div>
       </div>
@@ -188,6 +199,7 @@ function WindDial({ wind }) {
 }
 
 function WeatherCard({ g, onSelect, selectedId }) {
+  const [detailsOpen, setDetailsOpen] = useState(false)
   const liveMode = useLiveMode()
   const { game, weather: w, wind, envFactor, parkHR, stadium } = g
   const homeC = teamColor(game?.homeTeam?.id)
@@ -201,7 +213,7 @@ function WeatherCard({ g, onSelect, selectedId }) {
 
   return (
     <section
-      className="wxcard"
+      className={`wxcard ${detailsOpen ? 'is-expanded' : ''}`}
       style={{ 
         background: `linear-gradient(100deg, ${hexToRgba(awayC, 0.16)}, transparent 45%, transparent 55%, ${hexToRgba(homeC, 0.16)})`,
         border: '1px solid rgba(255,255,255,0.06)',
@@ -233,6 +245,32 @@ function WeatherCard({ g, onSelect, selectedId }) {
           {envFactor != null && <b className="mono"> {signedPct(envFactor - 1, 0)}</b>}
         </span>
       </header>
+
+      <div className="wxcard-mobile-impact">
+        <div className="wx-mobile-wind">
+          <span className="wx-mobile-wind-k"><Icon name={closed ? 'House' : 'Wind'} size={12} /> Carry</span>
+          <b className="mono">
+            {closed
+              ? (isDome ? 'DOME' : 'CLOSED')
+              : wind
+                ? `${w?.windSpeedMph != null ? Math.round(w.windSpeedMph) : '—'} mph ${wind.verdict}`
+                : 'CALM'}
+          </b>
+          <span>{closed ? 'no air carry' : (wind?.caption || 'light wind')}</span>
+        </div>
+        <div className="wx-mobile-metric">
+          <small>Temp</small>
+          <b className="mono">{w?.tempF != null ? `${Math.round(w.tempF)}°` : '—'}</b>
+        </div>
+        <div className={`wx-mobile-metric ${(w?.precipProbPct ?? 0) <= 20 ? 'tone-good' : (w?.precipProbPct ?? 0) >= 50 ? 'tone-bad' : ''}`}>
+          <small>Rain</small>
+          <b className="mono">{w?.precipProbPct != null ? `${w.precipProbPct}%` : '—'}</b>
+        </div>
+        <div className="wx-mobile-metric">
+          <small>Park HR</small>
+          <b className="mono">{parkHR != null ? `${num(parkHR, 2)}×` : '—'}</b>
+        </div>
+      </div>
 
       <div className="wxcard-body" style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
         <div className="wxcard-wind" style={{ width: '120px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
@@ -326,6 +364,22 @@ function WeatherCard({ g, onSelect, selectedId }) {
           ))}
         </ul>
       </div>
+
+      {detailsOpen && (
+        <div className="wx-mobile-details">
+          <div><small>Humidity</small><b className="mono">{w?.humidity != null ? `${w.humidity}%` : '—'}</b></div>
+          <div><small>Gust</small><b className="mono">{Number.isFinite(w?.windGustMph) && w.windGustMph <= 90 ? `${Math.round(w.windGustMph)} mph` : '—'}</b></div>
+          <div><small>Sky</small><b>{sky || '—'}</b></div>
+        </div>
+      )}
+      <button
+        className="wx-mobile-disclosure"
+        onClick={() => setDetailsOpen((open) => !open)}
+        aria-expanded={detailsOpen}
+      >
+        {detailsOpen ? 'Hide details' : 'Forecast details'}
+        <Icon name={detailsOpen ? 'ChevronUp' : 'ChevronDown'} size={14} />
+      </button>
     </section>
   )
 }

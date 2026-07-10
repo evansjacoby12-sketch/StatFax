@@ -48,44 +48,53 @@ export default function PitchersView({ batters, kDistByPitcher = {}, liveKsByPit
   }
   return (
     <>
+      <div className="mobile-page-kicker pitchers-mobile-kicker">
+        <span><Icon name="CircleDot" size={14} /> Pitcher board</span>
+        <small className="mono">{pitchers.length} starters</small>
+      </div>
       <div className="pitchers-controls" role="group" aria-label="Pitcher view" style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap' }}>
-        <span className="pitchers-controls-k dim" style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>View Mode:</span>
-        <button 
-          className={`badge-toggle ${view === 'preview' ? 'on' : ''}`} 
-          onClick={() => setView('preview')}
-          style={{
-            borderColor: view === 'preview' ? 'var(--accent)' : 'var(--border-soft)',
-            background: view === 'preview' ? 'var(--hover)' : 'transparent',
-            color: view === 'preview' ? '#fff' : 'var(--text-faint)'
-          }}
-        >
-          Vulnerability
-        </button>
-        <button
-          className={`badge-toggle ${view === 'detail' ? 'on' : ''}`}
-          onClick={() => setView('detail')}
-          style={{
-            borderColor: view === 'detail' ? 'var(--accent)' : 'var(--border-soft)',
-            background: view === 'detail' ? 'var(--hover)' : 'transparent',
-            color: view === 'detail' ? '#fff' : 'var(--text-faint)'
-          }}
-        >
-          Detail Cards
-        </button>
-        <button
-          className={`badge-toggle ${view === 'kbrain' ? 'on' : ''}`}
-          onClick={() => setView('kbrain')}
-          style={{
-            borderColor: view === 'kbrain' ? 'var(--accent)' : 'var(--border-soft)',
-            background: view === 'kbrain' ? 'var(--hover)' : 'transparent',
-            color: view === 'kbrain' ? '#fff' : 'var(--text-faint)'
-          }}
-        >
-          <Icon name="Zap" size={11} style={{ marginRight: '3px' }} />K Brain
-        </button>
+        <div className="pitcher-mode-tabs">
+          <span className="pitchers-controls-k dim" style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>View Mode:</span>
+          <button
+            className={`badge-toggle ${view === 'preview' ? 'on' : ''}`}
+            onClick={() => setView('preview')}
+            aria-pressed={view === 'preview'}
+            style={{
+              borderColor: view === 'preview' ? 'var(--accent)' : 'var(--border-soft)',
+              background: view === 'preview' ? 'var(--hover)' : 'transparent',
+              color: view === 'preview' ? '#fff' : 'var(--text-faint)'
+            }}
+          >
+            Vulnerability
+          </button>
+          <button
+            className={`badge-toggle ${view === 'detail' ? 'on' : ''}`}
+            onClick={() => setView('detail')}
+            aria-pressed={view === 'detail'}
+            style={{
+              borderColor: view === 'detail' ? 'var(--accent)' : 'var(--border-soft)',
+              background: view === 'detail' ? 'var(--hover)' : 'transparent',
+              color: view === 'detail' ? '#fff' : 'var(--text-faint)'
+            }}
+          >
+            <span className="pitcher-detail-label">Detail Cards</span><span className="pitcher-cards-label">Cards</span>
+          </button>
+          <button
+            className={`badge-toggle ${view === 'kbrain' ? 'on' : ''}`}
+            onClick={() => setView('kbrain')}
+            aria-pressed={view === 'kbrain'}
+            style={{
+              borderColor: view === 'kbrain' ? 'var(--accent)' : 'var(--border-soft)',
+              background: view === 'kbrain' ? 'var(--hover)' : 'transparent',
+              color: view === 'kbrain' ? '#fff' : 'var(--text-faint)'
+            }}
+          >
+            <Icon name="Zap" size={11} style={{ marginRight: '3px' }} />K Brain
+          </button>
+        </div>
         
         {view === 'detail' && (
-          <>
+          <div className="pitcher-sort-row">
             <span className="pitchers-controls-k dim" style={{ marginLeft: 12, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Sort:</span>
             {PSORT.map((t) => (
               <button 
@@ -101,7 +110,7 @@ export default function PitchersView({ batters, kDistByPitcher = {}, liveKsByPit
                 {t.label}
               </button>
             ))}
-          </>
+          </div>
         )}
       </div>
 
@@ -512,8 +521,9 @@ function KParlaySection({ pitchers, open, onToggle }) {
   const combos = useMemo(() => buildKParlays(pitchers), [pitchers])
   if (!combos.length) return null
   return (
-    <div style={{ marginBottom: '16px', background: 'rgba(16,24,48,0.35)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '12px', overflow: 'hidden' }}>
+    <div className="k-parlay-section" style={{ marginBottom: '16px', background: 'rgba(16,24,48,0.35)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '12px', overflow: 'hidden' }}>
       <button
+        className="k-parlay-trigger"
         onClick={onToggle}
         style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', color: open ? '#fff' : 'var(--text-dim)', textAlign: 'left' }}
       >
@@ -736,6 +746,7 @@ function tone(value, { hi, lo, invert = false }) {
 
 export function PitcherCard({ entry, onSelect, selectedId, watchlist, slip }) {
   const [sgpOpen, setSgpOpen] = useState(false)
+  const [scoutingOpen, setScoutingOpen] = useState(false)
   const { pitcher, vuln, targets, team, game, attackSide } = entry
   const color = teamColor(team?.id)
   const logo = teamLogo(team?.id)
@@ -757,7 +768,7 @@ export function PitcherCard({ entry, onSelect, selectedId, watchlist, slip }) {
   const isFinal = game?.isFinal
 
   return (
-    <section id={`pcard-${entry.key}`} className={`pcard ${isFinal ? 'final' : ''}`} style={{ 
+    <section id={`pcard-${entry.key}`} className={`pcard ${isFinal ? 'final' : ''} ${scoutingOpen ? 'scouting-open' : ''}`} style={{
       '--tc': color,
       background: 'rgba(17, 18, 20, 0.45)',
       border: '1px solid rgba(255,255,255,0.06)',
@@ -826,6 +837,10 @@ export function PitcherCard({ entry, onSelect, selectedId, watchlist, slip }) {
         }}>
           <span className="pa-cap" style={{ fontWeight: '700', color: '#fff', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
             <Icon name="Crosshair" size={12} style={{ color: 'var(--accent)' }} /> Platoon Target
+          </span>
+          <span className="pa-mobile-copy">
+            <small>Best attack side</small>
+            <b>Target {attackSide === 'L' ? 'lefties' : 'righties'}</b>
           </span>
           <span className={`pa-hand ${attackSide === 'L' ? 'on' : ''}`} style={{ color: attackSide === 'L' ? 'var(--strong)' : 'var(--text-faint)', fontWeight: attackSide === 'L' ? '700' : '400' }}>
             LHB <b className="mono">{lH != null ? num(lH, 2) : '—'}</b>
@@ -898,6 +913,7 @@ export function PitcherCard({ entry, onSelect, selectedId, watchlist, slip }) {
             return (
               <div style={{ marginTop: '10px' }}>
                 <button
+                  className="pcard-sgp-toggle"
                   onClick={() => setSgpOpen((v) => !v)}
                   style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'none', border: 'none', padding: '4px 0', cursor: 'pointer', color: sgpOpen ? 'var(--accent)' : 'var(--text-faint)', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}
                 >
@@ -974,6 +990,14 @@ export function PitcherCard({ entry, onSelect, selectedId, watchlist, slip }) {
           )}
         </div>
       </div>
+      <button
+        className="pcard-scout-toggle"
+        onClick={() => setScoutingOpen((open) => !open)}
+        aria-expanded={scoutingOpen}
+      >
+        {scoutingOpen ? 'Hide scouting' : 'Pitch mix & scouting'}
+        <Icon name={scoutingOpen ? 'ChevronUp' : 'ChevronDown'} size={14} />
+      </button>
     </section>
   )
 }
