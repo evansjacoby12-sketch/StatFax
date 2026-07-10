@@ -26,6 +26,14 @@ const BF_PER_IP      = 4.3
 const LEAGUE_WHIFF_PCT = 24.5
 const LEAGUE_SWSTR_PCT = 11.0  // SwStr% league avg (swinging-strikes / total pitches)
 const STAB_BF          = 150   // regression threshold for pitcher platoon splits
+// K-brain calibration recenter. MEASURED 2026-07-09 on 133 reconciled pitcher-
+// games (kProps est vs actual): the projection ran +0.56 K high on average
+// (5.58 predicted vs 5.02 actual) and every over-line was 5-10pt too confident —
+// the classic K-model bias (starters get hooked earlier than their IP average
+// implies, so expBF over-counts). The raw optimum was 0.90 (bias→0, over-lines
+// within ~1pt of realized); we apply a conservative 0.92 (~80% of the fix) given
+// n=133, and tighten toward 0.90 as more graded starts accrue.
+const K_CALIBRATION    = 0.92
 
 // Poisson CDF — P(X ≤ k) for X ~ Poisson(lambda). Used to compute K-over
 // probabilities without any lookup tables. Fast for k ≤ 20.
@@ -240,7 +248,7 @@ export function kBrain(pitcher, targets, { weather, umpire } = {}) {
   const rawPKAdj = pitcher?.gameParkKFactor
   const pAdj = Number.isFinite(rawPKAdj) && rawPKAdj > 0 ? rawPKAdj : 1.0
 
-  const lambda = expBF * adjustedKRate * oppAdj * tAdj * uAdj * pAdj * tttoPenalty
+  const lambda = expBF * adjustedKRate * oppAdj * tAdj * uAdj * pAdj * tttoPenalty * K_CALIBRATION
 
   // P(K ≥ n) at every sportsbook threshold.
   const probs = {}

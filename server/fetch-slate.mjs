@@ -270,6 +270,12 @@ const _SS_BF_PER_IP      = 4.3;
 const _SS_LEAGUE_WHIFF   = 24.5;
 const _SS_LEAGUE_SWSTR   = 11.0;  // SwStr% league avg (swinging-strikes / total pitches)
 const _SS_STAB_BF        = 150;   // regression threshold for pitcher platoon splits
+// K-brain calibration recenter — MUST match the client kBrain (pitchers.js
+// K_CALIBRATION). Measured 2026-07-09 on 133 reconciled pitcher-games: the
+// projection ran +0.56 K high and every over-line was 5-10pt too confident
+// (starters get hooked earlier than their IP average implies). Raw optimum 0.90;
+// applied conservative 0.92 (~80% of the fix) on n=133, tighten as data accrues.
+const _SS_K_CALIBRATION  = 0.92;
 const _SS_K_LINES        = [3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5, 10.5];
 
 function _ssEffSide(batSide, pitcherHand) {
@@ -472,7 +478,7 @@ function computeKDist(pitcher, targets, { weather, umpire, parkFactorK } = {}) {
   }
   const pAdj = Number.isFinite(parkFactorK) && parkFactorK > 0 ? parkFactorK : 1.0;
 
-  const lambda = expBF * adjustedKRate * oppAdj * tempAdj * umpireAdj * pAdj * tttoPenalty;
+  const lambda = expBF * adjustedKRate * oppAdj * tempAdj * umpireAdj * pAdj * tttoPenalty * _SS_K_CALIBRATION;
   const probs = {};
   for (const line of _SS_K_LINES) probs[line] = _ssKOverProb(lambda, line);
   const lo = Math.max(0, _ssFindQuantile(lambda, 0.10));
