@@ -4,6 +4,7 @@ import { GradeChip } from './atoms.jsx'
 import Select from './Select.jsx'
 import { pct, num, rate, american, signedPct } from '../lib/format.js'
 import { buildGroups, legsByStrategy, mergeGroups, lastFirst, isoOf, blastOf, blastMixOf, blastVsHandOf, legFlags, legIsBad, risingForm } from '../lib/groups.js'
+import * as store from '../lib/storage.js'
 import { comboStatus, legStatus, VERDICT_META } from '../lib/live.js'
 import { americanToRawImplied, bestSingleBook } from '../lib/odds.js'
 import { bookLabel } from '../lib/data.js'
@@ -366,9 +367,10 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard, g
     incRef.current = parseInc(store.load(incKey, null))
   }, [incKey])
 
+  const betaCeil = store.load('betaCeil', false)   // beta switch → include the POWER READY β combo
   const bySize = useMemo(
-    () => buildGroups(pool, { favorConsistency, incumbents: incRef.current[poolSig] || null, scorecard, applyComboLock: comboLock }),
-    [pool, favorConsistency, scorecard, poolSig, comboLock],
+    () => buildGroups(pool, { favorConsistency, incumbents: incRef.current[poolSig] || null, scorecard, applyComboLock: comboLock, includeBeta: betaCeil }),
+    [pool, favorConsistency, scorecard, poolSig, comboLock, betaCeil],
   )
 
   // Persist this build's legs as next build's incumbents (for this pool only).

@@ -233,7 +233,7 @@ export default function ParlayBuilder({ batters, legs, slipSet, onToggle, onRemo
   const autoSuggest = useMemo(() => {
     const need = autoSize - legs.length
     if (legs.length === 0) {
-      const out = buildGroups(batters, { favorConsistency, scorecard })
+      const out = buildGroups(batters, { favorConsistency, scorecard, includeBeta: store.load('betaCeil', false) })
       const items = (out[autoSize] || [])
         .slice()
         .sort((a, b) => (b.ev ?? -Infinity) - (a.ev ?? -Infinity) || (b.allHit ?? 0) - (a.allHit ?? 0))
