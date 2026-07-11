@@ -453,7 +453,7 @@ function BetaCeiling({ b }) {
         <div className="beta-ceil-explain-row"><b>Ceiling</b><span>{explain.ceiling}</span></div>
         <div className="beta-ceil-explain-row"><b>Form</b><span>{explain.form}</span></div>
         <small>
-          {b.powerReady ? 'Together, these helped trigger POWER READY β. ' : ''}
+          {b.powerReady ? 'Together, these helped trigger POWER READY (beta). ' : ''}
           They describe contact quality and do not directly raise the HR probability.
         </small>
       </div>

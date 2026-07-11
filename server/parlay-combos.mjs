@@ -102,7 +102,7 @@ export function comboRowFromSnapshot(row) {
     // him homer-prone (prior < the 1.3 gate), just stops nulling him.
     pitcherHr9: Number.isFinite(row.pitcher?.season?.hrPer9) ? row.pitcher.season.hrPer9
       : (row.pitcher?.id != null ? 1.25 : null),
-    // POWER READY β signal — the powerReady combo strategy requires this. Advisory
+    // POWER READY (beta) signal — the powerReady combo strategy requires this. Advisory
     // (ceiling+matchup+form gate); never affects score/prob. Beta-gated in the UI.
     powerReady: row.powerReady === true,
     // Heat signals the `hot` strategy ranks on: heatIndex × recent-form multiplier.

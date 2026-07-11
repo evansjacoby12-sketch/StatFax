@@ -366,7 +366,7 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard, g
     incRef.current = parseInc(store.load(incKey, null))
   }, [incKey])
 
-  const betaCeil = store.load('betaCeil', false)   // beta switch → include the POWER READY β combo
+  const betaCeil = store.load('betaCeil', false)   // beta switch → include the POWER READY (beta) combo
   const bySize = useMemo(
     () => buildGroups(pool, { favorConsistency, incumbents: incRef.current[poolSig] || null, scorecard, applyComboLock: comboLock, includeBeta: betaCeil }),
     [pool, favorConsistency, scorecard, poolSig, comboLock, betaCeil],

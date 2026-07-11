@@ -188,13 +188,13 @@ export const STRATEGIES = [
   // yields nothing in the frozen graded record and exists purely as a live board
   // aid (track a value combo via Live Combos / My Tickets, not the scorecard).
   { key: 'value',     rank: (b) => b.edge ?? -Infinity, require: (b) => Number.isFinite(b.edge) && b.edge > 0 },
-  // Power Ready β — every leg carries the POWER READY signal (ceiling ≥75 +
+  // Power Ready (beta) — every leg carries the POWER READY signal (ceiling ≥75 +
   // matchup ≥60 + form ≥35 + a real recent sample; see ui/src/lib/powerReady.js).
   // Ranks on the model's calibrated HR prob so the combo pairs the MOST likely-
   // to-cash bats within the signal pool. BETA + advisory: it's built and logged
   // server-side so its combo hit-rate forward-validates alongside the other
   // strategies, but the UI only shows it when the beta switch is on (CombosView),
-  // and it never touches any score/probability. Graduates off β when its logged
+  // and it never touches any score/probability. Graduates off (beta) when its logged
   // all-hit rate clears the field (see the strategy audit / validate-ceil).
   { key: 'powerReady', beta: true, rank: (b) => b.hrProb ?? b.score ?? 0, require: (b) => b.powerReady === true },
   // Edge Stack was CUT 2026-07-09: 0-for-24 all-hit over 23 graded days, and its

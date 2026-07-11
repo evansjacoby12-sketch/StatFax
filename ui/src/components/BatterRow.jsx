@@ -57,7 +57,7 @@ export default function BatterRow({
   })
 
   const strongestSignal = b.powerReady
-    ? { label: 'Power Ready β', tone: 'warn', icon: 'Gauge' }
+    ? { label: 'Power Ready (beta)', tone: 'warn', icon: 'Gauge' }
     : pmScore >= 7
       ? { label: `Pitch ${pmScore.toFixed(1)}`, tone: 'good', icon: 'Target' }
     : dueSetup.n >= 4

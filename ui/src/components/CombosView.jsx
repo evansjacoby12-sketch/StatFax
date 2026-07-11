@@ -18,7 +18,7 @@ const CARD = { background: 'rgba(17, 18, 20, 0.45)', border: '1px solid rgba(255
 const H3 = { fontSize: '13px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '16px', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: '8px' }
 
 export default function CombosView({ batters, onSelect, favorConsistency = false }) {
-  // POWER READY β is a beta combo strategy: server builds + logs it for forward-
+  // POWER READY (beta) is a beta combo strategy: server builds + logs it for forward-
   // testing, but it only surfaces (list AND scorecard tallies) when the beta
   // switch is on, so non-beta users see zero influence from an unvalidated signal.
   const betaCeil = store.load('betaCeil', false)
