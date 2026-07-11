@@ -17,7 +17,7 @@ import { toast } from './Toast.jsx'
 import { sharePickCard } from '../lib/shareCard.js'
 import { useExplain } from '../lib/explain.js'
 import { locationRating5, arsenalRating5, combinedEdge5 } from '../lib/zoneEdge.js'
-import { powerReadyCriteria } from '../lib/powerReady.js'
+import { powerReadyCriteria, barrelReadyCriteria } from '../lib/powerReady.js'
 import * as store from '../lib/storage.js'
 
 const WORKER_URL = import.meta.env?.VITE_WORKER_URL || ''
@@ -446,7 +446,8 @@ function BetaCeiling({ b }) {
         {big('Ceiling', ceil)}
         {big('Form', form)}
       </div>
-      <PowerReadyChecklist b={b} />
+      <SignalChecklist title="Power Ready" badge="POWER READY (beta)" crit={powerReadyCriteria(b)} />
+      <SignalChecklist title="Barrel Ready" badge="BARREL READY (beta)" crit={barrelReadyCriteria(b)} />
       <div className="beta-ceil-explain" aria-label="Ceiling and form explanation">
         <div className="beta-ceil-explain-head">
           <Icon name={level === 'eli5' ? 'Sparkles' : 'BarChart3'} size={12} />
@@ -477,12 +478,11 @@ function BetaCeiling({ b }) {
   )
 }
 
-// Readable POWER READY criteria: each of the four gates with its value, the
-// threshold it must clear, and pass/fail — so you can SEE exactly why a bat did
-// or didn't qualify (e.g. "Matchup 57 · needs ≥60 ✗"). Thresholds come from
-// powerReady.js so labels never drift from the logic.
-function PowerReadyChecklist({ b }) {
-  const crit = powerReadyCriteria(b)
+// Readable beta-signal criteria: each gate with its value, the threshold it must
+// clear, and pass/fail — so you can SEE exactly why a bat did or didn't qualify
+// (e.g. "Matchup 57 · needs ≥60 ✗"). Renders for POWER READY and BARREL READY;
+// thresholds come from powerReady.js so labels never drift from the logic.
+function SignalChecklist({ title, badge, crit }) {
   const known = crit.filter((c) => c.value != null)
   if (known.length < 2) return null   // nothing meaningful to show yet
   const missing = crit.filter((c) => !c.met)
@@ -490,7 +490,7 @@ function PowerReadyChecklist({ b }) {
   return (
     <div style={{ border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '10px 12px', marginBottom: 12 }}>
       <div style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-dim)', marginBottom: 8 }}>
-        Power Ready criteria
+        {title} criteria
       </div>
       {crit.map((c) => (
         <div key={c.key} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '3px 0', fontSize: 12 }}>
@@ -504,7 +504,7 @@ function PowerReadyChecklist({ b }) {
       ))}
       <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.05)', fontSize: 12, fontWeight: 700, color: qualifies ? 'var(--strong)' : 'var(--text-dim)' }}>
         {qualifies
-          ? '✓ All four met — POWER READY (beta)'
+          ? `✓ All met — ${badge}`
           : `Not qualified — ${missing.map((m) => m.label.toLowerCase()).join(', ')} short`}
       </div>
     </div>

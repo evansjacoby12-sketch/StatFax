@@ -41,6 +41,7 @@ for (const recs of Object.values(log.records || {})) {
       form: f.form,
       ms: f.ms,
       powerReady: Array.isArray(r.badges) && r.badges.includes('powerReady'),
+      barrelReady: Array.isArray(r.badges) && r.badges.includes('barrelReady'),
       hr: r.homered ? 1 : 0,
     });
   }
@@ -74,7 +75,8 @@ console.log(`\nAUC vs HR — ceil ${auc(withCeil, 'ceil').toFixed(4)} · form ${
 const rate = a => a.length ? 100 * a.reduce((s, b) => s + b.hr, 0) / a.length : NaN;
 const lift = r => `${(r - 100 * base >= 0 ? '+' : '')}${(r - 100 * base).toFixed(1)}pt`;
 const SHORTLISTS = [
-  { label: 'POWER READY β (exact board signal)',    pred: b => b.powerReady === true },
+  { label: 'POWER READY (beta) (exact board signal)', pred: b => b.powerReady === true },
+  { label: 'BARREL READY (beta) (exact board signal)', pred: b => b.barrelReady === true },
   { label: 'CEIL ≥ 65',                          pred: b => b.ceil >= 65 },
   { label: 'CEIL ≥ 70 + FORM ≥ 60',              pred: b => b.ceil >= 70 && b.form >= 60 },
   { label: 'CEIL ≥ 75 + Matchup ≥ 60 (Elite)',   pred: b => b.ceil >= 75 && b.ms >= 60 },

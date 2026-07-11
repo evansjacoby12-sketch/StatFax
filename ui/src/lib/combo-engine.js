@@ -197,6 +197,10 @@ export const STRATEGIES = [
   // and it never touches any score/probability. Graduates off (beta) when its logged
   // all-hit rate clears the field (see the strategy audit / validate-ceil).
   { key: 'powerReady', beta: true, rank: (b) => b.hrProb ?? b.score ?? 0, require: (b) => b.powerReady === true },
+  // Barrel Ready (beta) — the hot-form complement to Power Ready. Every leg
+  // carries the BARREL READY signal (solid power + genuinely hot form, no matchup
+  // gate). Ranks on calibrated HR prob. Same beta gating + forward-testing.
+  { key: 'barrelReady', beta: true, rank: (b) => b.hrProb ?? b.score ?? 0, require: (b) => b.barrelReady === true },
   // Edge Stack was CUT 2026-07-09: 0-for-24 all-hit over 23 graded days, and its
   // gate (≥2 matchup-signal booleans) isn't logged, so it can't be re-tuned on
   // data without becoming a duplicate of precision. Dropped rather than cloned.

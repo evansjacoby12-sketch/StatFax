@@ -655,7 +655,7 @@ import { fetchRecentBatterBarrelsMultiWindow, fetchRecentPitcherVelo } from './s
 import { applySimResolution } from './lib/simResolution.mjs';
 import { fetchHROdds } from './lib/theOddsApi.mjs';
 import { advisoryBarrel } from './lib/barrelScore.mjs';
-import { powerReadySignal } from '../ui/src/lib/powerReady.js';
+import { powerReadySignal, barrelReadySignal } from '../ui/src/lib/powerReady.js';
 import { pitchMixScore } from '../ui/src/lib/scout.js';
 
 // ─── HTTP helpers ────────────────────────────────────────────────────────────
@@ -3400,6 +3400,7 @@ async function main() {
           // Advisory/filterable beta signal only. This boolean is intentionally
           // assigned after scoring and is never fed back into score/probability.
           row.powerReady = powerReadySignal(row);
+          row.barrelReady = barrelReadySignal(row);
         }
         // Apply umpire HR factor on the env contribution of the composite.
         // No-op when the factor is 1.0 (default for any ump not in the

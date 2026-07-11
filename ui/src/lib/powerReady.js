@@ -43,3 +43,37 @@ export function powerReadyCriteria(b) {
 export function powerReadySignal(b) {
   return powerReadyCriteria(b).every((c) => c.met)
 }
+
+// ── BARREL READY (beta) ──────────────────────────────────────────────────────
+// The complement to POWER READY: our take on Barrel Lab's "Barrel Signal". Where
+// POWER READY demands elite power + a favorable MATCHUP (form only a floor),
+// BARREL READY demands solid power + genuinely HOT form, with NO matchup gate —
+// so it surfaces bats heating up right now that POWER READY's matchup filter
+// would pass on. Advisory + beta, same as POWER READY: display/filter/log only.
+export const BARREL_READY_GATES = { ceiling: 70, form: 60, bbe: 6, swings: 25 }
+
+export function barrelReadyCriteria(b) {
+  const recentBBE = b?.recentBarrel?.recentBBE
+  const recentSwings = b?.batTracking?.recentSwings
+  const sampleMet = (Number.isFinite(recentBBE) && recentBBE >= BARREL_READY_GATES.bbe)
+    || (Number.isFinite(recentSwings) && recentSwings >= BARREL_READY_GATES.swings)
+  const sampleValue = Number.isFinite(recentBBE) ? recentBBE
+    : Number.isFinite(recentSwings) ? recentSwings : null
+  const sampleUnit = Number.isFinite(recentBBE) ? 'batted balls'
+    : Number.isFinite(recentSwings) ? 'swings' : ''
+  return [
+    { key: 'ceiling', label: 'Power ceiling', value: b?.ceilScore, need: BARREL_READY_GATES.ceiling,
+      met: Number.isFinite(b?.ceilScore) && b.ceilScore >= BARREL_READY_GATES.ceiling,
+      blurb: 'solid raw-power upside' },
+    { key: 'form', label: 'Recent form', value: b?.formScore, need: BARREL_READY_GATES.form,
+      met: Number.isFinite(b?.formScore) && b.formScore >= BARREL_READY_GATES.form,
+      blurb: 'genuinely hot — a real surge, not just "not cold"' },
+    { key: 'sample', label: 'Recent sample', value: sampleValue, need: BARREL_READY_GATES.bbe,
+      met: sampleMet, unit: sampleUnit, isSample: true,
+      blurb: 'enough recent contact to trust the read' },
+  ]
+}
+
+export function barrelReadySignal(b) {
+  return barrelReadyCriteria(b).every((c) => c.met)
+}

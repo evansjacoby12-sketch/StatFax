@@ -83,13 +83,13 @@ function significanceBand(rate, n, overallRate, deltaMax = DELTA_MAX) {
 // calibration applies only the badges ProbabilityEngine passes in
 // activeBadgeKeys (which excludes zone/barrel/park, since their signal is
 // already baked into the raw score), so nothing here double-counts.
-const BADGE_KEYS = ['hot', 'due', 'cold', 'bullpenLegend', 'homeEdge', 'awayEdge', 'powerReady', 'zoneMaster', 'barrelKing', 'launchPad'];
+const BADGE_KEYS = ['hot', 'due', 'cold', 'bullpenLegend', 'homeEdge', 'awayEdge', 'powerReady', 'barrelReady', 'zoneMaster', 'barrelKing', 'launchPad'];
 const GRADE_KEYS = ['PRIME', 'STRONG', 'LEAN', 'SKIP'];
 
 // The three premium badges aren't boolean row fields — derive them from the
 // same snapshot fields + thresholds the UI chips use so the lift table matches
 // exactly what users see (ZONE MASTER / BARREL KING / LAUNCH PAD).
-const DIRECT_BADGE_FIELDS = ['hot', 'due', 'cold', 'bullpenLegend', 'homeEdge', 'awayEdge', 'powerReady'];
+const DIRECT_BADGE_FIELDS = ['hot', 'due', 'cold', 'bullpenLegend', 'homeEdge', 'awayEdge', 'powerReady', 'barrelReady'];
 function activeBadgesForRow(row) {
   const out = DIRECT_BADGE_FIELDS.filter(k => row[k] === true);
   if (row.zoneMatchup?.badge === 'ZONE_MASTER')                              out.push('zoneMaster');

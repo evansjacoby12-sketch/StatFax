@@ -105,6 +105,8 @@ export function comboRowFromSnapshot(row) {
     // POWER READY (beta) signal — the powerReady combo strategy requires this. Advisory
     // (ceiling+matchup+form gate); never affects score/prob. Beta-gated in the UI.
     powerReady: row.powerReady === true,
+    // BARREL READY (beta) signal — the hot-form combo strategy requires this.
+    barrelReady: row.barrelReady === true,
     // Heat signals the `hot` strategy ranks on: heatIndex × recent-form multiplier.
     heat: heatIndex(row),
     heatMult: Number.isFinite(row.hotnessMultiplier) ? row.hotnessMultiplier : 1,
