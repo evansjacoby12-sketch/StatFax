@@ -5,6 +5,7 @@ import { pct, surname } from '../lib/format.js'
 import { legStatus } from '../lib/live.js'
 import LiveCombosView from './LiveCombosView.jsx'
 import MyTickets from './MyTickets.jsx'
+import * as store from '../lib/storage.js'
 
 // Dedicated Combos page: live combo tracking (today, in progress) + the settled
 // day-by-day combo scorecard graded off the backtest log. Split out of the
@@ -17,6 +18,11 @@ const CARD = { background: 'rgba(17, 18, 20, 0.45)', border: '1px solid rgba(255
 const H3 = { fontSize: '13px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '16px', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: '8px' }
 
 export default function CombosView({ batters, onSelect, favorConsistency = false }) {
+  // POWER READY β is a beta combo strategy: server builds + logs it for forward-
+  // testing, but it only surfaces (list AND scorecard tallies) when the beta
+  // switch is on, so non-beta users see zero influence from an unvalidated signal.
+  const betaCeil = store.load('betaCeil', false)
+  const showCombo = (c) => betaCeil || c?.strategy !== 'powerReady'
   const [log, setLog] = useState(null)
   const [err, setErr] = useState(null)
   const [comboDay, setComboDay] = useState(null)
@@ -74,7 +80,7 @@ export default function CombosView({ batters, onSelect, favorConsistency = false
       const recs = recByDay(activeComboDay)
       const src = windows[effWIdx] ? windows[effWIdx].combos : board === 'late' ? comboLateByDate[activeComboDay] : comboByDate[activeComboDay]
       return (src || [])
-        .filter((c) => c.size <= 3 && (!comboSize || c.size === comboSize))
+        .filter((c) => showCombo(c) && c.size <= 3 && (!comboSize || c.size === comboSize))
         .map((c) => {
           const legs = (c.legs || []).map((pid) => {
             const r = recs.get(Number(pid))
@@ -97,7 +103,7 @@ export default function CombosView({ batters, onSelect, favorConsistency = false
       const count = (combos) => {
         let hit = 0, tot = 0
         for (const c of combos || []) {
-          if (c.size > 3) continue
+          if (!showCombo(c) || c.size > 3) continue
           const legs = (c.legs || []).map((pid) => recs.get(Number(pid)))
           if (!legs.length || legs.some((r) => !r)) continue
           tot++

@@ -5,6 +5,7 @@ import { hexA } from './atoms.jsx'
 import { pct, num } from '../lib/format.js'
 import Select from './Select.jsx'
 import { buildGroups, lastFirst } from '../lib/groups.js'
+import * as store from '../lib/storage.js'
 import { comboStatus, legStatus, VERDICT_META, LEG_META } from '../lib/live.js'
 
 const GRADE_COLOR = { S: '#f5a623', A: '#32d74b', B: '#3b82f6', C: '#9aa6b6', D: '#6b7787' }
@@ -76,7 +77,7 @@ export default function LiveCombosView({ batters, onSelect, favorConsistency = f
   // Build combos across the FULL slate (finals included) so a combo is tracked
   // all day, then grade each against live HRs.
   const combos = useMemo(() => {
-    const bySize = buildGroups(batters, { favorConsistency, includeFinals: true })
+    const bySize = buildGroups(batters, { favorConsistency, includeFinals: true, includeBeta: store.load('betaCeil', false) })
     const all = [2, 3, 4].flatMap((k) => bySize[k] || [])
     // Dedupe identical leg sets that recur across strategies/sizes.
     const seen = new Set()

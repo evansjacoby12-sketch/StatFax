@@ -148,6 +148,7 @@ const STRAT_META = {
   park:      { label: 'Park & Air',   icon: 'Wind',       desc: 'park × weather × hand boosts HR' },
   value:     { label: 'Value',        icon: 'DollarSign', desc: 'the +EV pairing — bats the market underprices (model HR% > the fair line)' },
   edge:      { label: 'Edge Stack',   icon: 'Zap',        desc: '2+ matchup signals converge (pitch type, zones, platoon, fly-ball)' },
+  powerReady: { label: 'Power Ready β', icon: 'Gauge',    desc: 'every leg carries the POWER READY β signal — elite ceiling + soft matchup + live form. Unvalidated beta; forward-testing its hit rate.' },
 }
 
 // Map a live scored batter → the engine's canonical combo row. `ref` carries the
@@ -183,6 +184,7 @@ function toComboRow(b, applyLock = false) {
     // ranks on this to pair the bats the market most underprices. Null pre-odds.
     edge: Number.isFinite(b.edge) ? b.edge : null,
     hot: b.hot === true,
+    powerReady: b.powerReady === true,
     homeEdge: b.homeEdge === true,
     awayEdge: b.awayEdge === true,
     bullpenLegend: b.bullpenLegend === true,
@@ -289,9 +291,9 @@ export function mergeGroups(a, b) {
 // straight through to the engine (see buildCombos). `includeFinals` keeps
 // finished games in the pool — used by the Live tracker (not the betting board)
 // so a combo can be followed all day, not dropped the moment a game ends.
-export function buildGroups(batters, { maxPerBat = 2, globalMaxPerBat = 4, favorConsistency = false, incumbents = null, stickMargin = 0.05, includeFinals = false, scorecard = null, applyComboLock = false } = {}) {
+export function buildGroups(batters, { maxPerBat = 2, globalMaxPerBat = 4, favorConsistency = false, incumbents = null, stickMargin = 0.05, includeFinals = false, scorecard = null, applyComboLock = false, includeBeta = false } = {}) {
   const rows = (batters || []).filter((b) => includeFinals || !b.game?.isFinal).map((b) => toComboRow(b, applyComboLock))
-  const combos = buildCombos(rows, { sizes: SIZES, maxPerBat, globalMaxPerBat, favorConsistency, incumbents, stickMargin })
+  const combos = buildCombos(rows, { sizes: SIZES, maxPerBat, globalMaxPerBat, favorConsistency, incumbents, stickMargin, includeBeta })
   const out = {}
   for (const c of combos) {
     ;(out[c.size] ||= []).push(makeGroup(c))

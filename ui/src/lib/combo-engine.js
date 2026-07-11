@@ -188,6 +188,15 @@ export const STRATEGIES = [
   // yields nothing in the frozen graded record and exists purely as a live board
   // aid (track a value combo via Live Combos / My Tickets, not the scorecard).
   { key: 'value',     rank: (b) => b.edge ?? -Infinity, require: (b) => Number.isFinite(b.edge) && b.edge > 0 },
+  // Power Ready β — every leg carries the POWER READY signal (ceiling ≥75 +
+  // matchup ≥60 + form ≥35 + a real recent sample; see ui/src/lib/powerReady.js).
+  // Ranks on the model's calibrated HR prob so the combo pairs the MOST likely-
+  // to-cash bats within the signal pool. BETA + advisory: it's built and logged
+  // server-side so its combo hit-rate forward-validates alongside the other
+  // strategies, but the UI only shows it when the beta switch is on (CombosView),
+  // and it never touches any score/probability. Graduates off β when its logged
+  // all-hit rate clears the field (see the strategy audit / validate-ceil).
+  { key: 'powerReady', beta: true, rank: (b) => b.hrProb ?? b.score ?? 0, require: (b) => b.powerReady === true },
   // Edge Stack was CUT 2026-07-09: 0-for-24 all-hit over 23 graded days, and its
   // gate (≥2 matchup-signal booleans) isn't logged, so it can't be re-tuned on
   // data without becoming a duplicate of precision. Dropped rather than cloned.
@@ -309,14 +318,19 @@ export function buildCombos(rows, {
   favorConsistency = false,
   incumbents = null,
   stickMargin = 0.05,
+  includeBeta = false,   // beta strategies (e.g. powerReady) build only when opted in
 } = {}) {
+  // Beta strategies are off by default so an unvalidated signal never reaches a
+  // non-beta board. The server passes includeBeta:true to LOG them for forward-
+  // testing; the client passes the user's beta-switch state.
+  const activeStrategies = STRATEGIES.filter((s) => includeBeta || !s.beta)
   // Drop benched bats (confirmed lineup, no order slot — they can't homer). The
   // adapters precompute `benched` and `paWeight` from the (live) lineup so the
   // freeze can't pin them: bench status + batting order are the FACTS meant to
   // move the board as lineups post, distinct from the frozen strategy signals.
   const usable = (rows || []).filter((r) => !r.benched)
   // Each strategy's ranked pool is size-independent — compute once, slice per size.
-  const pools = STRATEGIES.map((strat) => {
+  const pools = activeStrategies.map((strat) => {
     // Tilt every strategy's rank by the leg's expected-PA weight (lineup slot),
     // so a hot 8-hole bat doesn't beat a comparable top-of-order bat who gets an
     // extra cut. Neutral (×1) until the order posts. Consistency lean still opt-in.

@@ -102,6 +102,9 @@ export function comboRowFromSnapshot(row) {
     // him homer-prone (prior < the 1.3 gate), just stops nulling him.
     pitcherHr9: Number.isFinite(row.pitcher?.season?.hrPer9) ? row.pitcher.season.hrPer9
       : (row.pitcher?.id != null ? 1.25 : null),
+    // POWER READY β signal — the powerReady combo strategy requires this. Advisory
+    // (ceiling+matchup+form gate); never affects score/prob. Beta-gated in the UI.
+    powerReady: row.powerReady === true,
     // Heat signals the `hot` strategy ranks on: heatIndex × recent-form multiplier.
     heat: heatIndex(row),
     heatMult: Number.isFinite(row.hotnessMultiplier) ? row.hotnessMultiplier : 1,
@@ -163,7 +166,9 @@ export function freezeComboInputs(row) {
  * one) so the scorecard can compare predicted vs actual cash rate.
  */
 export function buildComboRecords(rows, opts = {}) {
-  return buildCombos(rows, opts).map((c) => ({
+  // includeBeta:true so beta strategies (powerReady) are BUILT + LOGGED here for
+  // forward-testing; the UI still hides them unless the beta switch is on.
+  return buildCombos(rows, { includeBeta: true, ...opts }).map((c) => ({
     strategy: c.strategy,
     size: c.size,
     legs: c.legs.map((l) => l.playerId),
