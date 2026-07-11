@@ -10713,6 +10713,45 @@ button.th:focus-visible {
   .filters-panel .badges-row .badge-toggle-n { display: none; }
 }
 
+/* Ceiling & Form beta — follows the global ELI5 / stats explanation depth. */
+.beta-ceil-explain {
+  margin: 0 0 12px;
+  padding: 10px;
+  color: var(--text-dim);
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--border-soft));
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--accent) 4%, rgba(255,255,255,0.015));
+}
+.beta-ceil-explain-head {
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--accent);
+  font-size: 9px;
+  font-weight: 850;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+.beta-ceil-explain-row {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 8px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.beta-ceil-explain-row + .beta-ceil-explain-row { margin-top: 6px; }
+.beta-ceil-explain-row b { color: #fff; font-size: 10px; text-transform: uppercase; }
+.beta-ceil-explain small {
+  display: block;
+  margin-top: 9px;
+  padding-top: 8px;
+  color: var(--text-faint);
+  border-top: 1px solid var(--border-soft);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
 /* Mobile tools: a contained, opaque sheet instead of a narrow dropdown over the board. */
 .mobile-tools-scrim,
 .mobile-tools-sheet,

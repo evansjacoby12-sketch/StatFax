@@ -389,9 +389,48 @@ function StatcastTab({ b }) {
 // power inputs, loudly labeled UNVALIDATED. These never touch the HR score/prob;
 // qualifying rows may carry the filterable POWER READY beta signal while the
 // exact shortlist definition accrues forward results.
+function ceilingFormCopy(b, level) {
+  const ceil = b.ceilScore
+  const form = b.formScore
+
+  if (level === 'eli15') {
+    return {
+      heading: 'Stats behind the scores',
+      ceiling: Number.isFinite(ceil)
+        ? `${ceil}/100 blends Barrel%, xISO, robust top-five EV, BLAST, and sweet-spot × hard-hit quality.`
+        : 'Needs at least three usable power-quality inputs before it is scored.',
+      form: Number.isFinite(form)
+        ? `${form}/100 blends recent barrel level, exit velocity, and BLAST; small samples are shrunk toward the season baseline.`
+        : 'Needs a recent barrel or bat-tracking window before it is scored.',
+    }
+  }
+
+  const ceilingRead = !Number.isFinite(ceil)
+    ? 'We do not have enough power data yet.'
+    : ceil >= 85
+      ? 'When he squares it up, his best contact is explosive.'
+      : ceil >= 75
+        ? 'When he connects, he can do serious home-run damage.'
+        : ceil >= 50
+          ? 'He has solid power upside, but it is not elite.'
+          : 'His best contact has shown limited home-run damage.'
+
+  const formRead = !Number.isFinite(form)
+    ? 'We do not have enough recent contact data yet.'
+    : form >= 75
+      ? 'He has been striking the ball very well lately.'
+      : form >= 50
+        ? 'His recent contact has been solid.'
+        : 'He has not been making much dangerous contact lately.'
+
+  return { heading: 'Plain-English read', ceiling: ceilingRead, form: formRead }
+}
+
 function BetaCeiling({ b }) {
+  const level = useEliLevel()
   if (!store.load('betaCeil', false)) return null
   const ceil = b.ceilScore, form = b.formScore
+  const explain = ceilingFormCopy(b, level)
   const tone = (s) => s == null ? 'var(--text-faint)'
     : s >= 75 ? 'var(--strong)' : s >= 50 ? 'var(--prime)' : 'var(--text-dim)'
   const big = (label, v) => (
@@ -405,6 +444,18 @@ function BetaCeiling({ b }) {
       <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
         {big('Ceiling', ceil)}
         {big('Form', form)}
+      </div>
+      <div className="beta-ceil-explain" aria-label="Ceiling and form explanation">
+        <div className="beta-ceil-explain-head">
+          <Icon name={level === 'eli5' ? 'Sparkles' : 'BarChart3'} size={12} />
+          {explain.heading}
+        </div>
+        <div className="beta-ceil-explain-row"><b>Ceiling</b><span>{explain.ceiling}</span></div>
+        <div className="beta-ceil-explain-row"><b>Form</b><span>{explain.form}</span></div>
+        <small>
+          {b.powerReady ? 'Together, these helped trigger POWER READY β. ' : ''}
+          They describe contact quality and do not directly raise the HR probability.
+        </small>
       </div>
       {b.recentBarrel?.recentEVHi != null && <KV k="Top-5 EV (robust)" v={`${b.recentBarrel.recentEVHi.toFixed(1)} mph`} accent="var(--strong)" />}
       {b.sweetSpotPct != null && <KV k="Sweet-spot %" v={`${b.sweetSpotPct.toFixed(1)}%`} />}
