@@ -8307,6 +8307,7 @@ button.th:focus-visible {
   padding-top: max(var(--safe-top, env(safe-area-inset-top, 0px)), 12px) !important;
 }
 .bottom-nav {
+  display: none;
   border-top: none !important;
   background: rgba(0, 0, 0, 0.9) !important;
 }
@@ -11008,6 +11009,233 @@ button.th:focus-visible {
 
 @media (max-width: 560px) and (prefers-reduced-motion: reduce) {
   .mobile-tools-sheet { animation: none; }
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * Mobile shell: "broadcast glass" polish
+ * Connects the compact header, command rail, feature pick, ranked cards and
+ * bottom navigation into one surface without changing any model behavior.
+ * ────────────────────────────────────────────────────────────────────────── */
+@media (max-width: 560px) {
+  .app {
+    background:
+      radial-gradient(90% 280px at 50% -80px, rgba(0, 216, 246, 0.11), transparent 72%),
+      #000;
+  }
+
+  .topbar {
+    background: rgba(0, 0, 0, 0.82) !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.045) !important;
+    box-shadow: 0 12px 34px -28px rgba(0, 216, 246, 0.38);
+    backdrop-filter: blur(22px) saturate(145%);
+    -webkit-backdrop-filter: blur(22px) saturate(145%);
+  }
+
+  .header {
+    min-height: 64px;
+    padding-inline: 12px !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+  }
+
+  .brand { gap: 9px; }
+  .brand-mark {
+    width: 36px;
+    height: 36px;
+    border-radius: 11px;
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.06) inset,
+      0 8px 22px -10px rgba(0, 216, 246, 0.75);
+  }
+
+  .filters {
+    padding: 7px 12px 10px !important;
+    border-bottom: 0 !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+  }
+
+  .filters-row {
+    min-height: 48px;
+    padding: 2px;
+    border: 1px solid rgba(255, 255, 255, 0.055);
+    border-radius: 14px;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.038), rgba(255, 255, 255, 0.014)),
+      rgba(8, 9, 11, 0.78);
+    box-shadow:
+      0 12px 28px -24px rgba(0, 0, 0, 0.95),
+      0 1px 0 rgba(255, 255, 255, 0.025) inset;
+  }
+
+  .app:has(.mobile-board-row) .mobile-search-trigger,
+  .app:has(.mobile-board-row) .filters > .filters-row > .more-btn {
+    border-color: transparent !important;
+    background: transparent !important;
+    border-radius: 11px !important;
+  }
+
+  .app:has(.mobile-board-row) .mobile-search-trigger:active,
+  .app:has(.mobile-board-row) .filters > .filters-row > .more-btn:active {
+    background: rgba(255, 255, 255, 0.055) !important;
+  }
+
+  .app:has(.mobile-board-row) .grade-pill {
+    border-color: transparent !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  .app:has(.mobile-board-row) .grade-pill.on {
+    border-color: color-mix(in srgb, currentColor 30%, transparent) !important;
+    background: color-mix(in srgb, currentColor 8%, transparent) !important;
+    box-shadow: 0 0 14px color-mix(in srgb, currentColor 9%, transparent) !important;
+  }
+
+  .main {
+    padding: 11px 10px calc(88px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .day-rating {
+    margin-bottom: 8px;
+    border-color: rgba(255, 255, 255, 0.07);
+    background:
+      linear-gradient(90deg, rgba(0, 216, 246, 0.045), transparent 58%),
+      rgba(10, 11, 13, 0.72);
+    box-shadow: 0 10px 28px -26px rgba(0, 216, 246, 0.65);
+  }
+
+  .mobile-potd-row {
+    min-height: 76px;
+    margin-bottom: 11px;
+    border-radius: 15px;
+    background:
+      radial-gradient(70% 130% at 0% 50%, color-mix(in srgb, var(--mobile-potd-color) 14%, transparent), transparent 75%),
+      linear-gradient(115deg, rgba(24, 17, 9, 0.88), rgba(9, 10, 12, 0.9));
+    box-shadow:
+      0 16px 34px -26px color-mix(in srgb, var(--mobile-potd-color) 70%, transparent),
+      0 1px 0 rgba(255, 255, 255, 0.035) inset;
+    transition: border-color 0.18s, transform 0.16s, box-shadow 0.18s;
+  }
+
+  .mobile-potd-row:active { transform: scale(0.992); }
+  .mobile-potd-mark {
+    width: 38px;
+    height: 38px;
+    box-shadow:
+      0 0 18px color-mix(in srgb, var(--mobile-potd-color) 13%, transparent),
+      0 1px 0 rgba(255, 255, 255, 0.06) inset;
+  }
+  .mobile-potd-prob b { text-shadow: 0 0 14px color-mix(in srgb, var(--mobile-potd-color) 42%, transparent); }
+
+  .board { margin-top: 0 !important; }
+  .board-body { gap: 9px; }
+  .board-swipe {
+    border-radius: 15px;
+    content-visibility: auto;
+    contain-intrinsic-size: auto 78px;
+  }
+
+  .mobile-board-row {
+    min-height: 76px;
+    grid-template-columns: 21px 36px minmax(0, 1fr) 52px 44px 44px;
+    grid-template-rows: 76px;
+    padding-left: 8px;
+    border-color: rgba(255, 255, 255, 0.075);
+    border-left-color: color-mix(in srgb, var(--mobile-row-color) 62%, transparent);
+    border-radius: 14px;
+    background:
+      radial-gradient(70% 140% at 0% 50%, color-mix(in srgb, var(--mobile-row-color) 8%, transparent), transparent 72%),
+      linear-gradient(180deg, rgba(18, 20, 23, 0.88), rgba(9, 10, 12, 0.92));
+    box-shadow:
+      0 12px 26px -23px rgba(0, 0, 0, 0.95),
+      0 1px 0 rgba(255, 255, 255, 0.025) inset;
+    transition: background 0.16s, border-color 0.16s, transform 0.14s, box-shadow 0.18s;
+  }
+
+  .mobile-board-row::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 9px;
+    right: 88px;
+    height: 1px;
+    background: linear-gradient(90deg, color-mix(in srgb, var(--mobile-row-color) 24%, transparent), transparent 72%);
+    pointer-events: none;
+  }
+
+  .mobile-board-row:active {
+    transform: scale(0.994);
+    border-color: color-mix(in srgb, var(--mobile-row-color) 28%, rgba(255, 255, 255, 0.075));
+    box-shadow: 0 7px 18px -17px rgba(0, 0, 0, 0.95);
+  }
+
+  .mobile-board-avatar-wrap,
+  .mobile-board-avatar { width: 36px; height: 36px; }
+  .mobile-board-avatar {
+    border-color: rgba(255, 255, 255, 0.12);
+    box-shadow: 0 5px 14px -9px rgba(0, 0, 0, 0.95);
+  }
+  .mobile-board-name-line > strong { font-size: 13.25px; letter-spacing: -0.012em; }
+  .mobile-board-prob > b {
+    font-size: 16px;
+    letter-spacing: -0.035em;
+    text-shadow: 0 0 14px color-mix(in srgb, var(--mobile-row-color) 30%, transparent);
+  }
+  .mobile-board-action { height: 76px; }
+  .mobile-board-action:active { background: rgba(255, 255, 255, 0.055); }
+
+  .bottom-nav {
+    left: 10px !important;
+    right: 10px !important;
+    bottom: calc(8px + env(safe-area-inset-bottom, 0px)) !important;
+    height: 62px !important;
+    padding: 4px !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border-radius: 18px !important;
+    background: rgba(8, 9, 11, 0.88) !important;
+    box-shadow:
+      0 18px 50px rgba(0, 0, 0, 0.72),
+      0 1px 0 rgba(255, 255, 255, 0.055) inset !important;
+    backdrop-filter: blur(24px) saturate(155%) !important;
+    -webkit-backdrop-filter: blur(24px) saturate(155%) !important;
+  }
+
+  .bottom-nav-btn {
+    min-width: 44px;
+    min-height: 52px;
+    border-radius: 13px !important;
+    gap: 3px !important;
+  }
+  .bottom-nav-btn.active { background: rgba(0, 216, 246, 0.07) !important; }
+  .bottom-nav-btn.active::before {
+    top: 3px !important;
+    width: 18px !important;
+    border-radius: 999px !important;
+  }
+  .bottom-nav-label { font-size: 9px !important; }
+
+  .mobile-board-row:focus-visible,
+  .mobile-potd-row:focus-visible,
+  .bottom-nav-btn:focus-visible,
+  .mobile-search-trigger:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+}
+
+@media (max-width: 350px) {
+  .mobile-board-row {
+    min-height: 112px;
+    grid-template-rows: minmax(52px, auto) 44px;
+  }
+  .mobile-board-action { height: 44px; }
+}
+
+@media (max-width: 560px) and (prefers-reduced-motion: reduce) {
+  .mobile-board-row,
+  .mobile-potd-row,
+  .bottom-nav-btn { transition: none !important; }
 }
 
 /* Mobile Weather + Pitcher Cards: approved scan-first hierarchy. */

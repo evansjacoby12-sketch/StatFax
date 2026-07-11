@@ -944,7 +944,7 @@ export default function App() {
     {/* Bottom nav is a sibling of .app (not a child) so iOS doesn't route its
         touch events through the overflow-y:auto scroll container, which can
         swallow taps on position:fixed descendants in standalone PWA mode. */}
-    <nav className="bottom-nav">
+    <nav className="bottom-nav" aria-label="Primary navigation">
       {[
         { id: 'board', label: 'Board', icon: 'List' },
         { id: 'games', label: 'Games', icon: 'LayoutGrid' },
@@ -953,8 +953,11 @@ export default function App() {
       ].map((tab) => (
         <button
           key={tab.id}
+          type="button"
           className={`bottom-nav-btn ${view === tab.id || (tab.id === 'results' && view === 'combos') ? 'active' : ''}`}
           onClick={() => setView(tab.id)}
+          aria-current={view === tab.id || (tab.id === 'results' && view === 'combos') ? 'page' : undefined}
+          aria-label={tab.label}
         >
           <Icon name={tab.icon} size={20} />
           <span className="bottom-nav-label">{tab.label}</span>
