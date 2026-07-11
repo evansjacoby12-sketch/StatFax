@@ -60,8 +60,14 @@
    tap a signal. While the panel is open, drop out of sticky so the whole bar
    scrolls with the page in normal flow; collapsed, it pins as before. Browsers
    without :has() simply keep the prior sticky behavior — no regression. */
-.topbar:has(.filters-panel) {
-  position: static;
+/* Only unstick the (tall) open filters panel on MOBILE, where a sticky-open
+   panel would swallow the viewport. On desktop it's just a couple of rows, so
+   keep the whole chrome pinned while scrolling (--chrome-h is measured live, so
+   .board-head stacks right below it). */
+@media (max-width: 560px) {
+  .topbar:has(.filters-panel) {
+    position: static;
+  }
 }
 
 /* ============ Header ============ */
@@ -593,13 +599,15 @@
   border-bottom: 1px solid var(--border-soft);
   border-radius: var(--radius) var(--radius) 0 0;
 }
-/* When the filters panel is open, .topbar drops to position:static and scrolls
-   away with the page (see .topbar:has(.filters-panel)). The column header must
-   then pin to the very top — otherwise it sticks at top:--chrome-h, leaving a
-   dead band above it where batter rows bleed through and the header lands on top
-   of a row (the Nick-Kurtz overlap). .app wraps both topbar and board. */
-.app:has(.filters-panel) .board-head {
-  top: 0;
+/* On MOBILE the open filters panel unsticks .topbar (above), so the column
+   header must pin to the very top itself — otherwise it sticks at top:--chrome-h,
+   leaving a dead band where batter rows bleed through and the header lands on a
+   row (the Nick-Kurtz overlap). On desktop the topbar stays pinned, so the header
+   keeps its default top:--chrome-h and stacks below it. */
+@media (max-width: 560px) {
+  .app:has(.filters-panel) .board-head {
+    top: 0;
+  }
 }
 .th {
   font-size: 11px;
