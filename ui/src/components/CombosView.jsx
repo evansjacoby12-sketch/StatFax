@@ -13,9 +13,6 @@ import * as store from '../lib/storage.js'
 // own full page.
 
 const RECENT_DAYS = 7
-// The "Combo results" scorecard summarizes just the last couple of days (the day
-// picker still spans RECENT_DAYS for browsing). Keeps the headline tally recent.
-const SCORECARD_DAYS = 2
 const STRAT_LABEL = { top: 'Top Picks', mix: 'Best Mix', stack: 'Signal Stack', hot: 'Hot Hand', power: 'Power Bats', matchup: 'Soft Matchup', park: 'Park & Air', precision: 'Precision', value: 'Value', edge: 'Edge Stack' }
 const CARD = { background: 'rgba(17, 18, 20, 0.45)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '12px', padding: '20px', marginBottom: '24px' }
 const H3 = { fontSize: '13px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '16px', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: '8px' }
@@ -119,7 +116,7 @@ export default function CombosView({ batters, onSelect, favorConsistency = false
       for (const w of comboWindowsByDate[d] || []) { const x = count(w.combos); wHit += x.hit; wTot += x.tot }
       return { full, windows: { hit: wHit, tot: wTot } }
     }
-    const comboWeek = comboDates.slice(0, SCORECARD_DAYS).reduce((acc, d) => { const t = boardTally(d); acc.cashed += t.full.hit + t.windows.hit; acc.total += t.full.tot + t.windows.tot; return acc }, { cashed: 0, total: 0 })
+    const comboWeek = comboDates.reduce((acc, d) => { const t = boardTally(d); acc.cashed += t.full.hit + t.windows.hit; acc.total += t.full.tot + t.windows.tot; return acc }, { cashed: 0, total: 0 })
     const dayTally = activeComboDay ? boardTally(activeComboDay) : null
 
     // Same-game parlays — one SGP per game per size. Prefer the frozen pregame
@@ -227,7 +224,7 @@ export default function CombosView({ batters, onSelect, favorConsistency = false
           <h3 className="section-title" style={H3}>
             <Icon name="Layers" size={14} style={{ color: 'var(--accent)' }} /> Combo results
             <span style={{ fontWeight: '400', textTransform: 'none', marginLeft: '6px', fontSize: '12px', color: 'var(--text-faint)' }}>
-              · last 2d <b style={{ color: 'var(--strong)' }}>{settled.comboWeek.cashed}</b>/{settled.comboWeek.total} cashed
+              · last 7d <b style={{ color: 'var(--strong)' }}>{settled.comboWeek.cashed}</b>/{settled.comboWeek.total} cashed
               {settled.activeComboDay && settled.dayTally ? (
                 <> · {settled.activeComboDay.slice(5)}: <b style={{ color: 'var(--strong)' }}>{settled.dayTally.full.hit + settled.dayTally.windows.hit}</b> hit <span style={{ opacity: 0.8 }}>(main {settled.dayTally.full.hit} · windows {settled.dayTally.windows.hit})</span></>
               ) : ''}
