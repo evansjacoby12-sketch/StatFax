@@ -297,9 +297,11 @@ export function appendComboDay(log, date, gradedCombos, bestAvailable) {
   return { ...log, combos };
 }
 
-// Rolling window for both scorecards — last N graded days. Kept short so the
-// numbers reflect the CURRENT strategies (post cut/re-tune), not a stale blend.
+// Rolling window — last N graded days. Kept short so the numbers reflect the
+// CURRENT strategies (post cut/re-tune), not a stale blend. The combo scorecard
+// runs a tighter 2-day window (a very recent read); the SGP scorecard keeps 5.
 const SCORECARD_DAYS = 5;
+const COMBO_SCORECARD_DAYS = 2;
 
 /**
  * Rolling scorecard for the GRADED same-game parlays (sgpByDate). SGPs have no
@@ -345,9 +347,9 @@ export function sgpScorecard(log) {
  */
 export function comboScorecard(log) {
   const byDate = log?.combos?.byDate || {};
-  // Last SCORECARD_DAYS graded days only — a recent read, not a month-long blend
-  // that buries how the current strategies are doing under old (pre-re-tune) data.
-  const dates = Object.keys(byDate).sort().slice(-SCORECARD_DAYS);
+  // Last COMBO_SCORECARD_DAYS graded days only — a very recent read, not a
+  // month-long blend that buries how the current strategies are doing.
+  const dates = Object.keys(byDate).sort().slice(-COMBO_SCORECARD_DAYS);
   const cell = () => ({ combos: 0, allHit: 0, legs: 0, legHits: 0 });
   const byStrategy = {};
   const bySize = {};
