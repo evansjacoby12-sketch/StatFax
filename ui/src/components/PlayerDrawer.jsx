@@ -446,8 +446,8 @@ function BetaCeiling({ b }) {
         {big('Ceiling', ceil)}
         {big('Form', form)}
       </div>
-      <SignalChecklist title="Power Ready" badge="POWER READY (beta)" crit={powerReadyCriteria(b)} />
-      <SignalChecklist title="Barrel Ready" badge="BARREL READY (beta)" crit={barrelReadyCriteria(b)} />
+      <SignalChecklist title="Power Ready" badge="POWER READY (beta)" crit={powerReadyCriteria(b)} meaning={SIGNAL_MEANING.powerReady[level] ?? SIGNAL_MEANING.powerReady.eli5} />
+      <SignalChecklist title="Barrel Ready" badge="BARREL READY (beta)" crit={barrelReadyCriteria(b)} meaning={SIGNAL_MEANING.barrelReady[level] ?? SIGNAL_MEANING.barrelReady.eli5} />
       <div className="beta-ceil-explain" aria-label="Ceiling and form explanation">
         <div className="beta-ceil-explain-head">
           <Icon name={level === 'eli5' ? 'Sparkles' : 'BarChart3'} size={12} />
@@ -478,20 +478,39 @@ function BetaCeiling({ b }) {
   )
 }
 
-// Readable beta-signal criteria: each gate with its value, the threshold it must
-// clear, and pass/fail — so you can SEE exactly why a bat did or didn't qualify
-// (e.g. "Matchup 57 · needs ≥60 ✗"). Renders for POWER READY and BARREL READY;
-// thresholds come from powerReady.js so labels never drift from the logic.
-function SignalChecklist({ title, badge, crit }) {
+// Plain-English MEANING of each beta signal — what it actually says about a bat,
+// at the reader's ELI5/ELI15 depth. Keeps the criteria table from being just
+// numbers: the reader learns what "qualifying" means, not only that it did.
+const SIGNAL_MEANING = {
+  powerReady: {
+    eli5: 'Big power meeting a soft spot — his bat can do real damage and the pitcher/park is friendly, so a homer is in play even if he is not hot.',
+    eli15: 'Elite power ceiling (≥75) in a plus HR matchup (≥60); form only has to clear a not-cold floor (≥35).',
+  },
+  barrelReady: {
+    eli5: 'He is locked in right now — solid power and genuinely hot lately, so he is dangerous no matter who is pitching.',
+    eli15: 'Solid power ceiling (≥70) plus a real recent-form surge (≥60); no matchup requirement.',
+  },
+}
+// Friendly, human phrasing for a gate a bat is short on (used in the verdict).
+const MISS_PHRASE = { ceiling: 'more raw power', matchup: 'a friendlier matchup', form: 'to heat up', sample: 'more recent at-bats' }
+
+// Readable beta-signal criteria: a one-line MEANING, then each gate with its
+// value, the threshold it must clear, and pass/fail — so you SEE exactly why a
+// bat did or didn't qualify (e.g. "Matchup 57 · needs ≥60 ✗"). Renders for POWER
+// READY and BARREL READY; thresholds come from powerReady.js so labels never drift.
+function SignalChecklist({ title, badge, crit, meaning }) {
   const known = crit.filter((c) => c.value != null)
   if (known.length < 2) return null   // nothing meaningful to show yet
   const missing = crit.filter((c) => !c.met)
   const qualifies = missing.length === 0
   return (
     <div style={{ border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '10px 12px', marginBottom: 12 }}>
-      <div style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-dim)', marginBottom: 8 }}>
+      <div style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-dim)', marginBottom: 4 }}>
         {title} criteria
       </div>
+      {meaning && (
+        <div style={{ fontSize: 12, color: 'var(--text-dim)', lineHeight: 1.45, marginBottom: 9 }}>{meaning}</div>
+      )}
       {crit.map((c) => (
         <div key={c.key} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '3px 0', fontSize: 12 }}>
           <Icon name={c.met ? 'Check' : 'X'} size={13} style={{ color: c.met ? 'var(--strong)' : 'var(--bad)', flexShrink: 0 }} />
@@ -504,8 +523,8 @@ function SignalChecklist({ title, badge, crit }) {
       ))}
       <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.05)', fontSize: 12, fontWeight: 700, color: qualifies ? 'var(--strong)' : 'var(--text-dim)' }}>
         {qualifies
-          ? `✓ All met — ${badge}`
-          : `Not qualified — ${missing.map((m) => m.label.toLowerCase()).join(', ')} short`}
+          ? `✓ Qualifies — ${badge}`
+          : `Not yet — just needs ${missing.map((m) => MISS_PHRASE[m.key] || m.label.toLowerCase()).join(' & ')}`}
       </div>
     </div>
   )
