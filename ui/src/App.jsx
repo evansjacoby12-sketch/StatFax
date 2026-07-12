@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback, useRef, useLayoutEffect } from 'react'
-import { loadSlate, loadBrief, forceSlateRefresh, normName } from './lib/data.js'
+import { loadSlate, loadBrief, forceSlateRefresh, normName, projectedSlateHRs } from './lib/data.js'
 import { GRADE_ORDER, BADGES } from './lib/badges.js'
 import { HOT_HEAT, DESC_BY_DEFAULT, DEFAULT_FILTERS, SORTS } from './lib/constants.js'
 import { risingForm, precisionSignal, sleeperSignal } from './lib/groups.js'
@@ -686,7 +686,7 @@ export default function App() {
           <>
             {showDayRating && <DayRating
               rating={data.meta?.dayRating}
-              estHRs={data.batters?.reduce((s, b) => s + (Number.isFinite(b.hrProbability) ? b.hrProbability : 0), 0) ?? null}
+              estHRs={projectedSlateHRs(data.batters)}
             />}
             <SlateBrief brief={brief} />
             {pick && pick.id !== podDismissedId && (

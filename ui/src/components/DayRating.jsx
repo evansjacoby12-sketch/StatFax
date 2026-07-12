@@ -29,7 +29,7 @@ export default function DayRating({ rating, estHRs }) {
         <Stars n={stars} />
         <span className="dr-verdict">{verdict}</span>
         {estStr && (
-          <span className="dr-est-hrs" title="Sum of every scored batter's model HR probability — the slate's expected home-run count">
+          <span className="dr-est-hrs" title="Projected home runs across today's starting lineups — Σ of each starter's calibrated HR probability (~9 batters per team)">
             {estStr} HRs
           </span>
         )}
@@ -38,7 +38,7 @@ export default function DayRating({ rating, estHRs }) {
       <div className="dr-body">
         <div className="dr-cap dim">
           How good a home-run slate this is — score {score}/100. Higher = more homer-prone arms, better parks/weather, and more elite bats.
-          {estStr && <> Model expects <b>{estStr} HRs</b> from today's scored batters (Σ HR probabilities).</>}
+          {estStr && <> Model projects <b>{estStr} HRs</b> across today's starting lineups (Σ each starter's HR%).</>}
         </div>
         <div className="dr-bars">
           <Bar label="Soft pitching" v={factors.pitching} sub={`${softArmPct}% of starters HR-prone`} />

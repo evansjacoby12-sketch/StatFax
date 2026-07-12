@@ -61,6 +61,34 @@ export async function forceSlateRefresh(onStatus) {
   }
 }
 
+// Realistic slate HR projection. Only ~9 batters START per team, so summing the
+// calibrated HR% of EVERY scored bat (~13/side, incl. bench/depth) overcounts a
+// real slate by ~40% (e.g. 47 vs a true ~35). Project over each team-side's
+// lineup instead: the confirmed 9 once orders post, else the top 9 by score as a
+// pre-lineup proxy. Uses the CALIBRATED hrProbability, not the raw pre-calibration
+// expectedHRs. Returns null when there's nothing scored yet.
+export function projectedSlateHRs(batters) {
+  if (!Array.isArray(batters) || !batters.length) return null
+  const sides = new Map()   // `${gamePk}|H|A` → bats on that team-side
+  for (const b of batters) {
+    if (!Number.isFinite(b?.hrProbability)) continue
+    const key = `${b.gamePk}|${b.isHome ? 'H' : 'A'}`
+    if (!sides.has(key)) sides.set(key, [])
+    sides.get(key).push(b)
+  }
+  if (!sides.size) return null
+  let total = 0
+  for (const bats of sides.values()) {
+    const withOrder = bats.filter((b) => Number.isFinite(b.battingOrder))
+    // ≥8 orders = lineup is posted → use the real starters; else top 9 by score.
+    const starters = withOrder.length >= 8
+      ? withOrder
+      : bats.slice().sort((a, b) => (b.score ?? 0) - (a.score ?? 0)).slice(0, 9)
+    total += starters.reduce((s, b) => s + (b.hrProbability || 0), 0)
+  }
+  return total
+}
+
 // Normalize a player name for fuzzy matching across sources (MLB API vs books).
 // Strips accents, punctuation, generational suffixes; lowercases.
 export function normName(name) {
