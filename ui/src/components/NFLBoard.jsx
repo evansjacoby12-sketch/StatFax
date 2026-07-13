@@ -147,25 +147,51 @@ function BoardRow({ player, rank, marketId, watched, inSlip, onSelect, onToggleW
 }
 
 function PlayerResearch({ player, marketId, onClose, inSlip, onToggleSlip }) {
+  const [tab, setTab] = useState('overview')
+  useEffect(() => { setTab('overview') }, [player?.id])
   if (!player) return null
   const scoredMarkets = eligiblePropMarkets(player).map((market) => ({ market, model: scoreNFLProp(player, market.id) }))
   const current = scoreNFLProp(player, marketId)
+  const marketLabel = NFL_PROP_MARKET_LIST.find((market) => market.id === marketId)?.label
+  const researchTabs = [
+    { id: 'overview', label: 'Overview', icon: 'Sparkles' },
+    { id: 'role', label: 'Role', icon: 'Users' },
+    { id: 'matchup', label: 'Matchup', icon: 'Shield' },
+    { id: 'gamelog', label: 'Game log', icon: 'Activity' },
+  ]
   return <>
     <button className="nfl-drawer-scrim" onClick={onClose} aria-label="Close player research" />
     <aside className="nfl-drawer nfl-prop-drawer" role="dialog" aria-modal="true" aria-labelledby="nfl-drawer-title">
-      <button className="nfl-drawer-close" onClick={onClose} aria-label="Close"><Icon name="X" size={18} /></button>
-      <span className="nfl-drawer-eyebrow">NFL prop research · current model context</span>
-      <h2 id="nfl-drawer-title">{player.name}</h2><p>{player.position} · {player.team} vs {player.opponent} · {liveLabel(player)}</p>
-      <div className="nfl-drawer-market">{NFL_PROP_MARKET_LIST.find((market) => market.id === marketId)?.label}</div>
-      <div className="nfl-drawer-scorecard"><div><small>Model</small><strong className="mono">{pct(current.probability)}</strong></div><div><small>Line / odds</small><strong className="mono">{marketValue(player, current, marketId)}</strong></div><div><small>Edge</small><strong className={`mono ${current.edge == null ? '' : current.edge >= 0 ? 'positive' : 'negative'}`}>{current.edge == null ? '—' : `${current.edge >= 0 ? '+' : ''}${pct(current.edge)}`}</strong></div></div>
-      <section className="nfl-drawer-section"><h3><Icon name="ListFilter" size={14} /> Eligible props</h3><div className="nfl-eligible-grid">{scoredMarkets.map(({ market, model }) => <span key={market.id} title={eligibilityReason(player, market.id)}><b>{market.shortLabel}</b><em className="mono">{pct(model.probability)}</em></span>)}</div></section>
-      <section className="nfl-drawer-section"><h3><Icon name="Target" size={14} /> Red-zone role</h3><div className="nfl-research-grid"><span>RZ targets L3 <b>{number(player.usage?.redZoneTargetsL3)}</b></span><span>End-zone targets L3 <b>{number(player.usage?.endZoneTargetsL3)}</b></span><span>RZ touches L3 <b>{number(player.usage?.redZoneTouchesL3)}</b></span><span>Goal-line touches L3 <b>{number(player.usage?.goalLineTouchesL3)}</b></span></div></section>
-      <section className="nfl-drawer-section"><h3><Icon name="Shield" size={14} /> Defense and environment</h3><div className="nfl-research-grid"><span>Defense vs {player.position} <b>{player.defenseVsPosition?.label}</b></span><span>TDs allowed / game <b>{number(player.defenseVsPosition?.touchdownsAllowedPerGame, 2)}</b></span><span>RZ chances allowed / game <b>{number(player.defenseVsPosition?.redZoneOpportunitiesAllowedPerGame, 1)}</b></span><span>Weather <b>{current.weather.label}</b></span></div></section>
-      <section className="nfl-drawer-section"><h3><Icon name="Users" size={14} /> Role and availability</h3><div className="nfl-research-grid"><span>Role <b>{player.usage?.roleLabel || 'Unconfirmed'}</b></span><span>Projected snaps <b>{pct(player.usage?.snapShare, 0)}</b></span><span>Availability <b>{player.availability?.label || player.status}</b></span><span>Opportunity multiplier <b>{pct(player.availability?.multiplier, 0)}</b></span></div></section>
-      <section className="nfl-drawer-section"><h3><Icon name="Activity" size={14} /> Recent games</h3><div className="nfl-game-log"><header><span>Week</span><span>Pass</span><span>Rush</span><span>Rec</span><span>TD</span></header>{player.recentGames.slice(0, 5).map((game) => <div key={`${game.season}-${game.week}`}><span>W{game.week}</span><span>{number(game.passingYards)}</span><span>{number(game.rushingYards)}</span><span>{number(game.receivingYards)}</span><span>{number(game.totalTds)}</span></div>)}</div></section>
-      {player.live?.isLive && <section className="nfl-drawer-section nfl-live-analysis"><h3><Icon name="Activity" size={14} /> Live analysis</h3><p>{liveLabel(player)} · {player.live.teamScore}–{player.live.opponentScore} · {player.live.gameScript}. Approximately {player.live.estimatedPossessionsRemaining} possessions remain. Current production, clock, score and game script are blended with the pregame expectation.</p>{player.live.downDistance && <small>{player.live.downDistance}{player.live.lastPlay ? ` · ${player.live.lastPlay}` : ''}</small>}</section>}
-      <section className="nfl-drawer-section nfl-truth-note"><h3><Icon name="Info" size={14} /> Data disclosure</h3><p>Model features reflect the history, role, injury, weather and live-game coverage available for this slate. Missing feeds are shown as limited rather than replaced with invented values.</p></section>
-      <button className={`nfl-drawer-cta ${inSlip ? 'is-added' : ''}`} onClick={() => onToggleSlip(player)}><Icon name={inSlip ? 'Check' : 'Plus'} size={16} />{inSlip ? 'Added to prop slip' : 'Add selected prop to slip'}</button>
+      <header className="nfl-research-header">
+        <button className="nfl-drawer-close" onClick={onClose} aria-label="Close"><Icon name="X" size={18} /></button>
+        <span className="nfl-drawer-eyebrow">NFL player research · model confidence</span>
+        <div className="nfl-research-identity"><div><h2 id="nfl-drawer-title">{player.name}</h2><span className="nfl-position">{player.position}</span><span className={`nfl-live-state ${player.live?.isLive ? 'is-live' : ''}`}><Icon name={player.live?.isLive ? 'Activity' : 'Clock'} size={11} />{liveLabel(player)}</span></div><p><b>{player.team}</b> vs {player.opponent} · {player.kickoff} · {player.isHome ? 'Home' : 'Away'}</p></div>
+        <div className="nfl-research-decision">
+          <div className="nfl-research-market"><small>Selected market</small><b>{marketLabel}</b></div>
+          <div className="nfl-research-score"><span><small>Model</small><strong className="mono">{pct(current.probability)}</strong></span><span><small>Line / odds</small><strong className="mono">{marketValue(player, current, marketId)}</strong></span><span><small>Edge</small><strong className={`mono ${current.edge == null ? '' : current.edge >= 0 ? 'positive' : 'negative'}`}>{current.edge == null ? 'No price' : `${current.edge >= 0 ? '+' : ''}${pct(current.edge)}`}</strong></span></div>
+          <button className={`nfl-drawer-cta ${inSlip ? 'is-added' : ''}`} onClick={() => onToggleSlip(player)}><Icon name={inSlip ? 'Check' : 'Plus'} size={16} />{inSlip ? 'Added to slip' : 'Add to slip'}</button>
+        </div>
+      </header>
+      <nav className="nfl-research-tabs" aria-label="Player research sections">{researchTabs.map((item) => <button key={item.id} className={tab === item.id ? 'active' : ''} aria-current={tab === item.id ? 'page' : undefined} onClick={() => setTab(item.id)}><Icon name={item.icon} size={13} />{item.label}</button>)}</nav>
+      <div className="nfl-research-body">
+        {tab === 'overview' && <div className="nfl-research-view">
+          <section className="nfl-research-panel"><header><span><Icon name="Sparkles" size={14} /> Primary model signals</span><small>{current.signals?.length || 0} active</small></header><div className="nfl-research-signals">{current.signals?.slice(0, 3).map((signal) => <article key={signal.key} className={`tone-${signal.tone}`}><Icon name={signalIcon(signal)} size={15} /><div><b>{signal.text}</b><small>Active model evidence</small></div></article>)}{!current.signals?.length && <div className="nfl-research-empty"><Icon name="Info" size={15} />No active streak or role signal for this market.</div>}</div></section>
+          <section className="nfl-research-panel"><header><span><Icon name="LayoutGrid" size={14} /> Eligible markets</span><small>{scoredMarkets.length} available</small></header><div className="nfl-eligible-grid">{scoredMarkets.map(({ market, model }) => <span key={market.id} className={market.id === marketId ? 'active' : ''} title={eligibilityReason(player, market.id)}><b>{market.shortLabel}</b><em className="mono">{pct(model.probability)}</em><small className="mono">{marketValue(player, model, market.id)}</small></span>)}</div></section>
+          <section className="nfl-research-disclosure"><Icon name="Info" size={14} /><p>Model features reflect the history, role, injury, weather and live-game coverage available for this slate. Missing feeds are shown as limited rather than replaced with invented values.</p></section>
+        </div>}
+        {tab === 'role' && <div className="nfl-research-view">
+          <section className="nfl-research-panel"><header><span><Icon name="Users" size={14} /> Role and availability</span></header><div className="nfl-research-grid"><span>Role <b>{player.usage?.roleLabel || 'Unconfirmed'}</b></span><span>Projected snaps <b>{pct(player.usage?.snapShare, 0)}</b></span><span>Availability <b>{player.availability?.label || player.status}</b></span><span>Opportunity multiplier <b>{pct(player.availability?.multiplier, 0)}</b></span></div></section>
+          <section className="nfl-research-panel"><header><span><Icon name="Target" size={14} /> Red-zone profile · last 3</span></header><div className="nfl-research-grid"><span>RZ targets <b>{number(player.usage?.redZoneTargetsL3)}</b></span><span>End-zone targets <b>{number(player.usage?.endZoneTargetsL3)}</b></span><span>RZ touches <b>{number(player.usage?.redZoneTouchesL3)}</b></span><span>Goal-line touches <b>{number(player.usage?.goalLineTouchesL3)}</b></span></div></section>
+        </div>}
+        {tab === 'matchup' && <div className="nfl-research-view">
+          <section className="nfl-research-panel"><header><span><Icon name="Shield" size={14} /> Defense analysis</span></header><div className="nfl-research-grid"><span>Defense vs {player.position} <b>{player.defenseVsPosition?.label || 'No split'}</b></span><span>TDs allowed / game <b>{number(player.defenseVsPosition?.touchdownsAllowedPerGame, 2)}</b></span><span>RZ chances allowed / game <b>{number(player.defenseVsPosition?.redZoneOpportunitiesAllowedPerGame, 1)}</b></span><span>Defense rank <b>{player.defenseVsPosition?.rank ? `#${player.defenseVsPosition.rank}` : '—'}</b></span></div></section>
+          <section className="nfl-research-panel"><header><span><Icon name="Wind" size={14} /> Environment and split</span></header><div className="nfl-research-grid"><span>Weather <b className={`tone-${current.weather.tone}`}>{current.weather.label}</b></span><span>Temperature <b>{player.weather?.tempF == null ? '—' : `${number(player.weather.tempF)}°F`}</b></span><span>Wind <b>{player.weather?.windMph == null ? '—' : `${number(player.weather.windMph)} mph`}</b></span><span>{player.isHome ? 'Home' : 'Away'} split <b>{player.splits?.activeEdge == null ? 'Neutral' : `${player.splits.activeEdge >= 0 ? '+' : ''}${pct(player.splits.activeEdge)}`}</b></span></div></section>
+        </div>}
+        {tab === 'gamelog' && <div className="nfl-research-view">
+          {player.live?.isLive && <section className="nfl-research-panel nfl-live-analysis"><header><span><Icon name="Activity" size={14} /> Live game analysis</span><small>{liveLabel(player)}</small></header><p>{player.live.teamScore}–{player.live.opponentScore} · {player.live.gameScript}. Approximately {player.live.estimatedPossessionsRemaining} possessions remain. Current production, clock, score and game script are blended with the pregame expectation.</p>{player.live.downDistance && <small>{player.live.downDistance}{player.live.lastPlay ? ` · ${player.live.lastPlay}` : ''}</small>}</section>}
+          <section className="nfl-research-panel"><header><span><Icon name="List" size={14} /> Recent performance</span><small>Last 5 games</small></header><div className="nfl-game-log"><header><span>Week</span><span>Pass</span><span>Rush</span><span>Rec</span><span>TD</span></header>{player.recentGames.slice(0, 5).map((game) => <div key={`${game.season}-${game.week}`}><span>W{game.week}</span><span>{number(game.passingYards)}</span><span>{number(game.rushingYards)}</span><span>{number(game.receivingYards)}</span><span>{number(game.totalTds)}</span></div>)}</div></section>
+        </div>}
+      </div>
     </aside>
   </>
 }

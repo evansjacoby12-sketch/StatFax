@@ -20,3 +20,13 @@ test('NFL board exposes aligned position, team, and game filters', async () => {
   assert.match(board, /gameKeyFor\(player\) === game/)
   assert.match(styles, /\.nfl-prop-filters \{[^}]*align-items: stretch/)
 })
+
+test('NFL player research uses the approved tabbed evidence workspace', async () => {
+  const [board, styles] = await Promise.all([readFile(new URL('../ui/src/components/NFLBoard.jsx', import.meta.url), 'utf8'), readFile(new URL('../ui/src/app.css', import.meta.url), 'utf8')])
+  for (const tab of ['Overview', 'Role', 'Matchup', 'Game log']) assert.match(board, new RegExp(`label: '${tab}'`))
+  assert.match(board, /className="nfl-research-decision"/)
+  assert.match(board, /className="nfl-research-tabs"/)
+  assert.match(board, /tab === 'gamelog'/)
+  assert.match(styles, /\.nfl-prop-drawer \{ width: min\(860px, 100vw\)/)
+  assert.match(styles, /@media \(max-width: 700px\)[\s\S]*?\.nfl-prop-drawer \{ width: 100vw;/)
+})
