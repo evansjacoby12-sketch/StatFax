@@ -132,10 +132,18 @@ export async function buildNFLSnapshot({ now = new Date(), fetchImpl = fetch, hi
   const trackingLog = await readJSON(trackingPath) || { records: [] }
   const oddsResult = await fetchNFLOdds(oddsApiKey, fetchImpl)
   const teams = [...new Set(games.flatMap((game) => [game.home.abbr, game.away.abbr]))]
+  const teamIds = new Map(games.flatMap((game) => [[game.home.abbr, game.home.id], [game.away.abbr, game.away.id]]))
   const rosterResults = await Promise.all(teams.map(async (team) => {
-    try { return [team, await fetchESPNRoster(team, fetchImpl)] } catch (error) { console.warn(`[nfl] roster ${team}: ${error.message}`); return [team, []] }
+    try { return [team, await fetchESPNRoster(team, fetchImpl, teamIds.get(team))] } catch (error) { console.warn(`[nfl] roster ${team}: ${error.message}`); return [team, []] }
   }))
   const rosters = new Map(rosterResults)
+  const rosterAvailabilityPlayers = rosterResults.flatMap(([, players]) => players.map((player) => ({
+    espnId: player.espnId, name: player.name, status: player.injury?.status || player.rosterStatus || 'Active',
+    practiceParticipation: player.injury?.practiceParticipation || null, detail: player.injury?.detail || null,
+    active: !/\b(out|inactive|injured reserve|\bir\b|pup|suspend)/i.test(`${player.injury?.status || ''} ${player.rosterStatus || ''}`),
+    source: 'espn-roster',
+  })))
+  const automaticAvailabilityReady = teams.length > 0 && teams.every((team) => (rosters.get(team) || []).length > 0)
   const depthResults = await Promise.all(teams.map(async (team) => {
     try { return [team, await fetchESPNDepthChart(team, fetchImpl), true] } catch (error) { console.warn(`[nfl] depth ${team}: ${error.message}`); return [team, [], false] }
   }))
@@ -143,7 +151,7 @@ export async function buildNFLSnapshot({ now = new Date(), fetchImpl = fetch, hi
   const automaticDepthReady = depthResults.length > 0 && depthResults.every(([, players, ok]) => ok && players.length > 0)
   const depthPayload = externalDepthPayload || (automaticDepthPlayers.length ? { generatedAt: new Date(now).toISOString(), players: automaticDepthPlayers, source: 'espn-depth-chart' } : null)
   const depthIndex = indexDepthChart(depthPayload)
-  const availabilityPayload = externalAvailabilityPayload || (automaticDepthPlayers.length ? { generatedAt: depthPayload.generatedAt, players: automaticDepthPlayers, source: 'espn-depth-chart' } : null)
+  const availabilityPayload = externalAvailabilityPayload || (rosterAvailabilityPlayers.length ? { generatedAt: new Date(now).toISOString(), players: rosterAvailabilityPlayers, source: 'espn-roster' } : automaticDepthPlayers.length ? { generatedAt: depthPayload.generatedAt, players: automaticDepthPlayers, source: 'espn-depth-chart' } : null)
   const availabilityIndex = indexAvailability(availabilityPayload)
   const summaryResults = await Promise.all(games.map(async (game) => {
     try { return [game.id, await fetchESPNSummary(game, fetchImpl)] } catch (error) { console.warn(`[nfl] summary ${game.id}: ${error.message}`); return [game.id, null] }
@@ -225,7 +233,7 @@ export async function buildNFLSnapshot({ now = new Date(), fetchImpl = fetch, hi
   const weatherFreshness = overlayFreshness(weatherIndex.generatedAt, now, 24)
   const overlayWeatherCoverage = games.length ? games.filter((game) => weatherFor(game, weatherIndex) || game.venue.indoor).length / games.length : 0
   const providers = {
-    schedule: 'espn', rosters: 'espn', injuries: 'espn', practice: externalAvailabilityPayload ? 'availability-snapshot' : automaticDepthPlayers.length ? 'espn-depth-chart' : 'espn-when-reported',
+    schedule: 'espn', rosters: 'espn', injuries: 'espn', practice: externalAvailabilityPayload ? 'availability-snapshot' : rosterAvailabilityPlayers.length ? 'espn-roster-reports' : automaticDepthPlayers.length ? 'espn-depth-chart' : 'espn-when-reported',
     depth: externalDepthPayload ? 'depth-snapshot' : automaticDepthPlayers.length ? 'espn-depth-chart' : 'historical-role',
     weather: externalWeatherPayload ? 'weather-snapshot' : automaticWeatherPayload.games.length ? 'open-meteo' : 'espn-when-reported',
     live: 'espn', history: history ? 'nflverse' : 'position-priors', odds: oddsResult.status === 'ok' ? 'sportsgameodds' : oddsResult.status,
@@ -236,7 +244,7 @@ export async function buildNFLSnapshot({ now = new Date(), fetchImpl = fetch, hi
     defenseByPosition: Boolean(history?.coverage?.defenseByPosition || defenseProfiles),
     firstTouchdown: Boolean(history?.coverage?.firstTouchdown),
     depthChart: depthFreshness.fresh && (Boolean(externalDepthPayload) || automaticDepthReady),
-    officialAvailability: availabilityFreshness.fresh && Boolean(availabilityPayload),
+    officialAvailability: availabilityFreshness.fresh && (Boolean(externalAvailabilityPayload) || automaticAvailabilityReady || automaticDepthReady),
     weatherCoverage: Math.max(weatherCoverage, overlayWeatherCoverage),
     weatherFresh: weatherCoverage > 0 || (weatherFreshness.fresh && overlayWeatherCoverage > 0),
     calibratedMarkets: Object.values(calibration).filter((market) => market?.samples > 0).length,

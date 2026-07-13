@@ -203,7 +203,10 @@ async function getJSON(url, fetchImpl) {
 }
 
 async function getText(url, fetchImpl) {
-  const response = await fetchImpl(url, { headers: { Accept: 'text/html', 'User-Agent': 'StatFax-NFL/1.0' } })
+  const response = await fetchImpl(url, { headers: {
+    Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    'User-Agent': 'StatFax-NFL/1.0',
+  } })
   if (!response.ok) throw new Error(`ESPN HTTP ${response.status}: ${url}`)
   return response.text()
 }
@@ -212,12 +215,29 @@ export async function fetchESPNSeason(year, fetchImpl = fetch) {
   return parseESPNScoreboard(await getJSON(`${ESPN_BASE}/scoreboard?limit=1000&dates=${year}`, fetchImpl))
 }
 
-export async function fetchESPNRoster(teamAbbr, fetchImpl = fetch) {
-  return parseESPNRoster(await getJSON(`${ESPN_BASE}/teams/${teamAbbr.toLowerCase()}/roster`, fetchImpl), teamAbbr)
+export async function fetchESPNRoster(teamAbbr, fetchImpl = fetch, teamId = null) {
+  try {
+    return parseESPNRoster(await getJSON(`${ESPN_BASE}/teams/${teamAbbr.toLowerCase()}/roster`, fetchImpl), teamAbbr)
+  } catch (error) {
+    if (!teamId) throw error
+    return parseESPNRoster(await getJSON(`${ESPN_BASE}/teams/${teamId}/roster`, fetchImpl), teamAbbr)
+  }
 }
 
 export async function fetchESPNDepthChart(teamAbbr, fetchImpl = fetch) {
-  return parseESPNDepthChartHTML(await getText(`${ESPN_WEB}/${teamAbbr.toLowerCase()}`, fetchImpl), teamAbbr)
+  const base = `${ESPN_WEB}/${teamAbbr.toLowerCase()}`
+  const urls = [`${base}?device=featurephone`, `${base}?platform=amp`, `${base}?xhr=1`, base]
+  let lastError = null
+  for (const url of urls) {
+    try {
+      const players = parseESPNDepthChartHTML(await getText(url, fetchImpl), teamAbbr)
+      if (players.length) return players
+      lastError = new Error(`ESPN depth chart contained no QB/RB/WR/TE rows for ${teamAbbr}`)
+    } catch (error) {
+      lastError = error
+    }
+  }
+  throw lastError || new Error(`ESPN depth chart unavailable for ${teamAbbr}`)
 }
 
 export async function fetchESPNSummary(game, fetchImpl = fetch) {
