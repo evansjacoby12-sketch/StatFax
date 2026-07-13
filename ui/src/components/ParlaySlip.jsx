@@ -9,7 +9,7 @@ import * as store from '../lib/storage.js'
 import { makeTicket, trackTicket } from '../lib/tickets.js'
 import { toast } from './Toast.jsx'
 
-const GRADE_COLOR = { S: '#f5a623', A: '#10b981', B: '#3b82f6', C: '#94a3b8', D: '#64748b' }
+const GRADE_COLOR = { S: '#d6b56f', A: '#69b99e', B: '#8587b7', C: '#94a3b8', D: '#676673' }
 
 function useCountUp(target, ms = 450) {
   const [value, setValue] = useState(target)

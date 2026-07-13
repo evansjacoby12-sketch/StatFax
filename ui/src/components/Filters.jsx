@@ -193,7 +193,7 @@ export default function Filters({ value, onChange, gradeCounts, games, badgeCoun
               title="More filters"
               style={{
                 borderColor: open ? 'var(--accent)' : activeMore ? 'var(--accent)' : 'var(--border)',
-                background: open ? 'var(--hover)' : activeMore ? 'rgba(0, 216, 246, 0.08)' : 'var(--card)',
+                background: open ? 'var(--hover)' : activeMore ? 'rgba(151, 149, 203, 0.08)' : 'var(--card)',
                 color: open || activeMore ? '#fff' : 'var(--text-dim)'
               }}
             >
@@ -292,7 +292,7 @@ export default function Filters({ value, onChange, gradeCounts, games, badgeCoun
               aria-pressed={v.confirmedOnly}
               title="Only batters in confirmed lineups"
               style={v.confirmedOnly ? {
-                background: 'rgba(16, 185, 129, 0.1)',
+                background: 'rgba(105, 185, 158, 0.1)',
                 borderColor: 'var(--strong)',
                 color: 'var(--strong)'
               } : {}}
@@ -307,7 +307,7 @@ export default function Filters({ value, onChange, gradeCounts, games, badgeCoun
               aria-pressed={v.watchedOnly}
               title="Only batters on your watchlist"
               style={v.watchedOnly ? {
-                background: 'rgba(245, 166, 35, 0.1)',
+                background: 'rgba(214, 181, 111, 0.1)',
                 borderColor: 'var(--prime)',
                 color: 'var(--prime)'
               } : {}}
@@ -338,7 +338,7 @@ export default function Filters({ value, onChange, gradeCounts, games, badgeCoun
               aria-pressed={v.precisionOnly}
               title="Only batters meeting all precision gates (pitch mix ≥7, heat ≥48, HR due 5/6+, 8+ positive trends, ≤3 negatives)"
               style={v.precisionOnly ? {
-                background: 'rgba(0, 216, 246, 0.1)',
+                background: 'rgba(151, 149, 203, 0.1)',
                 borderColor: 'var(--accent)',
                 color: 'var(--accent)'
               } : {}}
@@ -354,7 +354,7 @@ export default function Filters({ value, onChange, gradeCounts, games, badgeCoun
               title="Under-the-radar value: STRONG/LEAN bats with PRIME-adjacent form (heat ≥48, setup 3/6+, hot or rising) — hit 21% over the validation window"
               style={v.sleepersOnly ? {
                 background: 'rgba(139, 92, 246, 0.12)',
-                borderColor: '#8b5cf6',
+                borderColor: '#9085bd',
                 color: '#a78bfa'
               } : {}}
             >
@@ -432,8 +432,8 @@ function FilterChip({ label, icon, onClear }) {
         display: 'inline-flex',
         alignItems: 'center',
         gap: '6px',
-        background: 'rgba(0, 216, 246, 0.1)',
-        border: '1px solid rgba(0, 216, 246, 0.25)',
+        background: 'rgba(151, 149, 203, 0.1)',
+        border: '1px solid rgba(151, 149, 203, 0.25)',
         borderRadius: '8px',
         padding: '4px 10px',
         fontSize: '12px',

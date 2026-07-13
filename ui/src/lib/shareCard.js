@@ -7,7 +7,7 @@ import { hrSetup } from './scout.js'
 import { american } from './format.js'
 
 const BG = '#000000'
-const ACCENT = '#00d8f6'
+const ACCENT = '#b8b7d8'
 const DIM = '#8b98ab'
 const FAINT = '#5b6b80'
 
@@ -190,11 +190,11 @@ export async function renderPickCard(b) {
   let chx = 90
   chx += chip(ctx, chx, chy, `Heat ${b.heatIndex ?? '—'}`, { color: '#ff9f43', border: 'rgba(255,159,67,0.4)', bg: 'rgba(255,159,67,0.08)' }) + 18
   chx += chip(ctx, chx, chy, `HR Setup ${setup.n}/6`, {
-    color: setup.n >= 5 ? '#f5a623' : DIM,
-    border: setup.n >= 5 ? 'rgba(245,166,35,0.5)' : 'rgba(255,255,255,0.14)',
-    bg: setup.n >= 5 ? 'rgba(245,166,35,0.1)' : 'rgba(255,255,255,0.04)',
+    color: setup.n >= 5 ? '#d6b56f' : DIM,
+    border: setup.n >= 5 ? 'rgba(214,181,111,0.5)' : 'rgba(255,255,255,0.14)',
+    bg: setup.n >= 5 ? 'rgba(214,181,111,0.1)' : 'rgba(255,255,255,0.04)',
   }) + 18
-  if (best?.american) chx += chip(ctx, chx, chy, `Best ${american(best.american)}`, { color: '#32d74b', border: 'rgba(50,215,75,0.4)', bg: 'rgba(50,215,75,0.08)' }) + 18
+  if (best?.american) chx += chip(ctx, chx, chy, `Best ${american(best.american)}`, { color: '#69b99e', border: 'rgba(50,215,75,0.4)', bg: 'rgba(50,215,75,0.08)' }) + 18
 
   // ── footer ──
   ctx.strokeStyle = 'rgba(255,255,255,0.08)'

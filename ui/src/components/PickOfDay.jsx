@@ -88,7 +88,7 @@ export default function PickOfDay({ batter: b, onSelect, watched, inSlip, onTogg
         '--row-accent': color,
         '--team-logo': teamLogo(b.teamId) ? `url(${teamLogo(b.teamId)})` : 'none',
         background: `linear-gradient(135deg, ${hexA(color, 0.1)} 0%, rgba(2, 3, 5, 0.7) 100%)`,
-        border: hrToday ? '1px solid rgba(245, 166, 35, 0.55)' : `1px solid ${hexA(color, 0.25)}`,
+        border: hrToday ? '1px solid rgba(214, 181, 111, 0.55)' : `1px solid ${hexA(color, 0.25)}`,
         boxShadow: `0 8px 32px rgba(0, 0, 0, 0.4), 0 0 16px ${hexA(color, 0.08)}, inset 0 1px 0 rgba(255, 255, 255, 0.05)`,
         borderRadius: '16px',
         padding: '20px',
@@ -173,11 +173,11 @@ export default function PickOfDay({ batter: b, onSelect, watched, inSlip, onTogg
           display: 'flex',
           alignItems: 'center',
           gap: '6px',
-          background: b.lineupConfirmed ? 'rgba(16, 185, 129, 0.08)' : 'rgba(255,255,255,0.03)',
+          background: b.lineupConfirmed ? 'rgba(105, 185, 158, 0.08)' : 'rgba(255,255,255,0.03)',
           padding: '2px 8px',
           borderRadius: '6px',
           color: b.lineupConfirmed ? 'var(--strong)' : 'var(--text-faint)',
-          border: b.lineupConfirmed ? '1px solid rgba(16, 185, 129, 0.2)' : '1px solid rgba(255,255,255,0.05)'
+          border: b.lineupConfirmed ? '1px solid rgba(105, 185, 158, 0.2)' : '1px solid rgba(255,255,255,0.05)'
         }}>
           <span className="confirm-dot" style={{
             background: b.lineupConfirmed ? 'var(--strong)' : 'var(--text-faint)',
@@ -300,9 +300,9 @@ export default function PickOfDay({ batter: b, onSelect, watched, inSlip, onTogg
               gap: '4px',
               borderRadius: '6px',
               padding: '3px 8px',
-              background: c.pass ? 'rgba(16, 185, 129, 0.05)' : 'rgba(255,255,255,0.01)',
+              background: c.pass ? 'rgba(105, 185, 158, 0.05)' : 'rgba(255,255,255,0.01)',
               color: c.pass ? 'var(--strong)' : 'var(--text-faint)',
-              border: c.pass ? '1px solid rgba(16, 185, 129, 0.15)' : '1px solid rgba(255,255,255,0.03)'
+              border: c.pass ? '1px solid rgba(105, 185, 158, 0.15)' : '1px solid rgba(255,255,255,0.03)'
             }}
           >
             <Icon name={c.pass ? 'Check' : 'X'} size={10} />
@@ -328,7 +328,7 @@ export default function PickOfDay({ batter: b, onSelect, watched, inSlip, onTogg
             height: '32px',
             borderRadius: '8px',
             border: '1px solid var(--border)',
-            background: watched ? 'rgba(245,166,35,0.1)' : 'var(--card)',
+            background: watched ? 'rgba(214,181,111,0.1)' : 'var(--card)',
             color: watched ? 'var(--prime)' : 'var(--text-faint)',
             display: 'grid',
             placeItems: 'center'
@@ -345,7 +345,7 @@ export default function PickOfDay({ batter: b, onSelect, watched, inSlip, onTogg
             height: '32px',
             borderRadius: '8px',
             border: '1px solid var(--border)',
-            background: inSlip ? 'rgba(16,185,129,0.1)' : 'var(--card)',
+            background: inSlip ? 'rgba(105,185,158,0.1)' : 'var(--card)',
             color: inSlip ? 'var(--strong)' : 'var(--text-faint)',
             display: 'grid',
             placeItems: 'center'

@@ -70,7 +70,7 @@ function GodPitcher({ p, onOpenPitcher, gamePk }) {
     <button className="god-pitcher" onClick={() => onOpenPitcher?.(p.id, gamePk)} title={`${p.name} — open pitcher card`} style={{
       color: 'var(--accent)',
       fontWeight: '600',
-      borderBottom: '1px dashed rgba(0, 216, 246, 0.4)',
+      borderBottom: '1px dashed rgba(151, 149, 203, 0.4)',
       display: 'inline-block'
     }}>
       {lastName(p.name)} {hr9 != null && <b className={tone} style={{ marginLeft: '4px' }}>{num(hr9, 2)}</b>}
@@ -86,8 +86,8 @@ function GameOfDay({ god, onSelect, onOpenPitcher }) {
   const wind = interpretWind(god.weather, g?.homeTeam?.abbr, { roofClosed: god.weather?.roofClosed })
   return (
     <section className="god-card" style={{
-      background: 'linear-gradient(135deg, rgba(0, 216, 246, 0.12) 0%, rgba(8,12,28,0.85) 100%)',
-      border: '1px solid rgba(0, 216, 246, 0.25)',
+      background: 'linear-gradient(135deg, rgba(151, 149, 203, 0.12) 0%, rgba(8,12,28,0.85) 100%)',
+      border: '1px solid rgba(151, 149, 203, 0.25)',
       boxShadow: '0 8px 32px rgba(0,0,0,0.5), 0 0 16px var(--accent-glow)',
       borderRadius: '16px',
       padding: '20px',
@@ -680,9 +680,9 @@ function ExtractorCard({ game: g, groups, idx = 0, ...ctx }) {
           borderRadius: '8px',
           fontSize: '11px',
           fontWeight: '500',
-          background: alert.tone === 'good' ? 'rgba(16, 185, 129, 0.08)' : alert.tone === 'bad' ? 'rgba(239, 68, 68, 0.08)' : 'rgba(255,255,255,0.03)',
+          background: alert.tone === 'good' ? 'rgba(105, 185, 158, 0.08)' : alert.tone === 'bad' ? 'rgba(239, 68, 68, 0.08)' : 'rgba(255,255,255,0.03)',
           color: alert.tone === 'good' ? 'var(--strong)' : alert.tone === 'bad' ? 'var(--bad)' : 'var(--text-dim)',
-          border: alert.tone === 'good' ? '1px solid rgba(16, 185, 129, 0.15)' : alert.tone === 'bad' ? '1px solid rgba(239, 68, 68, 0.15)' : '1px solid rgba(255,255,255,0.05)'
+          border: alert.tone === 'good' ? '1px solid rgba(105, 185, 158, 0.15)' : alert.tone === 'bad' ? '1px solid rgba(239, 68, 68, 0.15)' : '1px solid rgba(255,255,255,0.05)'
         }}>
           <Icon name="TriangleAlert" size={11} />
           <span>{alert.text}</span>
@@ -741,7 +741,7 @@ function GameStatus({ g }) {
     )
   }
   if (g.isFinal) return <div className="gc-status final" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-faint)' }}>Final</div>
-  return <div className="gc-status" style={{ background: 'rgba(0, 216, 246, 0.08)', color: 'var(--accent)' }}>{gameTime(g.gameDate) || 'TBD'}</div>
+  return <div className="gc-status" style={{ background: 'rgba(151, 149, 203, 0.08)', color: 'var(--accent)' }}>{gameTime(g.gameDate) || 'TBD'}</div>
 }
 
 function TeamHead({ team, pitcher, score, showScore, align, gamePk, onOpenPitcher }) {
@@ -774,7 +774,7 @@ function TeamHead({ team, pitcher, score, showScore, align, gamePk, onOpenPitche
             style={{
               color: 'var(--accent)',
               fontSize: '11px',
-              borderBottom: '1px dashed rgba(0, 216, 246, 0.3)'
+              borderBottom: '1px dashed rgba(151, 149, 203, 0.3)'
             }}
           >
             {pitcher.name}
@@ -861,9 +861,9 @@ function GameChips({ sample, game }) {
           alignItems: 'center',
           gap: '4px',
           fontSize: '11px',
-          background: c.tone === 'good' ? 'rgba(16, 185, 129, 0.08)' : c.tone === 'bad' ? 'rgba(239, 68, 68, 0.08)' : 'rgba(255,255,255,0.03)',
+          background: c.tone === 'good' ? 'rgba(105, 185, 158, 0.08)' : c.tone === 'bad' ? 'rgba(239, 68, 68, 0.08)' : 'rgba(255,255,255,0.03)',
           color: c.tone === 'good' ? 'var(--strong)' : c.tone === 'bad' ? 'var(--bad)' : 'var(--text-dim)',
-          border: c.tone === 'good' ? '1px solid rgba(16, 185, 129, 0.15)' : c.tone === 'bad' ? '1px solid rgba(239, 68, 68, 0.15)' : '1px solid rgba(255,255,255,0.05)',
+          border: c.tone === 'good' ? '1px solid rgba(105, 185, 158, 0.15)' : c.tone === 'bad' ? '1px solid rgba(239, 68, 68, 0.15)' : '1px solid rgba(255,255,255,0.05)',
           padding: '2px 8px',
           borderRadius: '6px'
         }}>
@@ -971,7 +971,7 @@ function SiloBatter({ b, onSelect, selectedId, watchlist, slip, onToggleWatch, o
                 height: '22px',
                 borderRadius: '4px',
                 border: '1px solid var(--border-soft)',
-                background: watched ? 'rgba(245,166,35,0.1)' : 'transparent',
+                background: watched ? 'rgba(214,181,111,0.1)' : 'transparent',
                 color: watched ? 'var(--prime)' : 'var(--text-faint)',
                 display: 'grid',
                 placeItems: 'center'
@@ -989,7 +989,7 @@ function SiloBatter({ b, onSelect, selectedId, watchlist, slip, onToggleWatch, o
                 height: '22px',
                 borderRadius: '4px',
                 border: '1px solid var(--border-soft)',
-                background: inSlip ? 'rgba(16,185,129,0.1)' : 'transparent',
+                background: inSlip ? 'rgba(105,185,158,0.1)' : 'transparent',
                 color: inSlip ? 'var(--strong)' : 'var(--text-faint)',
                 display: 'grid',
                 placeItems: 'center'

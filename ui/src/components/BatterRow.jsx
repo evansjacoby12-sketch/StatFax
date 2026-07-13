@@ -203,7 +203,7 @@ export default function BatterRow({
               </span>
             )}
             {b.pitcherChanged && (
-              <span className="hr-tag" title="Starting pitcher changed after the morning lock — this row was re-scored for the new matchup" style={{ background: 'rgba(245,166,35,0.12)', color: 'var(--prime)', fontWeight: '700' }}>
+              <span className="hr-tag" title="Starting pitcher changed after the morning lock — this row was re-scored for the new matchup" style={{ background: 'rgba(214,181,111,0.12)', color: 'var(--prime)', fontWeight: '700' }}>
                 <Icon name="RefreshCw" size={9} /> NEW ARM
               </span>
             )}
@@ -235,7 +235,7 @@ export default function BatterRow({
                   title={`Open ${b.pitcher.name}'s pitcher card`}
                   style={{
                     color: 'var(--accent)',
-                    borderBottom: '1px dashed rgba(0, 216, 246, 0.4)'
+                    borderBottom: '1px dashed rgba(151, 149, 203, 0.4)'
                   }}
                 >
                   {b.pitcher.name}
@@ -264,9 +264,9 @@ export default function BatterRow({
                 <span style={{
                   display: 'inline-flex', alignItems: 'center', gap: '3px',
                   fontSize: '10px', fontWeight: '700', padding: '2px 7px', borderRadius: '6px',
-                  background: pmScore >= 7 ? 'rgba(16,185,129,0.14)' : pmScore >= 5 ? 'rgba(250,204,21,0.12)' : 'rgba(239,68,68,0.12)',
+                  background: pmScore >= 7 ? 'rgba(105,185,158,0.14)' : pmScore >= 5 ? 'rgba(250,204,21,0.12)' : 'rgba(239,68,68,0.12)',
                   color: pmScore >= 7 ? 'var(--strong)' : pmScore >= 5 ? '#facc15' : 'var(--bad)',
-                  border: `1px solid ${pmScore >= 7 ? 'rgba(16,185,129,0.22)' : pmScore >= 5 ? 'rgba(250,204,21,0.18)' : 'rgba(239,68,68,0.2)'}`,
+                  border: `1px solid ${pmScore >= 7 ? 'rgba(105,185,158,0.22)' : pmScore >= 5 ? 'rgba(250,204,21,0.18)' : 'rgba(239,68,68,0.2)'}`,
                 }}>
                   PITCH {pmScore.toFixed(1)}
                 </span>
@@ -275,9 +275,9 @@ export default function BatterRow({
                 <span className={dueSetup.n === dueSetup.checks.length ? 'due-perfect' : ''} style={dueSetup.n === dueSetup.checks.length ? {
                   display: 'inline-flex', alignItems: 'center', gap: '3px',
                   fontSize: '10px', fontWeight: '800', padding: '2px 7px', borderRadius: '6px',
-                  background: 'rgba(245,166,35,0.12)',
+                  background: 'rgba(214,181,111,0.12)',
                   color: 'var(--prime)',
-                  border: '1px solid rgba(245,166,35,0.4)',
+                  border: '1px solid rgba(214,181,111,0.4)',
                 } : {
                   display: 'inline-flex', alignItems: 'center', gap: '3px',
                   fontSize: '10px', fontWeight: '700', padding: '2px 7px', borderRadius: '6px',
@@ -292,9 +292,9 @@ export default function BatterRow({
                 <span title={`Air pull — park × weather × hand HR multiplier: ${air.toFixed(2)}× (1.00 = neutral). ${airTone === 'good' ? 'Tonight’s air helps the ball out.' : airTone === 'bad' ? 'Tonight’s air holds the ball in.' : 'Roughly neutral tonight.'}`} style={{
                   display: 'inline-flex', alignItems: 'center', gap: '3px',
                   fontSize: '10px', fontWeight: '700', padding: '2px 7px', borderRadius: '6px',
-                  background: airTone === 'good' ? 'rgba(16,185,129,0.14)' : airTone === 'bad' ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.04)',
+                  background: airTone === 'good' ? 'rgba(105,185,158,0.14)' : airTone === 'bad' ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.04)',
                   color: airTone === 'good' ? 'var(--strong)' : airTone === 'bad' ? 'var(--bad)' : 'var(--text-faint)',
-                  border: `1px solid ${airTone === 'good' ? 'rgba(16,185,129,0.22)' : airTone === 'bad' ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.06)'}`,
+                  border: `1px solid ${airTone === 'good' ? 'rgba(105,185,158,0.22)' : airTone === 'bad' ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.06)'}`,
                 }}>
                   AIR {signedPct(air - 1, 0)}
                 </span>
@@ -362,7 +362,7 @@ export default function BatterRow({
             aria-label="Toggle watchlist"
             style={{
               borderColor: watched ? 'var(--prime)' : 'var(--border)',
-              background: watched ? 'rgba(245,166,35,0.1)' : 'var(--card)',
+              background: watched ? 'rgba(214,181,111,0.1)' : 'var(--card)',
               color: watched ? 'var(--prime)' : 'var(--text-faint)'
             }}
           >
@@ -375,7 +375,7 @@ export default function BatterRow({
             aria-label="Toggle parlay leg"
             style={{
               borderColor: inSlip ? 'var(--strong)' : 'var(--border)',
-              background: inSlip ? 'rgba(16,185,129,0.1)' : 'var(--card)',
+              background: inSlip ? 'rgba(105,185,158,0.1)' : 'var(--card)',
               color: inSlip ? 'var(--strong)' : 'var(--text-faint)'
             }}
           >
@@ -419,7 +419,7 @@ function RowWhy({ b }) {
         style={{
           display: 'inline-flex', alignItems: 'center', gap: '4px',
           fontSize: '10px', fontWeight: '700', padding: '2px 8px', borderRadius: '6px',
-          background: 'rgba(0,216,246,0.08)', border: '1px solid rgba(0,216,246,0.22)',
+          background: 'rgba(151,149,203,0.08)', border: '1px solid rgba(151,149,203,0.22)',
           color: 'var(--accent)', cursor: status === 'loading' ? 'default' : 'pointer',
         }}
       >

@@ -11,7 +11,7 @@ import * as store from '../lib/storage.js'
 import { makeTicket, trackTicket } from '../lib/tickets.js'
 import { toast } from './Toast.jsx'
 
-const GRADE_COLOR = { S: '#f5a623', A: '#10b981', B: '#3b82f6', C: '#94a3b8', D: '#64748b' }
+const GRADE_COLOR = { S: '#d6b56f', A: '#69b99e', B: '#8587b7', C: '#94a3b8', D: '#676673' }
 const SIZES = [2, 3, 4]
 const QB_SIZES = [2, 3, 4, 5, 6, 7]
 
@@ -148,9 +148,9 @@ function LegRow({ b, perLeg, weak, onSelect, onRemove }) {
   const st = legStatus(b)
   const lm = LEG_META[st.code]
   // A homered leg gets a green wash; a dead one dims.
-  const bg = st.code === 'hit' ? hexA('#10b981', 0.08) : st.code === 'dead' ? 'rgba(255,255,255,0.01)' : 'rgba(255,255,255,0.015)'
+  const bg = st.code === 'hit' ? hexA('#69b99e', 0.08) : st.code === 'dead' ? 'rgba(255,255,255,0.01)' : 'rgba(255,255,255,0.015)'
   return (
-    <div className={`pb-leg ${isWeak ? 'weak' : ''}`} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px', background: bg, border: `1px solid ${st.code === 'hit' ? 'rgba(16,185,129,0.25)' : isWeak ? 'rgba(249,115,22,0.18)' : 'rgba(255,255,255,0.05)'}`, borderRadius: '9px', opacity: st.code === 'dead' ? 0.6 : 1 }}>
+    <div className={`pb-leg ${isWeak ? 'weak' : ''}`} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px', background: bg, border: `1px solid ${st.code === 'hit' ? 'rgba(105,185,158,0.25)' : isWeak ? 'rgba(249,115,22,0.18)' : 'rgba(255,255,255,0.05)'}`, borderRadius: '9px', opacity: st.code === 'dead' ? 0.6 : 1 }}>
       <button onClick={() => onSelect(b)} title="Open detail" style={{ display: 'flex', alignItems: 'center', gap: '7px', flex: '1', textAlign: 'left', minWidth: 0 }}>
         <span style={{ background: st.code !== 'pending' ? lm.color : gradeColor(b.grade?.label), width: '6px', height: '6px', borderRadius: '50%', flex: 'none' }} />
         <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
@@ -305,7 +305,7 @@ export default function ParlayBuilder({ batters, legs, slipSet, onToggle, onRemo
       <Summary p={p} live={live} wager={wager} onWager={setWager} />
 
       {sgGroups.length > 0 && (
-        <div className="pb-sg-note" style={{ fontSize: '11px', color: 'var(--b-plat)', background: hexA('#8b5cf6', 0.08), border: `1px solid ${hexA('#8b5cf6', 0.25)}`, borderRadius: '8px', padding: '7px 10px', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <div className="pb-sg-note" style={{ fontSize: '11px', color: 'var(--b-plat)', background: hexA('#9085bd', 0.08), border: `1px solid ${hexA('#9085bd', 0.25)}`, borderRadius: '8px', padding: '7px 10px', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
           <Icon name="GitBranch" size={12} />
           <span>{sgGroups.length === 1 ? 'One same-game group' : `${sgGroups.length} same-game groups`} — independent all-hit estimate, with no correlation uplift applied.</span>
         </div>
@@ -352,7 +352,7 @@ export default function ParlayBuilder({ batters, legs, slipSet, onToggle, onRemo
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               {suggestions.length ? suggestions.map((b) => (
                 <button key={b.id} onClick={() => onToggle(b)} className="pb-sugg" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px', background: 'rgba(255,255,255,0.015)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '9px', textAlign: 'left' }}>
-                  <span style={{ width: '22px', height: '22px', borderRadius: '50%', background: hexA('#00d8f6', 0.12), color: 'var(--accent)', display: 'grid', placeItems: 'center', flex: 'none' }}><Icon name="Plus" size={13} /></span>
+                  <span style={{ width: '22px', height: '22px', borderRadius: '50%', background: hexA('#b8b7d8', 0.12), color: 'var(--accent)', display: 'grid', placeItems: 'center', flex: 'none' }}><Icon name="Plus" size={13} /></span>
                   <span style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
                     <span style={{ fontSize: '12.5px', fontWeight: '600', color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.name}</span>
                     <span style={{ fontSize: '10px', color: 'var(--text-faint)' }}>{b.team} {b.opponent?.abbr ? `vs ${b.opponent.abbr}` : ''}</span>
@@ -369,7 +369,7 @@ export default function ParlayBuilder({ batters, legs, slipSet, onToggle, onRemo
         {tab === 'build' && (
           <>
             {/* ── Quick Build ─────────────────────────────────────────── */}
-            <div style={{ background: 'rgba(0,216,246,0.04)', border: '1px solid rgba(0,216,246,0.12)', borderRadius: '14px', padding: '14px', marginBottom: '16px' }}>
+            <div style={{ background: 'rgba(151,149,203,0.04)', border: '1px solid rgba(151,149,203,0.12)', borderRadius: '14px', padding: '14px', marginBottom: '16px' }}>
               {/* Strategy */}
               <div style={{ fontSize: '9px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-faint)', marginBottom: '7px' }}>Strategy</div>
               <div style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
@@ -378,7 +378,7 @@ export default function ParlayBuilder({ batters, legs, slipSet, onToggle, onRemo
                   return (
                     <button key={key} onClick={() => { setQbStrat(key); setQbBuilt(null) }}
                       title={s.desc}
-                      style={{ flex: 1, fontSize: '11px', fontWeight: '800', padding: '7px 4px', borderRadius: '9px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', color: active ? '#fff' : 'var(--text-dim)', background: active ? 'rgba(0,216,246,0.14)' : 'rgba(255,255,255,0.03)', border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}` }}>
+                      style={{ flex: 1, fontSize: '11px', fontWeight: '800', padding: '7px 4px', borderRadius: '9px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', color: active ? '#fff' : 'var(--text-dim)', background: active ? 'rgba(151,149,203,0.14)' : 'rgba(255,255,255,0.03)', border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}` }}>
                       <Icon name={s.icon} size={14} style={{ color: active ? 'var(--accent)' : 'var(--text-faint)' }} />
                       {s.label}
                     </button>
@@ -393,7 +393,7 @@ export default function ParlayBuilder({ batters, legs, slipSet, onToggle, onRemo
                   const active = qbLegs === s
                   return (
                     <button key={s} onClick={() => { setQbLegs(s); setQbBuilt(null) }}
-                      style={{ flex: 1, fontSize: '12px', fontWeight: '800', padding: '6px 0', borderRadius: '8px', color: active ? '#fff' : 'var(--text-dim)', background: active ? 'rgba(0,216,246,0.14)' : 'rgba(255,255,255,0.03)', border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}` }}>
+                      style={{ flex: 1, fontSize: '12px', fontWeight: '800', padding: '6px 0', borderRadius: '8px', color: active ? '#fff' : 'var(--text-dim)', background: active ? 'rgba(151,149,203,0.14)' : 'rgba(255,255,255,0.03)', border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}` }}>
                       {s}
                     </button>
                   )
@@ -409,7 +409,7 @@ export default function ParlayBuilder({ batters, legs, slipSet, onToggle, onRemo
                   ['qbSameWindow', qbSameWindow, () => { setQbSameWindow(v => !v); setQbBuilt(null) }, 'Same window'],
                 ].map(([key, val, toggle, label]) => (
                   <button key={key} onClick={toggle}
-                    style={{ fontSize: '11px', fontWeight: '700', padding: '5px 10px', borderRadius: '7px', display: 'inline-flex', alignItems: 'center', gap: '5px', color: val ? 'var(--accent)' : 'var(--text-dim)', background: val ? 'rgba(0,216,246,0.1)' : 'rgba(255,255,255,0.03)', border: `1px solid ${val ? 'var(--accent)' : 'var(--border)'}` }}>
+                    style={{ fontSize: '11px', fontWeight: '700', padding: '5px 10px', borderRadius: '7px', display: 'inline-flex', alignItems: 'center', gap: '5px', color: val ? 'var(--accent)' : 'var(--text-dim)', background: val ? 'rgba(151,149,203,0.1)' : 'rgba(255,255,255,0.03)', border: `1px solid ${val ? 'var(--accent)' : 'var(--border)'}` }}>
                     <Icon name={val ? 'CheckSquare' : 'Square'} size={12} />{label}
                   </button>
                 ))}
@@ -551,7 +551,7 @@ export default function ParlayBuilder({ batters, legs, slipSet, onToggle, onRemo
               const resolved = s.ids.map((id) => byId.get(id)).filter(Boolean)
               const v = comboStatus(resolved)
               return (
-                <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '9px 11px', background: v.code === 'cashed' ? hexA('#10b981', 0.07) : 'rgba(255,255,255,0.015)', border: `1px solid ${v.code === 'cashed' ? 'rgba(16,185,129,0.25)' : 'rgba(255,255,255,0.05)'}`, borderRadius: '9px' }}>
+                <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '9px 11px', background: v.code === 'cashed' ? hexA('#69b99e', 0.07) : 'rgba(255,255,255,0.015)', border: `1px solid ${v.code === 'cashed' ? 'rgba(105,185,158,0.25)' : 'rgba(255,255,255,0.05)'}`, borderRadius: '9px' }}>
                   <button onClick={() => { onReplace(s.ids); setTab('legs') }} style={{ flex: 1, textAlign: 'left', minWidth: 0 }}>
                     <span style={{ display: 'block', fontSize: '12.5px', fontWeight: '600', color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.name}</span>
                     <span className="dim" style={{ fontSize: '10px' }}>{s.ids.length} legs · saved {new Date(s.savedAt).toLocaleDateString()}</span>

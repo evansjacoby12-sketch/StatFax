@@ -304,7 +304,7 @@ function KBrainView({ pitchers, liveKsByPitcher = {} }) {
                 const p = ek.probs[line]
                 if (p == null) return null
                 const pct100 = p * 100
-                const barColor = pct100 >= 60 ? 'var(--strong)' : pct100 >= 40 ? '#f59e0b' : 'var(--bad)'
+                const barColor = pct100 >= 60 ? 'var(--strong)' : pct100 >= 40 ? '#c69a57' : 'var(--bad)'
                 return (
                   <div className="kbrain-line" key={line} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px' }}>
                     <span className="mono" style={{ width: '32px', color: 'var(--text-dim)', flexShrink: 0 }}>{line}+</span>
@@ -336,7 +336,7 @@ function KBrainView({ pitchers, liveKsByPitcher = {} }) {
                 style={{ width: '70px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '4px 8px', color: '#fff', fontSize: '12px', fontFamily: 'monospace' }}
               />
               {myProb != null && Number.isFinite(myProb) && (
-                <span style={{ fontSize: '12px', fontWeight: '700', color: myProb >= 0.55 ? 'var(--strong)' : myProb >= 0.40 ? '#f59e0b' : 'var(--bad)' }}>
+                <span style={{ fontSize: '12px', fontWeight: '700', color: myProb >= 0.55 ? 'var(--strong)' : myProb >= 0.40 ? '#c69a57' : 'var(--bad)' }}>
                   {(myProb * 100).toFixed(0)}% over · {myProb >= 0.55 ? 'value ✓' : myProb <= 0.35 ? 'fade ✗' : 'neutral'}
                 </span>
               )}
@@ -387,7 +387,7 @@ function KBrainView({ pitchers, liveKsByPitcher = {} }) {
             <summary className="kbrain-record-summary" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
               <span style={{ fontSize: '12px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-faint)' }}>K-prop record</span>
               {totalGraded > 0 && (
-                <span style={{ fontSize: '11px', color: totalHits / totalGraded >= 0.65 ? 'var(--strong)' : totalHits / totalGraded >= 0.45 ? '#f59e0b' : 'var(--bad)' }}>
+                <span style={{ fontSize: '11px', color: totalHits / totalGraded >= 0.65 ? 'var(--strong)' : totalHits / totalGraded >= 0.45 ? '#c69a57' : 'var(--bad)' }}>
                   {totalHits}/{totalGraded} within range ({(totalHits / totalGraded * 100).toFixed(0)}% hit rate)
                 </span>
               )}
@@ -588,10 +588,10 @@ function KParlaySection({ pitchers, open, onToggle }) {
 }
 
 const PVP_TIERS = [
-  { key: 'vuln', label: 'Tier 1 — High Vulnerability', sub: 'best targets', color: '#ff5c5c', test: (s) => s >= 80 },
+  { key: 'vuln', label: 'Tier 1 — High Vulnerability', sub: 'best targets', color: '#c96f7e', test: (s) => s >= 80 },
   { key: 'shaky', label: 'Tier 2 — Shaky', sub: 'decent targets', color: '#ffb02e', test: (s) => s >= 60 && s < 80 },
-  { key: 'mild', label: 'Tier 3 — Mild', sub: 'situational', color: '#ffd60a', test: (s) => s >= 40 && s < 60 },
-  { key: 'tough', label: 'Tier 4 — Tough', sub: 'avoid targeting', color: '#32d74b', test: (s) => s < 40 },
+  { key: 'mild', label: 'Tier 3 — Mild', sub: 'situational', color: '#d6b56f', test: (s) => s >= 40 && s < 60 },
+  { key: 'tough', label: 'Tier 4 — Tough', sub: 'avoid targeting', color: '#69b99e', test: (s) => s < 40 },
 ]
 
 function lastName(name) {
@@ -638,7 +638,7 @@ function PitcherPreview({ pitchers, onSelect }) {
           padding: '16px'
         }}>
           <div className="pvp-tier-head" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', marginBottom: '8px' }}>
-            <span className="pvp-dot" style={{ background: '#64748b', width: '8px', height: '8px', borderRadius: '50%' }} />
+            <span className="pvp-dot" style={{ background: '#676673', width: '8px', height: '8px', borderRadius: '50%' }} />
             <b style={{ color: '#fff' }}>TBD / low sample</b> 
             <span className="dim" style={{ fontSize: '12px' }}>· treat league-avg</span>
           </div>
@@ -921,7 +921,7 @@ export function PitcherCard({ entry, onSelect, selectedId, watchlist, slip }) {
                   <span className={`bathand ${attackSide && effSide(b.batSide, pitcher.hand) === attackSide ? 'pa-match' : ''}`} style={{
                     fontSize: '8px',
                     borderColor: attackSide && effSide(b.batSide, pitcher.hand) === attackSide ? 'var(--strong)' : 'rgba(255,255,255,0.1)',
-                    background: attackSide && effSide(b.batSide, pitcher.hand) === attackSide ? 'rgba(16,185,129,0.1)' : 'transparent',
+                    background: attackSide && effSide(b.batSide, pitcher.hand) === attackSide ? 'rgba(105,185,158,0.1)' : 'transparent',
                     color: attackSide && effSide(b.batSide, pitcher.hand) === attackSide ? 'var(--strong)' : 'inherit',
                     padding: '0 3px',
                     borderRadius: '3px',

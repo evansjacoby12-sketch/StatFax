@@ -1,51 +1,51 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 
 :root {
-  /* ---- Surfaces: Deep, dark OLED with glass/neon overlays ---- */
-  --bg: #010102;
-  --bg-grad-1: #070708;
-  --bg-grad-2: #000000;
-  --panel: rgba(13, 13, 15, 0.75);
-  --card: rgba(17, 18, 20, 0.45);
-  --card-2: rgba(24, 25, 28, 0.55);
-  --hover: rgba(46, 47, 52, 0.4);
-  --border: rgba(255, 255, 255, 0.08);
-  --border-soft: rgba(255, 255, 255, 0.04);
+  /* ---- Surfaces: ink-black and graphite from the metallic SF mark ---- */
+  --bg: #07060c;
+  --bg-grad-1: #15141a;
+  --bg-grad-2: #09080e;
+  --panel: rgba(15, 14, 21, 0.82);
+  --card: rgba(21, 20, 26, 0.62);
+  --card-2: rgba(36, 35, 42, 0.66);
+  --hover: rgba(103, 102, 115, 0.22);
+  --border: rgba(227, 227, 231, 0.10);
+  --border-soft: rgba(227, 227, 231, 0.055);
   --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.6);
-  --glass-border: 1px solid rgba(255, 255, 255, 0.08);
-  --glass-bg: rgba(10, 10, 12, 0.75);
+  --glass-border: 1px solid rgba(227, 227, 231, 0.10);
+  --glass-bg: rgba(11, 10, 16, 0.82);
 
   /* ---- Text: Crisp, high-contrast typography ---- */
-  --text: #f8fafc;
-  --text-dim: #cbd5e1;
-  --text-faint: #94a3b8;
+  --text: #f2f2f5;
+  --text-dim: #c4c4cc;
+  --text-faint: #858491;
 
   /* ---- Brand & Accent Colors ---- */
-  --prime: #f5a623;    /* Amber */
-  --strong: #10b981;   /* Emerald */
-  --lean: #f59e0b;     /* Warm Yellow */
-  --skip: #64748b;     /* Slate */
+  --prime: #d6b56f;    /* Muted champagne */
+  --strong: #69b99e;   /* Muted jade */
+  --lean: #c69a57;     /* Brushed bronze */
+  --skip: #676673;     /* Graphite */
   
-  --accent: #00d8f6;   /* Electric Cyan CTA */
-  --accent-glow: rgba(0, 216, 246, 0.35);
-  --blue: #3b82f6;
-  --good: #10b981;
-  --bad: #ef4444;
-  --warn: #f59e0b;
+  --accent: #b8b7d8;   /* Cool silver-violet from the icon glow */
+  --accent-glow: rgba(151, 149, 203, 0.30);
+  --blue: #aaa9d2;
+  --good: #69b99e;
+  --bad: #c96f7e;
+  --warn: #c69a57;
 
   /* ---- Badge Hues ---- */
-  --b-hot: #f97316;
-  --b-due: #3b82f6;
-  --b-cold: #06b6d4;
-  --b-bullpen: #a855f7;
-  --b-home: #10b981;
-  --b-away: #14b8a6;
-  --b-neg: #ef4444;
-  --b-pitch: #ec4899;
-  --b-wx: #00d8f6;
-  --b-barrel: #eab308;
-  --b-fly: #06b6d4;
-  --b-plat: #8b5cf6;
+  --b-hot: #c98568;
+  --b-due: #8587b7;
+  --b-cold: #7f9daf;
+  --b-bullpen: #9d83b5;
+  --b-home: #69b99e;
+  --b-away: #6ca7a1;
+  --b-neg: #c96f7e;
+  --b-pitch: #bd779c;
+  --b-wx: #a8a9cf;
+  --b-barrel: #c4a35d;
+  --b-fly: #789cac;
+  --b-plat: #9085bd;
 
   --radius: 16px;
   --radius-sm: 10px;
@@ -106,7 +106,7 @@ body {
 }
 
 ::selection {
-  background: rgba(0, 216, 246, 0.35);
+  background: rgba(151, 149, 203, 0.35);
   color: #ffffff;
 }
 
@@ -157,7 +157,7 @@ a {
   transition: color 0.15s ease;
 }
 a:hover {
-  color: #60a5fa;
+  color: #d1d0ea;
   text-decoration: none;
 }
 

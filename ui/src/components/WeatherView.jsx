@@ -89,7 +89,7 @@ export default function WeatherView({ batters, onSelect, selectedId }) {
             title="Hide domes & closed roofs"
             style={{
               borderColor: outdoorOnly ? 'var(--accent)' : 'var(--border-soft)',
-              background: outdoorOnly ? 'rgba(0, 216, 246, 0.08)' : 'transparent',
+              background: outdoorOnly ? 'rgba(151, 149, 203, 0.08)' : 'transparent',
               color: outdoorOnly ? '#fff' : 'var(--text-faint)',
               fontSize: '11px',
               padding: '4px 10px',
@@ -109,7 +109,7 @@ export default function WeatherView({ batters, onSelect, selectedId }) {
             title="Only HR-friendly conditions"
             style={{
               borderColor: favorableOnly ? 'var(--accent)' : 'var(--border-soft)',
-              background: favorableOnly ? 'rgba(0, 216, 246, 0.08)' : 'transparent',
+              background: favorableOnly ? 'rgba(151, 149, 203, 0.08)' : 'transparent',
               color: favorableOnly ? '#fff' : 'var(--text-faint)',
               fontSize: '11px',
               padding: '4px 10px',
@@ -256,7 +256,7 @@ function WeatherCard({ g, onSelect, selectedId }) {
           fontWeight: '700',
           padding: '2px 8px',
           borderRadius: '4px',
-          background: env.tone === 'good' ? 'rgba(16, 185, 129, 0.1)' : env.tone === 'bad' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(255,255,255,0.05)',
+          background: env.tone === 'good' ? 'rgba(105, 185, 158, 0.1)' : env.tone === 'bad' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(255,255,255,0.05)',
           color: env.tone === 'good' ? 'var(--strong)' : env.tone === 'bad' ? 'var(--bad)' : 'var(--text-dim)'
         }}>
           {env.label}

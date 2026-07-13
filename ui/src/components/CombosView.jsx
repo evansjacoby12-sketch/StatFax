@@ -215,7 +215,7 @@ export default function CombosView({ batters, onSelect, favorConsistency = false
       ) : settled && settled.comboDates.length > 0 ? (
         <div className={`combo-history-wrap combo-workspace-section ${comboSection === 'history' ? 'is-mobile-active' : ''}`}>
         {settled.isStale && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', marginBottom: '12px', borderRadius: '8px', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', color: 'rgb(245,158,11)', fontSize: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', marginBottom: '12px', borderRadius: '8px', background: 'rgba(198,154,87,0.08)', border: '1px solid rgba(198,154,87,0.25)', color: 'rgb(245,158,11)', fontSize: '12px' }}>
             <Icon name="TriangleAlert" size={14} />
             <span>Combo data is {settled.daysBehind}d stale (last: {settled.latestDate?.slice(5)}) — slate cron may be down.</span>
           </div>
@@ -260,8 +260,8 @@ export default function CombosView({ batters, onSelect, favorConsistency = false
             {shownCombos.map((c, i) => (
               <li className={`combo-res-row ${c.allHit ? 'hit' : 'miss'}`} key={`${c.strategy}-${c.size}-${i}`} style={{
                 display: 'flex', alignItems: 'center', gap: '12px',
-                background: c.allHit ? 'rgba(16, 185, 129, 0.08)' : 'rgba(255,255,255,0.02)',
-                border: `1px solid ${c.allHit ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255,255,255,0.04)'}`,
+                background: c.allHit ? 'rgba(105, 185, 158, 0.08)' : 'rgba(255,255,255,0.02)',
+                border: `1px solid ${c.allHit ? 'rgba(105, 185, 158, 0.2)' : 'rgba(255,255,255,0.04)'}`,
                 padding: '10px 14px', borderRadius: '8px'
               }}>
                 <span className="combo-res-badge" style={{ fontSize: '16px' }}>{c.allHit ? <Icon name="Check" size={15} /> : `${c.nHit}/${c.size}`}</span>
@@ -293,8 +293,8 @@ export default function CombosView({ batters, onSelect, favorConsistency = false
                 {shownSgp.map((s, i) => (
                   <li className={`combo-res-row ${s.allHit ? 'hit' : 'miss'}`} key={`sgp-${s.gamePk}-${s.size}-${i}`} style={{
                     display: 'flex', alignItems: 'center', gap: '12px',
-                    background: s.allHit ? 'rgba(16, 185, 129, 0.08)' : 'rgba(255,255,255,0.02)',
-                    border: `1px solid ${s.allHit ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255,255,255,0.04)'}`,
+                    background: s.allHit ? 'rgba(105, 185, 158, 0.08)' : 'rgba(255,255,255,0.02)',
+                    border: `1px solid ${s.allHit ? 'rgba(105, 185, 158, 0.2)' : 'rgba(255,255,255,0.04)'}`,
                     padding: '10px 14px', borderRadius: '8px'
                   }}>
                     <span className="combo-res-badge" style={{ fontSize: '16px' }}>{s.allHit ? <Icon name="Check" size={15} /> : `${s.nHit}/${s.size}`}</span>

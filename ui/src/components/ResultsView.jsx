@@ -421,7 +421,7 @@ function ModelResults({ meta }) {
                         height: '5px',
                         borderRadius: '50%',
                         background: p.hit ? 'var(--strong)' : 'rgba(255,255,255,0.09)',
-                        boxShadow: p.hit ? '0 0 4px rgba(16,185,129,0.55)' : 'none',
+                        boxShadow: p.hit ? '0 0 4px rgba(105,185,158,0.55)' : 'none',
                         flexShrink: 0,
                       }}
                     />

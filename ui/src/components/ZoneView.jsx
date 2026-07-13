@@ -384,8 +384,8 @@ export default function ZoneView({ batter: b, onClose }) {
           fontSize: '13px',
           fontWeight: '700',
           color: 'var(--accent)',
-          border: '1px solid rgba(0, 216, 246, 0.25)',
-          background: 'rgba(0, 216, 246, 0.05)',
+          border: '1px solid rgba(151, 149, 203, 0.25)',
+          background: 'rgba(151, 149, 203, 0.05)',
           padding: '6px 14px',
           borderRadius: '8px',
           flexShrink: 0,
@@ -494,7 +494,7 @@ export default function ZoneView({ batter: b, onClose }) {
                           <div key={c.i} className="z3-attack-row" style={{
                             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                             padding: '7px 10px', borderRadius: '8px',
-                            background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.18)',
+                            background: 'rgba(198,154,87,0.07)', border: '1px solid rgba(198,154,87,0.18)',
                           }}>
                             <span style={{ fontSize: '12px', fontWeight: '700', color: '#fff' }}>{c.name}</span>
                             <span className="mono" style={{ fontSize: '11px', color: 'var(--text-dim)', display: 'flex', gap: '10px' }}>
@@ -519,7 +519,7 @@ export default function ZoneView({ batter: b, onClose }) {
                       {scaleLabel}
                     </span>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                      <span style={{ width: '11px', height: '11px', borderRadius: '3px', border: '1.5px solid var(--prime)', boxShadow: '0 0 6px rgba(245,158,11,0.5)' }} /> attack zone
+                      <span style={{ width: '11px', height: '11px', borderRadius: '3px', border: '1.5px solid var(--prime)', boxShadow: '0 0 6px rgba(198,154,87,0.5)' }} /> attack zone
                     </span>
                   </div>
                 </div>
@@ -562,7 +562,7 @@ export default function ZoneView({ batter: b, onClose }) {
                 Pitcher&apos;s usage mix vs batter stats (SLG and Whiff rate) per pitch type.
               </p>
               {blindSpot && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '9px 12px', marginBottom: '14px', borderRadius: '8px', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.22)', color: 'var(--prime)', fontSize: '12px', lineHeight: 1.4 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '9px 12px', marginBottom: '14px', borderRadius: '8px', background: 'rgba(198,154,87,0.08)', border: '1px solid rgba(198,154,87,0.22)', color: 'var(--prime)', fontSize: '12px', lineHeight: 1.4 }}>
                   <Icon name="TriangleAlert" size={14} style={{ flexShrink: 0 }} />
                   <span>
                     <b>No book on his #1 pitch</b> — {b?.name?.split(' ').slice(-1)[0] || 'the batter'} has no tracked SLG vs {b?.pitcher?.name?.split(' ').slice(-1)[0] || 'the starter'}&apos;s {blindSpot.label.toLowerCase()} ({Math.round(blindSpot.usage)}% of his pitches). A real unknown in this matchup.

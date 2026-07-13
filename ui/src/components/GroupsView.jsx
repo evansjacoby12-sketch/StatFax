@@ -12,7 +12,7 @@ import { toast } from './Toast.jsx'
 import { useTickets, makeTicket } from '../lib/tickets.js'
 import { useComboExplain } from '../lib/explain.js'
 
-const GROUP_GRADE_COLOR = { S: '#f5a623', A: '#32d74b', B: '#3b82f6', C: '#9aa6b6', D: '#6b7787' }
+const GROUP_GRADE_COLOR = { S: '#d6b56f', A: '#69b99e', B: '#8587b7', C: '#9aa6b6', D: '#676673' }
 const LOCK_STRAT_LABEL = { precision: 'Precision', matchup: 'Soft Matchup', mix: 'Best Mix', park: 'Park & Air', edge: 'Edge Stack' }
 
 // The server-frozen bettable board, shown only AFTER the slate has started
@@ -645,7 +645,7 @@ function GroupCard({ g, idx = 0, onSelect, selectedId, comboConf = 'off', slipSe
     toast.success(`${missing.length} leg${missing.length > 1 ? 's' : ''} → parlay slip`)
   }
   const implied = americanToRawImplied(g.american)
-  const gc = GROUP_GRADE_COLOR[g.grade] || '#6b7787'
+  const gc = GROUP_GRADE_COLOR[g.grade] || '#676673'
   const { legs: legInfo, weakestIdx, tone } = assessCombo(g)
   // Start-time spread: a parlay locks at the EARLIEST leg's first pitch, but a
   // much-later leg's lineup won't be posted by then — so you're forced to bet it
@@ -806,8 +806,8 @@ function GroupCard({ g, idx = 0, onSelect, selectedId, comboConf = 'off', slipSe
             disabled={why.status === 'loading'}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '11px', fontWeight: '700',
-              padding: '4px 10px', borderRadius: '7px', background: 'rgba(0,216,246,0.08)',
-              border: '1px solid rgba(0,216,246,0.22)', color: 'var(--accent)',
+              padding: '4px 10px', borderRadius: '7px', background: 'rgba(151,149,203,0.08)',
+              border: '1px solid rgba(151,149,203,0.22)', color: 'var(--accent)',
               cursor: why.status === 'loading' ? 'default' : 'pointer',
             }}
           >

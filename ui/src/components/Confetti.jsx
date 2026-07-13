@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react'
 
-const COLORS = ['#00d8f6', '#f5a623', '#10b981', '#ff5c5c', '#8b5cf6', '#facc15', '#fff']
+const COLORS = ['#b8b7d8', '#d6b56f', '#69b99e', '#c96f7e', '#9085bd', '#facc15', '#fff']
 
 // CSS-only confetti burst for the big moments (parlay cashed). Renders ~60
 // falling pieces with randomized drift/spin, then calls onDone so the parent

@@ -10,7 +10,7 @@
  *
  * Bump VERSION to force a full cache flush on the next deploy.
  */
-const VERSION = 'sf-v1'
+const VERSION = 'sf-v2'
 const SHELL = `${VERSION}-shell`
 const ASSETS = `${VERSION}-assets`
 const DATA = `${VERSION}-data`
@@ -19,7 +19,7 @@ const ASSET_LIMIT = 60
 
 self.addEventListener('install', (e) => {
   e.waitUntil(
-    caches.open(SHELL).then((c) => c.addAll(['/', '/manifest.webmanifest', '/icon.svg'])).then(() => self.skipWaiting())
+    caches.open(SHELL).then((c) => c.addAll(['/', '/manifest.webmanifest', '/icon.png', '/icons/favicon-32.png'])).then(() => self.skipWaiting())
   )
 })
 

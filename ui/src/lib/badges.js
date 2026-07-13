@@ -3,23 +3,23 @@
 export const GRADE_ORDER = ['PRIME', 'STRONG', 'LEAN', 'SKIP']
 
 export const GRADE_COLORS = {
-  PRIME: '#f5a623',
-  STRONG: '#32d74b',
-  LEAN: '#ffd60a',
-  SKIP: '#6b7787',
+  PRIME: '#d6b56f',
+  STRONG: '#69b99e',
+  LEAN: '#c69a57',
+  SKIP: '#676673',
 }
 
 export function gradeColor(label) {
-  return GRADE_COLORS[label] || '#6b7787'
+  return GRADE_COLORS[label] || '#676673'
 }
 
 // Boolean flags on a scored batter → display chips.
 // `lucide` field is the lucide-react icon name; tone drives color.
 export const BADGES = [
   { key: 'precision', label: 'Precision', lucide: 'Sparkles', color: 'var(--accent)', tone: 'good', desc: 'Meets every precision gate: pitch mix ≥7, heat ≥48, HR due 5/6+, 8+ positive trends, ≤3 negatives' },
-  { key: 'powerReady', label: 'Power Ready (beta)', lucide: 'Gauge', color: '#22d3ee', tone: 'warn', desc: 'Beta advisory signal: ceiling ≥75, matchup ≥60 and form ≥35 with a real recent contact sample. Logged for forward validation; it does not add a probability bonus.' },
-  { key: 'barrelReady', label: 'Barrel Ready (beta)', lucide: 'Flame', color: '#f59e0b', tone: 'warn', desc: 'Beta advisory signal: solid power (ceiling ≥70) AND genuinely hot form (form ≥60) with a real recent contact sample — no matchup gate. The hot-form complement to Power Ready. Logged for forward validation; it does not add a probability bonus.' },
-  { key: 'sleeper', label: 'Sleeper', lucide: 'Moon', color: '#8b5cf6', tone: 'good', desc: 'Under-the-radar value: STRONG/LEAN grade but PRIME-adjacent form — heat ≥48, HR setup 3/6+, hot or rising power. Hit 21% over the 14-day validation window at non-chalk prices' },
+  { key: 'powerReady', label: 'Power Ready (beta)', lucide: 'Gauge', color: '#a8a9cf', tone: 'warn', desc: 'Beta advisory signal: ceiling ≥75, matchup ≥60 and form ≥35 with a real recent contact sample. Logged for forward validation; it does not add a probability bonus.' },
+  { key: 'barrelReady', label: 'Barrel Ready (beta)', lucide: 'Flame', color: '#c69a57', tone: 'warn', desc: 'Beta advisory signal: solid power (ceiling ≥70) AND genuinely hot form (form ≥60) with a real recent contact sample — no matchup gate. The hot-form complement to Power Ready. Logged for forward validation; it does not add a probability bonus.' },
+  { key: 'sleeper', label: 'Sleeper', lucide: 'Moon', color: '#9085bd', tone: 'good', desc: 'Under-the-radar value: STRONG/LEAN grade but PRIME-adjacent form — heat ≥48, HR setup 3/6+, hot or rising power. Hit 21% over the 14-day validation window at non-chalk prices' },
   { key: 'hot', label: 'Hot', lucide: 'Flame', color: 'var(--b-hot)', tone: 'good', desc: 'On a hot streak — recent power surge' },
   { key: 'rising', label: 'Rising', lucide: 'TrendingUp', color: 'var(--good)', tone: 'good', desc: 'Recent ~14-day barrel rate surging above the season rate — heating up right now (the recency edge sharps ride)' },
   { key: 'due', label: 'Due', lucide: 'Hourglass', color: 'var(--b-due)', tone: 'good', desc: 'HR drought vs. expected — regression candidate' },

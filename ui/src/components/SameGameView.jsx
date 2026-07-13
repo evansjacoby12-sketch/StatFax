@@ -8,7 +8,7 @@ import { comboStatus, legStatus, VERDICT_META, LEG_META } from '../lib/live.js'
 import { gradeFor, paWeight, isBenched } from '../lib/combo-engine.js'
 
 const SIZES = [2, 3, 4]
-const GRADE_COLOR = { S: '#f5a623', A: '#32d74b', B: '#3b82f6', C: '#9aa6b6', D: '#6b7787' }
+const GRADE_COLOR = { S: '#d6b56f', A: '#69b99e', B: '#8587b7', C: '#9aa6b6', D: '#676673' }
 
 // Same-Game Parlays: the best `size` bats from ONE game stacked together.
 // Honors the same consistency lean as the combos page.

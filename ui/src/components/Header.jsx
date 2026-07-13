@@ -353,8 +353,8 @@ export default function Header({
         <div className="brand-sport">
           <div className="brand">
             <span className="brand-mark" style={{
-              background: 'linear-gradient(135deg, var(--accent) 0%, #0052d4 100%)',
-              boxShadow: '0 0 16px rgba(0, 216, 246, 0.4)',
+              background: 'linear-gradient(135deg, var(--accent) 0%, #68668f 100%)',
+              boxShadow: '0 0 16px rgba(151, 149, 203, 0.4)',
               borderRadius: '10px',
               width: '34px',
               height: '34px',
@@ -362,7 +362,7 @@ export default function Header({
               placeItems: 'center',
               color: '#fff'
             }}>
-              <Icon name="Trophy" size={16} />
+              <img className="brand-mark-img" src="/icons/icon-192.png" alt="" aria-hidden="true" />
             </span>
             <div className="brand-txt">
               <span className="brand-name">
@@ -448,7 +448,7 @@ export default function Header({
           aria-pressed={liveScores}
           aria-label={liveScores ? 'Live scores on' : 'Pregame look'}
           style={{
-            background: liveScores ? 'rgba(16, 185, 129, 0.1)' : 'var(--card)',
+            background: liveScores ? 'rgba(105, 185, 158, 0.1)' : 'var(--card)',
             borderColor: liveScores ? 'var(--strong)' : 'var(--border)',
             color: liveScores ? 'var(--strong)' : 'var(--text-dim)'
           }}

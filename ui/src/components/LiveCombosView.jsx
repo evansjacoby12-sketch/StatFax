@@ -8,7 +8,7 @@ import { buildGroups, lastFirst } from '../lib/groups.js'
 import * as store from '../lib/storage.js'
 import { comboStatus, legStatus, VERDICT_META, LEG_META } from '../lib/live.js'
 
-const GRADE_COLOR = { S: '#f5a623', A: '#32d74b', B: '#3b82f6', C: '#9aa6b6', D: '#6b7787' }
+const GRADE_COLOR = { S: '#d6b56f', A: '#69b99e', B: '#8587b7', C: '#9aa6b6', D: '#676673' }
 const STATUS_OPTS = [
   { value: 'all', label: 'All live' },
   { value: 'cashed', label: 'Cashed' },
@@ -34,10 +34,10 @@ function Tag({ code, text, meta }) {
 function LiveCombo({ g, idx = 0, onSelect }) {
   const v = comboStatus(g.legs)
   const vm = VERDICT_META[v.code]
-  const gc = GRADE_COLOR[g.grade] || '#6b7787'
+  const gc = GRADE_COLOR[g.grade] || '#676673'
   const cashed = v.code === 'cashed'
   return (
-    <section className={`lc-card${cashed ? ' cashed' : ''}`} style={{ '--i': Math.min(idx, 8), borderRadius: '12px', border: `1px solid ${hexA(vm.color, 0.3)}`, background: cashed ? hexA('#10b981', 0.06) : 'rgba(8, 9, 12, 0.5)', padding: '12px 14px', borderLeft: `3px solid ${vm.color}` }}>
+    <section className={`lc-card${cashed ? ' cashed' : ''}`} style={{ '--i': Math.min(idx, 8), borderRadius: '12px', border: `1px solid ${hexA(vm.color, 0.3)}`, background: cashed ? hexA('#69b99e', 0.06) : 'rgba(8, 9, 12, 0.5)', padding: '12px 14px', borderLeft: `3px solid ${vm.color}` }}>
       <header style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
         <Icon name={g.icon || 'Layers'} size={13} style={{ color: 'var(--accent)' }} />
         <span style={{ fontSize: '12.5px', fontWeight: '700', color: '#fff' }}>{g.label}</span>
@@ -53,7 +53,7 @@ function LiveCombo({ g, idx = 0, onSelect }) {
           const st = legStatus(b)
           const lm = LEG_META[st.code]
           return (
-            <li key={b.id} onClick={() => onSelect(b)} role="button" tabIndex={0} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', padding: '4px 4px', borderRadius: '6px', background: st.code === 'hit' ? hexA('#10b981', 0.07) : 'transparent', opacity: st.code === 'dead' ? 0.55 : 1 }}>
+            <li key={b.id} onClick={() => onSelect(b)} role="button" tabIndex={0} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', padding: '4px 4px', borderRadius: '6px', background: st.code === 'hit' ? hexA('#69b99e', 0.07) : 'transparent', opacity: st.code === 'dead' ? 0.55 : 1 }}>
               <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: lm.color, flexShrink: 0 }} />
               <span style={{ fontSize: '12.5px', fontWeight: '600', color: '#fff', flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{lastFirst(b.name)}</span>
               <span className="dim" style={{ fontSize: '10px', flexShrink: 0 }}>{b.team}</span>
@@ -167,7 +167,7 @@ export default function LiveCombosView({ batters, onSelect, favorConsistency = f
 
 function Kpi({ label, value, color, glow = false }) {
   return (
-    <div className={glow ? 'lc-kpi-glow' : undefined} style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${glow ? 'rgba(16,185,129,0.3)' : 'rgba(255,255,255,0.05)'}`, borderRadius: '10px', padding: '10px', textAlign: 'center' }}>
+    <div className={glow ? 'lc-kpi-glow' : undefined} style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${glow ? 'rgba(105,185,158,0.3)' : 'rgba(255,255,255,0.05)'}`, borderRadius: '10px', padding: '10px', textAlign: 'center' }}>
       <div key={value} className="mono slip-legs-bump" style={{ fontSize: '22px', fontWeight: '800', color }}>{value}</div>
       <div style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-faint)', marginTop: '2px' }}>{label}</div>
     </div>

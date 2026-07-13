@@ -587,7 +587,7 @@ function SprayTab({ b }) {
 const HIT_EVENTS = new Set(['single', 'double', 'triple', 'home_run'])
 
 function bipDotColor(b) {
-  if (b.events === 'home_run') return '#ef4444'
+  if (b.events === 'home_run') return '#c96f7e'
   if (b.events === 'triple')   return '#f97316'
   if (b.events === 'double')   return '#facc15'
   if (HIT_EVENTS.has(b.events)) return '#4ade80'
@@ -666,7 +666,7 @@ function SprayChart({ bips }) {
       </svg>
 
       <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 10, flexWrap: 'wrap' }}>
-        {[['#4ade80','Single'],['#facc15','Double'],['#f97316','Triple'],['#ef4444','HR'],['rgba(148,163,184,0.65)','Out']].map(([c,l]) => (
+        {[['#4ade80','Single'],['#facc15','Double'],['#f97316','Triple'],['#c96f7e','HR'],['rgba(148,163,184,0.65)','Out']].map(([c,l]) => (
           <span key={l} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--text-faint)' }}>
             <svg width="8" height="8"><circle cx="4" cy="4" r="4" fill={c}/></svg>
             {l}
@@ -715,7 +715,7 @@ function StatcastTrend({ bips }) {
           const clr = g.avgEV == null ? 'rgba(148,163,184,0.18)'
             : g.avgEV >= 95 ? 'var(--b-hot)'
             : g.avgEV >= 90 ? '#facc15'
-            : '#64748b'
+            : '#676673'
           return (
             <div key={i} title={g.avgEV != null ? `${g.date}: ${g.avgEV.toFixed(1)} mph avg EV · ${g.bip} BIP` : `${g.date}: no tracked BIP`}
               style={{ flex: 1, height: '100%', display: 'flex', alignItems: 'flex-end', cursor: 'default' }}>
@@ -879,16 +879,16 @@ function DrawerHeader({ b, color, onClose, watched, inSlip, onToggleWatch, onTog
           </div>
           <div style={{ marginBottom: b.precision ? '8px' : '10px' }}><BadgeRow batter={b} /></div>
           {b.precision && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(0,216,246,0.08)', border: '1px solid rgba(0,216,246,0.2)', borderRadius: '8px', padding: '6px 10px', marginBottom: '10px', fontSize: '11px', fontWeight: '700', color: 'var(--accent)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(151,149,203,0.08)', border: '1px solid rgba(151,149,203,0.2)', borderRadius: '8px', padding: '6px 10px', marginBottom: '10px', fontSize: '11px', fontWeight: '700', color: 'var(--accent)' }}>
               <Icon name="Sparkles" size={12} />
               Precision Play — all 5 gates cleared
             </div>
           )}
           <div style={{ display: 'flex', gap: '8px' }}>
-            <button className={`d-act ${inSlip ? 'on' : ''}`} onClick={() => onToggleSlip(b)} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: inSlip ? 'rgba(16,185,129,0.12)' : 'rgba(255,255,255,0.04)', color: inSlip ? 'var(--strong)' : '#fff', border: inSlip ? '1px solid var(--strong)' : '1px solid rgba(255,255,255,0.08)', padding: '5px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: '600' }}>
+            <button className={`d-act ${inSlip ? 'on' : ''}`} onClick={() => onToggleSlip(b)} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: inSlip ? 'rgba(105,185,158,0.12)' : 'rgba(255,255,255,0.04)', color: inSlip ? 'var(--strong)' : '#fff', border: inSlip ? '1px solid var(--strong)' : '1px solid rgba(255,255,255,0.08)', padding: '5px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: '600' }}>
               <Icon name={inSlip ? 'Check' : 'Plus'} size={13} />{inSlip ? 'In parlay' : 'Add to parlay'}
             </button>
-            <button className={`d-act ghost ${watched ? 'on' : ''}`} onClick={() => onToggleWatch(b)} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: watched ? 'rgba(245,166,35,0.12)' : 'transparent', color: watched ? 'var(--prime)' : 'var(--text-dim)', border: watched ? '1px solid var(--prime)' : '1px solid transparent', padding: '5px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: '600' }}>
+            <button className={`d-act ghost ${watched ? 'on' : ''}`} onClick={() => onToggleWatch(b)} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: watched ? 'rgba(214,181,111,0.12)' : 'transparent', color: watched ? 'var(--prime)' : 'var(--text-dim)', border: watched ? '1px solid var(--prime)' : '1px solid transparent', padding: '5px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: '600' }}>
               <Icon name="Star" size={13} style={{ fill: watched ? 'currentColor' : 'none' }} />{watched ? 'Watching' : 'Watch'}
             </button>
             <button
@@ -1105,11 +1105,11 @@ function PlateMatchup({ b, onOpenZone }) {
         <span style={{ fontSize: '12px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-dim)', display: 'flex', alignItems: 'center', gap: '6px' }}>
           <Icon name="Target" size={14} /> Plate Matchup
         </span>
-        <span style={{ fontSize: '10px', fontWeight: '700', padding: '2px 8px', borderRadius: '6px', display: 'inline-flex', alignItems: 'center', gap: '4px', background: pm.tone === 'good' ? 'rgba(16,185,129,0.1)' : pm.tone === 'bad' ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.05)', color: pm.tone === 'good' ? 'var(--strong)' : pm.tone === 'bad' ? 'var(--bad)' : 'var(--text-dim)' }}>
+        <span style={{ fontSize: '10px', fontWeight: '700', padding: '2px 8px', borderRadius: '6px', display: 'inline-flex', alignItems: 'center', gap: '4px', background: pm.tone === 'good' ? 'rgba(105,185,158,0.1)' : pm.tone === 'bad' ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.05)', color: pm.tone === 'good' ? 'var(--strong)' : pm.tone === 'bad' ? 'var(--bad)' : 'var(--text-dim)' }}>
           <Icon name="Zap" size={10} /> HR Signal
         </span>
       </div>
-      <div className="pm-verdict-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', borderRadius: '8px', marginBottom: '14px', background: pm.tone === 'good' ? 'rgba(16,185,129,0.05)' : pm.tone === 'bad' ? 'rgba(239,68,68,0.05)' : 'rgba(255,255,255,0.02)', border: `1px solid ${pm.tone === 'good' ? 'rgba(16,185,129,0.15)' : pm.tone === 'bad' ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.04)'}` }}>
+      <div className="pm-verdict-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', borderRadius: '8px', marginBottom: '14px', background: pm.tone === 'good' ? 'rgba(105,185,158,0.05)' : pm.tone === 'bad' ? 'rgba(239,68,68,0.05)' : 'rgba(255,255,255,0.02)', border: `1px solid ${pm.tone === 'good' ? 'rgba(105,185,158,0.15)' : pm.tone === 'bad' ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.04)'}` }}>
         <div>
           <span style={{ fontSize: '15px', fontWeight: '800', color: '#fff', display: 'block' }}>{pm.verdict}</span>
           <span style={{ fontSize: '11px', color: 'var(--text-dim)' }}>batter vs {b.pitcher?.name || 'TBD'}</span>
@@ -1232,7 +1232,7 @@ function PitchBar({ adv }) {
   return (
     <div style={{ flex: 1, height: '10px', background: 'rgba(255,255,255,0.04)', borderRadius: '4px', position: 'relative', overflow: 'hidden' }}>
       <div style={{ position: 'absolute', left: '50%', top: 0, bottom: 0, width: '1px', background: 'rgba(255,255,255,0.15)', transform: 'translateX(-50%)', zIndex: 1 }} />
-      <div style={{ position: 'absolute', top: 0, bottom: 0, left: isBatter ? '50%' : `${50 - pct50}%`, width: `${pct50}%`, background: isBatter ? 'rgba(16,185,129,0.75)' : 'rgba(239,68,68,0.65)', borderRadius: isBatter ? '0 4px 4px 0' : '4px 0 0 4px' }} />
+      <div style={{ position: 'absolute', top: 0, bottom: 0, left: isBatter ? '50%' : `${50 - pct50}%`, width: `${pct50}%`, background: isBatter ? 'rgba(105,185,158,0.75)' : 'rgba(239,68,68,0.65)', borderRadius: isBatter ? '0 4px 4px 0' : '4px 0 0 4px' }} />
     </div>
   )
 }
@@ -1288,7 +1288,7 @@ function PitchMixAdvantage({ b }) {
       </div>
 
       {bigBlind && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 11px', marginBottom: '14px', borderRadius: '8px', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.22)', color: 'var(--prime)', fontSize: '11.5px', lineHeight: 1.4 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 11px', marginBottom: '14px', borderRadius: '8px', background: 'rgba(198,154,87,0.08)', border: '1px solid rgba(198,154,87,0.22)', color: 'var(--prime)', fontSize: '11.5px', lineHeight: 1.4 }}>
           <Icon name="TriangleAlert" size={13} style={{ flexShrink: 0 }} />
           <span><b>No book on his {bigBlind.name?.toLowerCase() || 'top pitch'}</b> ({bigBlind.usage}% usage) — excluded from the rating. A real unknown here.</span>
         </div>
@@ -1374,8 +1374,8 @@ function PitcherSection({ b, batters, onOpenPitcher }) {
         <Cell k="IP" v={num(s.ip, 1)} />
         <Cell k="GB/FB" v={battedBallLabel(s.goAo)} tone={ballTone(s.goAo)} title="League ~1.15." />
       </div>
-      {b.flyBallMatchup && <div className="note good" style={{ fontSize: '11px', display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(16,185,129,0.06)', padding: '6px 10px', borderRadius: '6px', marginBottom: '8px', border: '1px solid rgba(16,185,129,0.1)' }}><Icon name="Wind" size={12} style={{ color: 'var(--strong)' }} /> <span>Fly-ball arm matchup (GB/FB {num(s.goAo, 2)})</span></div>}
-      {b.hrPlatoonEdge && <div className="note good" style={{ fontSize: '11px', display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(16,185,129,0.06)', padding: '6px 10px', borderRadius: '6px', marginBottom: '8px', border: '1px solid rgba(16,185,129,0.1)' }}><Icon name="Target" size={12} style={{ color: 'var(--strong)' }} /> <span>Gives up more HRs vs {b.batSide === 'S' ? 'this side' : `${b.batSide}HB`}</span></div>}
+      {b.flyBallMatchup && <div className="note good" style={{ fontSize: '11px', display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(105,185,158,0.06)', padding: '6px 10px', borderRadius: '6px', marginBottom: '8px', border: '1px solid rgba(105,185,158,0.1)' }}><Icon name="Wind" size={12} style={{ color: 'var(--strong)' }} /> <span>Fly-ball arm matchup (GB/FB {num(s.goAo, 2)})</span></div>}
+      {b.hrPlatoonEdge && <div className="note good" style={{ fontSize: '11px', display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(105,185,158,0.06)', padding: '6px 10px', borderRadius: '6px', marginBottom: '8px', border: '1px solid rgba(105,185,158,0.1)' }}><Icon name="Target" size={12} style={{ color: 'var(--strong)' }} /> <span>Gives up more HRs vs {b.batSide === 'S' ? 'this side' : `${b.batSide}HB`}</span></div>}
       {split && (
         <div style={{ display: 'flex', gap: '10px', padding: '8px 10px', background: 'rgba(255,255,255,0.02)', borderRadius: '6px', fontSize: '11px', marginBottom: '8px', border: '1px solid rgba(255,255,255,0.04)' }}>
           <span style={{ fontWeight: '700', color: 'var(--text-dim)' }}>vs {b.batSide}HB</span>
@@ -1508,7 +1508,7 @@ function HrSetupSection({ b }) {
       <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginBottom: '14px', paddingBottom: '12px', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
         <span style={{ fontSize: '28px', fontWeight: '800', fontFamily: 'var(--mono)', color: tone === 'good' ? 'var(--strong)' : tone === 'warn' ? 'var(--prime)' : 'var(--bad)', lineHeight: 1 }}>{heat}</span>
         <span style={{ fontSize: '11px', color: 'var(--text-faint)' }}>/ 100</span>
-        <span style={{ fontSize: '11px', fontWeight: '700', color: tone === 'good' ? 'var(--strong)' : tone === 'warn' ? 'var(--prime)' : 'var(--bad)', background: tone === 'good' ? 'rgba(16,185,129,0.08)' : tone === 'warn' ? 'rgba(245,166,35,0.08)' : 'rgba(239,68,68,0.08)', padding: '2px 8px', borderRadius: '4px', marginLeft: '8px' }}>{tag}</span>
+        <span style={{ fontSize: '11px', fontWeight: '700', color: tone === 'good' ? 'var(--strong)' : tone === 'warn' ? 'var(--prime)' : 'var(--bad)', background: tone === 'good' ? 'rgba(105,185,158,0.08)' : tone === 'warn' ? 'rgba(214,181,111,0.08)' : 'rgba(239,68,68,0.08)', padding: '2px 8px', borderRadius: '4px', marginLeft: '8px' }}>{tag}</span>
         <span style={{ fontSize: '11px', color: 'var(--text-faint)', marginLeft: 'auto' }}>setup {n}/6</span>
       </div>
       <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -1567,12 +1567,12 @@ function GameBreakdown({ g }) {
   const iso = g.ab > 0 ? (g.d + g.t * 2 + g.hr * 3) / g.ab : null
 
   const chips = [
-    ...Array(g.hr).fill({ label: 'HR', bg: 'rgba(245,166,35,0.18)', color: 'var(--b-hot)', border: 'rgba(245,166,35,0.3)' }),
+    ...Array(g.hr).fill({ label: 'HR', bg: 'rgba(214,181,111,0.18)', color: 'var(--b-hot)', border: 'rgba(214,181,111,0.3)' }),
     ...Array(g.t).fill({ label: '3B', bg: 'rgba(251,146,60,0.14)', color: '#fb923c', border: 'rgba(251,146,60,0.25)' }),
     ...Array(g.d).fill({ label: '2B', bg: 'rgba(250,204,21,0.12)', color: '#fbbf24', border: 'rgba(250,204,21,0.22)' }),
-    ...Array(singles).fill({ label: '1B', bg: 'rgba(16,185,129,0.10)', color: 'var(--strong)', border: 'rgba(16,185,129,0.2)' }),
-    ...Array(g.bb).fill({ label: 'BB', bg: 'rgba(0,216,246,0.08)', color: 'var(--accent)', border: 'rgba(0,216,246,0.18)' }),
-    ...Array(g.hbp ?? 0).fill({ label: 'HBP', bg: 'rgba(0,216,246,0.06)', color: 'var(--accent)', border: 'rgba(0,216,246,0.14)' }),
+    ...Array(singles).fill({ label: '1B', bg: 'rgba(105,185,158,0.10)', color: 'var(--strong)', border: 'rgba(105,185,158,0.2)' }),
+    ...Array(g.bb).fill({ label: 'BB', bg: 'rgba(151,149,203,0.08)', color: 'var(--accent)', border: 'rgba(151,149,203,0.18)' }),
+    ...Array(g.hbp ?? 0).fill({ label: 'HBP', bg: 'rgba(151,149,203,0.06)', color: 'var(--accent)', border: 'rgba(151,149,203,0.14)' }),
     ...Array(g.k).fill({ label: 'K', bg: 'rgba(239,68,68,0.10)', color: 'var(--bad)', border: 'rgba(239,68,68,0.2)' }),
     ...Array(nonKOuts).fill({ label: 'OUT', bg: 'rgba(255,255,255,0.03)', color: 'var(--text-faint)', border: 'rgba(255,255,255,0.07)' }),
   ]
@@ -1630,7 +1630,7 @@ function GameLogTable({ log, loading }) {
                     style={{
                       cursor: 'pointer',
                       borderBottom: open ? 'none' : '1px solid rgba(255,255,255,0.02)',
-                      background: open ? 'rgba(99,102,241,0.08)' : g.hr > 0 ? 'rgba(245,166,35,0.04)' : 'transparent',
+                      background: open ? 'rgba(99,102,241,0.08)' : g.hr > 0 ? 'rgba(214,181,111,0.04)' : 'transparent',
                     }}
                   >
                     <td style={{ padding: '6px 8px', fontFamily: 'var(--mono)', color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>{g.date?.slice(5)}</td>
@@ -1774,7 +1774,7 @@ function StatcastSection({ b }) {
         {b.hardHitPct != null && <Cell k="Hard Hit%" v={`${num(b.hardHitPct, 0)}%`} tone={b.hardHitPct >= 40 ? 'good' : null} />}
       </div>
       {b.primaryPitchEdge?.passes && (
-        <div style={{ marginTop: '12px', background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.15)', borderRadius: '8px', padding: '10px 12px', fontSize: '11px', color: 'var(--strong)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <div style={{ marginTop: '12px', background: 'rgba(105,185,158,0.08)', border: '1px solid rgba(105,185,158,0.15)', borderRadius: '8px', padding: '10px 12px', fontSize: '11px', color: 'var(--strong)', display: 'flex', alignItems: 'center', gap: '6px' }}>
           <Icon name="Target" size={12} />
           <span>Crushes the {b.primaryPitchEdge.pitchName} ({rate(b.primaryPitchEdge.batterSlg)} SLG) — pitcher throws it {pct(b.primaryPitchEdge.pitcherFreq, 0)}</span>
         </div>
@@ -1968,7 +1968,7 @@ function TodaysOutlook({ b }) {
       </div>
       <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '7px' }}>
         {items.map((r, i) => (
-          <li key={i} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', padding: '10px 12px', borderRadius: '8px', background: r.tone === 'good' ? 'rgba(16,185,129,0.05)' : r.tone === 'bad' ? 'rgba(239,68,68,0.04)' : 'rgba(255,255,255,0.02)', border: `1px solid ${r.tone === 'good' ? 'rgba(16,185,129,0.15)' : r.tone === 'bad' ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.04)'}` }}>
+          <li key={i} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', padding: '10px 12px', borderRadius: '8px', background: r.tone === 'good' ? 'rgba(105,185,158,0.05)' : r.tone === 'bad' ? 'rgba(239,68,68,0.04)' : 'rgba(255,255,255,0.02)', border: `1px solid ${r.tone === 'good' ? 'rgba(105,185,158,0.15)' : r.tone === 'bad' ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.04)'}` }}>
             <Icon name={r.tone === 'good' ? 'CheckCircle2' : r.tone === 'bad' ? 'AlertTriangle' : 'Minus'} size={14} style={{ color: r.tone === 'good' ? 'var(--strong)' : r.tone === 'bad' ? 'var(--prime)' : 'var(--text-faint)', marginTop: '1px', flexShrink: 0 }} />
             <span style={{ fontSize: '12px', color: r.tone === 'good' ? 'var(--text)' : 'var(--text-dim)', lineHeight: '1.45' }}>{r.text}</span>
           </li>
@@ -1990,12 +1990,12 @@ function DueIndicatorSection({ b }) {
       <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '14px', paddingBottom: '12px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
         <span style={{ fontSize: '26px', fontWeight: '800', fontFamily: 'var(--mono)', color: dueColor, lineHeight: 1 }}>{n}</span>
         <span style={{ fontSize: '13px', color: 'var(--text-faint)' }}>/ {total}</span>
-        <span style={{ fontSize: '12px', fontWeight: '700', color: dueColor, background: n >= 5 ? 'rgba(16,185,129,0.08)' : n >= 3 ? 'rgba(245,166,35,0.08)' : 'rgba(255,255,255,0.04)', padding: '2px 10px', borderRadius: '6px', marginLeft: '6px' }}>{dueLabel}</span>
+        <span style={{ fontSize: '12px', fontWeight: '700', color: dueColor, background: n >= 5 ? 'rgba(105,185,158,0.08)' : n >= 3 ? 'rgba(214,181,111,0.08)' : 'rgba(255,255,255,0.04)', padding: '2px 10px', borderRadius: '6px', marginLeft: '6px' }}>{dueLabel}</span>
         <span style={{ marginLeft: 'auto', fontSize: '11px', color: 'var(--text-faint)' }}>heat {heat}/100</span>
       </div>
       <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '8px' }}>
         {checks.map(c => (
-          <li key={c.label} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', padding: '10px 12px', borderRadius: '8px', background: c.pass ? 'rgba(16,185,129,0.04)' : 'rgba(255,255,255,0.02)', border: `1px solid ${c.pass ? 'rgba(16,185,129,0.12)' : 'rgba(255,255,255,0.04)'}` }}>
+          <li key={c.label} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', padding: '10px 12px', borderRadius: '8px', background: c.pass ? 'rgba(105,185,158,0.04)' : 'rgba(255,255,255,0.02)', border: `1px solid ${c.pass ? 'rgba(105,185,158,0.12)' : 'rgba(255,255,255,0.04)'}` }}>
             <Icon name={c.pass ? 'Check' : 'X'} size={13} style={{ color: c.pass ? 'var(--strong)' : 'var(--text-faint)', marginTop: '1px', flexShrink: 0 }} />
             <div>
               <div style={{ fontSize: '12px', fontWeight: c.pass ? '600' : '400', color: c.pass ? '#fff' : 'var(--text-faint)' }}>{c.label}</div>
@@ -2149,7 +2149,7 @@ function ExplainPick({ b }) {
             disabled={status === 'loading'}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: '7px',
-              background: 'rgba(0,216,246,0.08)', border: '1px solid rgba(0,216,246,0.25)',
+              background: 'rgba(151,149,203,0.08)', border: '1px solid rgba(151,149,203,0.25)',
               color: 'var(--accent)', padding: '8px 14px', borderRadius: '9px',
               fontSize: '13px', fontWeight: '700', cursor: status === 'loading' ? 'default' : 'pointer',
               opacity: status === 'loading' ? 0.7 : 1,
