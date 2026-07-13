@@ -18,8 +18,19 @@ const MARKET_ICONS = {
   receiving_yards: 'TrendingUp', rushing_yards: 'Zap', rushing_receiving_yards: 'GitMerge', passing_rushing_yards: 'GitBranch',
 }
 const GRADE_COLORS = { PRIME: 'var(--prime)', STRONG: 'var(--strong)', LEAN: 'var(--lean)', SKIP: 'var(--skip)' }
+const NFL_TEAM_COLORS = {
+  ARI: '#97233f', ATL: '#a71930', BAL: '#6a4c93', BUF: '#2f5fa7', CAR: '#0085ca', CHI: '#c83803', CIN: '#fb4f14', CLE: '#ff3c00',
+  DAL: '#5b6f8f', DEN: '#fb4f14', DET: '#0076b6', GB: '#203731', HOU: '#03202f', IND: '#315f91', JAX: '#008e97', KC: '#e31837',
+  LAC: '#0080c6', LAR: '#315f91', LVR: '#a5acaf', MIA: '#008e97', MIN: '#4f2683', NE: '#315f91', NO: '#d3bc8d', NYG: '#315f91',
+  NYJ: '#125740', PHI: '#004c54', PIT: '#ffb612', SEA: '#69be28', SF: '#aa0000', TB: '#d50a0a', TEN: '#4b92db', WAS: '#773141',
+}
 
 const gameKeyFor = (player) => player.gameId || [player.team, player.opponent].filter(Boolean).sort().join('-')
+
+function PlayerHeadshotSilo({ player, variant = 'compact' }) {
+  const teamColor = NFL_TEAM_COLORS[player.team] || '#9795cb'
+  return <span className={`nfl-headshot-silo is-${variant}`} style={{ '--team-color': teamColor }} aria-hidden="true"><span className="nfl-headshot-fallback"><Icon name="Users" size={variant === 'workspace' ? 28 : 18} /></span>{player.headshotUrl && <img src={player.headshotUrl} alt="" loading="lazy" onError={(event) => { event.currentTarget.style.display = 'none' }} />}</span>
+}
 
 const pct = (value, digits = 1) => value == null ? '—' : `${(value * 100).toFixed(digits)}%`
 const odds = (value) => value == null ? '—' : value > 0 ? `+${value}` : String(value)
@@ -98,15 +109,7 @@ function PlayerCard({ player, marketId, watched, inSlip, onSelect, onToggleWatch
   return (
     <article className="nfl-prop-card" style={{ '--nfl-grade': color }}>
       <button className="nfl-card-open" onClick={() => onSelect(player)} aria-label={`Open ${player.name} prop research`}>
-        <header>
-          <div>
-            <span className="nfl-card-name">{player.name}</span>
-            <span className="nfl-position">{player.position}</span>
-            <span className="nfl-grade" style={{ color }}>{model.grade}</span>
-          </div>
-          <small className={`nfl-live-state ${player.live?.isLive ? 'is-live' : ''}`}><Icon name={player.live?.isLive ? 'Activity' : 'Clock'} size={11} />{liveLabel(player)}</small>
-        </header>
-        <div className="nfl-card-matchup"><b>{player.team}</b><Icon name="ChevronRight" size={10} /><span>{player.opponent}</span><i>·</i><span>{player.kickoff}</span><i>·</i><span>{player.isHome ? 'Home' : 'Away'}</span></div>
+        <div className="nfl-card-hero"><PlayerHeadshotSilo player={player} /><div className="nfl-card-hero-copy"><header><div><span className="nfl-card-name">{player.name}</span><span className="nfl-position">{player.position}</span><span className="nfl-grade" style={{ color }}>{model.grade}</span></div><small className={`nfl-live-state ${player.live?.isLive ? 'is-live' : ''}`}><Icon name={player.live?.isLive ? 'Activity' : 'Clock'} size={11} />{liveLabel(player)}</small></header><div className="nfl-card-matchup"><b>{player.team}</b><Icon name="ChevronRight" size={10} /><span>{player.opponent}</span><i>·</i><span>{player.kickoff}</span><i>·</i><span>{player.isHome ? 'Home' : 'Away'}</span></div></div></div>
         <div className="nfl-card-price">
           <div><small>Model probability</small><strong className="mono" style={{ color }}>{pct(model.probability)}</strong></div>
           <div><small>{['anytime_td', 'first_td', 'two_plus_td'].includes(marketId) ? 'Odds / edge' : 'Line / edge'}</small><span><b className="mono">{marketValue(player, model, marketId)}</b><em className={`mono ${model.edge == null ? '' : model.edge >= 0 ? 'positive' : 'negative'}`}>{model.edge == null ? 'No price' : `${model.edge >= 0 ? '+' : ''}${pct(model.edge)}`}</em></span></div>
@@ -165,7 +168,7 @@ function PlayerResearch({ player, marketId, onClose, inSlip, onToggleSlip }) {
       <header className="nfl-research-header">
         <button className="nfl-drawer-close" onClick={onClose} aria-label="Close"><Icon name="X" size={18} /></button>
         <span className="nfl-drawer-eyebrow">NFL player research · model confidence</span>
-        <div className="nfl-research-identity"><div><h2 id="nfl-drawer-title">{player.name}</h2><span className="nfl-position">{player.position}</span><span className={`nfl-live-state ${player.live?.isLive ? 'is-live' : ''}`}><Icon name={player.live?.isLive ? 'Activity' : 'Clock'} size={11} />{liveLabel(player)}</span></div><p><b>{player.team}</b> vs {player.opponent} · {player.kickoff} · {player.isHome ? 'Home' : 'Away'}</p></div>
+        <div className="nfl-research-identity"><PlayerHeadshotSilo player={player} variant="workspace" /><div className="nfl-research-identity-copy"><div><h2 id="nfl-drawer-title">{player.name}</h2><span className="nfl-position">{player.position}</span><span className={`nfl-live-state ${player.live?.isLive ? 'is-live' : ''}`}><Icon name={player.live?.isLive ? 'Activity' : 'Clock'} size={11} />{liveLabel(player)}</span></div><p><b>{player.team}</b> vs {player.opponent} · {player.kickoff} · {player.isHome ? 'Home' : 'Away'}</p></div></div>
         <div className="nfl-research-decision">
           <div className="nfl-research-market"><small>Selected market</small><b>{marketLabel}</b></div>
           <div className="nfl-research-score"><span><small>Model</small><strong className="mono">{pct(current.probability)}</strong></span><span><small>Line / odds</small><strong className="mono">{marketValue(player, current, marketId)}</strong></span><span><small>Edge</small><strong className={`mono ${current.edge == null ? '' : current.edge >= 0 ? 'positive' : 'negative'}`}>{current.edge == null ? 'No price' : `${current.edge >= 0 ? '+' : ''}${pct(current.edge)}`}</strong></span></div>
