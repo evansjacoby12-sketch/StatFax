@@ -39,7 +39,10 @@ const unit = (x, lo, hi) => {
 //    launch AT real impact) — handled specially below as a geometric mean.
 const CEIL_TERMS = [
   { key: 'barrelPctBBE', w: 1.3, lo: 3,     hi: 13,    get: b => b?.barrelPctBBE },          // % (avg ~8)
-  { key: 'xISO',         w: 1.1, lo: 0.080, hi: 0.240, get: b => b?.xStats?.xISO },          // pts (avg ~.160)
+  // xISO with a season-ISO fallback: xISO comes from the flaky Savant CSV, but
+  // season iso is ~100% covered, so the ceiling keeps a power term even when a
+  // Savant fetch drops (the 7-11 outage otherwise left only barrel% = 1 input).
+  { key: 'xISO',         w: 1.1, lo: 0.080, hi: 0.240, get: b => b?.xStats?.xISO ?? b?.season?.iso },
   { key: 'recentEVHi',   w: 1.0, lo: 100,   hi: 111,   get: b => b?.recentBarrel?.recentEVHi }, // mph, top-5 mean
   { key: 'blastPct',     w: 0.9, lo: 6,     hi: 20,    get: b => b?.batTracking?.blastPct }, // % (avg ~13)
 ];
@@ -69,7 +72,10 @@ export function barrelScore(b) {
     if (u == null) continue;
     acc += u * t.w; sw += t.w; n++;
   }
-  if (n < 3 || sw === 0) return null;            // too little signal to trust
+  // Need ≥2 present terms. With the season-iso fallback, barrel% + xISO/iso are
+  // almost always available even during a Savant-CSV outage, so the ceiling
+  // survives the day (degraded, not null) instead of dropping the whole signal.
+  if (n < 2 || sw === 0) return null;
   return Math.round((acc / sw) * 100);
 }
 

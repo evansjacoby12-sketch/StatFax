@@ -736,19 +736,37 @@ async function savantGetEmbedded(url) {
  * The "Download CSV" links have more permissive Cloudflare rules than the
  * internal JSON API. Returns array of row-objects (header → value), [] on failure.
  */
-async function savantCSV(url) {
-  try {
-    const res = await fetch(url, {
-      headers: { ...SAVANT_HEADERS, Accept: 'text/csv, text/plain, */*' },
-    });
-    if (!res.ok) return [];
-    const raw = await res.text();
-    const text = raw.replace(/^﻿/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
-    if (!text || text.startsWith('<') || text.startsWith('{')) return [];
+async function savantCSV(url, retries = 2) {
+  // Retry transient failures (5xx/429, network errors, empty bodies, and the
+  // Cloudflare HTML/JSON challenge page) with backoff — a single miss otherwise
+  // silently drops that whole CSV for the day. This is exactly what zeroed
+  // sweet-spot%/maxEV on 7-11 → barrelScore lost its inputs → no ceiling/signal.
+  let lastEmpty = false;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch(url, {
+        headers: { ...SAVANT_HEADERS, Accept: 'text/csv, text/plain, */*' },
+      });
+      if (!res.ok) {
+        if (res.status !== 429 && res.status < 500) return [];  // real 4xx → don't retry
+        throw new Error(`HTTP ${res.status}`);                  // transient → retry
+      }
+      const raw = await res.text();
+      const text = raw.replace(/^﻿/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+      // Empty body or a challenge page (HTML/JSON) → transient, retry.
+      if (!text || text.startsWith('<') || text.startsWith('{')) { lastEmpty = true; throw new Error('empty/challenge'); }
+      const lines = text.split('\n');
+      if (lines.length < 2) { lastEmpty = true; throw new Error('no rows'); }
+      return parseCsvRows(lines);
+    } catch (e) {
+      if (attempt < retries) { await new Promise((r) => setTimeout(r, 400 * (attempt + 1))); continue; }
+      if (lastEmpty) console.warn(`[savant] CSV empty after ${retries + 1} tries: ${url.slice(0, 80)}`);
+      return [];
+    }
+  }
+  return [];
 
-    const lines = text.split('\n');
-    if (lines.length < 2) return [];
-
+  function parseCsvRows(lines) {
     const parseRow = (line) => {
       const vals = [];
       let cur = '', inQ = false;
@@ -774,8 +792,6 @@ async function savantCSV(url) {
       headers.forEach((h, i) => { obj[h.trim()] = (vals[i] ?? '').trim(); });
       return obj;
     });
-  } catch {
-    return [];
   }
 }
 
