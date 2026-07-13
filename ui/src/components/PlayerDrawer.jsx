@@ -156,9 +156,9 @@ function useSavantBIP(playerId, enabled) {
 
 const TABS = [
   { id: 'overview',  label: 'Summary'   },
+  { id: 'statcast',  label: 'Power'     },
   { id: 'matchup',   label: 'Matchup'   },
   { id: 'form',      label: 'Form'      },
-  { id: 'statcast',  label: 'Power'     },
   { id: 'splits',    label: 'Splits'    },
   { id: 'trends',    label: 'Trends'    },
   { id: 'spray',     label: 'Spray'     },
@@ -166,6 +166,8 @@ const TABS = [
 
 function TabBar({ active, onChange }) {
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false)
+  const [desktopMoreOpen, setDesktopMoreOpen] = useState(false)
+  const desktopMoreRef = useRef(null)
   const primaryTabs = TABS.slice(0, 4)
   const moreTabs = TABS.slice(4)
   const moreActive = moreTabs.some((t) => t.id === active)
@@ -191,18 +193,69 @@ function TabBar({ active, onChange }) {
     ro.observe(wrap)
     return () => ro.disconnect()
   }, [active])
+  useEffect(() => {
+    if (!desktopMoreOpen) return
+    const closeOutside = (event) => {
+      if (!desktopMoreRef.current?.contains(event.target)) setDesktopMoreOpen(false)
+    }
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') setDesktopMoreOpen(false)
+    }
+    document.addEventListener('mousedown', closeOutside)
+    document.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.removeEventListener('mousedown', closeOutside)
+      document.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [desktopMoreOpen])
   return (
     <>
-      <div className="drawer-tabs desktop-drawer-tabs" ref={wrapRef}>
+      <div className="drawer-tabs desktop-drawer-tabs" ref={wrapRef} role="tablist" aria-label="Player evidence sections">
         <span className="drawer-tab-ind" ref={indRef} aria-hidden="true" />
-        {TABS.map(t => (
+        {primaryTabs.map(t => (
           <button
             key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={active === t.id}
             data-tab={t.id}
             className={`drawer-tab ${active === t.id ? 'active' : ''}`}
-            onClick={() => onChange(t.id)}
+            onClick={() => {
+              setDesktopMoreOpen(false)
+              onChange(t.id)
+            }}
           >{t.label}</button>
         ))}
+        <div className="desktop-tab-more" ref={desktopMoreRef}>
+          <button
+            type="button"
+            className={`drawer-tab desktop-more-trigger${moreActive ? ' active' : ''}`}
+            onClick={() => setDesktopMoreOpen((open) => !open)}
+            aria-haspopup="menu"
+            aria-expanded={desktopMoreOpen}
+          >
+            More <Icon name="ChevronDown" size={12} />
+          </button>
+          {desktopMoreOpen && (
+            <div className="desktop-tab-menu" role="menu">
+              {moreTabs.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  role="menuitem"
+                  className={active === t.id ? 'active' : ''}
+                  onClick={() => {
+                    onChange(t.id)
+                    setDesktopMoreOpen(false)
+                  }}
+                >
+                  <span>{t.label}</span>
+                  {active === t.id && <Icon name="Check" size={13} />}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
       <div className="mobile-drawer-tabs" role="tablist" aria-label="Player detail sections">
         {primaryTabs.map((t) => (
@@ -335,7 +388,6 @@ function OverviewTab({ b, color, onOpenZone, liveMode }) {
   return (
     <>
       <ResearchThesis b={b} />
-      <HeroNumbers b={b} color={color} />
       <PlateMatchup b={b} onOpenZone={onOpenZone} />
       <ScoutReport b={b} />
       <ExplainPick b={b} />
@@ -790,6 +842,9 @@ function ResearchReasons({ b, compact = false }) {
 
 function DesktopResearchRail({ b, color, onClose, watched, inSlip, onToggleWatch, onToggleSlip }) {
   const pitcherHand = b.pitcher?.hand ? `${b.pitcher.hand}HP` : null
+  const market = b.vegasImpliedProb
+  const hasMarket = Number.isFinite(market)
+  const edge = hasMarket && Number.isFinite(b.hrProbability) ? b.hrProbability - market : null
   return (
     <aside className="research-decision-rail" style={{ '--rail-accent': color }}>
       <button className="research-rail-close" onClick={onClose} aria-label="Close player details">
@@ -802,19 +857,35 @@ function DesktopResearchRail({ b, color, onClose, watched, inSlip, onToggleWatch
           <h2>{b.name}</h2>
           <div className="research-identity-chips">
             <span>{b.batSide}HB</span>
-            <GradeChip grade={b.grade} size="sm" score={b.score} />
+            <span>{b.team}</span>
           </div>
         </div>
       </div>
 
-      <div className="research-rail-metrics">
-        <div><small>HR Probability</small><strong className="mono" style={{ color }}>{pct(b.hrProbability, 1)}</strong></div>
-        <div><small>Model Score</small><strong className="mono">{Math.round(b.score ?? 0)}</strong></div>
+      <div className="research-decision-card">
+        <div className="research-decision-head">
+          <small>StatFax read</small>
+          <GradeChip grade={b.grade} size="sm" score={b.score} />
+        </div>
+        <div className="research-decision-value">
+          <strong className="mono" style={{ color }}>{pct(b.hrProbability, 1)}</strong>
+          <span>HR probability</span>
+        </div>
+        <div className="research-market-row">
+          {hasMarket ? (
+            <>
+              <span className={edge != null && edge >= 0 ? 'good' : 'bad'}>{signedPct(edge, 1)} edge</span>
+              <span>{pct(market, 1)} market</span>
+            </>
+          ) : (
+            <span>Market price unavailable</span>
+          )}
+        </div>
       </div>
 
       <dl className="research-context-list">
         <div><dt>Matchup</dt><dd>{b.team} vs {b.opponent?.abbr || b.opponent?.name || '—'}</dd></div>
-        <div><dt>Lineup</dt><dd>{b.battingOrder ? `${ordinal(b.battingOrder)} spot` : (b.lineupConfirmed ? 'Confirmed' : 'Projected')}</dd></div>
+        <div><dt>Lineup</dt><dd>{b.battingOrder ? `${ordinal(b.battingOrder)} spot · ${b.lineupConfirmed ? 'Confirmed' : 'Projected'}` : (b.lineupConfirmed ? 'Confirmed' : 'Projected')}</dd></div>
         <div><dt>Pitcher</dt><dd>{b.pitcher?.name || 'TBD'}{pitcherHand ? ` · ${pitcherHand}` : ''}</dd></div>
       </dl>
 
@@ -970,7 +1041,6 @@ function MobileDrawerHeader({ b, color, onClose, watched, inSlip, onToggleWatch,
 
       <div className="mobile-player-metrics">
         <span><small>Score</small><b className="mono">{Math.round(b.score ?? 0)}</b></span>
-        <span><small>xHR</small><b className="mono">{num(b.expectedHRs, 3)}</b></span>
         <span><small>{hasMarket ? 'Market' : 'Sim'}</small><b className="mono">{hasMarket ? pct(market, 1) : pct(b.simHRProb, 1)}</b></span>
         <span><small>{hasMarket ? 'Edge' : 'Ens'}</small><b className={`mono${edge != null && edge >= 0 ? ' good' : edge != null ? ' bad' : ''}`}>{hasMarket ? signedPct(edge, 1) : num(b.ensembleScore)}</b></span>
       </div>

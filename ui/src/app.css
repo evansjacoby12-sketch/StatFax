@@ -1449,14 +1449,12 @@ button.th:focus-visible {
   top: 14px;
   right: 14px;
 }
-/* Tab bar: on desktop the 7 tabs flex to share the drawer width exactly so
-   none get cut off behind a scroll (min-width:0 + ellipsis is a safety net so
-   a tab can never overflow the row). On mobile we let them keep their natural
-   width and scroll horizontally instead of squeezing/clipping the labels. */
+/* Player evidence navigation: four primary families stay visible while the
+   advanced research views live behind a compact More menu. */
 .drawer-tabs {
   display: flex;
   flex-shrink: 0;
-  padding: 0 8px;
+  padding: 0 12px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 .drawer-tab {
@@ -1489,6 +1487,17 @@ button.th:focus-visible {
   color: #fff;
   border-bottom-color: var(--accent);
 }
+.desktop-tab-more { position: relative; flex: 0 0 92px; min-width: 0; }
+.desktop-more-trigger { width: 100%; height: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
+.desktop-more-trigger svg { transition: transform 0.18s ease; }
+.desktop-more-trigger[aria-expanded='true'] svg { transform: rotate(180deg); }
+.desktop-more-trigger.active::after { content: ''; position: absolute; left: 18px; right: 18px; bottom: -1px; height: 2px; border-radius: 2px 2px 0 0; background: var(--accent); box-shadow: 0 0 8px var(--accent-glow); }
+.desktop-tab-menu { position: absolute; top: calc(100% + 6px); right: 0; z-index: 12; width: 156px; padding: 5px; border: 1px solid var(--border); border-radius: 10px; background: rgba(10,11,13,0.98); box-shadow: 0 14px 36px rgba(0,0,0,0.55); }
+.desktop-tab-menu button { width: 100%; min-height: 38px; padding: 0 10px; display: flex; align-items: center; justify-content: space-between; color: var(--text-dim); border: 0; border-radius: 7px; background: transparent; font-size: 10px; font-weight: 700; }
+.desktop-tab-menu button:hover { color: #fff; background: rgba(255,255,255,0.045); }
+.desktop-tab-menu button.active { color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.desktop-more-trigger:focus-visible,
+.desktop-tab-menu button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 /* Match the drawer's own bottom-sheet breakpoint (max-width:560px). Only once
    the drawer is a full-width sheet do the tabs revert to natural width +
    horizontal scroll; above this the 480px desktop panel keeps equal-share tabs. */
@@ -8616,11 +8625,18 @@ button.th:focus-visible {
 }
 .research-rail-identity h2 { max-width: 172px; overflow: hidden; color: #fff; font-family: var(--display); font-size: 19px; font-weight: 800; line-height: 1.1; text-overflow: ellipsis; white-space: nowrap; }
 .research-identity-chips { margin-top: 7px; display: flex; align-items: center; gap: 6px; }
-.research-identity-chips > span:first-child { padding: 2px 5px; color: var(--text-faint); border: 1px solid var(--border-soft); border-radius: 4px; font-family: var(--mono); font-size: 8px; font-weight: 800; }
-.research-rail-metrics { margin-top: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.research-rail-metrics > div { min-width: 0; padding: 13px 10px; text-align: center; border: 1px solid var(--border-soft); border-radius: 11px; background: rgba(0,0,0,0.2); }
-.research-rail-metrics small { display: block; color: var(--text-faint); font-size: 7px; font-weight: 800; letter-spacing: 0.07em; text-transform: uppercase; }
-.research-rail-metrics strong { display: block; margin-top: 5px; color: #fff; font-size: 22px; font-weight: 900; }
+.research-identity-chips > span { padding: 2px 5px; color: var(--text-faint); border: 1px solid var(--border-soft); border-radius: 4px; font-size: 8px; font-weight: 800; }
+.research-identity-chips > span:first-child { font-family: var(--mono); }
+.research-decision-card { position: relative; margin-top: 20px; padding: 15px; overflow: hidden; border: 1px solid color-mix(in srgb, var(--rail-accent) 28%, var(--border-soft)); border-radius: 13px; background: linear-gradient(145deg, color-mix(in srgb, var(--rail-accent) 8%, rgba(0,0,0,.26)), rgba(0,0,0,.26)); box-shadow: inset 0 1px 0 rgba(255,255,255,.035); }
+.research-decision-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.research-decision-head > small { color: var(--text-faint); font-size: 7px; font-weight: 900; letter-spacing: .11em; text-transform: uppercase; }
+.research-decision-head .grade-chip { flex: none; }
+.research-decision-value { margin-top: 14px; display: flex; align-items: flex-end; gap: 8px; }
+.research-decision-value strong { color: #fff; font-size: 34px; font-weight: 900; line-height: .9; letter-spacing: -.05em; }
+.research-decision-value > span { padding-bottom: 2px; color: var(--text-faint); font-size: 8px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+.research-market-row { margin-top: 14px; padding-top: 10px; display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--text-faint); border-top: 1px solid rgba(255,255,255,.055); font-family: var(--mono); font-size: 9px; font-weight: 700; }
+.research-market-row .good { color: var(--strong); }
+.research-market-row .bad { color: var(--bad); }
 .research-context-list { margin: 16px 0 0; display: grid; gap: 0; }
 .research-context-list > div { min-width: 0; padding: 9px 0; display: flex; align-items: center; justify-content: space-between; gap: 10px; border-bottom: 1px solid rgba(255,255,255,0.045); }
 .research-context-list dt { color: var(--text-faint); font-size: 10px; }
@@ -8633,7 +8649,7 @@ button.th:focus-visible {
 .research-rail-actions { margin-top: auto; padding-top: 16px; display: grid; gap: 8px; }
 .research-rail-actions button { min-height: 40px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; color: var(--text-dim); border: 1px solid var(--border-soft); border-radius: 9px; background: rgba(255,255,255,0.025); font-size: 10px; font-weight: 800; }
 .research-rail-actions > div { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.research-rail-actions .research-add { color: #fff; border-color: color-mix(in srgb, var(--rail-accent) 55%, transparent); background: color-mix(in srgb, var(--rail-accent) 10%, transparent); }
+.research-rail-actions .research-add { min-height: 46px; color: #fff; border-color: color-mix(in srgb, var(--rail-accent) 55%, transparent); background: color-mix(in srgb, var(--rail-accent) 10%, transparent); box-shadow: 0 8px 22px color-mix(in srgb, var(--rail-accent) 10%, transparent); }
 .research-rail-actions .research-add.on { color: var(--strong); border-color: color-mix(in srgb, var(--strong) 55%, transparent); background: color-mix(in srgb, var(--strong) 10%, transparent); }
 .research-rail-actions button.on { color: var(--prime); border-color: color-mix(in srgb, var(--prime) 40%, transparent); background: color-mix(in srgb, var(--prime) 8%, transparent); }
 .research-mobile-thesis { display: none; }
@@ -12948,8 +12964,8 @@ button.th:focus-visible {
   .mobile-potd-name-line .grade-chip { display: none; }
 }
 
-/* Mobile player card: approved compact decision-first drawer. The desktop
-   modal keeps the original full header and seven-tab strip. */
+/* Mobile player card: the same decision-first hierarchy compressed into a
+   full-screen research sheet. */
 .mobile-player-head,
 .mobile-drawer-tabs { display: none; }
 
@@ -13020,7 +13036,7 @@ button.th:focus-visible {
     min-height: 44px;
     margin: 0 12px 8px;
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     border: 1px solid color-mix(in srgb, var(--player-accent) 20%, var(--border));
     border-radius: 10px;
     background: color-mix(in srgb, var(--player-accent) 4%, transparent);
