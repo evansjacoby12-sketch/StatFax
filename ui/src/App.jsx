@@ -33,6 +33,7 @@ import BetLab from './components/BetLab.jsx'
 import FindPlays from './components/FindPlays.jsx'
 import LearnCenter from './components/LearnCenter.jsx'
 import WorkspaceShell from './components/WorkspaceShell.jsx'
+import NFLBoard from './components/NFLBoard.jsx'
 import ToastStack, { toast } from './components/Toast.jsx'
 import InstallPrompt from './components/InstallPrompt.jsx'
 import Confetti from './components/Confetti.jsx'
@@ -128,6 +129,7 @@ export default function App() {
   const [watchlist, setWatchlist] = useState(() => new Set(store.load('watchlist', [])))
   const [slipIds, setSlipIds] = useState(() => store.load('slip', []))
   const [autoRefresh, setAutoRefresh] = useState(() => store.load('autoRefresh', false))
+  const [sport, setSport] = useState(() => (store.load('sport', 'mlb') === 'nfl' ? 'nfl' : 'mlb'))
   const [view, setView] = useState(() => (staleReturn ? 'board' : (viewFromHash() || store.load('view', 'board'))))
   const [liveScores, setLiveScores] = useState(() => store.load('liveScores', true))
   const [eliLevel, setEliLevel] = useState(() => store.load('eliLevel', 'eli5')) // 'eli5' | 'eli15'
@@ -153,6 +155,7 @@ export default function App() {
   useEffect(() => store.save('watchlist', [...watchlist]), [watchlist])
   useEffect(() => store.save('slip', slipIds), [slipIds])
   useEffect(() => store.save('autoRefresh', autoRefresh), [autoRefresh])
+  useEffect(() => store.save('sport', sport), [sport])
   useEffect(() => store.save('windowMode', windowMode), [windowMode])
   useEffect(() => store.save('showDayRating', showDayRating), [showDayRating])
   useEffect(() => store.save('comboConf', comboConf), [comboConf])
@@ -578,6 +581,53 @@ export default function App() {
     )[0]
   }, [all])
 
+  if (sport === 'nfl') {
+    const openMlb = (nextView = 'board') => {
+      setSport('mlb')
+      setView(nextView)
+    }
+    return (
+      <LiveModeContext.Provider value={false}>
+      <EliLevelContext.Provider value={eliLevel}>
+        <div className="app nfl-app">
+          <div className="topbar" ref={topbarRef}>
+            <Header
+              sport="nfl"
+              onSportChange={(next) => setSport(next)}
+              meta={{ week: 'Demo Week', modelMetrics: null, generatedAt: null }}
+              counts={{ games: 6, total: 8, shown: 8 }}
+              onRefresh={() => toast.info('NFL live feed is not connected yet')}
+              onOpenModel={() => openMlb('results')}
+              onOpenLegend={() => { openMlb('board'); setLearnTab('glossary') }}
+              onToggleLive={() => toast.info('NFL live mode will activate with the data feed')}
+              onCycleEli={() => setEliLevel((value) => nextEliLevel(value))}
+              liveScores={false}
+              eliLevel={eliLevel}
+              refreshing={false}
+              gradeCounts={{}}
+              total={8}
+              games={[]}
+              onOpenGuide={() => { openMlb('board'); setLearnTab('guide') }}
+              onOpenHowTo={() => { openMlb('board'); setLearnTab('playbook') }}
+              onOpenBuilder={() => { openMlb('board'); setBetLabTab('builder') }}
+              onOpenWeather={() => { openMlb('board'); setFindPlaysTab('weather') }}
+              onOpenListBuilder={() => { openMlb('board'); setFindPlaysTab('list-builder') }}
+              onOpenGroups={() => { openMlb('board'); setBetLabTab('explore') }}
+              onOpenSGP={() => { openMlb('board'); setBetLabTab('same-game') }}
+              onOpenSplits={() => { openMlb('board'); setFindPlaysTab('cheat-sheet') }}
+              onOpenBacktest={() => { openMlb('board'); setShowBacktest(true) }}
+              onOpenSettings={() => { openMlb('board'); setShowSettings(true) }}
+            />
+          </div>
+          <main className="main nfl-main"><NFLBoard /></main>
+          <footer className="foot"><span className="dim">StatFax NFL · Touchdown markets</span></footer>
+          <ToastStack />
+        </div>
+      </EliLevelContext.Provider>
+      </LiveModeContext.Provider>
+    )
+  }
+
   if (state.status === 'loading') {
     return <Skeleton />
   }
@@ -608,6 +658,8 @@ export default function App() {
     <div className="app">
       <div className="topbar" ref={topbarRef}>
         <Header
+          sport="mlb"
+          onSportChange={(next) => setSport(next)}
           meta={data.meta}
           counts={{
             games: data.games.length,

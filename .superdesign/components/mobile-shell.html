@@ -1,0 +1,27 @@
+<div class="statfax-mobile-shell" v-scope="{ active: 'pitchers' }">
+  <header class="mobile-shell-header">
+    <div class="mobile-shell-brand">
+      <span class="mobile-shell-mark" aria-hidden="true">S</span>
+      <span><strong>Stat<span>Fax</span></strong><small>2026-07-10 &nbsp;·&nbsp; 15 games</small></span>
+    </div>
+    <button class="mobile-shell-menu" type="button" aria-label="Menu">•••</button>
+  </header>
+  <nav class="mobile-shell-nav" aria-label="Primary navigation">
+    <button v-for="item in ['board','games','pitchers','results']" :class="{ active: active === item }" @click="active = item" type="button">
+      <span class="mobile-shell-nav-icon" aria-hidden="true"></span>
+      <span>{{ item }}</span>
+    </button>
+  </nav>
+</div>
+
+<style>
+.statfax-mobile-shell{font-family:Inter,sans-serif;color:#f8fafc;background:#010102}
+.mobile-shell-header{min-height:78px;padding:12px;display:flex;align-items:center;justify-content:space-between;background:#010102}
+.mobile-shell-brand{display:flex;align-items:center;gap:9px}.mobile-shell-brand>span:last-child{display:flex;flex-direction:column;gap:3px}
+.mobile-shell-mark{width:34px;height:34px;display:grid;place-items:center;border-radius:10px;color:#fff;background:linear-gradient(135deg,#00d8f6,#1688f8);font-weight:800}
+.mobile-shell-brand strong{font-family:Outfit,sans-serif;font-size:18px}.mobile-shell-brand strong span{color:#00d8f6}.mobile-shell-brand small{color:#94a3b8;font-family:'JetBrains Mono',monospace;font-size:9px}
+.mobile-shell-menu{width:44px;height:44px;border:1px solid rgba(255,255,255,.08);border-radius:12px;color:#cbd5e1;background:rgba(17,18,20,.45)}
+.mobile-shell-nav{position:fixed;left:0;right:0;bottom:0;z-index:20;height:64px;padding-bottom:env(safe-area-inset-bottom,0);display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid rgba(255,255,255,.08);background:rgba(1,1,2,.96)}
+.mobile-shell-nav button{min-width:44px;min-height:44px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:#94a3b8;background:none;border:0;font-size:9px;font-weight:700;text-transform:capitalize}.mobile-shell-nav button.active{color:#00d8f6}
+.mobile-shell-nav-icon{width:16px;height:16px;border:1.5px solid currentColor;border-radius:5px}
+</style>

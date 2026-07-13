@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>StatFax · Compact Player Card</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&family=JetBrains+Mono:wght@600;700;800&family=Outfit:wght@700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg:#010102; --sheet:#090a0c; --card:#0e1012; --line:rgba(255,255,255,.08);
+      --text:#f8fafc; --muted:#94a3b8; --faint:#64748b; --prime:#f5a623;
+      --cyan:#00d8f6; --green:#10b981; --orange:#f97316;
+    }
+    * { box-sizing:border-box; }
+    html, body { min-height:100%; margin:0; background:#050506; color:var(--text); font-family:Inter,sans-serif; }
+    body { display:grid; place-items:start center; }
+    button { color:inherit; font:inherit; }
+    .phone { position:relative; width:390px; height:844px; overflow:hidden; background:var(--bg); }
+    .board-ghost { position:absolute; inset:0; padding:14px 12px; opacity:.26; filter:blur(1px); }
+    .ghost-top { height:46px; display:flex; align-items:center; justify-content:space-between; }
+    .ghost-brand { width:112px; height:30px; border-radius:9px; background:linear-gradient(90deg,rgba(0,216,246,.4),rgba(255,255,255,.06)); }
+    .ghost-menu { width:42px; height:42px; border:1px solid var(--line); border-radius:10px; }
+    .ghost-row { height:44px; margin-top:10px; border:1px solid var(--line); border-radius:10px; background:rgba(255,255,255,.025); }
+    .scrim { position:absolute; inset:0; background:rgba(0,0,0,.68); backdrop-filter:blur(3px); }
+    .sheet {
+      position:absolute; inset:64px 0 0; display:flex; flex-direction:column; overflow:hidden;
+      border:1px solid var(--line); border-bottom:0; border-radius:18px 18px 0 0;
+      background:linear-gradient(180deg,rgba(245,166,35,.055),transparent 190px),var(--sheet);
+      box-shadow:0 -18px 50px rgba(0,0,0,.65);
+    }
+    .grab { flex:0 0 24px; display:grid; place-items:center; }
+    .grab::after { content:""; width:44px; height:4px; border-radius:5px; background:rgba(255,255,255,.18); }
+    .identity { flex:0 0 68px; padding:4px 12px 8px; display:grid; grid-template-columns:52px minmax(0,1fr) auto 44px; gap:10px; align-items:center; }
+    .avatar { width:52px; height:52px; object-fit:cover; border:1.5px solid rgba(245,166,35,.58); border-radius:50%; background:#15171a; }
+    .who { min-width:0; }
+    .name-line { display:flex; align-items:center; gap:6px; min-width:0; }
+    .name { overflow:hidden; font-family:Outfit,sans-serif; font-size:17px; font-weight:800; text-overflow:ellipsis; white-space:nowrap; }
+    .hand { flex:none; padding:2px 4px; color:var(--muted); border:1px solid var(--line); border-radius:4px; font:700 7px JetBrains Mono,monospace; }
+    .matchup { margin-top:3px; overflow:hidden; color:var(--muted); font-size:9px; text-overflow:ellipsis; white-space:nowrap; }
+    .matchup b { color:#e2e8f0; }
+    .chips { margin-top:5px; display:flex; gap:4px; }
+    .chip { height:17px; padding:0 6px; display:inline-flex; align-items:center; gap:3px; border:1px solid rgba(255,255,255,.09); border-radius:5px; background:rgba(255,255,255,.03); font-size:7px; font-weight:800; text-transform:uppercase; }
+    .chip.grade { color:var(--prime); border-color:rgba(245,166,35,.32); background:rgba(245,166,35,.09); }
+    .chip.hot { color:var(--orange); border-color:rgba(249,115,22,.28); background:rgba(249,115,22,.08); }
+    .prob { text-align:right; }
+    .prob b { display:block; color:var(--prime); font:800 18px JetBrains Mono,monospace; }
+    .prob small { display:block; margin-top:1px; color:var(--faint); font-size:6px; font-weight:800; letter-spacing:.08em; }
+    .close { width:44px; height:44px; display:grid; place-items:center; border:0; border-left:1px solid var(--line); background:transparent; color:var(--muted); }
+    .metrics { flex:0 0 44px; margin:0 12px 8px; display:grid; grid-template-columns:repeat(4,1fr); border:1px solid rgba(245,166,35,.18); border-radius:10px; background:rgba(245,166,35,.035); }
+    .metric { min-width:0; display:grid; place-content:center; text-align:center; border-right:1px solid var(--line); }
+    .metric:last-child { border-right:0; }
+    .metric small { color:var(--faint); font-size:6px; font-weight:800; letter-spacing:.07em; text-transform:uppercase; }
+    .metric b { margin-top:2px; color:#e5e7eb; font:700 10px JetBrains Mono,monospace; }
+    .metric b.good { color:var(--green); }
+    .signals { flex:0 0 30px; padding:0 12px 7px; display:flex; gap:5px; overflow:hidden; }
+    .signal { height:23px; padding:0 8px; display:inline-flex; align-items:center; gap:4px; white-space:nowrap; border:1px solid var(--line); border-radius:7px; background:rgba(255,255,255,.025); color:#cbd5e1; font-size:7.5px; font-weight:800; }
+    .signal::before { content:""; width:5px; height:5px; border-radius:50%; background:currentColor; box-shadow:0 0 7px currentColor; }
+    .signal.precision { color:var(--cyan); }
+    .signal.edge { color:#ec4899; }
+    .signal.pitch { color:var(--green); }
+    .signal.more { color:var(--muted); }
+    .actions { flex:0 0 50px; padding:0 12px 8px; display:grid; grid-template-columns:minmax(0,1fr) 44px 44px; gap:8px; }
+    .add { height:42px; display:flex; align-items:center; justify-content:center; gap:7px; border:1px solid rgba(245,166,35,.65); border-radius:9px; background:rgba(245,166,35,.11); color:#fff; font-size:10px; font-weight:800; letter-spacing:.03em; }
+    .icon-btn { width:44px; height:42px; display:grid; place-items:center; border:1px solid var(--line); border-radius:9px; background:rgba(255,255,255,.025); color:var(--muted); }
+    svg { width:15px; height:15px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+    .tabs { flex:0 0 43px; position:relative; display:grid; grid-template-columns:repeat(4,1fr); border-block:1px solid var(--line); background:rgba(4,5,6,.94); }
+    .tab { border:0; background:transparent; color:var(--faint); font-size:8px; font-weight:800; text-transform:uppercase; }
+    .tab.active { color:#fff; }
+    .tab.active::after { content:""; position:absolute; left:12px; bottom:-1px; width:72px; height:2px; border-radius:2px; background:var(--prime); box-shadow:0 0 8px rgba(245,166,35,.6); }
+    .content { flex:1; overflow:hidden; padding:12px; background:linear-gradient(180deg,rgba(255,255,255,.012),transparent); }
+    .section { margin-bottom:10px; padding:11px; border:1px solid var(--line); border-radius:11px; background:rgba(255,255,255,.018); }
+    .section-title { display:flex; align-items:center; justify-content:space-between; margin-bottom:9px; color:var(--muted); font-size:7.5px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; }
+    .badge { padding:3px 6px; color:var(--green); border:1px solid rgba(16,185,129,.2); border-radius:5px; background:rgba(16,185,129,.07); font-size:6.5px; }
+    .verdict { display:flex; align-items:flex-end; justify-content:space-between; }
+    .verdict strong { font-family:Outfit,sans-serif; font-size:14px; }
+    .verdict small { display:block; margin-top:2px; color:var(--muted); font-size:7.5px; }
+    .edge-num { color:var(--green); font:800 18px JetBrains Mono,monospace; }
+    .bars { margin-top:10px; display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+    .bar-head { display:flex; justify-content:space-between; color:var(--muted); font-size:6.5px; }
+    .bar-head b { color:#e2e8f0; font:700 7px JetBrains Mono,monospace; }
+    .bar { height:3px; margin-top:4px; overflow:hidden; border-radius:4px; background:rgba(255,255,255,.06); }
+    .bar i { display:block; height:100%; background:var(--green); }
+    .why-list { display:grid; gap:7px; }
+    .why { display:grid; grid-template-columns:18px minmax(0,1fr) auto; gap:7px; align-items:center; }
+    .why-icon { width:18px; height:18px; display:grid; place-items:center; border-radius:5px; background:rgba(245,166,35,.08); color:var(--prime); font:800 8px JetBrains Mono,monospace; }
+    .why b { display:block; font-size:9px; }
+    .why span { display:block; margin-top:1px; color:var(--muted); font-size:7px; }
+    .why em { color:var(--green); font:normal 700 8px JetBrains Mono,monospace; }
+    .tonight { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+    .tonight div { padding-right:7px; border-right:1px solid var(--line); }
+    .tonight div:last-child { border:0; }
+    .tonight small { display:block; color:var(--faint); font-size:6px; text-transform:uppercase; }
+    .tonight b { display:block; margin-top:3px; font:700 9px JetBrains Mono,monospace; }
+    .note { position:absolute; top:12px; left:50%; transform:translateX(-50%); padding:4px 8px; color:var(--muted); border:1px solid var(--line); border-radius:99px; background:rgba(0,0,0,.65); font-size:7px; letter-spacing:.05em; text-transform:uppercase; }
+  </style>
+</head>
+<body>
+  <main class="phone" aria-label="StatFax compact player card design draft">
+    <div class="board-ghost" aria-hidden="true">
+      <div class="ghost-top"><div class="ghost-brand"></div><div class="ghost-menu"></div></div>
+      <div class="ghost-row"></div><div class="ghost-row"></div><div class="ghost-row"></div>
+    </div>
+    <div class="scrim"></div>
+    <div class="note">Compact player card · draft</div>
+    <section class="sheet">
+      <div class="grab"></div>
+      <header class="identity">
+        <img class="avatar" src="https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png/w_120,q_auto:best/v1/people/545361/headshot/67/current" alt="Mike Trout" />
+        <div class="who">
+          <div class="name-line"><span class="name">Mike Trout</span><span class="hand">RHB</span></div>
+          <div class="matchup"><b>LAA</b> › MIN · vs Zebby Matthews · Away</div>
+          <div class="chips"><span class="chip grade">Prime 97</span><span class="chip hot">Hot</span></div>
+        </div>
+        <div class="prob"><b>23.6%</b><small>HR PROB</small></div>
+        <button class="close" aria-label="Close">
+          <svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12" /></svg>
+        </button>
+      </header>
+
+      <div class="metrics">
+        <div class="metric"><small>Score</small><b>97</b></div>
+        <div class="metric"><small>xHR</small><b>0.086</b></div>
+        <div class="metric"><small>Market</small><b>21.1%</b></div>
+        <div class="metric"><small>Edge</small><b class="good">+2.4%</b></div>
+      </div>
+
+      <div class="signals">
+        <span class="signal precision">Precision</span><span class="signal edge">Zone Edge</span><span class="signal pitch">Pitch Mix</span><span class="signal more">+5</span>
+      </div>
+
+      <div class="actions">
+        <button class="add">
+          <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></svg>
+          Add to parlay
+        </button>
+        <button class="icon-btn" aria-label="Watch">
+          <svg viewBox="0 0 24 24"><path d="m12 2.5 2.9 5.9 6.5.9-4.7 4.6 1.1 6.5-5.8-3-5.8 3 1.1-6.5-4.7-4.6 6.5-.9Z" /></svg>
+        </button>
+        <button class="icon-btn" aria-label="Share">
+          <svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 10.5 6.8-4M8.6 13.5l6.8 4"/></svg>
+        </button>
+      </div>
+
+      <nav class="tabs">
+        <button class="tab active">Overview</button><button class="tab">Matchup</button><button class="tab">Form</button><button class="tab">More · 4</button>
+      </nav>
+
+      <div class="content">
+        <section class="section">
+          <div class="section-title"><span>Plate matchup</span><span class="badge">HR signal</span></div>
+          <div class="verdict"><div><strong>Batter favored</strong><small>Mike Trout vs Zebby Matthews</small></div><div class="edge-num">+24</div></div>
+          <div class="bars">
+            <div><div class="bar-head"><span>Bat threat</span><b>88</b></div><div class="bar"><i style="width:88%"></i></div></div>
+            <div><div class="bar-head"><span>Matchup</span><b>74</b></div><div class="bar"><i style="width:74%"></i></div></div>
+            <div><div class="bar-head"><span>Air</span><b>70</b></div><div class="bar"><i style="width:70%"></i></div></div>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-title"><span>Why this play</span><span>Top 3</span></div>
+          <div class="why-list">
+            <div class="why"><div class="why-icon">1</div><div><b>Elite contact quality</b><span>21% barrels · 18% BLAST</span></div><em>Strong</em></div>
+            <div class="why"><div class="why-icon">2</div><div><b>Pitch mix advantage</b><span>Fastball and slider zones fit Trout</span></div><em>+24</em></div>
+            <div class="why"><div class="why-icon">3</div><div><b>Favorable run environment</b><span>Park and weather score 70</span></div><em>Good</em></div>
+          </div>
+        </section>
+
+        <section class="section tonight">
+          <div><small>Best odds</small><b>+325</b></div><div><small>Setup</small><b>5 / 6</b></div><div><small>Expected PA</small><b>4.0</b></div>
+        </section>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

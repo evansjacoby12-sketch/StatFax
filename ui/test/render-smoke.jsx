@@ -29,6 +29,7 @@ import UpdateBanner from '../src/components/UpdateBanner.jsx'
 import PullToRefresh from '../src/components/PullToRefresh.jsx'
 import BacktestView from '../src/components/BacktestView.jsx'
 import PickOfDay from '../src/components/PickOfDay.jsx'
+import NFLBoard from '../src/components/NFLBoard.jsx'
 
 const SYNTH = {
   version: 4,
@@ -185,6 +186,7 @@ add('UpdateBanner', <UpdateBanner />)
 add('PullToRefresh', <PullToRefresh onRefresh={noop} />)
 add('BacktestView', <BacktestView />)
 add('PickOfDay', <PickOfDay batter={normal} onSelect={noop} watched={false} inSlip={false} onToggleWatch={noop} onToggleSlip={noop} />)
+add('NFLBoard', <NFLBoard />)
 
 let failed = 0
 for (const [name, el] of cases) {

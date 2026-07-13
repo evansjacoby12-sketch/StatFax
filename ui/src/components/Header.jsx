@@ -33,13 +33,14 @@ function FirstPitchCountdown({ games = [] }) {
   )
 }
 
-function SportSwitcher() {
+function SportSwitcher({ sport = 'mlb', onChange }) {
   return (
     <div className="sport-switcher" role="group" aria-label="Sport">
       <button
         type="button"
-        className="sport-option active"
-        aria-pressed="true"
+        className={`sport-option ${sport === 'mlb' ? 'active' : ''}`}
+        aria-pressed={sport === 'mlb'}
+        onClick={() => onChange?.('mlb')}
         title="MLB model board"
       >
         <Icon name="CircleDot" size={13} />
@@ -47,13 +48,13 @@ function SportSwitcher() {
       </button>
       <button
         type="button"
-        className="sport-option upcoming"
-        disabled
-        title="NFL models are coming soon"
+        className={`sport-option ${sport === 'nfl' ? 'active' : ''}`}
+        aria-pressed={sport === 'nfl'}
+        onClick={() => onChange?.('nfl')}
+        title="NFL touchdown scorer board"
       >
         <Icon name="Shield" size={13} />
         <span>NFL</span>
-        <small>Soon</small>
       </button>
     </div>
   )
@@ -62,12 +63,14 @@ function SportSwitcher() {
 // Help dropdown anchored to the header info button
 function HelpMenu({ onOpenWeather, onOpenGroups, onOpenBacktest, onOpenHowTo, onOpenSettings, onOpenModel, liveScores, onToggleLive, eliLevel, onCycleEli, refreshing, onRefresh }) {
   const [open, setOpen] = useState(false)
+  const [toolQuery, setToolQuery] = useState('')
   const ref = useRef(null)
   const triggerRef = useRef(null)
   const mobileSheetRef = useRef(null)
 
   const closeMobileMenu = () => {
     setOpen(false)
+    setToolQuery('')
     requestAnimationFrame(() => triggerRef.current?.focus())
   }
   
@@ -88,7 +91,7 @@ function HelpMenu({ onOpenWeather, onOpenGroups, onOpenBacktest, onOpenHowTo, on
         return
       }
       if (!mobile || e.key !== 'Tab') return
-      const focusable = [...(mobileSheetRef.current?.querySelectorAll('button:not(:disabled)') || [])]
+      const focusable = [...(mobileSheetRef.current?.querySelectorAll('input:not(:disabled), button:not(:disabled)') || [])]
       if (!focusable.length) return
       const first = focusable[0]
       const last = focusable[focusable.length - 1]
@@ -143,6 +146,62 @@ function HelpMenu({ onOpenWeather, onOpenGroups, onOpenBacktest, onOpenHowTo, on
     },
   ]
 
+  const featuredTool = {
+    label: 'Bet Lab',
+    desc: 'Analyze model edge and parlay combos',
+    icon: 'Beaker',
+    fn: onOpenGroups,
+    keywords: 'build slips same game saved tickets',
+  }
+  const quickTools = [
+    { label: 'Find Plays', meta: 'Discovery', icon: 'ScanSearch', fn: onOpenWeather, keywords: 'weather cheat sheets filtered lists' },
+    { label: 'Proof', meta: 'Backtests', icon: 'Activity', fn: onOpenBacktest, keywords: 'validate grades signals historical outcomes' },
+    { label: 'Learn', meta: 'Guide', icon: 'GraduationCap', fn: onOpenHowTo, keywords: 'learn center playbook glossary help' },
+  ]
+  const utilityTools = [
+    { label: 'Model', meta: 'Metrics', icon: 'Gauge', fn: onOpenModel, keywords: 'performance accuracy calibration results' },
+    {
+      label: 'Scores',
+      meta: liveScores ? 'Live on' : 'Pregame',
+      icon: liveScores ? 'Activity' : 'Clock',
+      fn: onToggleLive,
+      active: liveScores,
+      keywords: 'live scores innings pause enable',
+    },
+    {
+      label: 'Detail',
+      meta: eliLevel === 'eli5' ? 'Plain text' : 'Stats view',
+      icon: eliLevel === 'eli5' ? 'Sparkles' : 'BarChart3',
+      fn: onCycleEli,
+      keywords: 'explanations depth eli5 stats plain',
+    },
+    {
+      label: refreshing ? 'Refreshing' : 'Reload',
+      meta: refreshing ? 'Working' : 'Manual',
+      icon: refreshing ? 'Loader' : 'RefreshCw',
+      fn: onRefresh,
+      disabled: refreshing,
+      keywords: 'refresh slate latest model board',
+    },
+  ]
+  const settingsTool = {
+    label: 'System settings',
+    icon: 'SlidersHorizontal',
+    fn: onOpenSettings,
+    keywords: 'display updates parlays experimental controls settings',
+  }
+  const normalizedQuery = toolQuery.trim().toLowerCase()
+  const toolMatches = (tool) => !normalizedQuery || `${tool.label} ${tool.meta || ''} ${tool.desc || ''} ${tool.keywords || ''}`.toLowerCase().includes(normalizedQuery)
+  const visibleFeatured = toolMatches(featuredTool)
+  const visibleQuickTools = quickTools.filter(toolMatches)
+  const visibleUtilityTools = utilityTools.filter(toolMatches)
+  const visibleSettings = toolMatches(settingsTool)
+  const hasMobileResults = visibleFeatured || visibleQuickTools.length > 0 || visibleUtilityTools.length > 0 || visibleSettings
+  const runMobileTool = (tool) => {
+    tool.fn?.()
+    closeMobileMenu()
+  }
+
   return (
     <div className="help-menu" ref={ref} style={{ position: 'relative' }}>
       <button
@@ -153,10 +212,6 @@ function HelpMenu({ onOpenWeather, onOpenGroups, onOpenBacktest, onOpenHowTo, on
         aria-expanded={open}
         title="Menu"
         aria-label="Menu"
-        style={{
-          background: open ? 'var(--hover)' : 'var(--card)',
-          borderColor: open ? 'var(--accent)' : 'var(--border)'
-        }}
       >
         <Icon name="ChevronDown" size={16} className="help-chevron" style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
         <Icon name="Ellipsis" size={18} className="help-ellipsis" />
@@ -244,32 +299,106 @@ function HelpMenu({ onOpenWeather, onOpenGroups, onOpenBacktest, onOpenHowTo, on
             </header>
 
             <div className="mobile-tools-body">
-              {sections.map((sec) => (
-                <div className="vm-group" key={sec.title} role="group" aria-label={sec.title}>
-                  <div className="vm-section">{sec.title}</div>
-                  {sec.items.map((it) => (
-                    <button
-                      key={it.label}
-                      type="button"
-                      className={`vm-item${it.mobileOnly ? ' mobile-menu-only' : ''}`}
-                      onClick={() => {
-                        it.fn?.()
-                        setOpen(false)
-                      }}
-                      disabled={it.mobileOnly && it.label.startsWith('Refreshing')}
-                    >
-                      <span className="vm-icon-box" aria-hidden="true">
-                        <Icon name={it.icon} size={16} />
-                      </span>
-                      <span className="vm-txt">
-                        <b>{it.label}</b>
-                        <span className="dim">{it.desc}</span>
-                      </span>
-                      <Icon name="ChevronRight" size={15} className="mobile-tools-chevron" aria-hidden="true" />
+              <label className="mobile-tools-search">
+                <Icon name="Search" size={17} aria-hidden="true" />
+                <span className="sr-only">Find a tool</span>
+                <input
+                  type="search"
+                  value={toolQuery}
+                  onChange={(event) => setToolQuery(event.target.value)}
+                  placeholder="Find a tool"
+                  autoComplete="off"
+                />
+                {toolQuery && (
+                  <button type="button" onClick={() => setToolQuery('')} aria-label="Clear tool search">
+                    <Icon name="X" size={15} />
+                  </button>
+                )}
+              </label>
+
+              {visibleFeatured && (
+                <button
+                  type="button"
+                  className="mobile-tools-featured"
+                  onClick={() => runMobileTool(featuredTool)}
+                >
+                  <span className="mobile-tools-featured-icon" aria-hidden="true">
+                    <Icon name={featuredTool.icon} size={22} />
+                  </span>
+                  <span className="mobile-tools-featured-copy">
+                    <span>
+                      <b>{featuredTool.label}</b>
+                      <small>Featured</small>
+                    </span>
+                    <em>{featuredTool.desc}</em>
+                  </span>
+                  <Icon name="ChevronRight" size={17} aria-hidden="true" />
+                </button>
+              )}
+
+              {visibleQuickTools.length > 0 && (
+                <div
+                  className="mobile-tools-quick"
+                  role="group"
+                  aria-label="Quick launch"
+                  style={{ '--mobile-tool-count': visibleQuickTools.length }}
+                >
+                  {visibleQuickTools.map((tool) => (
+                    <button key={tool.label} type="button" onClick={() => runMobileTool(tool)}>
+                      <Icon name={tool.icon} size={21} aria-hidden="true" />
+                      <b>{tool.label}</b>
+                      <small>{tool.meta}</small>
                     </button>
                   ))}
                 </div>
-              ))}
+              )}
+
+              {(visibleUtilityTools.length > 0 || visibleSettings) && (
+                <div className="mobile-tools-utilities" role="group" aria-label="Utilities">
+                  <div className="mobile-tools-section-label">Utilities</div>
+                  {visibleUtilityTools.length > 0 && (
+                    <div className="mobile-tools-utility-grid">
+                      {visibleUtilityTools.map((tool) => (
+                        <button
+                          key={tool.label}
+                          type="button"
+                          className={tool.active ? 'is-active' : ''}
+                          onClick={() => runMobileTool(tool)}
+                          disabled={tool.disabled}
+                          aria-label={`${tool.label}: ${tool.meta}`}
+                        >
+                          <Icon name={tool.icon} size={19} className={tool.disabled ? 'animate-spin' : ''} aria-hidden="true" />
+                          <span>
+                            <b>{tool.label}</b>
+                            <small>{tool.meta}</small>
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {visibleSettings && (
+                    <button
+                      type="button"
+                      className="mobile-tools-settings"
+                      onClick={() => runMobileTool(settingsTool)}
+                    >
+                      <span>
+                        <Icon name={settingsTool.icon} size={19} aria-hidden="true" />
+                        <b>{settingsTool.label}</b>
+                      </span>
+                      <Icon name="ChevronRight" size={15} aria-hidden="true" />
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {!hasMobileResults && (
+                <div className="mobile-tools-empty" role="status">
+                  <Icon name="Search" size={20} aria-hidden="true" />
+                  <b>No tools found</b>
+                  <span>Try a different name or category.</span>
+                </div>
+              )}
             </div>
           </section>
         </>,
@@ -282,6 +411,8 @@ function HelpMenu({ onOpenWeather, onOpenGroups, onOpenBacktest, onOpenHowTo, on
 export default function Header({
   meta,
   counts,
+  sport = 'mlb',
+  onSportChange,
   onRefresh,
   onHoldBuild,
   onOpenModel,
@@ -368,14 +499,14 @@ export default function Header({
               <span className="brand-name">
                 Stat<span style={{ color: 'var(--accent)', textShadow: '0 0 8px var(--accent-glow)' }}>Fax</span>
               </span>
-              <span className="brand-sub">Model Board</span>
+              <span className="brand-sub">{sport === 'nfl' ? 'NFL Board' : 'Model Board'}</span>
             </div>
           </div>
-          <SportSwitcher />
+          <SportSwitcher sport={sport} onChange={onSportChange} />
         </div>
         <div className="slate-block">
           <div className="slate-meta">
-            <span className="slate-date">{meta.date}</span>
+            <span className="slate-date">{sport === 'nfl' ? (meta.week || 'NFL Demo') : meta.date}</span>
             <span className="dot-sep">·</span>
             <span>{counts.games} games</span>
             <span className="dot-sep slate-batters">·</span>
@@ -385,10 +516,11 @@ export default function Header({
                 <span>/</span>
                 <span>{counts.total}</span>
               </span>
-              <span>batters</span>
+              <span>{sport === 'nfl' ? 'players' : 'batters'}</span>
             </span>
-            <FirstPitchCountdown games={games} />
-            {meta.morningLockAt && (
+            {sport === 'mlb' && <FirstPitchCountdown games={games} />}
+            {sport === 'nfl' && <span className="nfl-header-demo"><Icon name="Beaker" size={10} /> demo slate</span>}
+            {sport === 'mlb' && meta.morningLockAt && (
               <>
                 <span className="dot-sep">·</span>
                 <span className="first-pitch" title={`Scores locked for the day at ${new Date(meta.morningLockAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} — only lineups, scratches, odds and live state update from here. A changed starting pitcher re-scores that game.`}>
@@ -397,7 +529,7 @@ export default function Header({
               </>
             )}
           </div>
-          {total > 0 && (
+          {sport === 'mlb' && total > 0 && (
             <div className="grade-bar" title="Grade distribution" style={{ height: '4px', background: 'rgba(255,255,255,0.05)', borderRadius: '2px', overflow: 'hidden', marginTop: '6px' }}>
               {GRADE_ORDER.map((g) => {
                 const n = gradeCounts[g] || 0
@@ -417,113 +549,130 @@ export default function Header({
       </div>
 
       <div className="header-right">
-        <button className="metric-pill" onClick={onOpenModel} title="Model accuracy & calibration tracker">
-          <Icon name="Gauge" size={14} style={{ color: 'var(--accent)' }} />
-          <span className="metric-pill-stack">
-            <span className="metric-pill-k">Brier</span>
-            <span className="metric-pill-v mono" style={{ color: 'var(--accent)' }}>{m ? m.brier.toFixed(4) : '—'}</span>
-          </span>
-          {brierEdge != null && (
-            <span className={`metric-delta ${brierEdge >= 0 ? 'up' : 'down'} mono`}>
-              {brierEdge >= 0 ? '▲' : '▼'} {pct(Math.abs(brierEdge), 0)}
+        {sport === 'nfl' && (
+          <div className="metric-pill model-health nfl-feed-health" title="NFL interface demo; live data feed not connected">
+            <span className="model-health-gauge" aria-hidden="true"><Icon name="Beaker" size={15} /></span>
+            <span className="model-health-copy">
+              <span className="model-health-main"><strong>Demo</strong><small>NFL feed</small></span>
+              <span className="model-health-meta"><span>Offline</span></span>
             </span>
-          )}
-        </button>
-
-        <div
-          className={`gen-meta ${slateStale ? 'stale' : ''}`}
+          </div>
+        )}
+        <button
+          className="metric-pill model-health"
+          style={sport === 'nfl' ? { display: 'none' } : undefined}
+          onClick={onOpenModel}
           title={
             slateStale
-              ? `Slate generated ${meta.generatedAt} — scores/innings are from then, not live-now.`
-              : `Generated ${meta.generatedAt}`
+              ? `Model accuracy & calibration. Slate generated ${meta.generatedAt} — scores/innings are from then, not live-now.`
+              : `Model accuracy & calibration. Generated ${meta.generatedAt}`
           }
+          aria-label={`Model health. Brier ${m ? m.brier.toFixed(4) : 'unavailable'}${brierEdge != null ? `, ${pct(Math.abs(brierEdge), 0)} ${brierEdge >= 0 ? 'better' : 'worse'} than baseline` : ''}. ${slateStale ? 'Stale' : 'Updated'} ${timeAgo(meta.generatedAt)}.`}
         >
-          <Icon name={slateStale ? 'TriangleAlert' : 'Clock'} size={13} style={{ color: slateStale ? 'var(--warn)' : 'var(--text-faint)' }} />
-          <span style={{ color: slateStale ? 'var(--warn)' : 'var(--text-dim)' }}>{timeAgo(meta.generatedAt)}</span>
-        </div>
-
-        <button
-          className={`toggle-btn live-btn ${liveScores ? 'on' : ''}`}
-          onClick={onToggleLive}
-          title={
-            liveScores
-              ? 'Live scores & innings auto-updating — tap to view pregame only'
-              : 'Pregame only — tap to enable live updates'
-          }
-          aria-pressed={liveScores}
-          aria-label={liveScores ? 'Live scores on' : 'Pregame look'}
-          style={{
-            background: liveScores ? 'rgba(105, 185, 158, 0.1)' : 'var(--card)',
-            borderColor: liveScores ? 'var(--strong)' : 'var(--border)',
-            color: liveScores ? 'var(--strong)' : 'var(--text-dim)'
-          }}
-        >
-          <Icon name={liveScores ? 'Activity' : 'Clock'} size={14} className={liveScores ? 'spin-pulse' : ''} />
+          <span className="model-health-gauge" aria-hidden="true">
+            <Icon name="Gauge" size={15} />
+          </span>
+          <span className="model-health-copy">
+            <span className="model-health-main">
+              <strong className="mono">{m ? m.brier.toFixed(4) : '—'}</strong>
+              <small>Brier</small>
+            </span>
+            <span className={`model-health-meta ${slateStale ? 'stale' : ''}`}>
+              {brierEdge != null && (
+                <span className={`metric-delta ${brierEdge >= 0 ? 'up' : 'down'} mono`}>
+                  {brierEdge >= 0 ? '▲' : '▼'} {pct(Math.abs(brierEdge), 0)}
+                </span>
+              )}
+              <span className="model-health-dot" aria-hidden="true" />
+              <span>{slateStale ? 'Stale' : 'Updated'} {timeAgo(meta.generatedAt)}</span>
+            </span>
+          </span>
         </button>
 
-        <button
-          className="toggle-btn eli-btn"
-          onClick={onCycleEli}
-          title={
-            eliLevel === 'eli5'
-              ? 'Explanations: Plain English (ELI5). Tap for stats depth (ELI15).'
-              : 'Explanations: Stats depth (ELI15). Tap for plain English (ELI5).'
-          }
-          aria-label={`Explanation depth: ${eliLevel}`}
-        >
-          <Icon name={eliLevel === 'eli5' ? 'Sparkles' : 'BarChart3'} size={14} style={{ color: 'var(--accent)' }} />
-        </button>
+        <span className="header-health-divider" aria-hidden="true" style={sport === 'nfl' ? { display: 'none' } : undefined} />
 
-        <HelpMenu
-          onOpenWeather={onOpenWeather}
-          onOpenBuilder={onOpenBuilder}
-          onOpenGroups={onOpenGroups}
-          onOpenSGP={onOpenSGP}
-          onOpenSplits={onOpenSplits}
-          onOpenBacktest={onOpenBacktest}
-          onOpenListBuilder={onOpenListBuilder}
-          onOpenGuide={onOpenGuide}
-          onOpenHowTo={onOpenHowTo}
-          onOpenLegend={onOpenLegend}
-          onOpenSettings={onOpenSettings}
-          onOpenModel={onOpenModel}
-          liveScores={liveScores}
-          onToggleLive={onToggleLive}
-          eliLevel={eliLevel}
-          onCycleEli={onCycleEli}
-          refreshing={refreshing}
-          onRefresh={handleRefreshClick}
-        />
+        <div className="header-actions" role="group" aria-label="App controls">
+          <button
+            className={`header-action-btn live-btn ${liveScores ? 'on' : ''}`}
+            style={sport === 'nfl' ? { display: 'none' } : undefined}
+            onClick={onToggleLive}
+            title={
+              liveScores
+                ? 'Live scores & innings auto-updating — tap to view pregame only'
+                : 'Pregame only — tap to enable live updates'
+            }
+            aria-pressed={liveScores}
+            aria-label={liveScores ? 'Live scores on' : 'Pregame look'}
+          >
+            <Icon name={liveScores ? 'Activity' : 'Clock'} size={17} className={liveScores ? 'spin-pulse' : ''} />
+          </button>
 
-        <button
-          className={`icon-btn ${refreshing ? 'refreshing' : ''} ${holding ? 'holding' : ''}`}
-          onClick={handleRefreshClick}
-          onPointerDown={startHold}
-          onPointerUp={clearHold}
-          onPointerLeave={clearHold}
-          onPointerCancel={clearHold}
-          onContextMenu={(e) => { if (holding) e.preventDefault() }}
-          title={slateBuilding ? 'Building fresh slate from MLB APIs…' : canBuild ? 'Tap to reload · hold 10s to rebuild the slate' : 'Reload slate'}
-          aria-label={slateBuilding ? 'Building slate' : 'Reload slate — hold to rebuild'}
-          style={{
-            position: 'relative',
-            overflow: 'hidden',
-            touchAction: 'none'   // let the hold gesture own the press (no scroll steal)
-          }}
-        >
-          {/* Hold-progress fill — charges bottom-up over HOLD_MS while pressed,
-              snaps back on release. Behind the icon, pointer-transparent. */}
-          <span
-            aria-hidden="true"
-            style={{
-              position: 'absolute', left: 0, right: 0, bottom: 0,
-              height: holding ? '100%' : '0%',
-              background: 'var(--accent)', opacity: 0.28, pointerEvents: 'none',
-              transition: holding ? `height ${HOLD_MS}ms linear` : 'height 180ms ease',
-            }}
+          <button
+            className="header-action-btn eli-btn"
+            onClick={onCycleEli}
+            title={
+              eliLevel === 'eli5'
+                ? 'Explanations: Plain English (ELI5). Tap for stats depth (ELI15).'
+                : 'Explanations: Stats depth (ELI15). Tap for plain English (ELI5).'
+            }
+            aria-label={`Explanation depth: ${eliLevel}`}
+          >
+            <Icon name={eliLevel === 'eli5' ? 'Sparkles' : 'BarChart3'} size={17} />
+          </button>
+
+          <HelpMenu
+            onOpenWeather={onOpenWeather}
+            onOpenBuilder={onOpenBuilder}
+            onOpenGroups={onOpenGroups}
+            onOpenSGP={onOpenSGP}
+            onOpenSplits={onOpenSplits}
+            onOpenBacktest={onOpenBacktest}
+            onOpenListBuilder={onOpenListBuilder}
+            onOpenGuide={onOpenGuide}
+            onOpenHowTo={onOpenHowTo}
+            onOpenLegend={onOpenLegend}
+            onOpenSettings={onOpenSettings}
+            onOpenModel={onOpenModel}
+            liveScores={liveScores}
+            onToggleLive={onToggleLive}
+            eliLevel={eliLevel}
+            onCycleEli={onCycleEli}
+            refreshing={refreshing}
+            onRefresh={handleRefreshClick}
           />
-          <Icon name={slateBuilding ? 'Loader' : 'RefreshCw'} size={14} className={refreshing ? 'animate-spin' : ''} style={{ position: 'relative' }} />
-        </button>
+
+          <span className="header-health-divider header-refresh-divider" aria-hidden="true" />
+
+          <button
+            className={`icon-btn header-refresh-btn ${refreshing ? 'refreshing' : ''} ${holding ? 'holding' : ''}`}
+            onClick={handleRefreshClick}
+            onPointerDown={startHold}
+            onPointerUp={clearHold}
+            onPointerLeave={clearHold}
+            onPointerCancel={clearHold}
+            onContextMenu={(e) => { if (holding) e.preventDefault() }}
+            title={slateBuilding ? 'Building fresh slate from MLB APIs…' : canBuild ? 'Tap to reload · hold 10s to rebuild the slate' : 'Reload slate'}
+            aria-label={slateBuilding ? 'Building slate' : 'Reload slate — hold to rebuild'}
+            style={{
+              position: 'relative',
+              overflow: 'hidden',
+              touchAction: 'none'   // let the hold gesture own the press (no scroll steal)
+            }}
+          >
+            {/* Hold-progress fill — charges bottom-up over HOLD_MS while pressed,
+                snaps back on release. Behind the icon, pointer-transparent. */}
+            <span
+              aria-hidden="true"
+              style={{
+                position: 'absolute', left: 0, right: 0, bottom: 0,
+                height: holding ? '100%' : '0%',
+                background: 'var(--accent)', opacity: 0.28, pointerEvents: 'none',
+                transition: holding ? `height ${HOLD_MS}ms linear` : 'height 180ms ease',
+              }}
+            />
+            <Icon name={slateBuilding ? 'Loader' : 'RefreshCw'} size={17} className={refreshing ? 'animate-spin' : ''} style={{ position: 'relative' }} />
+          </button>
+        </div>
       </div>
     </header>
   )

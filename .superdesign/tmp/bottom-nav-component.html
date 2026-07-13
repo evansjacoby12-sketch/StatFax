@@ -1,0 +1,6 @@
+<nav class="grid h-[62px] grid-cols-4 rounded-[18px] border border-white/10 bg-[#08090b]/90 p-1 text-[#858491] shadow-2xl backdrop-blur-2xl" aria-label="Primary navigation">
+  <button class="flex min-h-13 flex-col items-center justify-center gap-1 rounded-[13px] bg-[#9795cb]/10 text-[#b8b7d8]" :class="{'bg-[#9795cb]/10 text-[#b8b7d8]': activeItem === 'board'}">Board</button>
+  <button class="flex min-h-13 flex-col items-center justify-center gap-1 rounded-[13px]" :class="{'bg-[#9795cb]/10 text-[#b8b7d8]': activeItem === 'games'}">Games</button>
+  <button class="flex min-h-13 flex-col items-center justify-center gap-1 rounded-[13px]" :class="{'bg-[#9795cb]/10 text-[#b8b7d8]': activeItem === 'pitchers'}">Pitchers</button>
+  <button class="flex min-h-13 flex-col items-center justify-center gap-1 rounded-[13px]" :class="{'bg-[#9795cb]/10 text-[#b8b7d8]': activeItem === 'results'}">Results</button>
+</nav>
