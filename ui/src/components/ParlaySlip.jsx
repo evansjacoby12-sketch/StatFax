@@ -1,251 +1,269 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Icon from './Icon.jsx'
-import { GradeChip } from './atoms.jsx'
-import { computeParlay, parlayGrade } from '../lib/parlay.js'
-import { pct, american, signedPct } from '../lib/format.js'
+import { GradeChip, hexA } from './atoms.jsx'
+import { pct, american, signedPct, surname } from '../lib/format.js'
 import { gradeColor } from '../lib/badges.js'
-import { hexA } from './atoms.jsx'
+import { buildParlay } from '../lib/parlayMath.js'
+import { comboStatus, legStatus, LEG_META, VERDICT_META } from '../lib/live.js'
+import * as store from '../lib/storage.js'
 import { toast } from './Toast.jsx'
 
 const GRADE_COLOR = { S: '#f5a623', A: '#10b981', B: '#3b82f6', C: '#94a3b8', D: '#64748b' }
 
-// Roll the payout toward its new value when the wager or legs change —
-// money that ticks up feels like money.
 function useCountUp(target, ms = 450) {
-  const [v, setV] = useState(target)
+  const [value, setValue] = useState(target)
   useEffect(() => {
-    if (target == null || !Number.isFinite(target)) { setV(target); return }
-    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) { setV(target); return }
-    let raf, start = null
-    const from = Number.isFinite(v) ? v : 0
-    const tick = (t) => {
-      if (start === null) start = t
-      const p = Math.min(1, (t - start) / ms)
-      setV(from + (target - from) * (1 - Math.pow(1 - p, 3)))
-      if (p < 1) raf = requestAnimationFrame(tick)
+    if (target == null || !Number.isFinite(target)) { setValue(target); return }
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) { setValue(target); return }
+    let raf
+    let start = null
+    const from = Number.isFinite(value) ? value : 0
+    const tick = (time) => {
+      if (start === null) start = time
+      const progress = Math.min(1, (time - start) / ms)
+      setValue(from + (target - from) * (1 - Math.pow(1 - progress, 3)))
+      if (progress < 1) raf = requestAnimationFrame(tick)
     }
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [target, ms])
-  return v
+  return value
 }
 
-function buildCopyText(legs, p) {
-  const header = `📊 StatFax Parlay · ${p.n} ${p.n === 1 ? 'leg' : 'legs'} · Model: ${pct(p.modelProb, 1)}${p.allPriced ? ` · ${american(p.american)}` : ''}`
+function copyText(legs, parlay) {
+  const market = parlay.allPriced ? ` | ${american(parlay.american)}` : ` | Fair ${american(parlay.fairAmerican)}`
+  const header = `StatFax ${parlay.n}-leg parlay | Model ${pct(parlay.modelAllHit, parlay.modelAllHit < 0.01 ? 2 : 1)}${market}`
   const items = legs.map((b, i) => {
     const odds = b.odds?.best?.american ? ` ${american(b.odds.best.american)}` : ''
-    return `${i + 1}. ${b.name} (${b.team})${odds} — ${Math.round((b.hrProbability ?? 0) * 100)}% HR`
+    return `${i + 1}. ${b.name} (${b.team})${odds} - ${pct(b.hrProbability, 1)} HR`
   })
   return [header, ...items].join('\n')
 }
 
-function parlaySummary(p) {
-  if (!p.n) return ''
-  const hit = pct(p.modelProb, p.modelProb < 0.01 ? 2 : 1)
-  const size = `${p.n} ${p.n === 1 ? 'leg' : 'legs'}`
-  let s = `${size} · ${hit} to cash`
-  if (p.allPriced) {
-    s += ` · Pays ${american(p.american)}`
-    s += p.edge != null ? ` · ${signedPct(p.edge, 0)} edge` : ''
-  } else {
-    s += ` · Fair price ${american(p.fairAmerican)}`
-    s += p.n > 1 && p.priced > 0 ? ` · ${p.priced}/${p.n} priced` : ''
-  }
-  return s
+function decisionLabel(parlay) {
+  if (!parlay.allPriced) return { label: 'Model-ready', detail: 'Awaiting complete market odds', tone: 'neutral' }
+  if (parlay.ev >= 0.05) return { label: 'Positive-value build', detail: `${signedPct(parlay.ev, 0)} expected value`, tone: 'positive' }
+  if (parlay.ev >= 0) return { label: 'Slight model edge', detail: `${signedPct(parlay.ev, 0)} expected value`, tone: 'positive' }
+  return { label: 'Market is expensive', detail: `${signedPct(parlay.ev, 0)} expected value`, tone: 'negative' }
 }
 
-export default function ParlaySlip({ legs, onRemove, onClear, onSelect, onOpenBuilder }) {
+function saveSlip(legs) {
+  const saved = store.load('savedSlips', [])
+  const entry = {
+    id: `s${Date.now()}`,
+    name: legs.map((b) => surname(b.name)).join(' · '),
+    ids: legs.map((b) => b.id),
+    savedAt: Date.now(),
+  }
+  const next = [entry, ...saved.filter((s) => s.ids.join() !== entry.ids.join())].slice(0, 20)
+  store.save('savedSlips', next)
+  toast.success('Slip saved')
+}
+
+export default function ParlaySlip({ legs, batters = [], onRemove, onClear, onSelect, onOpenBuilder, onReplace }) {
   const [open, setOpen] = useState(false)
   const [wager, setWager] = useState('10')
-  const p = legs.length ? computeParlay(legs) : null
-  const payDecimal = p ? (p.allPriced ? p.decimal : p.fairDecimal) : null
+  const [replaceOpen, setReplaceOpen] = useState(false)
+  const parlay = useMemo(() => buildParlay(legs, { correlate: false }), [legs])
+  const live = useMemo(() => comboStatus(legs), [legs])
+  const verdict = decisionLabel(parlay)
+  const grade = parlay.grade
+  const gradeTone = grade ? GRADE_COLOR[grade.letter] : null
+  const weak = parlay.weak
+  const unconfirmed = legs.filter((b) => b.lineupConfirmed !== true).length
+  const missingPrices = parlay.n - parlay.priced
+  const sameGameGroups = parlay.byGame.filter((g) => g.legs.length >= 2).length
+  const payDecimal = parlay.allPriced ? parlay.decimal : parlay.fairDecimal
   const wagerNum = parseFloat(wager)
-  const payout = p && Number.isFinite(wagerNum) && wagerNum > 0 && payDecimal ? wagerNum * payDecimal : null
+  const payout = Number.isFinite(wagerNum) && wagerNum > 0 && payDecimal ? wagerNum * payDecimal : null
   const shownPayout = useCountUp(payout)
+
+  const replacements = useMemo(() => {
+    if (!weak || !onReplace) return []
+    const base = legs.filter((b) => b.id !== weak.id)
+    const usedIds = new Set(base.map((b) => b.id))
+    const usedGames = new Set(base.map((b) => b.gamePk).filter((x) => x != null))
+    const perGame = new Map()
+    for (const b of batters) {
+      if (b.id === weak.id || usedIds.has(b.id) || b.game?.isFinal || b.game?.isLive) continue
+      if (b.gamePk != null && usedGames.has(b.gamePk)) continue
+      if ((b.grade?.label || 'SKIP') === 'SKIP' || !Number.isFinite(b.hrProbability)) continue
+      const key = b.gamePk ?? `solo-${b.id}`
+      const current = perGame.get(key)
+      if (!current || (b.score ?? 0) > (current.score ?? 0)) perGame.set(key, b)
+    }
+    return [...perGame.values()]
+      .map((candidate) => {
+        const next = buildParlay([...base, candidate], { correlate: false })
+        return { candidate, next, delta: next.modelAllHit - parlay.modelAllHit }
+      })
+      .filter(({ delta }) => delta > 0)
+      .sort((a, b) => b.delta - a.delta || (b.candidate.score ?? 0) - (a.candidate.score ?? 0))
+      .slice(0, 3)
+  }, [batters, legs, onReplace, parlay.modelAllHit, weak])
+
   if (!legs.length) return null
-  const pg = parlayGrade(legs)
-  const gColor = pg ? GRADE_COLOR[pg.letter] : null
-  const weak =
-    legs.length >= 2
-      ? legs.slice().sort((a, b) => (a.hrProbability ?? 1) - (b.hrProbability ?? 1) || (a.score ?? 0) - (b.score ?? 0) || String(a.id).localeCompare(String(b.id)))[0]
-      : null
-  const weakId = weak?.id
+
+  const signals = [
+    parlay.allPriced
+      ? { icon: 'TrendingUp', label: parlay.ev >= 0 ? `${signedPct(parlay.ev, 0)} EV vs posted prices` : `${signedPct(parlay.ev, 0)} EV at posted prices`, tone: parlay.ev >= 0 ? 'positive' : 'negative' }
+      : { icon: 'CircleDollarSign', label: `${missingPrices} ${missingPrices === 1 ? 'leg needs' : 'legs need'} sportsbook odds`, tone: 'neutral' },
+    { icon: unconfirmed ? 'Clock' : 'CircleCheck', label: unconfirmed ? `${unconfirmed} of ${parlay.n} lineups projected` : `All ${parlay.n} lineups confirmed`, tone: unconfirmed ? 'warning' : 'positive' },
+    { icon: sameGameGroups ? 'GitBranch' : 'Split', label: sameGameGroups ? `${sameGameGroups} same-game ${sameGameGroups === 1 ? 'group' : 'groups'} · independent estimate` : 'Every leg is from a separate game', tone: 'neutral' },
+  ]
+
+  const share = async () => {
+    try {
+      const text = copyText(legs, parlay)
+      if (navigator.share) await navigator.share({ title: 'StatFax parlay', text })
+      else {
+        await navigator.clipboard.writeText(text)
+        toast.success('Parlay copied')
+      }
+    } catch {
+      // Dismissing a native share sheet is not an error worth surfacing.
+    }
+  }
 
   return (
-    <div className={`slip parlay-slip ${open ? 'open' : ''}`} style={{
-      /* Geometry (position/bottom/right/width/z-index) is owned by app.css —
-         base .slip for desktop, the @560 rules for the mobile bottom-sheet
-         placement above the nav. Inline geometry here used to override the
-         mobile rules and make the slip overlap the bottom-nav. */
-      background: 'var(--glass-bg)',
-      border: '1px solid rgba(255, 255, 255, 0.08)',
-      boxShadow: 'var(--glass-shadow)',
-      borderRadius: '16px',
-      backdropFilter: 'blur(16px)',
-      overflow: 'hidden',
-      transition: 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
-    }}>
+    <div className={`slip parlay-slip ${open ? 'open' : ''}`}>
       {open && (
         <div className="slip-panel">
-          <div className="slip-panel-head">
-            <div className="slip-head-main">
-              <span className="slip-panel-title">
-                <Icon name="Layers" size={14} /> Parlay
-                <span aria-hidden="true">·</span>
-                <span key={p.n} className="slip-legs-bump">{p.n} {p.n === 1 ? 'leg' : 'legs'}</span>
-              </span>
-              {pg && (
-                <span className={`slip-grade grade-glow-${pg.letter}`} style={{
-                  color: gColor,
-                  borderColor: hexA(gColor, 0.4),
-                  background: hexA(gColor, 0.08),
-                }} title={`Avg leg score ${Math.round(pg.avgScore)}${pg.letter === 'S' ? ' — the cream' : ''}`}>
-                  {pg.letter === 'S' && <Icon name="Trophy" size={11} />}
-                  Grade {pg.letter}
-                </span>
-              )}
+          <header className="slip-panel-head">
+            <div className="slip-head-copy">
+              <span className="slip-eyebrow">Active parlay</span>
+              <div className="slip-title-row">
+                <h2>Decision Slip</h2>
+                <span className="slip-leg-count">{parlay.n} {parlay.n === 1 ? 'leg' : 'legs'}</span>
+                {grade && (
+                  <span className={`slip-grade grade-glow-${grade.letter}`} style={{ color: gradeTone, borderColor: hexA(gradeTone, 0.4), background: hexA(gradeTone, 0.08) }}>
+                    Grade {grade.letter}
+                  </span>
+                )}
+              </div>
             </div>
-            <div className="slip-actions" role="group" aria-label="Parlay actions">
-              {onOpenBuilder && (
-                <button type="button" className="slip-build" onClick={onOpenBuilder} title="Open the full parlay builder">
-                  <Icon name="Sparkles" size={14} /> Build
-                </button>
-              )}
-              <button
-                type="button"
-                className="slip-copy"
-                title="Copy parlay to clipboard"
-                onClick={() => {
-                  navigator.clipboard?.writeText(buildCopyText(legs, p)).then(() => {
-                    toast.success('Parlay copied!')
-                  }).catch(() => toast.warn('Copy failed'))
-                }}
-              >
-                <Icon name="Copy" size={14} /> Copy
-              </button>
-              <button type="button" className="slip-clear" onClick={onClear} title="Remove every leg">
-                <Icon name="Trash2" size={14} /> Clear
-              </button>
+            <div className="slip-head-actions" role="group" aria-label="Slip actions">
+              <button type="button" className="icon-btn" onClick={share} aria-label="Share parlay" title="Share or copy"><Icon name="Share2" size={15} /></button>
+              <button type="button" className="icon-btn" onClick={() => saveSlip(legs)} aria-label="Save parlay" title="Save"><Icon name="Bookmark" size={15} /></button>
+              <button type="button" className="icon-btn" onClick={onClear} aria-label="Clear parlay" title="Clear"><Icon name="Trash2" size={15} /></button>
+              <button type="button" className="icon-btn slip-close" onClick={() => setOpen(false)} aria-label="Close decision slip"><Icon name="X" size={17} /></button>
             </div>
-          </div>
-          
-          <div className="slip-summary">
-            <span className="slip-summary-copy">{parlaySummary(p)}</span>
+          </header>
+
+          <div className="slip-decision-body">
+            <section className={`slip-scorecard ${verdict.tone}`} aria-label="Parlay scorecard">
+              <div className="slip-scorecard-verdict">
+                <span>{verdict.label}</span>
+                <small>{verdict.detail}</small>
+              </div>
+              <div className="slip-score-metric">
+                <span>All-hit</span>
+                <strong className="mono">{pct(parlay.modelAllHit, parlay.modelAllHit < 0.01 ? 2 : 1)}</strong>
+              </div>
+              <div className="slip-score-metric">
+                <span>{parlay.allPriced ? 'Market odds' : 'Fair odds'}</span>
+                <strong className="mono">{american(parlay.allPriced ? parlay.american : parlay.fairAmerican)}</strong>
+              </div>
+            </section>
+
+            <section className="slip-signals" aria-label="Construction checks">
+              {signals.map((signal) => (
+                <div className={`slip-signal ${signal.tone}`} key={signal.label}>
+                  <Icon name={signal.icon} size={13} />
+                  <span>{signal.label}</span>
+                </div>
+              ))}
+            </section>
+
+            {live.started && (
+              <section className={`slip-live-state ${live.code}`}>
+                <span style={{ color: VERDICT_META[live.code].color }}><Icon name={VERDICT_META[live.code].icon} size={13} /> {VERDICT_META[live.code].label}</span>
+                <b>{live.hits}/{live.n} legs hit</b>
+              </section>
+            )}
+
+            <section className="slip-leg-section">
+              <div className="slip-section-head"><span>Your legs</span><small>Strongest signal first</small></div>
+              <div className="slip-legs">
+                {[...legs].sort((a, b) => (b.score ?? 0) - (a.score ?? 0)).map((b) => {
+                  const status = legStatus(b)
+                  const statusMeta = LEG_META[status.code]
+                  const isWeak = b.id === weak?.id
+                  return (
+                    <article className={`slip-leg-card ${isWeak ? 'weak' : ''}`} key={b.id}>
+                      <button type="button" className="slip-leg-main" onClick={() => onSelect(b)}>
+                        <span className="slip-leg-grade-mark" style={{ background: gradeColor(b.grade?.label) }} />
+                        <span className="slip-leg-identity">
+                          <span><b>{b.name}</b><small>{b.team}</small></span>
+                          <span className="slip-leg-meta">
+                            {isWeak && <em><Icon name="TriangleAlert" size={10} /> Weakest leg</em>}
+                            <span style={{ color: statusMeta.color }}><Icon name={statusMeta.icon} size={10} /> {status.label}</span>
+                          </span>
+                        </span>
+                      </button>
+                      <GradeChip grade={b.grade} size="sm" score={b.score} />
+                      <span className="slip-leg-number mono"><b>{pct(b.hrProbability, 1)}</b><small>model</small></span>
+                      <span className="slip-leg-number mono"><b>{b.odds?.best ? american(b.odds.best.american) : '—'}</b><small>book</small></span>
+                      <button type="button" className="slip-leg-remove" onClick={() => onRemove(b.id)} aria-label={`Remove ${b.name}`}><Icon name="X" size={14} /></button>
+                    </article>
+                  )
+                })}
+              </div>
+            </section>
+
             {weak && (
-              <span className="slip-weak-note">
-                <Icon name="TriangleAlert" size={12} />
-                <span>Weak link: <b>{weak.name}</b> ({pct(weak.hrProbability, 2)})</span>
-              </span>
+              <section className="slip-weak-card">
+                <div>
+                  <span className="slip-eyebrow">Weakest leg</span>
+                  <b>{weak.name} is the first stress point.</b>
+                  <small>Its {pct(weak.hrProbability, 1)} model rate limits this ticket most.</small>
+                </div>
+                {replacements.length > 0 && (
+                  <button type="button" className="slip-replace-toggle" onClick={() => setReplaceOpen((value) => !value)}>
+                    <Icon name="RefreshCw" size={13} /> {replaceOpen ? 'Hide options' : 'Find a stronger leg'}
+                  </button>
+                )}
+                {replaceOpen && (
+                  <div className="slip-replacements">
+                    {replacements.map(({ candidate, next, delta }) => (
+                      <button type="button" key={candidate.id} onClick={() => {
+                        onReplace(legs.map((b) => b.id === weak.id ? candidate.id : b.id))
+                        setReplaceOpen(false)
+                        toast.success(`${surname(candidate.name)} replaced ${surname(weak.name)}`)
+                      }}>
+                        <span><b>{candidate.name}</b><small>{candidate.team} · Grade {next.grade?.letter || '—'}</small></span>
+                        <span className={`mono ${delta >= 0 ? 'pos' : 'neg'}`}>{signedPct(delta, 3)} all-hit</span>
+                        <Icon name="ArrowRight" size={13} />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </section>
             )}
           </div>
 
-          <div className="slip-wager">
-            <label className="slip-wager-field">
-              <span className="slip-wager-k">Wager $</span>
-              <input
-                className="slip-wager-input mono"
-                type="number"
-                inputMode="decimal"
-                min="0"
-                step="1"
-                value={wager}
-                onChange={(e) => setWager(e.target.value)}
-                aria-label="Wager"
-              />
-            </label>
-            <span className="slip-wager-arrow" aria-hidden="true">
-              <Icon name="ChevronRight" size={14} />
-            </span>
-            <span className="slip-wager-field is-payout">
-              <span className="slip-wager-k">Payout{p.allPriced ? '' : ' (fair)'}</span>
-              <span className="slip-wager-payout mono">{shownPayout != null && Number.isFinite(shownPayout) ? `$${shownPayout >= 100 ? Math.round(shownPayout) : shownPayout.toFixed(2)}` : '—'}</span>
-            </span>
-          </div>
-
-          <div className="slip-legs">
-            {legs.map((b) => (
-              <div className={`slip-leg ${b.id === weakId ? 'weak' : ''}`} key={b.id}>
-                <button type="button" className="slip-leg-main" onClick={() => onSelect(b)} title="Open detail">
-                  <span className="slip-leg-grade" style={{ background: gradeColor(b.grade?.label) }} />
-                  {/* Name owns the flexible space and ellipsizes; the team + weak
-                      tag are fixed-size so they can't squeeze the name to nothing. */}
-                  <span className="slip-leg-name">{b.name}</span>
-                  <span className="slip-leg-team">{b.team}</span>
-                  {b.lineupConfirmed !== true && (
-                    <span className="slip-leg-prov" title="Lineup not posted — this leg can still change">
-                      <Icon name="Clock" size={10} />
-                    </span>
-                  )}
-                  {b.id === weakId && (
-                    <Icon className="slip-leg-weak-icon" name="TriangleAlert" size={10} title="Weakest leg" />
-                  )}
-                </button>
-                <GradeChip grade={b.grade} size="sm" score={b.score} />
-                <span className="slip-leg-prob mono">{pct(b.hrProbability, 1)}</span>
-                <span className="slip-leg-odds mono">{b.odds?.best ? american(b.odds.best.american) : '—'}</span>
-                <button type="button" className="slip-leg-remove" onClick={() => onRemove(b.id)} aria-label={`Remove ${b.name}`}>
-                  <Icon name="X" size={13} />
-                </button>
-              </div>
-            ))}
-          </div>
+          <footer className="slip-review-footer">
+            <div className="slip-wager">
+              <label><span>Wager</span><span className="slip-money-input mono">$<input type="number" inputMode="decimal" min="0" step="1" value={wager} onChange={(e) => setWager(e.target.value)} aria-label="Wager" /></span></label>
+              <Icon name="ArrowRight" size={14} />
+              <div><span>Payout{parlay.allPriced ? '' : ' at fair odds'}</span><strong className="mono">{shownPayout != null && Number.isFinite(shownPayout) ? `$${shownPayout >= 100 ? Math.round(shownPayout) : shownPayout.toFixed(2)}` : '—'}</strong></div>
+            </div>
+            <button type="button" className="slip-review-btn" onClick={() => { setOpen(false); onOpenBuilder?.() }}><Icon name="ScanSearch" size={16} /> Review parlay</button>
+          </footer>
         </div>
       )}
 
-      <button className="slip-bar" onClick={() => setOpen((o) => !o)} style={{
-        width: '100%',
-        padding: '12px 16px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        background: open ? 'rgba(0,0,0,0.1)' : 'transparent',
-        border: 'none',
-        color: '#fff',
-        cursor: 'pointer'
-      }}>
-        <span className="slip-bar-left" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span key={p.n} className="slip-count slip-count-bump" style={{
-            background: 'var(--accent)',
-            color: '#fff',
-            fontSize: '11px',
-            fontWeight: '800',
-            borderRadius: '50%',
-            width: '20px',
-            height: '20px',
-            display: 'grid',
-            placeItems: 'center'
-          }}>{p.n}</span>
-          <span className="slip-bar-label" style={{ fontSize: '13px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Parlay Slip</span>
-          {pg && (
-            <span className={`slip-bar-grade grade-glow-${pg.letter}`} style={{ 
-              color: gColor, 
-              borderColor: hexA(gColor, 0.4),
-              borderWidth: '1px',
-              borderStyle: 'solid',
-              fontSize: '10px',
-              fontWeight: '800',
-              padding: '1px 5px',
-              borderRadius: '4px',
-              background: hexA(gColor, 0.08)
-            }}>
-              {pg.letter}
-            </span>
-          )}
+      <button className="slip-bar" type="button" onClick={() => setOpen(true)} aria-label="Open decision slip">
+        <span className="slip-bar-left">
+          <span className="slip-count">{parlay.n}</span>
+          <span><b>Decision Slip</b><small>{verdict.label}</small></span>
         </span>
-        <span className="slip-bar-stats" style={{ display: 'flex', gap: '14px', marginRight: '8px' }}>
-          <span className="slip-stat" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-            <span className="slip-stat-k" style={{ fontSize: '8px', color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Model</span>
-            <span className="slip-stat-v mono" style={{ fontSize: '12px', fontWeight: '700', color: 'var(--accent)' }}>{pct(p.modelProb, p.modelProb < 0.01 ? 2 : 1)}</span>
-          </span>
-          {p.edge != null && (
-            <span className="slip-stat" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-              <span className="slip-stat-k" style={{ fontSize: '8px', color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Edge</span>
-              <span className={`slip-stat-v mono ${p.edge >= 0 ? 'pos' : 'neg'}`} style={{ fontSize: '12px', fontWeight: '700' }}>{signedPct(p.edge, 0)}</span>
-            </span>
-          )}
+        <span className="slip-bar-stats">
+          <span><small>All-hit</small><b className="mono">{pct(parlay.modelAllHit, parlay.modelAllHit < 0.01 ? 2 : 1)}</b></span>
+          {parlay.ev != null && <span><small>EV</small><b className={`mono ${parlay.ev >= 0 ? 'pos' : 'neg'}`}>{signedPct(parlay.ev, 0)}</b></span>}
+          <Icon name="ChevronUp" size={15} />
         </span>
-        <Icon name={open ? 'ChevronDown' : 'ChevronUp'} size={14} style={{ color: 'var(--text-faint)' }} />
       </button>
     </div>
   )

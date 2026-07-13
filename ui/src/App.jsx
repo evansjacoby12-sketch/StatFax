@@ -764,8 +764,10 @@ export default function App() {
 
       <ParlaySlip
         legs={slipLegs}
+        batters={all}
         onRemove={removeSlip}
         onClear={clearSlip}
+        onReplace={replaceSlip}
         onSelect={(b) => setSelectedId(b.id)}
         onOpenBuilder={() => setShowBuilder(true)}
       />
