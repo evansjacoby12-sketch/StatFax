@@ -15071,6 +15071,9 @@ button.th:focus-visible {
 .nfl-research-panel > .nfl-research-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); border: 0; border-radius: 0; }
 .nfl-research-panel .nfl-research-grid span { min-height: 88px; padding: 13px; }
 .nfl-research-panel .nfl-research-grid b { font-size: 12px; }
+.nfl-lineup-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; background: var(--border-soft); }
+.nfl-lineup-grid > span { min-width: 0; min-height: 68px; padding: 11px 12px; display: flex; flex-direction: column; justify-content: center; gap: 6px; color: var(--text-faint); background: rgba(10,9,15,.98); font-size: 8px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; }
+.nfl-lineup-grid b { overflow: hidden; color: var(--text-dim); font-size: 10px; letter-spacing: 0; line-height: 1.35; text-overflow: ellipsis; text-transform: none; }
 .nfl-research-disclosure { padding: 13px 14px; display: flex; align-items: flex-start; gap: 9px; color: var(--text-faint); border: 1px dashed rgba(184,183,216,.13); border-radius: 11px; background: rgba(255,255,255,.01); }
 .nfl-research-disclosure svg { flex: none; margin-top: 1px; }
 .nfl-research-disclosure p { font-size: 9px; line-height: 1.5; }
@@ -15139,6 +15142,129 @@ button.th:focus-visible {
   .nfl-prop-card > footer > button { min-height: 44px; }
   .nfl-drawer-section > .nfl-eligible-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .nfl-research-grid { grid-template-columns: 1fr; }
+  .nfl-lineup-grid { grid-template-columns: 1fr 1fr; }
+}
+
+/* NFL Bet Lab — slate-native combo workspace. */
+.nfl-bet-lab {
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: rgba(10,9,15,.58);
+}
+.nfl-bet-lab-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
+.nfl-bet-lab-head h2 { margin-top: 7px; font-family: var(--display); font-size: 24px; }
+.nfl-bet-lab-head p { margin-top: 5px; color: var(--text-faint); font-size: 11px; }
+.nfl-bet-lab-slip {
+  min-width: 132px;
+  min-height: 48px;
+  padding: 7px 11px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--accent);
+  border: 1px solid rgba(184,183,216,.22);
+  border-radius: 10px;
+  background: rgba(184,183,216,.05);
+  text-align: left;
+}
+.nfl-bet-lab-slip span { display: flex; flex-direction: column; gap: 2px; }
+.nfl-bet-lab-slip small { color: var(--text-faint); font-size: 7px; font-weight: 800; text-transform: uppercase; }
+.nfl-bet-lab-slip b { color: var(--text); font-size: 10px; }
+.nfl-lab-controls {
+  margin-top: 16px;
+  padding: 10px;
+  display: grid;
+  grid-template-columns: 170px repeat(3, minmax(130px, 1fr));
+  gap: 8px;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: rgba(255,255,255,.015);
+}
+.nfl-lab-controls fieldset { min-width: 0; border: 0; }
+.nfl-lab-controls legend,
+.nfl-lab-controls label > span {
+  margin-bottom: 6px;
+  display: block;
+  color: var(--text-faint);
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.nfl-lab-controls select {
+  width: 100%;
+  min-height: 38px;
+  padding: 0 9px;
+  color: var(--text);
+  border: 1px solid var(--border-soft);
+  border-radius: 9px;
+  background: #0d0c13;
+  font: 700 9px var(--sans);
+  color-scheme: dark;
+}
+.nfl-lab-segment { min-height: 38px; padding: 3px; display: grid; grid-template-columns: repeat(3,1fr); gap: 3px; border: 1px solid var(--border-soft); border-radius: 9px; background: #0d0c13; }
+.nfl-lab-segment button { color: var(--text-faint); border-radius: 6px; font: 800 10px var(--mono); }
+.nfl-lab-segment button.active { color: var(--text); background: rgba(184,183,216,.13); box-shadow: inset 0 0 0 1px rgba(184,183,216,.14); }
+.nfl-lab-summary { min-height: 42px; margin: 10px 0; padding: 8px 11px; display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--text-faint); border: 1px solid var(--border-soft); border-radius: 10px; background: rgba(255,255,255,.012); font-size: 9px; }
+.nfl-lab-summary > span { display: inline-flex; align-items: center; gap: 6px; }
+.nfl-lab-summary svg { color: var(--accent); }
+.nfl-lab-summary b { color: var(--text-dim); }
+.nfl-lab-summary small { text-align: right; }
+.nfl-combo-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
+.nfl-combo-card { min-width: 0; overflow: hidden; position: relative; border: 1px solid var(--border-soft); border-radius: 13px; background: rgba(255,255,255,.018); }
+.nfl-combo-card::before { content: ''; position: absolute; inset: 0 auto 0 0; width: 3px; background: color-mix(in srgb, var(--nfl-combo-grade) 52%, transparent); }
+.nfl-combo-card > header { min-height: 42px; padding: 0 12px 0 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; border-bottom: 1px solid var(--border-soft); }
+.nfl-combo-card > header > div { min-width: 0; display: flex; align-items: center; gap: 6px; }
+.nfl-combo-rank { color: var(--nfl-combo-grade); font-size: 11px; font-weight: 800; }
+.nfl-combo-strategy,
+.nfl-combo-sgp,
+.nfl-combo-grade { padding: 3px 5px; border: 1px solid var(--border-soft); border-radius: 5px; background: rgba(255,255,255,.025); font-size: 7px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
+.nfl-combo-sgp { color: var(--accent); }
+.nfl-combo-grade { flex: none; border-color: color-mix(in srgb, currentColor 24%, transparent); }
+.nfl-combo-metrics { display: grid; grid-template-columns: repeat(3,1fr); border-bottom: 1px solid var(--border-soft); }
+.nfl-combo-metrics > span { min-width: 0; min-height: 66px; padding: 10px; display: flex; flex-direction: column; justify-content: center; gap: 5px; text-align: center; }
+.nfl-combo-metrics > span + span { border-left: 1px solid var(--border-soft); }
+.nfl-combo-metrics small { color: var(--text-faint); font-size: 7px; font-weight: 800; text-transform: uppercase; }
+.nfl-combo-metrics strong { overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.nfl-combo-legs { margin: 0; padding: 8px; display: flex; flex-direction: column; gap: 6px; list-style: none; }
+.nfl-combo-legs li { min-width: 0; min-height: 64px; padding: 8px; display: grid; grid-template-columns: 24px minmax(0,1fr) auto; align-items: center; gap: 8px; border: 1px solid var(--border-soft); border-radius: 9px; background: rgba(255,255,255,.018); }
+.nfl-combo-ord { width: 22px; height: 22px; display: grid; place-items: center; color: var(--accent); border: 1px solid rgba(184,183,216,.18); border-radius: 50%; background: rgba(184,183,216,.05); font-size: 8px; }
+.nfl-combo-legs li > div { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.nfl-combo-legs li b { overflow: hidden; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.nfl-combo-legs li small { overflow: hidden; color: var(--text-faint); font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.nfl-combo-legs li div > span { min-width: 0; display: flex; gap: 4px; overflow: hidden; }
+.nfl-combo-legs em { min-width: 0; padding: 2px 4px; overflow: hidden; color: var(--text-dim); border-radius: 4px; background: rgba(255,255,255,.035); font-size: 7px; font-style: normal; text-overflow: ellipsis; white-space: nowrap; }
+.nfl-combo-legs aside { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+.nfl-combo-legs aside strong { color: var(--prime); font-size: 10px; }
+.nfl-combo-legs aside small { color: var(--text-faint); }
+.nfl-combo-why { margin: 0 8px 8px; padding: 8px 9px; display: flex; align-items: flex-start; gap: 6px; color: var(--text-faint); border: 1px dashed rgba(184,183,216,.13); border-radius: 8px; font-size: 8px; line-height: 1.45; }
+.nfl-combo-why svg { flex: none; color: var(--accent); }
+.nfl-combo-card > footer { padding: 0 8px 8px; }
+.nfl-combo-card > footer button { width: 100%; min-height: 40px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; color: var(--text); border: 1px solid var(--border-soft); border-radius: 9px; background: rgba(255,255,255,.035); font-size: 9px; font-weight: 800; }
+.nfl-combo-card > footer button:hover,
+.nfl-combo-card > footer button.active { color: var(--accent); border-color: rgba(184,183,216,.28); background: rgba(184,183,216,.075); }
+.nfl-lab-empty { min-height: 260px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px; color: var(--text-faint); text-align: center; }
+.nfl-lab-empty b { color: var(--text-dim); font-size: 12px; }
+.nfl-lab-empty span { font-size: 9px; }
+
+@media (max-width: 900px) {
+  .nfl-lab-controls { grid-template-columns: 1fr 1fr; }
+  .nfl-combo-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+  .nfl-view-tabs { max-width: 100%; overflow-x: auto; justify-content: flex-start; scrollbar-width: none; }
+  .nfl-view-tabs::-webkit-scrollbar { display: none; }
+  .nfl-view-tabs .command-tab { min-width: max-content; flex: none; }
+  .nfl-bet-lab { padding: 13px; }
+  .nfl-bet-lab-head { flex-direction: column; }
+  .nfl-bet-lab-slip { width: 100%; }
+  .nfl-lab-controls { grid-template-columns: 1fr; }
+  .nfl-lab-summary { align-items: flex-start; flex-direction: column; }
+  .nfl-lab-summary small { text-align: left; }
+  .nfl-combo-metrics > span { padding: 8px 5px; }
+  .nfl-combo-legs li { grid-template-columns: 22px minmax(0,1fr); }
+  .nfl-combo-legs aside { grid-column: 2; flex-direction: row; align-items: center; }
 }
 
 @media (max-width: 700px) {
