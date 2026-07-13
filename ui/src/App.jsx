@@ -55,6 +55,12 @@ const STALE_RESET_MS = 30 * 60 * 1000 // 30 min
 // Each view is its own page via a URL hash (#board, #pitchers, …) — bookmarkable
 // and back/forward navigable. Hash routing works as-is on static hosting.
 const VIEWS = new Set(['board', 'games', 'pitchers', 'weather', 'combos', 'results'])
+const BOTTOM_TABS = [
+  { id: 'board', label: 'Board', icon: 'List' },
+  { id: 'games', label: 'Games', icon: 'LayoutGrid' },
+  { id: 'pitchers', label: 'Pitchers', icon: 'Crosshair' },
+  { id: 'results', label: 'Results', icon: 'Activity' },
+]
 const viewFromHash = () => {
   const h = (typeof location !== 'undefined' ? location.hash : '').replace(/^#\/?/, '')
   return VIEWS.has(h) ? h : null
@@ -592,6 +598,8 @@ export default function App() {
   }
 
   const { data } = state
+  const bottomNavView = view === 'combos' ? 'results' : view
+  const bottomNavIndex = BOTTOM_TABS.findIndex((tab) => tab.id === bottomNavView)
 
   return (
     <LiveModeContext.Provider value={liveScores}>
@@ -882,19 +890,20 @@ export default function App() {
     {/* Bottom nav is a sibling of .app (not a child) so iOS doesn't route its
         touch events through the overflow-y:auto scroll container, which can
         swallow taps on position:fixed descendants in standalone PWA mode. */}
-    <nav className="bottom-nav" aria-label="Primary navigation">
-      {[
-        { id: 'board', label: 'Board', icon: 'List' },
-        { id: 'games', label: 'Games', icon: 'LayoutGrid' },
-        { id: 'pitchers', label: 'Pitchers', icon: 'Crosshair' },
-        { id: 'results', label: 'Results', icon: 'Activity' }
-      ].map((tab) => (
+    <nav
+      className="bottom-nav"
+      aria-label="Primary navigation"
+      data-has-active={bottomNavIndex >= 0}
+      style={{ '--bottom-nav-index': Math.max(0, bottomNavIndex) }}
+    >
+      <span className="bottom-nav-indicator" aria-hidden="true" />
+      {BOTTOM_TABS.map((tab) => (
         <button
           key={tab.id}
           type="button"
-          className={`bottom-nav-btn ${view === tab.id || (tab.id === 'results' && view === 'combos') ? 'active' : ''}`}
+          className={`bottom-nav-btn ${bottomNavView === tab.id ? 'active' : ''}`}
           onClick={() => setView(tab.id)}
-          aria-current={view === tab.id || (tab.id === 'results' && view === 'combos') ? 'page' : undefined}
+          aria-current={bottomNavView === tab.id ? 'page' : undefined}
           aria-label={tab.label}
         >
           <Icon name={tab.icon} size={20} />

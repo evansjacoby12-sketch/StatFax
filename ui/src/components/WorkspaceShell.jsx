@@ -1,4 +1,5 @@
 import Icon from './Icon.jsx'
+import CommandTabs from './CommandTabs.jsx'
 
 export default function WorkspaceShell({
   icon,
@@ -32,21 +33,14 @@ export default function WorkspaceShell({
         </header>
 
         {tabs.length > 0 && (
-          <nav className="workspace-tabs" role="tablist" aria-label={`${title} modes`}>
-            {tabs.map((tab) => (
-              <button
-                type="button"
-                key={tab.id}
-                role="tab"
-                aria-selected={activeTab === tab.id}
-                onClick={() => onTabChange(tab.id)}
-              >
-                <Icon name={tab.icon} size={14} />
-                <span>{tab.label}</span>
-                {tab.badge != null && <b className="mono">{tab.badge}</b>}
-              </button>
-            ))}
-          </nav>
+          <CommandTabs
+            as="nav"
+            className="workspace-tabs"
+            label={`${title} modes`}
+            value={activeTab}
+            onChange={onTabChange}
+            tabs={tabs.map((tab) => ({ ...tab, iconSize: 14 }))}
+          />
         )}
 
         <div className="workspace-body">{children}</div>

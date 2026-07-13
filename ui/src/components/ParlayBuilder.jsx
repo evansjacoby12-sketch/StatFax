@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import Icon from './Icon.jsx'
+import CommandTabs from './CommandTabs.jsx'
 import { GradeChip } from './atoms.jsx'
 import { hexA } from './atoms.jsx'
 import { pct, num, american, signedPct, surname } from '../lib/format.js'
@@ -311,13 +312,17 @@ export default function ParlayBuilder({ batters, legs, slipSet, onToggle, onRemo
         </div>
       )}
 
-      <div className="pb-tabs" style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
-        {[['legs', 'Legs', 'Layers'], ['build', 'Auto-build', 'Sparkles'], ['saved', `Saved${saved.length ? ` (${saved.length})` : ''}`, 'Bookmark']].map(([k, label, icon]) => (
-          <button key={k} onClick={() => setTab(k)} style={{ flex: 1, fontSize: '12px', fontWeight: '700', padding: '8px', borderRadius: '8px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '5px', color: tab === k ? '#fff' : 'var(--text-dim)', background: tab === k ? 'var(--hover)' : 'transparent', border: `1px solid ${tab === k ? 'var(--accent)' : 'var(--border)'}` }}>
-            <Icon name={icon} size={13} /> {label}
-          </button>
-        ))}
-      </div>
+      <CommandTabs
+        className="pb-tabs"
+        label="Parlay builder sections"
+        value={tab}
+        onChange={setTab}
+        tabs={[
+          { id: 'legs', label: 'Legs', icon: 'Layers' },
+          { id: 'build', label: 'Auto-build', icon: 'Sparkles' },
+          { id: 'saved', label: `Saved${saved.length ? ` (${saved.length})` : ''}`, icon: 'Bookmark' },
+        ]}
+      />
 
       <div className="pb-body" style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
         {tab === 'legs' && (

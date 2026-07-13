@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import Icon from './Icon.jsx'
+import CommandTabs from './CommandTabs.jsx'
 import { pct, num, signedPct } from '../lib/format.js'
 import { GRADE_ORDER, gradeColor } from '../lib/badges.js'
 import { GradeChip } from './atoms.jsx'
@@ -46,13 +47,14 @@ export default function ResultsView({ meta, batters, onSelect, favorConsistency 
         <span><Icon name="BarChart3" size={14} /> Accountability</span>
         <small className="mono">Outcomes + process</small>
       </div>
-      <div className="results-subnav accountability-subnav" role="tablist" aria-label="Results workspace">
-        {RESULTS_TABS.map((t) => (
-          <button key={t.id} role="tab" onClick={() => setTab(t.id)} aria-selected={tab === t.id} aria-pressed={tab === t.id}>
-            <Icon name={t.icon} size={13} /> {t.label}
-          </button>
-        ))}
-      </div>
+      <CommandTabs
+        className="results-subnav accountability-subnav"
+        label="Results workspace"
+        value={tab}
+        onChange={setTab}
+        tabs={RESULTS_TABS}
+        ariaPressed
+      />
       {tab === 'overview' && <AccountabilityOverview meta={meta} batters={batters} onSelect={onSelect} onOpenTickets={() => setTab('tickets')} />}
       {tab === 'tickets' && <CombosView batters={batters} onSelect={onSelect} favorConsistency={favorConsistency} initialSection="tickets" />}
       {tab === 'model' && <ModelResults meta={meta} />}
@@ -247,10 +249,16 @@ function ModelResults({ meta }) {
         {m && <Kpi label="Brier vs baseline" value={m.brier.toFixed(4)} sub={`${pct((m.baselineBrier - m.brier) / m.baselineBrier, 0)} better`} accent="var(--accent)" />}
       </div>
 
-      <div className="results-chart-tabs" role="tablist" aria-label="Results analysis">
-        <button role="tab" aria-selected={chartTab === 'grades'} className={chartTab === 'grades' ? 'on' : ''} onClick={() => setChartTab('grades')}>Grades</button>
-        <button role="tab" aria-selected={chartTab === 'calibration'} className={chartTab === 'calibration' ? 'on' : ''} onClick={() => setChartTab('calibration')}>Calibration</button>
-      </div>
+      <CommandTabs
+        className="results-chart-tabs"
+        label="Results analysis"
+        value={chartTab}
+        onChange={setChartTab}
+        tabs={[
+          { id: 'grades', label: 'Grades', icon: 'Trophy' },
+          { id: 'calibration', label: 'Calibration', icon: 'Gauge' },
+        ]}
+      />
 
       <div className="results-cols" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px', flexWrap: 'wrap' }}>
         <section className={`results-card results-grade-card ${chartTab === 'grades' ? 'is-mobile-active' : ''}`} style={{

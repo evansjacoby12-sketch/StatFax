@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import Icon from './Icon.jsx'
+import CommandTabs from './CommandTabs.jsx'
 import { pct, num, rate } from '../lib/format.js'
 import { gradeColor } from '../lib/badges.js'
 import { hexA } from './atoms.jsx'
@@ -440,19 +441,15 @@ export default function ZoneView({ batter: b, onClose }) {
                 <h3 className="zone-h3" style={{ fontSize: '13px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px', color: '#fff' }}>
                   <Icon name="Crosshair" size={14} style={{ color: 'var(--accent)' }} /> Strike-Zone Attack Map
                 </h3>
-                {/* segmented mode control */}
-                <div className="z3-seg" role="group" aria-label="Map mode">
-                  {MODES.map((m) => (
-                    <button
-                      key={m.key}
-                      className={`z3-seg-btn ${mode === m.key ? 'on' : ''}`}
-                      onClick={() => setMode(m.key)}
-                      aria-pressed={mode === m.key}
-                    >
-                      <Icon name={m.icon} size={11} /> {m.label}
-                    </button>
-                  ))}
-                </div>
+                <CommandTabs
+                  className="z3-seg"
+                  variant="compact"
+                  label="Map mode"
+                  value={mode}
+                  onChange={setMode}
+                  tabs={MODES.map((item) => ({ ...item, id: item.key, iconSize: 11 }))}
+                  ariaPressed
+                />
               </div>
 
               <p className="zone-explain dim" style={{ fontSize: '12px', marginBottom: '16px', lineHeight: '1.45', minHeight: '34px' }}>

@@ -1,5 +1,6 @@
-import { useEffect, useState, useRef, useLayoutEffect } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import Icon from './Icon.jsx'
+import CommandTabs from './CommandTabs.jsx'
 import Select from './Select.jsx'
 import { GRADE_ORDER, gradeColor, BADGES } from '../lib/badges.js'
 import { SORTS } from '../lib/constants.js'
@@ -23,42 +24,20 @@ const MOBILE_PRIMARY_SIGNALS = new Set(['precision', 'hot', 'due', 'pitchEdge', 
 // between tabs instead of the active style teleporting.
 function ViewToggle({ view, onView }) {
   const activeId = view === 'combos' ? 'results' : view
-  const wrapRef = useRef(null)
-  const indRef = useRef(null)
-
-  useLayoutEffect(() => {
-    const wrap = wrapRef.current
-    const ind = indRef.current
-    if (!wrap || !ind) return
-    const place = () => {
-      const btn = wrap.querySelector(`[data-view="${activeId}"]`)
-      if (!btn) { ind.style.opacity = '0'; return }
-      ind.style.opacity = '1'
-      ind.style.transform = `translateX(${btn.offsetLeft}px)`
-      ind.style.width = `${btn.offsetWidth}px`
-    }
-    place()
-    const ro = new ResizeObserver(place) // reflows (font load, phone rotate) re-seat it
-    ro.observe(wrap)
-    return () => ro.disconnect()
-  }, [activeId])
 
   return (
-    <div className="view-toggle" role="group" aria-label="View" ref={wrapRef}>
-      <span className="view-ind" ref={indRef} aria-hidden="true" />
-      {VIEW_TABS.map((tab, i) => (
-        <button
-          key={tab.id}
-          data-view={tab.id}
-          className={`view-btn ${activeId === tab.id ? 'on' : ''}`}
-          onClick={() => onView(tab.id)}
-          title={`${tab.desc} — press ${i + 1}`}
-        >
-          <Icon name={tab.icon} size={14} />
-          {tab.label}
-        </button>
-      ))}
-    </div>
+    <CommandTabs
+      className="view-toggle"
+      variant="workspace"
+      label="Primary workspace"
+      value={activeId}
+      onChange={onView}
+      tabs={VIEW_TABS.map((tab, index) => ({
+        ...tab,
+        iconSize: 14,
+        title: `${tab.desc} — press ${index + 1}`,
+      }))}
+    />
   )
 }
 

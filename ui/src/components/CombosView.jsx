@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import Icon from './Icon.jsx'
+import CommandTabs from './CommandTabs.jsx'
 import Select from './Select.jsx'
 import { pct, surname } from '../lib/format.js'
 import { legStatus } from '../lib/live.js'
@@ -169,23 +170,17 @@ export default function CombosView({ batters, onSelect, favorConsistency = false
         <span><Icon name="Layers" size={14} /> Parlay center</span>
         <small className="mono">Live + graded</small>
       </div>
-      <div className="combo-mobile-tabs" role="tablist" aria-label="Parlay combo sections">
-        {[
+      <CommandTabs
+        className="combo-mobile-tabs"
+        label="Parlay combo sections"
+        value={comboSection}
+        onChange={setComboSection}
+        tabs={[
           { id: 'live', label: 'Live', icon: 'Activity' },
           { id: 'tickets', label: 'Tickets', icon: 'Bookmark' },
           { id: 'history', label: 'History', icon: 'Clock' },
-        ].map((item) => (
-          <button
-            key={item.id}
-            role="tab"
-            aria-selected={comboSection === item.id}
-            className={comboSection === item.id ? 'on' : ''}
-            onClick={() => setComboSection(item.id)}
-          >
-            <Icon name={item.icon} size={13} /> {item.label}
-          </button>
-        ))}
-      </div>
+        ]}
+      />
 
       <section className={`results-card combo-workspace-section combo-section-tickets ${comboSection === 'tickets' ? 'is-mobile-active' : ''}`} style={CARD}>
         <h3 className="section-title" style={H3}>

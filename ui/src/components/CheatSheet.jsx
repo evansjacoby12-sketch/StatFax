@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import Icon from './Icon.jsx'
+import CommandTabs from './CommandTabs.jsx'
 import { GradeChip } from './atoms.jsx'
 import { hrSetup } from '../lib/scout.js'
 import { pct, num, rate, signedPct } from '../lib/format.js'
@@ -203,19 +204,13 @@ export default function CheatSheet({ batters, onSelect, onOpenPitcher }) {
 
   return (
     <div className="cheat">
-      <div className="cheat-tabs" role="tablist" aria-label="Cheat sheet pages">
-        {TABS.map((t) => (
-          <button
-            key={t.k}
-            role="tab"
-            aria-selected={tab === t.k}
-            className={`badge-toggle ${tab === t.k ? 'on' : ''}`}
-            onClick={() => setTab(t.k)}
-          >
-            <Icon name={t.icon} size={13} /> {t.label}
-          </button>
-        ))}
-      </div>
+      <CommandTabs
+        className="cheat-tabs"
+        label="Cheat sheet pages"
+        value={tab}
+        onChange={setTab}
+        tabs={TABS.map((item) => ({ ...item, id: item.k }))}
+      />
 
       {tab === 'batters' && (
         <div className="splits-grid">

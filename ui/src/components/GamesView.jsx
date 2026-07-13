@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import Icon from './Icon.jsx'
+import CommandTabs from './CommandTabs.jsx'
 import { GradeChip, BadgeRow, ProbBar, ProbRing } from './atoms.jsx'
 import { teamColor, teamLogo, hexToRgba, readableOn, playerHeadshot } from '../lib/teams.js'
 import { pct, num, gameTime, signedPct } from '../lib/format.js'
@@ -204,30 +205,18 @@ export default function GamesView({ games, batters, onSelect, selectedId, watchl
 
   return (
     <>
-      <div className="games-controls" role="group" aria-label="Games view" style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '16px' }}>
-        <span className="games-controls-k dim" style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>View Mode:</span>
-        <button 
-          className={`badge-toggle ${view === 'extractor' ? 'on' : ''}`} 
-          onClick={() => setView('extractor')}
-          style={{
-            borderColor: view === 'extractor' ? 'var(--accent)' : 'var(--border-soft)',
-            background: view === 'extractor' ? 'var(--hover)' : 'transparent',
-            color: view === 'extractor' ? '#fff' : 'var(--text-faint)'
-          }}
-        >
-          HR Extractor
-        </button>
-        <button 
-          className={`badge-toggle ${view === 'detail' ? 'on' : ''}`} 
-          onClick={() => setView('detail')}
-          style={{
-            borderColor: view === 'detail' ? 'var(--accent)' : 'var(--border-soft)',
-            background: view === 'detail' ? 'var(--hover)' : 'transparent',
-            color: view === 'detail' ? '#fff' : 'var(--text-faint)'
-          }}
-        >
-          Detail Silos
-        </button>
+      <div className="games-controls">
+        <span className="games-controls-k dim">View Mode</span>
+        <CommandTabs
+          className="games-mode-tabs"
+          label="Games view"
+          value={view}
+          onChange={setView}
+          tabs={[
+            { id: 'extractor', label: 'HR Extractor', icon: 'Crosshair' },
+            { id: 'detail', label: 'Detail Silos', icon: 'LayoutGrid' },
+          ]}
+        />
       </div>
       <div className="games-desktop-layout games-command-center">
         <aside className="games-navigator" aria-label="Game matchups">

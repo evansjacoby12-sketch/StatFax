@@ -1,5 +1,6 @@
 import { useMemo, useEffect, useState } from 'react'
 import Icon from './Icon.jsx'
+import CommandTabs from './CommandTabs.jsx'
 import { GradeChip, ScoreRing, ProbBar, Stat } from './atoms.jsx'
 import { groupPitchers, pitchUsage, effSide, K_LINES, kOverProb } from '../lib/pitchers.js'
 import { pct, num, rate, gameTime } from '../lib/format.js'
@@ -52,46 +53,20 @@ export default function PitchersView({ batters, kDistByPitcher = {}, liveKsByPit
         <span><Icon name="CircleDot" size={14} /> Pitcher board</span>
         <small className="mono">{pitchers.length} starters</small>
       </div>
-      <div className="pitchers-controls" role="group" aria-label="Pitcher view" style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap' }}>
-        <div className="pitcher-mode-tabs">
-          <span className="pitchers-controls-k dim" style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>View Mode:</span>
-          <button
-            className={`badge-toggle ${view === 'preview' ? 'on' : ''}`}
-            onClick={() => setView('preview')}
-            aria-pressed={view === 'preview'}
-            style={{
-              borderColor: view === 'preview' ? 'var(--accent)' : 'var(--border-soft)',
-              background: view === 'preview' ? 'var(--hover)' : 'transparent',
-              color: view === 'preview' ? '#fff' : 'var(--text-faint)'
-            }}
-          >
-            Vulnerability
-          </button>
-          <button
-            className={`badge-toggle ${view === 'detail' ? 'on' : ''}`}
-            onClick={() => setView('detail')}
-            aria-pressed={view === 'detail'}
-            style={{
-              borderColor: view === 'detail' ? 'var(--accent)' : 'var(--border-soft)',
-              background: view === 'detail' ? 'var(--hover)' : 'transparent',
-              color: view === 'detail' ? '#fff' : 'var(--text-faint)'
-            }}
-          >
-            <span className="pitcher-detail-label">Detail Cards</span><span className="pitcher-cards-label">Cards</span>
-          </button>
-          <button
-            className={`badge-toggle ${view === 'kbrain' ? 'on' : ''}`}
-            onClick={() => setView('kbrain')}
-            aria-pressed={view === 'kbrain'}
-            style={{
-              borderColor: view === 'kbrain' ? 'var(--accent)' : 'var(--border-soft)',
-              background: view === 'kbrain' ? 'var(--hover)' : 'transparent',
-              color: view === 'kbrain' ? '#fff' : 'var(--text-faint)'
-            }}
-          >
-            <Icon name="Zap" size={11} style={{ marginRight: '3px' }} />K Brain
-          </button>
-        </div>
+      <div className="pitchers-controls">
+        <span className="pitchers-controls-k dim">View Mode</span>
+        <CommandTabs
+          className="pitcher-mode-tabs"
+          label="Pitcher view"
+          value={view}
+          onChange={setView}
+          ariaPressed
+          tabs={[
+            { id: 'preview', label: 'Vulnerability', icon: 'Shield' },
+            { id: 'detail', label: <><span className="pitcher-detail-label">Detail Cards</span><span className="pitcher-cards-label">Cards</span></>, icon: 'LayoutGrid' },
+            { id: 'kbrain', label: 'K Brain', icon: 'Zap', iconSize: 11 },
+          ]}
+        />
         
         {view === 'detail' && (
           <div className="pitcher-sort-row">

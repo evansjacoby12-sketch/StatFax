@@ -173,25 +173,36 @@ function TabBar({ active, onChange }) {
   const moreActive = moreTabs.some((t) => t.id === active)
   // Sliding underline: one absolute bar measured off the active tab so it
   // glides between tabs (same motion language as the board's view toggle).
-  const wrapRef = useRef(null)
-  const indRef = useRef(null)
+  const desktopWrapRef = useRef(null)
+  const desktopIndRef = useRef(null)
+  const mobileWrapRef = useRef(null)
+  const mobileIndRef = useRef(null)
   useEffect(() => {
-    const wrap = wrapRef.current
-    const ind = indRef.current
-    if (!wrap || !ind) return
-    const place = () => {
-      const btn = wrap.querySelector(`[data-tab="${active}"]`)
+    const place = (wrap, ind) => {
+      if (!wrap || !ind) return
+      const btn = [...wrap.querySelectorAll('[data-tab]')]
+        .find((item) => item.dataset.tab === active)
       if (!btn) { ind.style.opacity = '0'; return }
+      const wrapBox = wrap.getBoundingClientRect()
+      const buttonBox = btn.getBoundingClientRect()
       ind.style.opacity = '1'
-      ind.style.transform = `translateX(${btn.offsetLeft}px)`
-      ind.style.width = `${btn.offsetWidth}px`
-      // On the phone bottom-sheet the tab row scrolls — keep the active tab visible.
+      ind.style.transform = `translateX(${buttonBox.left - wrapBox.left + wrap.scrollLeft}px)`
+      ind.style.width = `${buttonBox.width}px`
       btn.scrollIntoView?.({ inline: 'nearest', block: 'nearest' })
     }
-    place()
-    const ro = new ResizeObserver(place)
-    ro.observe(wrap)
-    return () => ro.disconnect()
+    const placeAll = () => {
+      place(desktopWrapRef.current, desktopIndRef.current)
+      place(mobileWrapRef.current, mobileIndRef.current)
+    }
+    placeAll()
+    const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(placeAll) : null
+    if (desktopWrapRef.current) ro?.observe(desktopWrapRef.current)
+    if (mobileWrapRef.current) ro?.observe(mobileWrapRef.current)
+    window.addEventListener('resize', placeAll)
+    return () => {
+      ro?.disconnect()
+      window.removeEventListener('resize', placeAll)
+    }
   }, [active])
   useEffect(() => {
     if (!desktopMoreOpen) return
@@ -210,8 +221,8 @@ function TabBar({ active, onChange }) {
   }, [desktopMoreOpen])
   return (
     <>
-      <div className="drawer-tabs desktop-drawer-tabs" ref={wrapRef} role="tablist" aria-label="Player evidence sections">
-        <span className="drawer-tab-ind" ref={indRef} aria-hidden="true" />
+      <div className="drawer-tabs desktop-drawer-tabs" ref={desktopWrapRef} role="tablist" aria-label="Player evidence sections">
+        <span className="drawer-tab-ind" ref={desktopIndRef} aria-hidden="true" />
         {primaryTabs.map(t => (
           <button
             key={t.id}
@@ -230,6 +241,7 @@ function TabBar({ active, onChange }) {
           <button
             type="button"
             className={`drawer-tab desktop-more-trigger${moreActive ? ' active' : ''}`}
+            data-tab={moreActive ? active : 'more'}
             onClick={() => setDesktopMoreOpen((open) => !open)}
             aria-haspopup="menu"
             aria-expanded={desktopMoreOpen}
@@ -257,13 +269,15 @@ function TabBar({ active, onChange }) {
           )}
         </div>
       </div>
-      <div className="mobile-drawer-tabs" role="tablist" aria-label="Player detail sections">
+      <div className="mobile-drawer-tabs" ref={mobileWrapRef} role="tablist" aria-label="Player detail sections">
+        <span className="mobile-drawer-tab-ind" ref={mobileIndRef} aria-hidden="true" />
         {primaryTabs.map((t) => (
           <button
             key={t.id}
             type="button"
             role="tab"
             aria-selected={active === t.id}
+            data-tab={t.id}
             className={`mobile-drawer-tab${active === t.id ? ' active' : ''}`}
             onClick={() => {
               setMobileMoreOpen(false)
@@ -277,6 +291,7 @@ function TabBar({ active, onChange }) {
           <button
             type="button"
             className={`mobile-drawer-tab mobile-more-trigger${moreActive ? ' active' : ''}`}
+            data-tab={moreActive ? active : 'more'}
             onClick={() => setMobileMoreOpen((open) => !open)}
             aria-haspopup="menu"
             aria-expanded={mobileMoreOpen}
