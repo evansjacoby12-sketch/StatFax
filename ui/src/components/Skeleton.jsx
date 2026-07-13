@@ -6,12 +6,15 @@ export default function Skeleton() {
       <div className="topbar">
         <header className="header">
           <div className="header-left">
-            <div className="brand">
-              <span className="brand-mark sk-pulse" />
-              <div className="brand-txt">
-                <span className="sk-bar" style={{ width: 84, height: 14 }} />
-                <span className="sk-bar" style={{ width: 64, height: 9, marginTop: 5 }} />
+            <div className="brand-sport">
+              <div className="brand">
+                <span className="brand-mark sk-pulse" />
+                <div className="brand-txt">
+                  <span className="sk-bar" style={{ width: 84, height: 14 }} />
+                  <span className="sk-bar" style={{ width: 64, height: 9, marginTop: 5 }} />
+                </div>
               </div>
+              <span className="sk-bar sport-switcher-skeleton" />
             </div>
             <span className="sk-bar" style={{ width: 220, height: 12 }} />
           </div>

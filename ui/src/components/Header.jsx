@@ -33,6 +33,32 @@ function FirstPitchCountdown({ games = [] }) {
   )
 }
 
+function SportSwitcher() {
+  return (
+    <div className="sport-switcher" role="group" aria-label="Sport">
+      <button
+        type="button"
+        className="sport-option active"
+        aria-pressed="true"
+        title="MLB model board"
+      >
+        <Icon name="CircleDot" size={13} />
+        <span>MLB</span>
+      </button>
+      <button
+        type="button"
+        className="sport-option upcoming"
+        disabled
+        title="NFL models are coming soon"
+      >
+        <Icon name="Shield" size={13} />
+        <span>NFL</span>
+        <small>Soon</small>
+      </button>
+    </div>
+  )
+}
+
 // Help dropdown anchored to the header info button
 function HelpMenu({ onOpenWeather, onOpenGroups, onOpenBacktest, onOpenHowTo, onOpenSettings, onOpenModel, liveScores, onToggleLive, eliLevel, onCycleEli, refreshing, onRefresh }) {
   const [open, setOpen] = useState(false)
@@ -324,25 +350,28 @@ export default function Header({
   return (
     <header className="header">
       <div className="header-left">
-        <div className="brand">
-          <span className="brand-mark" style={{
-            background: 'linear-gradient(135deg, var(--accent) 0%, #0052d4 100%)',
-            boxShadow: '0 0 16px rgba(0, 216, 246, 0.4)',
-            borderRadius: '10px',
-            width: '34px',
-            height: '34px',
-            display: 'grid',
-            placeItems: 'center',
-            color: '#fff'
-          }}>
-            <Icon name="Trophy" size={16} />
-          </span>
-          <div className="brand-txt">
-            <span className="brand-name">
-              Stat<span style={{ color: 'var(--accent)', textShadow: '0 0 8px var(--accent-glow)' }}>Fax</span>
+        <div className="brand-sport">
+          <div className="brand">
+            <span className="brand-mark" style={{
+              background: 'linear-gradient(135deg, var(--accent) 0%, #0052d4 100%)',
+              boxShadow: '0 0 16px rgba(0, 216, 246, 0.4)',
+              borderRadius: '10px',
+              width: '34px',
+              height: '34px',
+              display: 'grid',
+              placeItems: 'center',
+              color: '#fff'
+            }}>
+              <Icon name="Trophy" size={16} />
             </span>
-            <span className="brand-sub">Model Board</span>
+            <div className="brand-txt">
+              <span className="brand-name">
+                Stat<span style={{ color: 'var(--accent)', textShadow: '0 0 8px var(--accent-glow)' }}>Fax</span>
+              </span>
+              <span className="brand-sub">Model Board</span>
+            </div>
           </div>
+          <SportSwitcher />
         </div>
         <div className="slate-block">
           <div className="slate-meta">

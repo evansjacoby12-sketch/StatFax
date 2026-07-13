@@ -13464,6 +13464,146 @@ button.th:focus-visible {
   .bottom-nav-btn { transition: none !important; }
 }
 
+/* Multi-sport command header. Sport is the first level of navigation;
+   workspace tabs and filters stay in the command rail below it. */
+.brand-sport {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding-right: 18px;
+  border-right: 1px solid var(--border-soft);
+}
+
+.sport-switcher {
+  height: 36px;
+  padding: 3px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex: none;
+  border: 1px solid rgba(255,255,255,.055);
+  border-radius: 11px;
+  background: rgba(255,255,255,.025);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.025);
+}
+
+.sport-option {
+  height: 28px;
+  padding: 0 9px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-faint);
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  font-family: var(--display);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .055em;
+  text-transform: uppercase;
+}
+
+.sport-option.active {
+  color: var(--accent);
+  border-color: rgba(0,216,246,.28);
+  background: rgba(0,216,246,.085);
+  box-shadow: 0 0 14px rgba(0,216,246,.08), inset 0 1px 0 rgba(255,255,255,.035);
+}
+
+.sport-option.active svg {
+  filter: drop-shadow(0 0 4px var(--accent-glow));
+}
+
+.sport-option.upcoming {
+  padding-right: 6px;
+  color: #657083;
+  cursor: not-allowed;
+  opacity: 1;
+}
+
+.sport-option.upcoming small {
+  padding: 2px 4px;
+  color: #7e899a;
+  border: 1px solid rgba(255,255,255,.06);
+  border-radius: 4px;
+  background: rgba(255,255,255,.025);
+  font-family: var(--mono);
+  font-size: 6px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  line-height: 1;
+}
+
+.sport-switcher-skeleton {
+  width: 132px;
+  height: 36px;
+  border-radius: 11px;
+}
+
+@media (min-width: 561px) {
+  .header {
+    min-height: 58px;
+    padding-inline: 18px;
+  }
+
+  .header-left { gap: 20px; }
+
+  .header-right {
+    gap: 4px;
+    padding: 3px;
+    border: 1px solid rgba(255,255,255,.055);
+    border-radius: 13px;
+    background: rgba(255,255,255,.02);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.025);
+  }
+
+  .header-right .metric-pill {
+    border-color: transparent;
+    background: transparent;
+  }
+
+  .header-right .gen-meta { padding-inline: 7px; }
+}
+
+@media (max-width: 760px) and (min-width: 561px) {
+  .sport-option.upcoming span { display: none; }
+  .sport-option.upcoming { padding-inline: 7px; }
+  .slate-batters { display: none; }
+}
+
+@media (max-width: 560px) {
+  .brand-sport {
+    gap: 10px;
+    padding-right: 0;
+    border-right: 0;
+  }
+
+  .sport-switcher {
+    height: 32px;
+    padding: 2px;
+    border-radius: 10px;
+  }
+
+  .sport-option {
+    height: 26px;
+    padding-inline: 7px;
+    gap: 4px;
+    font-size: 9px;
+  }
+
+  .sport-option svg { width: 11px; height: 11px; }
+  .sport-option.upcoming { padding-right: 4px; }
+  .sport-option.upcoming small { padding-inline: 3px; font-size: 5.5px; }
+  .sport-switcher-skeleton { width: 116px; height: 32px; }
+
+  .header-right {
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+}
+
 /* Mobile Weather + Pitcher Cards: approved scan-first hierarchy. */
 .mobile-page-kicker,
 .wx-sort-select,
