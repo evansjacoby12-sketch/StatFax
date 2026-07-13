@@ -59,6 +59,23 @@ files remain visible as limited coverage and are not presented as current.
 - `dist/nfl/weather.json` or `NFL_WEATHER_PATH`: `{ generatedAt, games:
   [{ gameId, tempF, windMph, precipProbability, roof, source }] }`
 
+When those files are absent, the slate builds the same contracts automatically.
+ESPN team depth pages supply offensive depth order and reported availability;
+Open-Meteo supplies outdoor kickoff temperature, precipitation probability,
+sustained wind, and gusts for games inside its forecast window. Failures remain
+visible in `dataHealth` and fall back to historical role or neutral weather.
+
+## Season tracking and feed health
+
+Each slate run freezes opening and latest pregame forecasts in
+`dist/nfl/tracking.json`. Final ESPN box scores settle them and calculate Brier
+score for TD markets, projection MAE for volume markets, and unit profit/ROI
+only when real prices exist. GitHub Actions caches this ledger across deploys.
+
+`daily.json.dataHealth` reports schedule, roster, depth, availability, weather,
+and history independently. The UI also warns when the published slate is more
+than 45 minutes old.
+
 The NFL UI stores watchlists, active slips, and up to 50 settled tickets in
 local storage. Tickets settle from live/final player stats; First TD legs use
 the scorer identifier when the live feed supplies it and void safely when a

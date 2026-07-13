@@ -1,4 +1,5 @@
 const ESPN_BASE = 'https://site.api.espn.com/apis/site/v2/sports/football/nfl'
+const ESPN_WEB = 'https://www.espn.com/nfl/team/depth/_/name'
 const POSITIONS = new Set(['QB', 'RB', 'WR', 'TE'])
 
 const n = (value, fallback = 0) => {
@@ -81,6 +82,40 @@ export function parseESPNRoster(payload, teamAbbr) {
       } : null,
     }
   }).filter(Boolean)
+}
+
+const decodeHTML = (value = '') => String(value)
+  .replace(/&amp;/g, '&').replace(/&#x27;|&#39;/g, "'").replace(/&quot;/g, '"')
+  .replace(/&nbsp;/g, ' ').replace(/<[^>]+>/g, '').trim()
+
+const INJURY_LABELS = { Q: 'Questionable', D: 'Doubtful', O: 'Out', IR: 'Injured Reserve', PUP: 'PUP', SUS: 'Suspended' }
+
+export function parseESPNDepthChartHTML(html, teamAbbr) {
+  const rows = new Map()
+  const rowPattern = /<tr[^>]*data-idx="(\d+)"[^>]*>([\s\S]*?)<\/tr>/gi
+  for (const match of String(html || '').matchAll(rowPattern)) {
+    const index = Number(match[1])
+    const body = match[2]
+    const positionMatch = body.match(/data-testid="statCell"[^>]*>\s*(QB|RB|WR|TE)(?:<!-- -->)?/i)
+    if (positionMatch && !rows.has(index)) rows.set(index, { position: positionMatch[1].toUpperCase(), players: [] })
+  }
+  for (const match of String(html || '').matchAll(rowPattern)) {
+    const index = Number(match[1])
+    const row = rows.get(index)
+    if (!row || row.players.length) continue
+    const playerPattern = /data-player-uid="[^"]*a:(\d+)"[^>]*href="[^"]*\/player\/_\/id\/\d+\/[^"]*"[^>]*>([\s\S]*?)<\/a>\s*<span[^>]*DepthChart__injuryMeta[^>]*>([\s\S]*?)<\/span>/gi
+    for (const playerMatch of match[2].matchAll(playerPattern)) {
+      const injuryCode = decodeHTML(playerMatch[3]).toUpperCase()
+      row.players.push({
+        espnId: playerMatch[1], name: decodeHTML(playerMatch[2]), team: teamAbbr,
+        position: row.position, depthRank: row.players.length + 1,
+        role: row.players.length ? `${row.players.length + 1}${row.players.length === 1 ? 'nd' : row.players.length === 2 ? 'rd' : 'th'} string` : 'Starter',
+        status: INJURY_LABELS[injuryCode] || (injuryCode || 'Active'),
+        active: !['O', 'IR', 'PUP', 'SUS'].includes(injuryCode), source: 'espn-depth-chart',
+      })
+    }
+  }
+  return [...rows.values()].flatMap((row) => row.players)
 }
 
 function parseClockSeconds(clock) {
@@ -167,12 +202,22 @@ async function getJSON(url, fetchImpl) {
   return response.json()
 }
 
+async function getText(url, fetchImpl) {
+  const response = await fetchImpl(url, { headers: { Accept: 'text/html', 'User-Agent': 'StatFax-NFL/1.0' } })
+  if (!response.ok) throw new Error(`ESPN HTTP ${response.status}: ${url}`)
+  return response.text()
+}
+
 export async function fetchESPNSeason(year, fetchImpl = fetch) {
   return parseESPNScoreboard(await getJSON(`${ESPN_BASE}/scoreboard?limit=1000&dates=${year}`, fetchImpl))
 }
 
 export async function fetchESPNRoster(teamAbbr, fetchImpl = fetch) {
   return parseESPNRoster(await getJSON(`${ESPN_BASE}/teams/${teamAbbr.toLowerCase()}/roster`, fetchImpl), teamAbbr)
+}
+
+export async function fetchESPNDepthChart(teamAbbr, fetchImpl = fetch) {
+  return parseESPNDepthChartHTML(await getText(`${ESPN_WEB}/${teamAbbr.toLowerCase()}`, fetchImpl), teamAbbr)
 }
 
 export async function fetchESPNSummary(game, fetchImpl = fetch) {
