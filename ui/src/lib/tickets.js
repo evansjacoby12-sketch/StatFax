@@ -28,6 +28,14 @@ function write(list) {
   try { window.dispatchEvent(new Event(EVT)) } catch { /* SSR */ }
 }
 
+export function trackTicket(ticket) {
+  const list = read()
+  if (!ticket?.id || list.some((item) => item.id === ticket.id)) return false
+  list.unshift(ticket)
+  write(list)
+  return true
+}
+
 // Stable id from the leg set + slate date, so the same pair on the same day is
 // one ticket (idempotent Track), but the same pair on another day is distinct.
 export function ticketId(legs, date) {
@@ -36,8 +44,18 @@ export function ticketId(legs, date) {
 }
 
 // Build a ticket record from a display combo group (or a manual leg list).
-export function makeTicket({ legs, date, strategy = 'custom', label = 'Custom', size = null, allHit = null, american = null }) {
-  const slim = (legs || []).map((b) => ({ playerId: b.playerId, name: b.name, team: b.team, gamePk: b.gamePk }))
+export function makeTicket({ legs, date, strategy = 'custom', label = 'Custom', size = null, allHit = null, american = null, wager = null, book = null }) {
+  const slim = (legs || []).map((b) => ({
+    playerId: b.playerId,
+    name: b.name,
+    team: b.team,
+    opponent: b.opponent?.abbr || b.opponent || null,
+    gamePk: b.gamePk,
+    grade: b.grade?.label || b.grade || null,
+    score: Number.isFinite(b.score) ? b.score : null,
+    modelProb: Number.isFinite(b.hrProbability) ? b.hrProbability : null,
+    lineupConfirmed: b.lineupConfirmed === true,
+  }))
   return {
     id: ticketId(slim, date),
     tailedAt: Date.now(),
@@ -47,6 +65,8 @@ export function makeTicket({ legs, date, strategy = 'custom', label = 'Custom', 
     size: size ?? slim.length,
     allHitPct: Number.isFinite(allHit) ? allHit : null,
     american: Number.isFinite(american) ? american : null,
+    wager: Number.isFinite(wager) && wager > 0 ? wager : null,
+    book: book || null,
     legs: slim,
     settled: null, // { cashed: bool, at: ts } once every leg's game is final
   }
@@ -68,13 +88,25 @@ export function useTickets() {
   const toggle = useCallback((ticket) => {
     const list = read()
     const i = list.findIndex((t) => t.id === ticket.id)
-    if (i >= 0) list.splice(i, 1)
-    else list.unshift(ticket)
-    write(list)
+    if (i >= 0) {
+      list.splice(i, 1)
+      write(list)
+    } else {
+      trackTicket(ticket)
+    }
     return i < 0 // true when newly added
   }, [])
 
   const remove = useCallback((id) => { write(read().filter((t) => t.id !== id)) }, [])
+
+  const update = useCallback((id, patch) => {
+    const list = read()
+    const ticket = list.find((item) => item.id === id)
+    if (!ticket || ticket.settled) return false
+    Object.assign(ticket, patch, { updatedAt: Date.now() })
+    write(list)
+    return true
+  }, [])
 
   // Freeze the final outcome onto a ticket once its games are all done, so the
   // result survives after the slate rolls to the next day (when the live batters
@@ -87,5 +119,5 @@ export function useTickets() {
 
   const isTracked = useCallback((id) => tickets.some((t) => t.id === id), [tickets])
 
-  return { tickets, toggle, remove, settle, isTracked }
+  return { tickets, toggle, remove, update, settle, isTracked }
 }

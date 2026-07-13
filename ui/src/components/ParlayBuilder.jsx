@@ -8,6 +8,7 @@ import { buildParlay } from '../lib/parlayMath.js'
 import { buildGroups, lastFirst } from '../lib/groups.js'
 import { comboStatus, legStatus, VERDICT_META, LEG_META } from '../lib/live.js'
 import * as store from '../lib/storage.js'
+import { makeTicket, trackTicket } from '../lib/tickets.js'
 import { toast } from './Toast.jsx'
 
 const GRADE_COLOR = { S: '#f5a623', A: '#10b981', B: '#3b82f6', C: '#94a3b8', D: '#64748b' }
@@ -265,6 +266,17 @@ export default function ParlayBuilder({ batters, legs, slipSet, onToggle, onRemo
     const next = [entry, ...saved.filter((s) => s.ids.join() !== entry.ids.join())].slice(0, 20)
     setSaved(next)
     store.save('savedSlips', next)
+    const wagerNumber = Number(wager)
+    trackTicket(makeTicket({
+      legs,
+      date: new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' }),
+      strategy: 'saved-parlay',
+      label: name,
+      size: legs.length,
+      allHit: p.modelAllHit,
+      american: p.american,
+      wager: Number.isFinite(wagerNumber) && wagerNumber > 0 ? wagerNumber : null,
+    }))
     toast.success('Slip saved')
   }
   const deleteSaved = (id) => {

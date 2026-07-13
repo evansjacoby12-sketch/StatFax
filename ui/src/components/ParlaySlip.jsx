@@ -6,6 +6,7 @@ import { gradeColor } from '../lib/badges.js'
 import { buildParlay } from '../lib/parlayMath.js'
 import { comboStatus, legStatus, LEG_META, VERDICT_META } from '../lib/live.js'
 import * as store from '../lib/storage.js'
+import { makeTicket, trackTicket } from '../lib/tickets.js'
 import { toast } from './Toast.jsx'
 
 const GRADE_COLOR = { S: '#f5a623', A: '#10b981', B: '#3b82f6', C: '#94a3b8', D: '#64748b' }
@@ -48,7 +49,7 @@ function decisionLabel(parlay) {
   return { label: 'Market is expensive', detail: `${signedPct(parlay.ev, 0)} expected value`, tone: 'negative' }
 }
 
-function saveSlip(legs) {
+function saveSlip(legs, parlay, wager) {
   const saved = store.load('savedSlips', [])
   const entry = {
     id: `s${Date.now()}`,
@@ -58,6 +59,17 @@ function saveSlip(legs) {
   }
   const next = [entry, ...saved.filter((s) => s.ids.join() !== entry.ids.join())].slice(0, 20)
   store.save('savedSlips', next)
+  const wagerNumber = Number(wager)
+  trackTicket(makeTicket({
+    legs,
+    date: new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' }),
+    strategy: 'saved-parlay',
+    label: 'Saved parlay',
+    size: legs.length,
+    allHit: parlay.modelAllHit,
+    american: parlay.american,
+    wager: Number.isFinite(wagerNumber) && wagerNumber > 0 ? wagerNumber : null,
+  }))
   toast.success('Slip saved')
 }
 
@@ -145,7 +157,7 @@ export default function ParlaySlip({ legs, batters = [], onRemove, onClear, onSe
             </div>
             <div className="slip-head-actions" role="group" aria-label="Slip actions">
               <button type="button" className="icon-btn" onClick={share} aria-label="Share parlay" title="Share or copy"><Icon name="Share2" size={15} /></button>
-              <button type="button" className="icon-btn" onClick={() => saveSlip(legs)} aria-label="Save parlay" title="Save"><Icon name="Bookmark" size={15} /></button>
+              <button type="button" className="icon-btn" onClick={() => saveSlip(legs, parlay, wager)} aria-label="Save parlay" title="Save"><Icon name="Bookmark" size={15} /></button>
               <button type="button" className="icon-btn" onClick={onClear} aria-label="Clear parlay" title="Clear"><Icon name="Trash2" size={15} /></button>
               <button type="button" className="icon-btn slip-close" onClick={() => setOpen(false)} aria-label="Close decision slip"><Icon name="X" size={17} /></button>
             </div>

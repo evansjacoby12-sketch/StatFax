@@ -10423,6 +10423,782 @@ button.th:focus-visible {
   .groups-modal[aria-label='Parlay Combos'] .grp-size-controls > .badge-toggle { font-size: 9px; }
 }
 
+/* ============ Phase 5: results accountability workspace ============ */
+.accountability-subnav {
+  margin-bottom: 18px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.accountability-subnav > button {
+  min-height: 42px;
+  padding: 8px 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--text-faint);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+
+.accountability-subnav > button[aria-selected='true'] {
+  border-bottom-color: var(--accent);
+  color: #fff;
+}
+
+.accountability-overview {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.accountability-verdict {
+  min-height: 68px;
+  padding: 12px 16px;
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--border));
+  border-left: 3px solid var(--accent);
+  border-radius: 4px 12px 12px 4px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 8%, transparent), transparent 72%);
+}
+
+.accountability-verdict > span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--accent);
+  font-size: 9px;
+  font-weight: 850;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.accountability-verdict p {
+  margin: 6px 0 0;
+  max-width: 980px;
+  color: var(--text-dim);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.accountability-verdict.positive {
+  border-color: color-mix(in srgb, var(--strong) 26%, var(--border));
+  border-left-color: var(--strong);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--strong) 7%, transparent), transparent 72%);
+}
+
+.accountability-verdict.positive > span { color: var(--strong); }
+.accountability-verdict.warning { border-left-color: var(--warn); }
+.accountability-verdict.warning > span { color: var(--warn); }
+
+.accountability-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.accountability-kpis .results-kpi {
+  min-height: 104px;
+  padding: 14px !important;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  border-radius: 12px !important;
+  text-align: left !important;
+}
+
+.accountability-kpis .results-kpi-value { font-size: 23px !important; }
+
+.accountability-grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.82fr) minmax(0, 1.8fr);
+  align-items: start;
+  gap: 16px;
+}
+
+.accountability-grid > .results-card {
+  margin: 0;
+  padding: 16px;
+  border-radius: 13px;
+  background: rgba(17, 18, 20, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.accountability-grid h3,
+.accountability-section-head h3 {
+  margin: 0 0 14px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--text-dim);
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.accountability-grid h3 svg { color: var(--accent); }
+
+.accountability-brief {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.review-brief-item {
+  padding: 11px 0;
+  border-top: 1px solid var(--border-soft);
+}
+
+.review-brief-item > span {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--text-faint);
+  font-size: 8px;
+  font-weight: 850;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.review-brief-item.positive > span { color: var(--strong); }
+.review-brief-item.warning > span { color: var(--warn); }
+
+.review-brief-item p {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 10.5px;
+  line-height: 1.5;
+}
+
+.review-next-action {
+  margin-top: 5px;
+  padding: 10px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--border));
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+  color: var(--accent);
+}
+
+.review-next-action > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.review-next-action small {
+  color: var(--text-faint);
+  font-size: 7.5px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.review-next-action b {
+  color: #fff;
+  font-size: 10.5px;
+  line-height: 1.35;
+}
+
+.accountability-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.accountability-section-head h3 { margin-bottom: 14px; }
+
+.accountability-section-head > button {
+  min-height: 34px;
+  margin-bottom: 10px;
+  padding: 5px 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.ticket-ledger {
+  min-width: 0;
+}
+
+.ticket-ledger-head {
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ticket-ledger-summary {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(64px, auto));
+  gap: 14px;
+}
+
+.ticket-ledger-summary > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ticket-ledger-summary b {
+  color: #fff;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.ticket-ledger-summary b.accent { color: var(--accent); }
+.ticket-ledger-summary small {
+  color: var(--text-faint);
+  font-size: 7.5px;
+  font-weight: 750;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.ticket-ledger .mt-add-btn {
+  min-height: 36px;
+  margin-left: auto;
+  padding: 7px 11px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.ticket-ledger-note {
+  margin-bottom: 9px;
+  padding: 7px 9px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--border-soft);
+  border-radius: 7px;
+  color: var(--text-faint);
+  font-size: 9px;
+  line-height: 1.35;
+}
+
+.ticket-list {
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  list-style: none;
+}
+
+.ticket-card {
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.018);
+  overflow: hidden;
+}
+
+.ticket-card.status-cashed {
+  border-color: color-mix(in srgb, var(--strong) 24%, var(--border));
+  background: color-mix(in srgb, var(--strong) 4%, transparent);
+}
+
+.ticket-card.status-dead {
+  border-color: color-mix(in srgb, var(--bad) 20%, var(--border));
+  background: color-mix(in srgb, var(--bad) 3%, transparent);
+}
+
+.ticket-card.status-live { border-color: color-mix(in srgb, var(--accent) 27%, var(--border)); }
+
+.ticket-card-head {
+  min-height: 39px;
+  padding: 7px 10px;
+  display: grid;
+  grid-template-columns: 68px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.ticket-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 8.5px;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+}
+
+.ticket-card-date,
+.ticket-card-price {
+  color: var(--text-faint);
+  font-size: 8.5px;
+}
+
+.ticket-card-price { color: var(--text-dim); font-weight: 750; }
+
+.ticket-card-body {
+  padding: 9px 10px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(190px, 0.65fr);
+  align-items: center;
+  gap: 12px;
+}
+
+.ticket-leg-list {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.ticket-leg-list > button {
+  min-width: 0;
+  min-height: 30px;
+  padding: 3px 5px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+}
+
+.ticket-leg-list > button:hover { background: rgba(255, 255, 255, 0.025); }
+
+.ticket-leg-list > button > span:first-child {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.ticket-leg-list b {
+  overflow: hidden;
+  font-size: 10.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ticket-leg-list small {
+  flex: none;
+  color: var(--text-faint);
+  font-size: 8px;
+}
+
+.ticket-leg-list > button > span:last-child {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 8px;
+  font-weight: 750;
+}
+
+.ticket-economics {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.ticket-economics > span {
+  min-width: 0;
+  min-height: 49px;
+  padding: 7px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  border: 1px solid var(--border-soft);
+  border-radius: 7px;
+  background: rgba(0, 0, 0, 0.13);
+}
+
+.ticket-economics small {
+  color: var(--text-faint);
+  font-size: 7px;
+  font-weight: 750;
+  letter-spacing: 0.035em;
+  text-transform: uppercase;
+}
+
+.ticket-economics b {
+  overflow: hidden;
+  color: #fff;
+  font-size: 10.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ticket-card-foot {
+  min-height: 37px;
+  padding: 4px 7px 4px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-top: 1px solid var(--border-soft);
+  background: rgba(255, 255, 255, 0.012);
+}
+
+.ticket-card-foot > span {
+  overflow: hidden;
+  color: var(--text-faint);
+  font-size: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ticket-card-foot > div {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+}
+
+.ticket-card-foot button {
+  width: 34px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-faint);
+}
+
+.ticket-card-foot button:hover { background: rgba(255, 255, 255, 0.04); color: #fff; }
+
+.ticket-edit-row {
+  padding: 8px 10px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(110px, 1fr)) auto;
+  align-items: end;
+  gap: 8px;
+  border-top: 1px solid var(--border-soft);
+  background: color-mix(in srgb, var(--accent) 4%, transparent);
+}
+
+.ticket-edit-row label,
+.ticket-add-economics label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ticket-edit-row label > span,
+.ticket-add-economics label > span {
+  color: var(--text-faint);
+  font-size: 7.5px;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+
+.ticket-edit-row input,
+.ticket-add-economics input,
+.ticket-add-form > input {
+  width: 100%;
+  min-height: 38px;
+  box-sizing: border-box;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.25);
+  color: #fff;
+  font-family: var(--mono);
+  font-size: 11px;
+  outline: none;
+}
+
+.ticket-edit-row input,
+.ticket-add-economics input { padding: 7px 9px; }
+.ticket-edit-row input:focus,
+.ticket-add-economics input:focus,
+.ticket-add-form > input:focus { border-color: color-mix(in srgb, var(--accent) 50%, var(--border)); }
+
+.ticket-edit-row > button,
+.ticket-add-economics > button {
+  min-height: 38px;
+  padding: 7px 11px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.ticket-empty {
+  min-height: 94px;
+  padding: 14px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border: 1px dashed rgba(255, 255, 255, 0.09);
+  border-radius: 10px;
+}
+
+.ticket-empty > div {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-faint);
+}
+
+.ticket-empty > div > span { display: flex; flex-direction: column; gap: 3px; }
+.ticket-empty b { color: #fff; font-size: 11.5px; }
+.ticket-empty small { color: var(--text-faint); font-size: 9.5px; line-height: 1.35; }
+
+.ticket-ledger.compact .ticket-ledger-head,
+.ticket-ledger.compact .ticket-ledger-note { display: none; }
+
+.ticket-ledger.compact .ticket-card-body { grid-template-columns: minmax(0, 1fr) minmax(170px, 0.62fr); }
+.ticket-ledger.compact .ticket-card-foot > span { max-width: 70%; }
+
+.ticket-add-form {
+  margin-bottom: 12px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 20%, var(--border));
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.16);
+}
+
+.ticket-add-head {
+  margin-bottom: 9px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ticket-add-head > span:first-child { display: flex; flex-direction: column; gap: 3px; }
+.ticket-add-head b { color: #fff; font-size: 11px; }
+.ticket-add-head small { color: var(--text-faint); font-size: 9px; }
+.ticket-add-head > span:last-child { color: var(--accent); font-family: var(--mono); font-size: 10px; font-weight: 800; }
+.ticket-add-form > input { padding: 8px 10px; font-family: var(--font); }
+
+.ticket-picked {
+  margin-top: 7px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.ticket-picked button {
+  min-height: 28px;
+  padding: 3px 7px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  color: var(--accent);
+  font-size: 9px;
+  font-weight: 750;
+}
+
+.ticket-player-pool {
+  max-height: 190px;
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+}
+
+.ticket-player-pool > button {
+  min-height: 38px;
+  padding: 5px 7px;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) 45px;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-faint);
+  text-align: left;
+}
+
+.ticket-player-pool > button.on {
+  border-color: color-mix(in srgb, var(--accent) 24%, transparent);
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+  color: var(--accent);
+}
+
+.ticket-player-pool > button > span:nth-child(2) { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.ticket-player-pool b { overflow: hidden; color: #fff; font-size: 10.5px; text-overflow: ellipsis; white-space: nowrap; }
+.ticket-player-pool small { color: var(--text-faint); font-size: 8px; }
+.ticket-player-pool > button > span:last-child { justify-self: end; font-size: 9px; }
+
+.ticket-add-economics {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: minmax(110px, 1fr) minmax(110px, 1fr) auto;
+  align-items: end;
+  gap: 8px;
+}
+
+.ticket-add-economics > button:disabled { opacity: 0.45; }
+
+@media (max-width: 820px) {
+  .accountability-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .accountability-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 560px) {
+  .accountability-subnav {
+    min-height: 48px;
+    margin: 0 0 12px;
+    padding: 3px;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 3px;
+    border: 1px solid var(--border-soft);
+    border-radius: 11px;
+    background: rgba(255, 255, 255, 0.018);
+  }
+
+  .accountability-subnav > button {
+    min-height: 42px;
+    padding: 6px 3px;
+    border: 0;
+    border-radius: 8px;
+    font-size: 9px;
+  }
+
+  .accountability-subnav > button[aria-selected='true'] {
+    border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
+    background: color-mix(in srgb, var(--accent) 8%, transparent);
+    color: var(--accent);
+  }
+
+  .accountability-overview { gap: 10px; }
+  .accountability-verdict { min-height: 72px; padding: 10px 12px; }
+  .accountability-verdict p { font-size: 10.5px; }
+  .accountability-kpis { gap: 7px; }
+
+  .accountability-kpis .results-kpi {
+    min-width: 0;
+    min-height: 90px;
+    padding: 9px !important;
+  }
+
+  .accountability-kpis .results-kpi-label { min-height: 20px; font-size: 8px !important; }
+  .accountability-kpis .results-kpi-value { font-size: 18px !important; }
+  .accountability-kpis .results-kpi-sub { min-height: 20px; font-size: 8px !important; line-height: 1.3; }
+
+  .accountability-grid { gap: 10px; }
+  .accountability-grid > .results-card { display: block !important; padding: 12px !important; }
+
+  .accountability-section-head > button { min-height: 44px; margin: -8px 0 4px; }
+  .review-brief-item p { font-size: 10px; }
+  .review-next-action { min-height: 44px; }
+
+  .ticket-ledger-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .ticket-ledger-summary {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 5px;
+  }
+
+  .ticket-ledger-summary > span {
+    min-width: 0;
+    padding: 6px;
+    border: 1px solid var(--border-soft);
+    border-radius: 7px;
+  }
+
+  .ticket-ledger-summary b { font-size: 10px; }
+  .ticket-ledger-summary small { font-size: 6.5px; }
+  .ticket-ledger .mt-add-btn { min-height: 44px; width: 100%; margin: 0; }
+
+  .ticket-card-head {
+    min-height: 42px;
+    grid-template-columns: 62px minmax(0, 1fr) auto;
+    padding: 6px 8px;
+  }
+
+  .ticket-card-body {
+    padding: 7px 8px 9px;
+    grid-template-columns: 1fr;
+    gap: 7px;
+  }
+
+  .ticket-leg-list > button { min-height: 44px; padding: 5px 4px; }
+  .ticket-leg-list b { font-size: 11px; }
+  .ticket-leg-list small { display: block; }
+  .ticket-economics { gap: 4px; }
+  .ticket-economics > span { min-height: 47px; padding: 6px; }
+  .ticket-economics small { font-size: 6.5px; }
+  .ticket-economics b { font-size: 10px; }
+
+  .ticket-card-foot { min-height: 48px; }
+  .ticket-card-foot button { width: 44px; height: 44px; }
+
+  .ticket-edit-row,
+  .ticket-add-economics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ticket-edit-row > button,
+  .ticket-add-economics > button {
+    min-height: 44px;
+    grid-column: 1 / -1;
+  }
+
+  .ticket-empty {
+    min-height: 130px;
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .ticket-empty .mt-add-btn { width: 100%; margin: auto 0 0; }
+  .ticket-add-form { padding: 10px; }
+  .ticket-add-head { align-items: flex-start; }
+  .ticket-add-head small { max-width: 220px; }
+  .ticket-add-form > input { min-height: 44px; }
+  .ticket-player-pool > button { min-height: 44px; }
+
+  .ticket-ledger.compact .ticket-card-body { grid-template-columns: 1fr; }
+  .ticket-ledger.compact .ticket-card:nth-child(n+3) { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ticket-card,
+  .accountability-subnav > button { transition: none !important; }
+}
+
 /* ============ Phase 4: parlay decision workspace ============ */
 .parlay-slip {
   width: 390px;
@@ -14038,5 +14814,20 @@ button.th:focus-visible {
   .groups-modal[aria-label="Same-Game Parlays"] .sgp-leg {
     grid-template-columns: 18px minmax(0, 1fr) auto 44px;
     gap: 5px;
+  }
+}
+
+/* Keep the three-mode Phase 5 control above legacy two-mode Results rules. */
+@media (max-width: 560px) {
+  .results-wrap .accountability-subnav {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  .accountability-kpis .results-kpi,
+  .accountability-kpis .results-kpi-label,
+  .accountability-kpis .results-kpi-sub {
+    align-items: flex-start;
+    justify-items: start;
+    text-align: left;
   }
 }

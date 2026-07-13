@@ -665,7 +665,7 @@ export default function App() {
             batters={all}
             onSelect={(b) => setSelectedId(b.id)}
             favorConsistency={favorConsistency}
-            initialTab={view === 'combos' ? 'combos' : 'model'}
+            initialTab={view === 'combos' ? 'combos' : 'overview'}
           />
         ) : view === 'pitchers' ? (
           <PitchersView

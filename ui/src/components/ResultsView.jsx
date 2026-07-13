@@ -1,11 +1,14 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Icon from './Icon.jsx'
-import { pct, num } from '../lib/format.js'
+import { pct, num, signedPct } from '../lib/format.js'
 import { GRADE_ORDER, gradeColor } from '../lib/badges.js'
 import { GradeChip } from './atoms.jsx'
 import { playerHeadshot } from '../lib/teams.js'
 import { hexA } from './atoms.jsx'
 import CombosView from './CombosView.jsx'
+import MyTickets from './MyTickets.jsx'
+import { useTickets } from '../lib/tickets.js'
+import { gradeTicket, summarizeTickets } from '../lib/ticketMath.js'
 
 function computeAuc(rows) {
   const y = rows.map((r) => (r.homered ? 1 : 0))
@@ -26,41 +29,116 @@ function computeAuc(rows) {
 }
 
 const RESULTS_TABS = [
+  { id: 'overview', label: 'Overview', icon: 'LayoutGrid' },
+  { id: 'tickets', label: 'My Tickets', icon: 'Bookmark' },
   { id: 'model', label: 'Model', icon: 'Activity' },
-  { id: 'combos', label: 'Combos', icon: 'Layers' },
 ]
 
 // Results hub: the model track record and the parlay-combo record share one tab
 // now (combos was folded back in here), switched by a sub-toggle.
 export default function ResultsView({ meta, batters, onSelect, favorConsistency = false, initialTab = 'model' }) {
-  const [tab, setTab] = useState(initialTab)
-  useEffect(() => setTab(initialTab), [initialTab])
+  const normalizedInitial = initialTab === 'combos' ? 'tickets' : initialTab === 'model' ? 'model' : 'overview'
+  const [tab, setTab] = useState(normalizedInitial)
+  useEffect(() => setTab(initialTab === 'combos' ? 'tickets' : initialTab === 'model' ? 'model' : 'overview'), [initialTab])
   return (
     <div className="results-wrap">
-      {tab === 'model' && (
-        <div className="mobile-page-kicker results-mobile-kicker">
-          <span><Icon name="BarChart3" size={14} /> Results center</span>
-          <small className="mono">Model performance</small>
-        </div>
-      )}
-      <div className="results-subnav" style={{ display: 'flex', gap: '6px', marginBottom: '20px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+      <div className="mobile-page-kicker results-mobile-kicker">
+        <span><Icon name="BarChart3" size={14} /> Accountability</span>
+        <small className="mono">Outcomes + process</small>
+      </div>
+      <div className="results-subnav accountability-subnav" role="tablist" aria-label="Results workspace">
         {RESULTS_TABS.map((t) => (
-          <button key={t.id} onClick={() => setTab(t.id)} aria-pressed={tab === t.id} style={{
-            display: 'inline-flex', alignItems: 'center', gap: '5px',
-            padding: '8px 14px', fontSize: '12px', fontWeight: '700',
-            textTransform: 'uppercase', letterSpacing: '0.04em',
-            background: 'none', border: 'none', cursor: 'pointer',
-            color: tab === t.id ? '#fff' : 'var(--text-faint)',
-            borderBottom: tab === t.id ? '2px solid var(--accent)' : '2px solid transparent',
-            marginBottom: '-1px',
-          }}>
+          <button key={t.id} role="tab" onClick={() => setTab(t.id)} aria-selected={tab === t.id} aria-pressed={tab === t.id}>
             <Icon name={t.icon} size={13} /> {t.label}
           </button>
         ))}
       </div>
-      {tab === 'combos'
-        ? <CombosView batters={batters} onSelect={onSelect} favorConsistency={favorConsistency} />
-        : <ModelResults meta={meta} />}
+      {tab === 'overview' && <AccountabilityOverview meta={meta} batters={batters} onSelect={onSelect} onOpenTickets={() => setTab('tickets')} />}
+      {tab === 'tickets' && <CombosView batters={batters} onSelect={onSelect} favorConsistency={favorConsistency} initialSection="tickets" />}
+      {tab === 'model' && <ModelResults meta={meta} />}
+    </div>
+  )
+}
+
+function AccountabilityOverview({ meta, batters, onSelect, onOpenTickets }) {
+  const { tickets } = useTickets()
+  const graded = useMemo(() => tickets.map((ticket) => gradeTicket(ticket, batters)), [tickets, batters])
+  const summary = useMemo(() => summarizeTickets(graded), [graded])
+  const [log, setLog] = useState(null)
+
+  useEffect(() => {
+    let alive = true
+    fetch(`${import.meta.env.BASE_URL}data/backtest-log.json`, { cache: 'no-store' })
+      .then((response) => response.ok ? response.json() : null)
+      .then((data) => { if (alive) setLog(data) })
+      .catch(() => { if (alive) setLog(null) })
+    return () => { alive = false }
+  }, [])
+
+  const rows = useMemo(() => Object.entries(log?.records || {}).flatMap(([date, records]) => (records || [])
+    .filter((record) => typeof record.homered === 'boolean')
+    .map((record) => ({ ...record, date }))), [log])
+  const baseRate = rows.length ? rows.filter((row) => row.homered).length / rows.length : null
+  const gradeReview = GRADE_ORDER.map((grade) => {
+    const segment = rows.filter((row) => (row.grade || 'SKIP') === grade)
+    return { grade, n: segment.length, rate: segment.length ? segment.filter((row) => row.homered).length / segment.length : null }
+  })
+  const qualifiedGrades = gradeReview.filter((item) => item.n >= 20 && item.rate != null)
+  const strongestGrade = qualifiedGrades.slice().sort((a, b) => b.rate - a.rate)[0] || null
+  const weakestGrade = qualifiedGrades.slice().sort((a, b) => a.rate - b.rate)[0] || null
+  const projectedLegs = tickets.flatMap((ticket) => ticket.legs || []).filter((leg) => leg.lineupConfirmed === false).length
+  const modelMetrics = meta?.modelMetrics
+  const brierLift = modelMetrics && modelMetrics.baselineBrier > 0
+    ? (modelMetrics.baselineBrier - modelMetrics.brier) / modelMetrics.baselineBrier
+    : null
+
+  let verdict = 'Track tickets to connect StatFax recommendations to your actual betting results.'
+  let verdictTone = 'neutral'
+  if (summary.pricedSettled > 0) {
+    verdictTone = summary.net >= 0 ? 'positive' : 'warning'
+    verdict = `${summary.pricedSettled} fully priced ${summary.pricedSettled === 1 ? 'ticket' : 'tickets'} produced ${summary.net >= 0 ? '+' : ''}${summary.net.toFixed(2)} units. ${summary.pricedSettled < 20 ? 'The sample is still too small for a strategy conclusion.' : 'Keep judging the process alongside the result.'}`
+  } else if (summary.settled > 0) {
+    verdict = `${summary.settled} ticket ${summary.settled === 1 ? 'outcome is' : 'outcomes are'} settled. Add wager and posted odds to unlock honest profit and ROI.`
+  } else if (tickets.length > 0) {
+    verdict = `${tickets.length} ${tickets.length === 1 ? 'ticket is' : 'tickets are'} tracked with ${summary.open} still open. Exposure is visible now; profit and ROI remain locked until settlement.`
+  }
+
+  const nextAction = !tickets.length
+    ? 'Track the next parlay you actually place.'
+    : summary.settled > summary.pricedSettled
+      ? 'Add stake and posted odds to open tickets before first pitch.'
+      : projectedLegs > 0
+        ? `Review ${projectedLegs} projected-lineup ${projectedLegs === 1 ? 'leg' : 'legs'} before lock.`
+        : 'Keep stake sizing consistent while the sample grows.'
+
+  return (
+    <div className="accountability-overview">
+      <section className={`accountability-verdict ${verdictTone}`}>
+        <span><Icon name="Info" size={14} /> Evidence-based verdict</span>
+        <p>{verdict}</p>
+      </section>
+
+      <div className="accountability-kpis">
+        <Kpi label="Settled record" value={summary.settled ? `${summary.wins}-${summary.settled - summary.wins}` : '—'} sub={summary.settled ? `${pct(summary.wins / summary.settled, 1)} cash rate · n=${summary.settled}` : 'No settled tickets'} />
+        <Kpi label="Net units / ROI" value={summary.pricedSettled ? `${summary.net >= 0 ? '+' : ''}${summary.net.toFixed(2)}u` : '—'} sub={summary.roi != null ? `${signedPct(summary.roi, 1)} ROI · n=${summary.pricedSettled}` : 'Needs wager + odds'} accent={summary.pricedSettled ? summary.net >= 0 ? 'var(--strong)' : 'var(--bad)' : null} />
+        <Kpi label="Open exposure" value={summary.knownExposure > 0 ? `${summary.knownExposure.toFixed(2)}u` : summary.open ? 'Unknown' : '0u'} sub={`${summary.live} live · ${summary.open} open`} accent={summary.open ? 'var(--accent)' : null} />
+        <Kpi label="Model health" value={modelMetrics?.brier != null ? modelMetrics.brier.toFixed(4) : 'Building'} sub={brierLift != null ? `${signedPct(brierLift, 0)} vs baseline Brier` : `${rows.length} reconciled picks`} accent="var(--prime)" />
+      </div>
+
+      <div className="accountability-grid">
+        <section className="accountability-brief results-card">
+          <h3><Icon name="BookOpen" size={14} /> Review brief</h3>
+          <div className="review-brief-item positive"><span>Strongest repeatable signal</span><p>{strongestGrade ? `${strongestGrade.grade} picks have hit at ${pct(strongestGrade.rate, 1)} across ${strongestGrade.n} reconciled picks.` : 'More reconciled outcomes are needed before naming a repeatable strength.'}</p></div>
+          <div className="review-brief-item warning"><span>Biggest avoidable risk</span><p>{projectedLegs ? `${projectedLegs} tracked ${projectedLegs === 1 ? 'leg was' : 'legs were'} saved before lineup confirmation.` : weakestGrade && baseRate != null ? `${weakestGrade.grade} is the lowest observed tier at ${pct(weakestGrade.rate, 1)}; use the grade as a filter, not a guarantee.` : 'No lineup-readiness risk is visible in the current ticket ledger.'}</p></div>
+          <div className="review-brief-item neutral"><span>Sample-size warning</span><p>{summary.pricedSettled < 20 ? `Only ${summary.pricedSettled} settled ${summary.pricedSettled === 1 ? 'ticket has' : 'tickets have'} complete economics. ROI is descriptive, not yet reliable.` : `ROI currently covers ${summary.pricedSettled} fully priced tickets and excludes incomplete records.`}</p></div>
+          <div className="review-next-action"><Icon name="ArrowRight" size={14} /><span><small>Next action</small><b>{nextAction}</b></span></div>
+        </section>
+
+        <section className="accountability-ledger results-card">
+          <div className="accountability-section-head"><h3><Icon name="Bookmark" size={14} /> Recent tickets</h3><button type="button" onClick={onOpenTickets}>View ledger <Icon name="ChevronRight" size={13} /></button></div>
+          <MyTickets batters={batters} onSelect={onSelect} compact limit={3} />
+        </section>
+      </div>
     </div>
   )
 }

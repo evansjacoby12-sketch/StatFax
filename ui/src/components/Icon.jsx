@@ -70,6 +70,12 @@ import {
   Ellipsis,
   Grid3x3,
   BarChart2,
+  ArrowRight,
+  CircleCheck,
+  CircleDollarSign,
+  Pencil,
+  ScanSearch,
+  Split,
 } from 'lucide-react'
 
 const REGISTRY = {
@@ -144,6 +150,12 @@ const REGISTRY = {
   Ellipsis,
   Grid3x3,
   BarChart2,
+  ArrowRight,
+  CircleCheck,
+  CircleDollarSign,
+  Pencil,
+  ScanSearch,
+  Split,
 }
 
 export default function Icon({ name, size = 16, ...rest }) {

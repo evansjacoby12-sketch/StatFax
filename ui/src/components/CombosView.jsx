@@ -17,7 +17,7 @@ const STRAT_LABEL = { top: 'Top Picks', mix: 'Best Mix', stack: 'Signal Stack', 
 const CARD = { background: 'rgba(17, 18, 20, 0.45)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '12px', padding: '20px', marginBottom: '24px' }
 const H3 = { fontSize: '13px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '16px', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: '8px' }
 
-export default function CombosView({ batters, onSelect, favorConsistency = false }) {
+export default function CombosView({ batters, onSelect, favorConsistency = false, initialSection = 'live' }) {
   // Ready-signal combos are built + logged for forward testing, but only surface
   // (list AND scorecard tallies) when the beta
   // switch is on, so non-beta users see zero influence from an unvalidated signal.
@@ -29,7 +29,7 @@ export default function CombosView({ batters, onSelect, favorConsistency = false
   const [comboBoard, setComboBoard] = useState('full')
   const [comboSize, setComboSize] = useState(0)
   const [winnersOnly, setWinnersOnly] = useState(false)
-  const [comboSection, setComboSection] = useState('live')
+  const [comboSection, setComboSection] = useState(initialSection)
   const [historyExpanded, setHistoryExpanded] = useState(false)
 
   useEffect(() => {
