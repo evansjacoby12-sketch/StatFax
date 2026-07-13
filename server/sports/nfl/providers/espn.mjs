@@ -118,6 +118,29 @@ export function parseESPNDepthChartHTML(html, teamAbbr) {
   return [...rows.values()].flatMap((row) => row.players)
 }
 
+export function parseESPNDepthChart(payload, teamAbbr) {
+  const chart = (payload?.depthchart || []).find((group) => Object.values(group.positions || {}).some((slot) => ['QB', 'RB', 'WR', 'TE'].includes(slot.position?.abbreviation)))
+  const players = []
+  const seen = new Set()
+  for (const slot of Object.values(chart?.positions || {})) {
+    const position = normalizeNFLPosition(slot.position)
+    if (!position) continue
+    for (const [index, athlete] of (slot.athletes || []).entries()) {
+      const espnId = String(athlete.id || '')
+      if (!espnId || seen.has(espnId)) continue
+      seen.add(espnId)
+      const injury = athlete.injuries?.[0]
+      const status = injury?.status || injury?.type?.description || 'Active'
+      players.push({
+        espnId, name: athlete.displayName || athlete.fullName, team: teamAbbr, position,
+        depthRank: index + 1, role: index ? `${index + 1}${index === 1 ? 'nd' : index === 2 ? 'rd' : 'th'} string` : 'Starter',
+        status, active: !/\b(out|injured reserve|\bir\b|pup|suspend)/i.test(status), source: 'espn-depth-chart',
+      })
+    }
+  }
+  return players
+}
+
 function parseClockSeconds(clock) {
   const [minutes, seconds] = String(clock || '15:00').split(':').map(Number)
   return Number.isFinite(minutes) && Number.isFinite(seconds) ? minutes * 60 + seconds : 900
@@ -226,6 +249,10 @@ export async function fetchESPNRoster(teamAbbr, fetchImpl = fetch, teamId = null
 
 export async function fetchESPNDepthChart(teamAbbr, fetchImpl = fetch) {
   const base = `${ESPN_WEB}/${teamAbbr.toLowerCase()}`
+  try {
+    const players = parseESPNDepthChart(await getJSON(`${ESPN_BASE}/teams/${teamAbbr.toLowerCase()}/depthcharts`, fetchImpl), teamAbbr)
+    if (players.length) return players
+  } catch {}
   const urls = [`${base}?device=featurephone`, `${base}?platform=amp`, `${base}?xhr=1`, base]
   let lastError = null
   for (const url of urls) {
