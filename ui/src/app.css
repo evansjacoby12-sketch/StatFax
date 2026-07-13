@@ -14798,6 +14798,8 @@ button.th:focus-visible {
 /* Expanded NFL multi-prop workspace */
 .nfl-prop-workspace .nfl-workspace-head { align-items: center; }
 .nfl-view-tabs { flex: none; }
+.nfl-bet-lab-tabs { margin-bottom: 12px; display: flex; justify-content: flex-end; }
+.nfl-bet-lab-tabs .command-tabs { width: min(300px, 100%); }
 .nfl-market-rail {
   min-height: 48px;
   margin-bottom: 12px;

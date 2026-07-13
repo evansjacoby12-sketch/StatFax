@@ -65,10 +65,8 @@ const BOTTOM_TABS = [
 ]
 const NFL_BOTTOM_TABS = [
   { id: 'signals', label: 'Signals', icon: 'Zap' },
-  { id: 'board', label: 'Board', icon: 'List' },
   { id: 'bet-lab', label: 'Bet Lab', icon: 'Beaker' },
   { id: 'performance', label: 'Performance', icon: 'Gauge' },
-  { id: 'tickets', label: 'Tickets', icon: 'ClipboardList' },
 ]
 const viewFromHash = () => {
   const h = (typeof location !== 'undefined' ? location.hash : '').replace(/^#\/?/, '')
