@@ -41,6 +41,15 @@ export default function WeatherView({ batters, onSelect, selectedId }) {
     return sortGames(list, sort)
   }, [allGames, sort, outdoorOnly, favorableOnly])
 
+  const summary = useMemo(() => {
+    const outdoor = allGames.filter((g) => !g.closed)
+    const favorable = allGames.filter((g) => (g.envFactor ?? 0) >= 1.03)
+    const rainRisk = outdoor.filter((g) => (g.weather?.precipProbPct ?? 0) >= 50)
+    const bestCarry = sortGames(allGames, 'air')[0] || null
+    const warmest = sortGames(outdoor, 'warm')[0] || null
+    return { outdoor, favorable, rainRisk, bestCarry, warmest }
+  }, [allGames])
+
   if (!allGames.length) return <div className="empty-note" style={{ padding: '64px', textAlign: 'center', color: 'var(--text-faint)' }}>No games match the current filters.</div>
 
   return (
@@ -49,6 +58,43 @@ export default function WeatherView({ batters, onSelect, selectedId }) {
         <span><Icon name="Cloud" size={14} /> Weather impact</span>
         <small className="mono">{games.length} matchups</small>
       </div>
+      <section className="wx-summary" aria-label="Slate weather summary">
+        <div className="wx-summary-copy">
+          <span className="wx-summary-icon"><Icon name="Cloud" size={22} /></span>
+          <div>
+            <span className="wx-summary-kicker">Slate conditions</span>
+            <h1>Weather Impact</h1>
+            <p>
+              {summary.favorable.length
+                ? `${summary.favorable.length} HR-friendly ${summary.favorable.length === 1 ? 'park' : 'parks'} on this slate.`
+                : 'No major air-carry boosts on this slate.'}
+              {' '}{summary.rainRisk.length ? `${summary.rainRisk.length} rain-risk ${summary.rainRisk.length === 1 ? 'game' : 'games'} need monitoring.` : 'No major rain risks.'}
+            </p>
+          </div>
+        </div>
+        <div className="wx-summary-stats">
+          <div className="wx-summary-stat">
+            <small>Best carry</small>
+            <b>{summary.bestCarry?.game ? `${summary.bestCarry.game.awayTeam?.abbr} @ ${summary.bestCarry.game.homeTeam?.abbr}` : '—'}</b>
+            <span className="mono">{summary.bestCarry?.envFactor != null ? signedPct(summary.bestCarry.envFactor - 1, 0) : '—'}</span>
+          </div>
+          <div className={`wx-summary-stat ${summary.rainRisk.length ? 'tone-bad' : 'tone-good'}`}>
+            <small>Rain risk</small>
+            <b className="mono">{summary.rainRisk.length}</b>
+            <span>{summary.rainRisk.length ? 'monitor' : 'clear'}</span>
+          </div>
+          <div className="wx-summary-stat">
+            <small>Warmest</small>
+            <b>{summary.warmest?.game?.homeTeam?.abbr || '—'}</b>
+            <span className="mono">{summary.warmest?.tempF != null ? `${Math.round(summary.warmest.tempF)}°F` : '—'}</span>
+          </div>
+          <div className="wx-summary-stat">
+            <small>Outdoor</small>
+            <b className="mono">{summary.outdoor.length}</b>
+            <span>of {allGames.length}</span>
+          </div>
+        </div>
+      </section>
       <div className="wx-controls" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' }}>
         <label className="wx-sort-select">
           <Icon name="ArrowUpDown" size={15} />
@@ -357,7 +403,7 @@ function WeatherCard({ g, onSelect, selectedId }) {
           )
         })()}
         <ul className="ptarget-list" style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          {g.helped.slice(0, 4).map((b) => (
+          {g.helped.slice(0, 5).map((b) => (
             <li
               key={b.id}
               className={`ptarget ${selectedId === b.id ? 'selected' : ''}`}

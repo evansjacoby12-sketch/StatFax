@@ -1,5 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
-
 :root {
   /* ---- Surfaces: ink-black and graphite from the metallic SF mark ---- */
   --bg: #07060c;
@@ -56,7 +54,7 @@
   
   --mono: 'JetBrains Mono', monospace;
   --sans: 'Inter', sans-serif;
-  --display: 'Outfit', sans-serif;
+  --display: 'Space Grotesk', sans-serif;
   
   color-scheme: dark;
 }
