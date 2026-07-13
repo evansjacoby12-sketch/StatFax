@@ -29,7 +29,9 @@ const gameKeyFor = (player) => player.gameId || [player.team, player.opponent].f
 
 function PlayerHeadshotSilo({ player, variant = 'compact' }) {
   const teamColor = NFL_TEAM_COLORS[player.team] || '#9795cb'
-  return <span className={`nfl-headshot-silo is-${variant}`} style={{ '--team-color': teamColor }} aria-hidden="true"><span className="nfl-headshot-fallback"><Icon name="Users" size={variant === 'workspace' ? 28 : 18} /></span>{player.headshotUrl && <img src={player.headshotUrl} alt="" loading="lazy" onError={(event) => { event.currentTarget.style.display = 'none' }} />}</span>
+  const [failedUrl, setFailedUrl] = useState(null)
+  const hasHeadshot = Boolean(player.headshotUrl && failedUrl !== player.headshotUrl)
+  return <span className={`nfl-headshot-silo is-${variant}`} style={{ '--team-color': teamColor }} aria-hidden="true">{!hasHeadshot && <span className="nfl-headshot-fallback"><Icon name="Users" size={variant === 'workspace' ? 28 : 18} /></span>}{hasHeadshot && <img src={player.headshotUrl} alt="" loading="lazy" onError={() => setFailedUrl(player.headshotUrl)} />}</span>
 }
 
 const pct = (value, digits = 1) => value == null ? '—' : `${(value * 100).toFixed(digits)}%`
