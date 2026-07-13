@@ -202,6 +202,10 @@ console.log(`Windows: ${windows.length}\n`);
 
 // ── Per-window results accumulator ────────────────────────────────────────────
 const accumulated = { baseline: [], rule: [], shallow: [], rich: [] };
+// Rule↔Rich blend sweep — held-out Brier at each featModel weight, to size the
+// production blend cap (EXPERIMENTAL_ML_RANK_CAP) empirically instead of guessing.
+const BLEND_WEIGHTS = [0, 0.25, 0.4, 0.5, 0.65, 0.8, 1.0];
+const blendAcc = Object.fromEntries(BLEND_WEIGHTS.map(w => [w, []]));
 let lastWindowWeights = null;
 
 // ── Per-window header ─────────────────────────────────────────────────────────
@@ -255,6 +259,14 @@ for (const { trainDates, holdoutDates } of windows) {
     const p_ri_hold = predictLogReg(X_ri_hold, richModel);
     richRows = holdoutRich.map((r, i) => ({ p: p_ri_hold[i], y: r.homered ? 1 : 0 }));
     lastWindowWeights = { model: richModel, featureNames: RICH_FEATURE_NAMES };
+    // Blend the SAME held-out bats' rule prob and rich prob at each weight so
+    // the sweep is like-for-like (both probs exist for every rich-feat bat).
+    for (let i = 0; i < holdoutRich.length; i++) {
+      const y = holdoutRich[i].homered ? 1 : 0;
+      const pRule = scoreFn(holdoutRich[i].score);
+      const pRich = p_ri_hold[i];
+      for (const w of BLEND_WEIGHTS) blendAcc[w].push({ p: (1 - w) * pRule + w * pRich, y });
+    }
   }
 
   // ── Accumulate for aggregate ──
@@ -294,6 +306,20 @@ printMetrics('BASELINE',  accumulated.baseline);
 printMetrics('RULE',      accumulated.rule);
 printMetrics('SHALLOW',   accumulated.shallow);
 printMetrics('RICH',      accumulated.rich);
+
+// ── Rule↔Rich blend sweep — the empirical answer for the production blend cap ──
+if (blendAcc[1.0].length) {
+  console.log('\n  RULE↔RICH BLEND SWEEP (held-out Brier by featModel weight):');
+  let best = { w: 0, brier: Infinity };
+  for (const w of BLEND_WEIGHTS) {
+    const b = brier(blendAcc[w]);
+    if (b < best.brier) best = { w, brier: b };
+    const cur = w === 0.25 ? '  ← current cap' : '';
+    console.log(`    w=${w.toFixed(2)}  Brier ${b.toFixed(4)}  AUC ${auc(blendAcc[w]).toFixed(4)}${cur}`);
+  }
+  console.log(`  → best held-out Brier at featModel weight ${best.w.toFixed(2)} (${best.brier.toFixed(4)}). ` +
+    `Current cap 0.25 ${best.w > 0.25 ? 'is too LOW — raise toward ' + best.w.toFixed(2) : 'looks right'}.`);
+}
 
 // Brier skill score vs baseline: positive = improvement, 1.0 = perfect.
 const baseBrier  = brier(accumulated.baseline);

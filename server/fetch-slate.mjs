@@ -648,7 +648,14 @@ import { trainFeatModel, scoreFeatProb, probToScore } from './models/featModel.m
 // edge over the rule score; weight is sized by that edge and capped. Set to
 // false for instant rollback to pure-rule ranking.
 const EXPERIMENTAL_ML_RANK = true;
-const EXPERIMENTAL_ML_RANK_CAP = 0.25; // "nudge, don't dominate" — small-sample-safe
+// Blend cap for the rich featModel into the score. RAISED 0.25 → 0.60 after a
+// walk-forward blend sweep (model-lab/wf-eval.mjs): held-out Brier improves
+// MONOTONICALLY with featModel weight (0.1051 pure-rule → 0.1008 pure-feat) and
+// AUC 0.667 → 0.737 — 0.25 was throttling a validated, tighter model. Stop at
+// 0.60, not 1.0: keep a 40% deterministic rule-score floor as a stabilizer if
+// the featModel ever hits a thin/broken training window. The edge*10 gate below
+// still scales weight DOWN when the measured CV-AUC edge is weak (small-sample-safe).
+const EXPERIMENTAL_ML_RANK_CAP = 0.60;
 import { fetchBatterExpectedStats } from './statcastExpected.mjs';
 import { fetchCatcherFraming } from './catcherFraming.mjs';
 import { fetchRecentBatterBarrelsMultiWindow, fetchRecentPitcherVelo } from './statcastRecent.mjs';
