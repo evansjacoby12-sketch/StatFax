@@ -153,6 +153,13 @@ jobs:
           path: dist/nfl/history.json
           key: nfl-history-full-${{ hashFiles('server/sports/nfl/build-history.py') }}
 
+      - name: Restore NFL season tracking
+        uses: actions/cache@v4
+        with:
+          path: dist/nfl/tracking.json
+          key: nfl-tracking-${{ github.run_id }}
+          restore-keys: nfl-tracking-
+
       - name: Install brain deps
         run: npm install
 
@@ -222,6 +229,11 @@ jobs:
             aws s3 cp "dist/nfl/backtest.json" "s3://$R2_BUCKET/nfl/backtest.json" --endpoint-url "$ENDPOINT" \
               --content-type application/json --cache-control no-cache \
               && echo "R2: published nfl/backtest.json"
+          fi
+          if [ -f "dist/nfl/tracking.json" ]; then
+            aws s3 cp "dist/nfl/tracking.json" "s3://$R2_BUCKET/nfl/tracking.json" --endpoint-url "$ENDPOINT" \
+              --content-type application/json --cache-control no-cache \
+              && echo "R2: published nfl/tracking.json"
           fi
 
       # LLM soft-factor layer (injuries/lineups/weather/bullpen → dist/context.json).

@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { nflLegKey, settleNFLLeg, settleNFLTicket, ticketExportText } from '../ui/src/lib/nflTickets.js'
+import { filterNFLTickets, nflLegKey, nflTicketProfit, nflTicketsCSV, settleNFLLeg, settleNFLTicket, summarizeNFLTickets, ticketExportText } from '../ui/src/lib/nflTickets.js'
 
 const leg = (marketId, line = null) => ({ key: nflLegKey('p1', marketId), playerId: 'p1', name: 'Test Player', marketId, marketLabel: marketId, line, status: 'pending' })
 
@@ -31,5 +31,20 @@ test('ticket settlement and export summarize every leg', () => {
   const settled = settleNFLTicket(ticket, snapshot)
   assert.equal(settled.status, 'won')
   assert.match(ticketExportText(settled), /Receiver/)
+})
+
+test('ticket ledger computes unit profit, filters history, market splits, and CSV', () => {
+  const tickets = [
+    { id: 'won', createdAt: '2026-09-01T00:00:00Z', status: 'won', stake: 1, legs: [{ ...leg('anytime_td'), odds: 150, status: 'won' }] },
+    { id: 'lost', createdAt: '2026-09-02T00:00:00Z', status: 'lost', stake: 1, legs: [{ ...leg('rushing_yards', 40), odds: -110, status: 'lost' }] },
+  ]
+  assert.equal(nflTicketProfit(tickets[0]), 1.5)
+  assert.equal(nflTicketProfit(tickets[1]), -1)
+  const summary = summarizeNFLTickets(tickets)
+  assert.equal(summary.profit, .5)
+  assert.equal(summary.roi, .25)
+  assert.equal(filterNFLTickets(tickets, { status: 'won' }).length, 1)
+  assert.match(nflTicketsCSV(tickets), /ticket_profit_units/)
+  assert.match(nflTicketsCSV(tickets), /"Test Player"/)
 })
 

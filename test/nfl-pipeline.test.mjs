@@ -1,7 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { parseESPNRoster, parseESPNScoreboard, parseESPNSummary, selectCurrentNFLSlate } from '../server/sports/nfl/providers/espn.mjs'
+import { parseESPNDepthChartHTML, parseESPNRoster, parseESPNScoreboard, parseESPNSummary, selectCurrentNFLSlate } from '../server/sports/nfl/providers/espn.mjs'
+import { nearestHourlyForecast } from '../server/sports/nfl/providers/weather.mjs'
 import { parseSportsGameOdds } from '../server/sports/nfl/providers/odds.mjs'
 import { indexNFLHistory, matchHistoryPlayer, projectNFLPlayer } from '../server/sports/nfl/projections.mjs'
 import { buildNFLSnapshot, defenseProfile, normalizeFirstTouchdownProbabilities } from '../server/sports/nfl/fetch-nfl-slate.mjs'
@@ -9,6 +10,8 @@ import { assessPlayerAvailability, indexAvailability, externalAvailabilityFor } 
 import { evaluateNFLHistory } from '../server/sports/nfl/backtest.mjs'
 import { calibrateNFLProbability, correctedNFLProjection } from '../src/sports/nfl/logic/calibration.js'
 import { depthFor, indexDepthChart, indexWeather, overlayFreshness, weatherFor } from '../server/sports/nfl/context-overlays.mjs'
+import { buildNFLDataHealth } from '../server/sports/nfl/health.mjs'
+import { summarizeNFLTracking, updateNFLTracking } from '../server/sports/nfl/tracking.mjs'
 
 const event = (id, date, week = 1, state = 'pre') => ({
   id, date, season: { year: 2026, slug: 'regular-season' }, week: { number: week },
@@ -24,6 +27,35 @@ const roster = (team) => ({ athletes: [{ position: 'offense', items: [
   { id: `${team}-fb`, displayName: `${team} Fullback`, position: { abbreviation: 'FB' }, status: { name: 'Active' }, injuries: [] },
   { id: `${team}-wr`, displayName: `${team} Receiver`, position: { abbreviation: 'WR' }, status: { name: 'Active' }, injuries: [{ status: 'Questionable', details: { type: 'Hamstring' } }] },
 ] }] })
+
+test('ESPN depth chart parser preserves position, order, stable ID and availability', () => {
+  const html = '<tr data-idx="0"><td data-testid="statCell">QB<!-- --> <span></span></td></tr><tr data-idx="1"><td data-testid="statCell">RB<!-- --> <span></span></td></tr>'
+    + '<tr data-idx="1"><td><a data-player-uid="s:20~l:28~a:1" href="https://www.espn.com/nfl/player/_/id/1/starter">Starter Back</a> <span class="DepthChart__injuryMeta"></span></td><td><a data-player-uid="s:20~l:28~a:2" href="https://www.espn.com/nfl/player/_/id/2/backup">Backup Back</a> <span class="DepthChart__injuryMeta">Q</span></td></tr>'
+  const players = parseESPNDepthChartHTML(html, 'BUF')
+  assert.equal(players.length, 2)
+  assert.deepEqual(players.map((player) => [player.espnId, player.position, player.depthRank, player.status]), [['1', 'RB', 1, 'Active'], ['2', 'RB', 2, 'Questionable']])
+})
+
+test('weather forecast chooses the kickoff hour and health reports missing feeds', () => {
+  const weather = nearestHourlyForecast({ hourly: { time: ['2026-09-01T18:00', '2026-09-01T19:00'], temperature_2m: [70, 68], wind_speed_10m: [8, 10], wind_gusts_10m: [14, 18], precipitation_probability: [10, 30], weather_code: [1, 61] } }, '2026-09-01T18:45:00Z')
+  assert.equal(weather.tempF, 68)
+  assert.equal(weather.precipProbability, 30)
+  const health = buildNFLDataHealth({ games: [{}], players: [{}], quality: { depthChart: false, officialAvailability: true, weatherFresh: false, weatherCoverage: .5, playByPlay: true, defenseByPosition: true } })
+  assert.equal(health.status, 'limited')
+  assert.ok(health.issues.some((issue) => issue.id === 'depth'))
+})
+
+test('season tracker freezes forecasts and settles probability and projection results', () => {
+  const pregame = { generatedAt: '2026-09-01T00:00:00Z', players: [{ id: 'p1', gameId: 'g1', kickoffAt: '2026-09-02T00:00:00Z', name: 'Player', position: 'RB', team: 'BUF', live: {}, projections: { rushingYards: 55 }, markets: { anytime_td: { probability: .4, odds: 150 }, rushing_yards: { probability: .6, line: 49.5, odds: -110 } } }] }
+  const final = { generatedAt: '2026-09-02T04:00:00Z', players: [{ ...pregame.players[0], live: { isFinal: true, stats: { totalTds: 1, rushingYards: 60 } } }] }
+  const log = updateNFLTracking({}, pregame, final, new Date('2026-09-02T04:00:00Z'))
+  const summary = summarizeNFLTracking(log)
+  assert.equal(summary.settled, 2)
+  assert.equal(summary.markets.anytime_td.brier, .36)
+  assert.equal(summary.markets.anytime_td.calibration[0].observed, 1)
+  assert.equal(summary.markets.rushing_yards.mae, 5)
+  assert.equal(summary.markets.anytime_td.roiSamples, 1)
+})
 
 test('ESPN schedule normalization selects the nearest complete NFL week', () => {
   const games = parseESPNScoreboard({ events: [event('old', '2026-09-03T00:00:00Z', 1, 'post'), event('next-a', '2026-09-10T00:00:00Z', 2), event('next-b', '2026-09-11T00:00:00Z', 2)] })

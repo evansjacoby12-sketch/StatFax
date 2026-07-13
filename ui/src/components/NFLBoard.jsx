@@ -5,7 +5,7 @@ import NFL_DEMO_SNAPSHOT from '../../../src/sports/nfl/data/demoSlate.js'
 import { NFL_PROP_MARKET_LIST, eligiblePropMarkets, eligibilityReason } from '../../../src/sports/nfl/logic/propEligibility.js'
 import { scoreNFLSnapshot, scoreNFLProp } from '../../../src/sports/nfl/logic/ScoringEngine.js'
 import { loadNFLSnapshot } from '../../../src/sports/nfl/api/NFLService.js'
-import { nflLegKey, settleNFLTicket, ticketExportText } from '../lib/nflTickets.js'
+import { filterNFLTickets, nflLegKey, nflTicketsCSV, settleNFLTicket, summarizeNFLTickets, ticketExportText } from '../lib/nflTickets.js'
 
 const VIEW_TABS = [
   { id: 'cards', label: 'Cards', icon: 'LayoutGrid' },
@@ -51,9 +51,17 @@ function NFLPerformance({ snapshot }) {
     ['Play-by-play', quality.playByPlay], ['Red zone', quality.redZone], ['Defense splits', quality.defenseByPosition],
     ['First TD labels', quality.firstTouchdown], ['Depth chart', quality.depthChart], ['Official availability', quality.officialAvailability], ['Weather', quality.weatherFresh && Number(quality.weatherCoverage) >= .8],
   ]
+  const health = snapshot.dataHealth
+  const tracking = snapshot.modelTracking
+  const trackingMarkets = Object.entries(tracking?.markets || {})
+  const snapshotStale = snapshot.generatedAt && Date.now() - Date.parse(snapshot.generatedAt) > 45 * 60 * 1000
+  const healthIssues = [...(health?.issues || []), ...(snapshotStale ? [{ id: 'pipeline', label: 'Pipeline', message: 'Published slate is more than 45 minutes old' }] : [])]
   return <section className="nfl-performance" aria-labelledby="nfl-performance-title">
     <header><div><span className="nfl-eyebrow"><Icon name="Gauge" size={13} /> Model validation</span><h2 id="nfl-performance-title">NFL Model Performance</h2><p>Walk-forward results use only information available before each game.</p></div><span className="nfl-performance-updated">{performance?.generatedAt ? `Updated ${new Date(performance.generatedAt).toLocaleDateString()}` : 'Awaiting backtest'}</span></header>
     <div className="nfl-coverage-grid" aria-label="NFL data coverage">{coverage.map(([label, ready]) => <div key={label} className={ready ? 'is-ready' : 'is-limited'}><Icon name={ready ? 'CircleCheck' : 'TriangleAlert'} size={15} /><span><b>{label}</b><small>{ready ? 'Connected' : 'Limited'}</small></span></div>)}</div>
+    {healthIssues.length > 0 && <div className="nfl-health-alert" role="status" aria-live="polite"><Icon name="TriangleAlert" size={16} /><span><b>{healthIssues.length} feed{healthIssues.length === 1 ? '' : 's'} need attention</b><small>{healthIssues.map((issue) => `${issue.label}: ${issue.message}`).join(' · ')}</small></span></div>}
+    <section className="nfl-tracking-summary" aria-label="Season tracking"><header><span><Icon name="LineChart" size={14} /> Season tracking</span><small>{tracking?.updatedAt ? `Updated ${new Date(tracking.updatedAt).toLocaleString()}` : 'Starts with the next slate'}</small></header><div><span><b className="mono">{Number(tracking?.open || 0).toLocaleString()}</b><small>Open forecasts</small></span><span><b className="mono">{Number(tracking?.settled || 0).toLocaleString()}</b><small>Settled forecasts</small></span><span><b className="mono">{Object.values(tracking?.markets || {}).reduce((sum, market) => sum + Number(market.roiSamples || 0), 0).toLocaleString()}</b><small>Priced ROI samples</small></span></div></section>
+    {trackingMarkets.length > 0 && <div className="nfl-season-market-grid" aria-label="Season results by market">{trackingMarkets.map(([id, metric]) => <article key={id}><b>{NFL_PROP_MARKET_LIST.find((market) => market.id === id)?.shortLabel || id}</b><span><strong className="mono">{metric.brier != null ? metric.brier.toFixed(3) : metric.mae != null ? metric.mae.toFixed(1) : '—'}</strong><small>{metric.brier != null ? 'Brier' : 'MAE'}</small></span><span><strong className="mono">{pct(metric.roi)}</strong><small>ROI · {metric.roiSamples || 0}</small></span></article>)}</div>}
     {markets.length ? <div className="nfl-performance-grid">{markets.map(([id, metric]) => {
       const market = NFL_PROP_MARKET_LIST.find((item) => item.id === id)
       const primary = metric.type === 'probability' ? (metric.brier == null ? '—' : metric.brier.toFixed(3)) : (metric.mae == null ? '—' : metric.mae.toFixed(1))
@@ -63,12 +71,19 @@ function NFLPerformance({ snapshot }) {
   </section>
 }
 
-function NFLTicketCenter({ slipLegs, tickets, onSave, onClear, onExport }) {
+function NFLTicketCenter({ slipLegs, tickets, onSave, onClear, onExport, onCSV }) {
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [marketFilter, setMarketFilter] = useState('all')
+  const [ticketQuery, setTicketQuery] = useState('')
+  const summary = useMemo(() => summarizeNFLTickets(tickets), [tickets])
+  const filtered = useMemo(() => filterNFLTickets(tickets, { status: statusFilter, market: marketFilter, query: ticketQuery }), [marketFilter, statusFilter, ticketQuery, tickets])
   return <section className="nfl-ticket-center" aria-labelledby="nfl-tickets-title">
-    <header><div><span className="nfl-eyebrow"><Icon name="ClipboardList" size={13} /> Saved analysis</span><h2 id="nfl-tickets-title">NFL Prop Tickets</h2><p>Watchlists, open slips and settled results are saved on this device.</p></div><span className="nfl-ticket-count mono">{tickets.length} saved</span></header>
+    <header><div><span className="nfl-eyebrow"><Icon name="ClipboardList" size={13} /> Saved analysis</span><h2 id="nfl-tickets-title">NFL Prop Tickets</h2><p>Watchlists, open slips and settled results are saved on this device.</p></div><button type="button" className="nfl-ticket-export" onClick={onCSV} disabled={!tickets.length}><Icon name="Download" size={14} />Export CSV</button></header>
+    <div className="nfl-ticket-stats" aria-label="Ticket performance"><span><small>Record</small><b className="mono">{summary.won}–{summary.lost}</b></span><span><small>Hit rate</small><b className="mono">{pct(summary.hitRate)}</b></span><span><small>Profit</small><b className={`mono ${summary.profit == null ? '' : summary.profit >= 0 ? 'positive' : 'negative'}`}>{summary.profit == null ? 'No priced results' : `${summary.profit >= 0 ? '+' : ''}${summary.profit.toFixed(2)}u`}</b></span><span><small>ROI</small><b className="mono">{pct(summary.roi)}</b></span></div>
+    {summary.markets.length > 0 && <div className="nfl-ticket-markets" aria-label="Results by market">{summary.markets.slice(0, 6).map((market) => <span key={market.marketId}><b>{market.label}</b><small>{market.wins}–{market.losses} · {pct(market.settled ? market.wins / market.settled : null, 0)}</small></span>)}</div>}
     <div className="nfl-ticket-layout">
       <section className="nfl-current-slip"><header><b>Current slip</b><span>{slipLegs.length} leg{slipLegs.length === 1 ? '' : 's'}</span></header>{slipLegs.length ? <div className="nfl-ticket-legs">{slipLegs.map((leg) => <div key={leg.key}><Icon name="CircleDot" size={12} /><span><b>{leg.name}</b><small>{leg.marketLabel}{leg.line != null && !leg.marketId.includes('td') ? ` · over ${leg.line}` : ''}</small></span><em className="mono">{pct(leg.probability)}</em></div>)}</div> : <div className="nfl-ticket-empty"><Icon name="Plus" size={18} /><span>Add player props from Cards or Board.</span></div>}<footer><button type="button" onClick={onClear} disabled={!slipLegs.length}>Clear</button><button type="button" className="primary" onClick={onSave} disabled={!slipLegs.length}><Icon name="Save" size={14} />Save ticket</button></footer></section>
-      <section className="nfl-ticket-history"><header><b>Ticket history</b><span>Automatic settlement</span></header>{tickets.length ? <div>{tickets.map((ticket) => <article key={ticket.id} className={`is-${ticket.status}`}><header><span><b>{ticket.legs.length}-leg ticket</b><small>{new Date(ticket.createdAt).toLocaleString()}</small></span><em>{ticket.status}</em></header><ul>{ticket.legs.map((leg) => <li key={leg.key}><span>{leg.name} · {leg.marketLabel}</span><b>{leg.status}</b></li>)}</ul><button type="button" onClick={() => onExport(ticket)}><Icon name="Share2" size={13} />Copy ticket</button></article>)}</div> : <div className="nfl-ticket-empty"><Icon name="Clock" size={18} /><span>Saved tickets and results will appear here.</span></div>}</section>
+      <section className="nfl-ticket-history"><header><b>Ticket history</b><span>{filtered.length} shown</span></header><div className="nfl-ticket-filters"><label><span className="sr-only">Search ticket history</span><input value={ticketQuery} onChange={(event) => setTicketQuery(event.target.value)} placeholder="Search player or market" /></label><select aria-label="Ticket status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">All statuses</option>{['pending', 'live', 'won', 'lost'].map((status) => <option key={status}>{status}</option>)}</select><select aria-label="Ticket market" value={marketFilter} onChange={(event) => setMarketFilter(event.target.value)}><option value="all">All markets</option>{NFL_PROP_MARKET_LIST.map((market) => <option key={market.id} value={market.id}>{market.shortLabel}</option>)}</select></div>{filtered.length ? <div className="nfl-ticket-history-list">{filtered.map((ticket) => <article key={ticket.id} className={`is-${ticket.status}`}><header><span><b>{ticket.legs.length}-leg ticket</b><small>{new Date(ticket.createdAt).toLocaleString()}</small></span><em>{ticket.status}</em></header><ul>{ticket.legs.map((leg) => <li key={leg.key}><span>{leg.name} · {leg.marketLabel}</span><b>{leg.status}</b></li>)}</ul><button type="button" onClick={() => onExport(ticket)}><Icon name="Share2" size={13} />Copy ticket</button></article>)}</div> : <div className="nfl-ticket-empty"><Icon name="Clock" size={18} /><span>{tickets.length ? 'No tickets match these filters.' : 'Saved tickets and results will appear here.'}</span></div>}</section>
     </div>
   </section>
 }
@@ -165,6 +180,7 @@ export default function NFLBoard({ snapshot: suppliedSnapshot = null }) {
   const [watched, setWatched] = useState(() => new Set(readStorage('statfax:nfl:watchlist', [])))
   const [slip, setSlip] = useState(() => new Set(readStorage('statfax:nfl:slip', [])))
   const [tickets, setTickets] = useState(() => readStorage('statfax:nfl:tickets', []))
+  const snapshotStale = snapshot.generatedAt && Date.now() - Date.parse(snapshot.generatedAt) > 45 * 60 * 1000
 
   useEffect(() => {
     if (suppliedSnapshot) { setSnapshot(suppliedSnapshot); return undefined }
@@ -212,11 +228,19 @@ export default function NFLBoard({ snapshot: suppliedSnapshot = null }) {
     if (navigator.share) { try { await navigator.share({ title: 'StatFax NFL ticket', text }); return } catch {} }
     await navigator.clipboard?.writeText(text)
   }
+  const exportCSV = () => {
+    if (typeof document === 'undefined' || !tickets.length) return
+    const blob = new Blob([nflTicketsCSV(tickets)], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url; anchor.download = `statfax-nfl-tickets-${new Date().toISOString().slice(0, 10)}.csv`; anchor.click()
+    URL.revokeObjectURL(url)
+  }
 
   return <div className="nfl-workspace nfl-prop-workspace">
     <div className="nfl-workspace-head"><div><span className="nfl-eyebrow"><Icon name="Shield" size={13} /> NFL prop engine</span><h1>NFL Prop Board</h1><p>QB, RB, WR and TE markets powered by role, opponent, form, splits, weather and live pace.</p></div><CommandTabs tabs={VIEW_TABS} value={view} onChange={setView} label="NFL view" className="nfl-view-tabs" variant="workspace" /></div>
-    <div className="nfl-demo-banner" role="status" aria-live="polite"><Icon name={snapshot.dataQuality?.playByPlay ? 'CircleCheck' : 'TriangleAlert'} size={15} /><span><b>{snapshot.source?.mode === 'demo' ? 'Demo slate' : snapshot.dataQuality?.playByPlay ? 'Full NFL data connected' : 'NFL data connected · limited context'}</b> {snapshot.dataQuality?.playByPlay ? 'Red-zone, defense and model calibration coverage are active. Open Performance for live-feed coverage.' : 'Open Performance to see which supporting feeds are limited.'}</span></div>
-    {view === 'performance' ? <NFLPerformance snapshot={snapshot} /> : view === 'tickets' ? <NFLTicketCenter slipLegs={slipLegs} tickets={tickets} onSave={saveTicket} onClear={() => setSlip(new Set())} onExport={exportTicket} /> : <>
+    <div className={`nfl-demo-banner is-${snapshotStale ? 'critical' : snapshot.dataHealth?.status || 'ready'}`} role="status" aria-live="polite"><Icon name={snapshotStale || snapshot.dataHealth?.status === 'critical' || !snapshot.dataQuality?.playByPlay ? 'TriangleAlert' : 'CircleCheck'} size={15} /><span><b>{snapshotStale ? 'NFL pipeline update delayed' : snapshot.source?.mode === 'demo' ? 'Demo slate' : snapshot.dataHealth?.status === 'ready' ? 'All NFL feeds healthy' : snapshot.dataQuality?.playByPlay ? 'NFL core data connected' : 'NFL data connected · limited context'}</b> {snapshotStale ? 'The published slate is more than 45 minutes old. Open Performance for feed details.' : snapshot.dataHealth?.issues?.length ? `${snapshot.dataHealth.issues.length} supporting feed${snapshot.dataHealth.issues.length === 1 ? '' : 's'} limited. Open Performance for details.` : 'Red-zone, depth, availability, weather, defense and tracking coverage are active.'}</span></div>
+    {view === 'performance' ? <NFLPerformance snapshot={snapshot} /> : view === 'tickets' ? <NFLTicketCenter slipLegs={slipLegs} tickets={tickets} onSave={saveTicket} onClear={() => setSlip(new Set())} onExport={exportTicket} onCSV={exportCSV} /> : <>
       <div className="nfl-market-rail" role="tablist" aria-label="NFL prop market">{NFL_PROP_MARKET_LIST.map((market) => <button key={market.id} role="tab" aria-selected={marketId === market.id} className={marketId === market.id ? 'active' : ''} onClick={() => setMarketId(market.id)}><Icon name={MARKET_ICONS[market.id]} size={13} />{market.shortLabel}</button>)}</div>
       {marketId === 'first_td' && <div className="nfl-variance-note"><Icon name="TriangleAlert" size={14} /><span><b>First TD is high variance.</b> Listed offense receives {pct(snapshot.firstTdReserve?.listedOffense ?? .86, 0)}; other offense {pct(snapshot.firstTdReserve?.otherOffense ?? .06, 0)}, defense/special teams {pct(snapshot.firstTdReserve?.defenseSpecialTeams ?? .06, 0)}, and no touchdown {pct(snapshot.firstTdReserve?.noTouchdown ?? .02, 0)} are modeled separately.</span></div>}
       {marketId === 'two_plus_td' && <div className="nfl-variance-note"><Icon name="Flame" size={14} /><span><b>2+ TD is calibrated separately.</b> Multi-score probability is evaluated independently from Anytime TD.</span></div>}
