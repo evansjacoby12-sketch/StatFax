@@ -77,6 +77,7 @@ import {
   ScanSearch,
   Split,
   Beaker,
+  ClipboardList,
   GraduationCap,
 } from 'lucide-react'
 
@@ -159,6 +160,7 @@ const REGISTRY = {
   ScanSearch,
   Split,
   Beaker,
+  ClipboardList,
   GraduationCap,
 }
 

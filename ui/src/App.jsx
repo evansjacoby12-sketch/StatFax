@@ -63,6 +63,13 @@ const BOTTOM_TABS = [
   { id: 'pitchers', label: 'Pitchers', icon: 'Crosshair' },
   { id: 'results', label: 'Results', icon: 'Activity' },
 ]
+const NFL_BOTTOM_TABS = [
+  { id: 'signals', label: 'Signals', icon: 'Zap' },
+  { id: 'board', label: 'Board', icon: 'List' },
+  { id: 'bet-lab', label: 'Bet Lab', icon: 'Beaker' },
+  { id: 'performance', label: 'Performance', icon: 'Gauge' },
+  { id: 'tickets', label: 'Tickets', icon: 'ClipboardList' },
+]
 const viewFromHash = () => {
   const h = (typeof location !== 'undefined' ? location.hash : '').replace(/^#\/?/, '')
   return VIEWS.has(h) ? h : null
@@ -133,6 +140,7 @@ export default function App() {
   const [sport, setSport] = useState(() => (store.load('sport', 'mlb') === 'nfl' ? 'nfl' : 'mlb'))
   const [nflSnapshot, setNflSnapshot] = useState(null)
   const [nflRefreshing, setNflRefreshing] = useState(false)
+  const [nflView, setNflView] = useState('signals')
   const [view, setView] = useState(() => (staleReturn ? 'board' : (viewFromHash() || store.load('view', 'board'))))
   const [liveScores, setLiveScores] = useState(() => store.load('liveScores', true))
   const [eliLevel, setEliLevel] = useState(() => store.load('eliLevel', 'eli5')) // 'eli5' | 'eli15'
@@ -600,9 +608,11 @@ export default function App() {
     const nflData = nflSnapshot
     const nflPlayers = nflData?.players || []
     const nflLive = nflPlayers.some((player) => player.live?.isLive)
+    const nflBottomNavIndex = NFL_BOTTOM_TABS.findIndex((tab) => tab.id === nflView)
     return (
       <LiveModeContext.Provider value={false}>
       <EliLevelContext.Provider value={eliLevel}>
+        <>
         <div className="app nfl-app">
           <div className="topbar" ref={topbarRef}>
             <Header
@@ -621,10 +631,32 @@ export default function App() {
               games={nflData?.games || []}
             />
           </div>
-          <main className="main nfl-main"><NFLBoard snapshot={nflData} /></main>
+          <main className="main nfl-main"><NFLBoard snapshot={nflData} view={nflView} onViewChange={setNflView} /></main>
           <footer className="foot"><span className="dim">StatFax NFL · TD, yardage and reception props</span></footer>
           <ToastStack />
         </div>
+        <nav
+          className="bottom-nav nfl-bottom-nav"
+          aria-label="NFL primary navigation"
+          data-has-active={nflBottomNavIndex >= 0}
+          style={{ '--bottom-nav-index': Math.max(0, nflBottomNavIndex), '--bottom-nav-count': NFL_BOTTOM_TABS.length }}
+        >
+          <span className="bottom-nav-indicator" aria-hidden="true" />
+          {NFL_BOTTOM_TABS.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              className={`bottom-nav-btn ${nflView === tab.id ? 'active' : ''}`}
+              onClick={() => setNflView(tab.id)}
+              aria-current={nflView === tab.id ? 'page' : undefined}
+              aria-label={tab.label}
+            >
+              <Icon name={tab.icon} size={20} />
+              <span className="bottom-nav-label">{tab.label}</span>
+            </button>
+          ))}
+        </nav>
+        </>
       </EliLevelContext.Provider>
       </LiveModeContext.Provider>
     )
@@ -948,7 +980,7 @@ export default function App() {
       className="bottom-nav"
       aria-label="Primary navigation"
       data-has-active={bottomNavIndex >= 0}
-      style={{ '--bottom-nav-index': Math.max(0, bottomNavIndex) }}
+      style={{ '--bottom-nav-index': Math.max(0, bottomNavIndex), '--bottom-nav-count': BOTTOM_TABS.length }}
     >
       <span className="bottom-nav-indicator" aria-hidden="true" />
       {BOTTOM_TABS.map((tab) => (
