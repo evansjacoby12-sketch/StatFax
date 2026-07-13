@@ -12,6 +12,7 @@ import { calibrateNFLProbability, correctedNFLProjection } from '../src/sports/n
 import { depthFor, indexDepthChart, indexWeather, overlayFreshness, weatherFor } from '../server/sports/nfl/context-overlays.mjs'
 import { buildNFLDataHealth } from '../server/sports/nfl/health.mjs'
 import { summarizeNFLTracking, updateNFLTracking } from '../server/sports/nfl/tracking.mjs'
+import { buildTeamLineup, indexNFLLineups, lineupFor, summarizeLineupCoverage, teamLineupFor } from '../server/sports/nfl/lineups.mjs'
 
 const event = (id, date, week = 1, state = 'pre') => ({
   id, date, season: { year: 2026, slug: 'regular-season' }, week: { number: week },
@@ -154,6 +155,32 @@ test('depth and weather overlays match stable IDs and enforce freshness', () => 
   assert.equal(overlayFreshness('2026-09-01T00:00:00Z', new Date('2026-09-03T00:00:00Z'), 24).fresh, false)
 })
 
+test('lineup overlay indexes player and team context by stable identity', () => {
+  const index = indexNFLLineups({ generatedAt: '2026-09-01T00:00:00Z', players: [{ espnId: '7', name: 'Runner', expectedSnapShare: .75 }], teams: [{ team: 'BUF', confirmed: true }] })
+  assert.equal(lineupFor({ espnId: '7', name: 'Runner' }, index).expectedSnapShare, .75)
+  assert.equal(teamLineupFor('BUF', index).confirmed, true)
+})
+
+test('lineup engine reallocates inactive-player work and builds package factors', () => {
+  const rows = [
+    { player: { espnId: '1', name: 'RB One', team: 'BUF', position: 'RB', roleRank: 1 }, history: { recentGames: [{ snapShare: .72 }] }, depth: { depthRank: 1 }, availability: { eligible: false }, entry: { snapShare: .72, insideFiveSnapShare: .8 } },
+    { player: { espnId: '2', name: 'RB Two', team: 'BUF', position: 'RB', roleRank: 2 }, history: { recentGames: [{ snapShare: .28 }] }, depth: { depthRank: 2, carryShare: .25 }, availability: { eligible: true }, entry: { snapShare: .28, replacementPriority: 1 } },
+  ]
+  const contexts = buildTeamLineup(rows, { team: 'BUF', confirmed: true, offensiveLine: { startersAvailable: 5, continuity: .9 } }, { team: 'MIA', defense: { frontFactor: 1.04, nickelRate: .6 } }, { generatedAt: '2026-09-01T00:00:00Z', source: 'test' })
+  const backup = contexts.find((row) => row.player.espnId === '2').lineup
+  assert.equal(backup.confirmed, true)
+  assert.equal(backup.replacement.inherited, true)
+  assert.deepEqual(backup.replacement.replaces, ['RB One'])
+  assert.ok(backup.expectedSnapShare > .28)
+  assert.ok(backup.carryShare > .25)
+  assert.ok(backup.marketFactors.rushing_yards > 1)
+  assert.equal(backup.opponentDefense.nickelRate, .6)
+  const coverage = summarizeLineupCoverage(contexts.map((row) => ({ lineup: row.lineup })), [{ offensiveLine: { available: true, starters: ['LT'] }, defense: { available: true, starters: ['CB'] } }])
+  assert.equal(coverage.inheritedRoles, 1)
+  assert.equal(coverage.offensiveLines, 1)
+  assert.equal(coverage.defensiveLineups, 1)
+})
+
 test('First TD probabilities are normalized within each game', () => {
   const players = [
     { gameId: 'g1', projections: { anytimeTdProbability: .6 }, usage: { redZoneOpportunityShare: .5, roleRank: 1 }, markets: { first_td: {} } },
@@ -187,6 +214,9 @@ test('full NFL snapshot build joins schedule, rosters, injuries, and live contra
   assert.equal(snapshot.dataQuality.officialAvailability, true)
   assert.equal(snapshot.source.providers.practice, 'espn-roster-reports')
   assert.ok(snapshot.players.every((player) => player.markets.first_td.source === 'game_normalized_model'))
+  assert.ok(snapshot.players.every((player) => player.lineup?.projectionAdjusted))
+  assert.equal(snapshot.lineupCoverage.players, snapshot.players.length)
+  assert.equal(snapshot.dataQuality.lineups, false)
 })
 
 test('availability gate excludes inactive players and discounts practice risks', () => {

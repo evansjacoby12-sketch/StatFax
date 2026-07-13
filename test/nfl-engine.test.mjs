@@ -88,3 +88,20 @@ test('QB cards have completions and attempts projections', () => {
   assert.ok(allen.projections.completions > 0)
   assert.ok(allen.projections.attempts > allen.projections.completions)
 })
+
+test('unapplied lineup factors change scoring while pipeline-adjusted projections are not doubled', () => {
+  const henry = player('Derrick Henry')
+  const boosted = scoreNFLProp({ ...henry, lineup: { marketFactors: { rushing_yards: 1.2 } } }, 'rushing_yards')
+  const adjusted = scoreNFLProp({ ...henry, lineup: { projectionAdjusted: true, marketFactors: { rushing_yards: 1.2 } } }, 'rushing_yards')
+  const baseline = scoreNFLProp(henry, 'rushing_yards')
+  assert.ok(boosted.mean > baseline.mean)
+  assert.equal(adjusted.mean, baseline.mean)
+})
+
+test('live observed snaps and routes override pregame deployment after a real sample', () => {
+  const henry = player('Derrick Henry')
+  const basePlayer = { ...henry, lineup: { expectedSnapShare: .7, routesPerDropback: .4, projectionAdjusted: true, marketFactors: {} }, live: { ...henry.live, observedSnaps: 8 } }
+  const baseline = scoreNFLProp(basePlayer, 'rushing_yards')
+  const expanded = scoreNFLProp({ ...basePlayer, live: { ...basePlayer.live, observedSnapShare: .9 } }, 'rushing_yards')
+  assert.ok(expanded.mean > baseline.mean)
+})

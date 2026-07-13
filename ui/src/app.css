@@ -15071,6 +15071,9 @@ button.th:focus-visible {
 .nfl-research-panel > .nfl-research-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); border: 0; border-radius: 0; }
 .nfl-research-panel .nfl-research-grid span { min-height: 88px; padding: 13px; }
 .nfl-research-panel .nfl-research-grid b { font-size: 12px; }
+.nfl-lineup-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; background: var(--border-soft); }
+.nfl-lineup-grid > span { min-width: 0; min-height: 68px; padding: 11px 12px; display: flex; flex-direction: column; justify-content: center; gap: 6px; color: var(--text-faint); background: rgba(10,9,15,.98); font-size: 8px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; }
+.nfl-lineup-grid b { overflow: hidden; color: var(--text-dim); font-size: 10px; letter-spacing: 0; line-height: 1.35; text-overflow: ellipsis; text-transform: none; }
 .nfl-research-disclosure { padding: 13px 14px; display: flex; align-items: flex-start; gap: 9px; color: var(--text-faint); border: 1px dashed rgba(184,183,216,.13); border-radius: 11px; background: rgba(255,255,255,.01); }
 .nfl-research-disclosure svg { flex: none; margin-top: 1px; }
 .nfl-research-disclosure p { font-size: 9px; line-height: 1.5; }
@@ -15139,6 +15142,7 @@ button.th:focus-visible {
   .nfl-prop-card > footer > button { min-height: 44px; }
   .nfl-drawer-section > .nfl-eligible-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .nfl-research-grid { grid-template-columns: 1fr; }
+  .nfl-lineup-grid { grid-template-columns: 1fr 1fr; }
 }
 
 @media (max-width: 700px) {

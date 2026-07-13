@@ -28,12 +28,18 @@ export function nflStreakSignals(player) {
 
 export function nflRoleSignals(player) {
   const usage = player?.usage || {}
+  const lineup = player?.lineup || {}
   const signals = []
   if (Number(usage.redZoneTargetsL3) >= 5) signals.push({ key: 'rz-targets', text: `${usage.redZoneTargetsL3} RZ targets L3`, tone: 'prime' })
   if (Number(usage.redZoneTouchesL3) >= 10) signals.push({ key: 'rz-touches', text: `${usage.redZoneTouchesL3} RZ touches L3`, tone: 'prime' })
   if (Number(usage.goalLineTouchesL3) >= 4) signals.push({ key: 'goal-line', text: 'Goal-line role', tone: 'strong' })
   if (Number(usage.targetShare) >= 0.25) signals.push({ key: 'target-share', text: `${Math.round(usage.targetShare * 100)}% target share`, tone: 'strong' })
   if (Number(usage.snapShare) >= 0.8) signals.push({ key: 'snap-share', text: `${Math.round(usage.snapShare * 100)}% snaps`, tone: 'neutral' })
+  if (lineup.confirmed) signals.push({ key: 'lineup-confirmed', text: 'Lineup confirmed', tone: 'strong' })
+  if (lineup.replacement?.inherited) signals.push({ key: 'role-inheritance', text: `Role up: ${lineup.replacement.replaces?.join(', ') || 'vacated work'}`, tone: 'prime' })
+  if (Number(lineup.routesPerDropback) >= .75) signals.push({ key: 'route-participation', text: `${Math.round(lineup.routesPerDropback * 100)}% routes/dropback`, tone: 'strong' })
+  if (lineup.redZone?.goalLinePackage) signals.push({ key: 'goal-line-package', text: 'Goal-line package', tone: 'prime' })
+  if (lineup.restrictions?.snapLimit != null) signals.push({ key: 'snap-limit', text: `Snap limit ${Math.round(lineup.restrictions.snapLimit * 100)}%`, tone: 'warn' })
   return signals
 }
 

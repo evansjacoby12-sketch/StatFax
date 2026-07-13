@@ -73,6 +73,26 @@ function roleFactor(player, marketId) {
   return clamp(0.96 + share * 0.08, 0.94, 1.04)
 }
 
+function lineupFactor(player, marketId) {
+  const value = Number(player?.lineup?.marketFactors?.[marketId])
+  return Number.isFinite(value) ? clamp(value, .62, 1.42) : 1
+}
+
+function liveDeploymentFactor(player, marketId) {
+  const live = player?.live || {}
+  if (!live.isLive || Number(live.observedSnaps || 0) < 5) return 1
+  const expectedSnap = Number(player?.lineup?.expectedSnapShare || player?.usage?.snapShare || 0)
+  const observedSnap = Number(live.observedSnapShare)
+  let factor = expectedSnap > 0 && Number.isFinite(observedSnap) ? clamp(observedSnap / expectedSnap, .72, 1.28) : 1
+  if (['receptions', 'receiving_yards', 'rushing_receiving_yards'].includes(marketId)) {
+    const expectedRoutes = Number(player?.lineup?.routesPerDropback || 0)
+    const observedRoutes = Number(live.observedRoutesPerDropback)
+    if (expectedRoutes > 0 && Number.isFinite(observedRoutes)) factor = factor * .4 + clamp(observedRoutes / expectedRoutes, .68, 1.32) * .6
+  }
+  if (['anytime_td', 'first_td', 'two_plus_td'].includes(marketId) && Number(live.goalLineAppearances || 0) > 0) factor *= 1.04
+  return clamp(factor, .68, 1.35)
+}
+
 function splitFactor(player) {
   return clamp(1 + Number(player?.splits?.activeEdge || 0), 0.9, 1.1)
 }
@@ -94,6 +114,9 @@ export function scoreNFLProp(player, marketId) {
   const weather = nflWeatherImpact(player.weather, marketId)
   const defense = defenseFactor(player, marketId)
   const role = roleFactor(player, marketId)
+  const rawLineup = lineupFactor(player, marketId)
+  const lineup = player?.lineup?.projectionAdjusted ? 1 : rawLineup
+  const liveDeployment = liveDeploymentFactor(player, marketId)
   const split = splitFactor(player)
   let probability
   let line = propLineFor(player, marketId)
@@ -104,12 +127,12 @@ export function scoreNFLProp(player, marketId) {
     if (marketId === 'two_plus_td') probability = calibrateNFLProbability(probability, player?.modelCalibration?.two_plus_td)
   } else {
     mean = projectionMean(player, market)
-    mean = liveMean(player, market, mean) * weather.factor * defense * role * split
+    mean = liveMean(player, market, mean) * weather.factor * defense * role * split * lineup * liveDeployment
     const scale = distributionScale(market, mean)
     probability = logistic((mean - line) / scale)
   }
 
-  if (market.kind === 'touchdown') probability *= weather.factor * defense * role * split
+  if (market.kind === 'touchdown') probability *= weather.factor * defense * role * split * lineup * liveDeployment
   probability = clamp(probability)
   const rawOdds = player?.markets?.[marketId]?.odds
   const odds = rawOdds == null || rawOdds === '' ? null : Number(rawOdds)
@@ -119,6 +142,8 @@ export function scoreNFLProp(player, marketId) {
   const grade = probabilityGrade(probability, marketId, score, implied != null)
   const reasons = [
     `${Math.round((role - 1) * 100)}% role adjustment`,
+    `${Math.round((rawLineup - 1) * 100)}% lineup projection adjustment`,
+    `${Math.round((liveDeployment - 1) * 100)}% live deployment adjustment`,
     `${Math.round((defense - 1) * 100)}% defense-vs-${player.position} adjustment`,
     weather.label,
     `${player.isHome ? 'Home' : 'Away'} split ${Number(player?.splits?.activeEdge || 0) >= 0 ? '+' : ''}${Math.round(Number(player?.splits?.activeEdge || 0) * 100)}%`,
