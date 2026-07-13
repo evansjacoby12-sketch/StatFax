@@ -184,7 +184,7 @@ const MLB_V11   = 'https://statsapi.mlb.com/api/v1.1';
 const SEASON    = new Date().getFullYear();
 // NOTE: HR-prop odds were removed from statfax-brain. The engine scores on
 // model signal alone, so the pipeline needs no odds API key and the snapshot
-// carries no odds. (The HRSauce app keeps its own odds integration.)
+// carries no odds. (The StatFax app keeps its own odds integration.)
 
 // Normalize a player name for robust cross-source matching: strip accents,
 // lowercase, drop punctuation + common suffixes, collapse whitespace.
@@ -2196,7 +2196,7 @@ async function fetchRoofState(gamePk) {
 
 // ─── Main pipeline ───────────────────────────────────────────────────────────
 
-// Public R2 URL the HRSauce cron publishes the snapshot to. Read back at
+// Public R2 URL the StatFax cron publishes the snapshot to. Read back at
 // startup by the calibration loop (yesterday's snapshot → reconcile).
 const R2_PUBLIC_BASE  = 'https://pub-f7f0c61cfc5840ce8b07ddb42902aa48.r2.dev';
 const SNAPSHOT_URL    = `${R2_PUBLIC_BASE}/daily.json`;

@@ -1,5 +1,5 @@
 /**
- * MLBService — live data fetcher for HRSauce
+ * MLBService — live data fetcher for StatFax
  *
  * Data sources:
  *   MLB Stats API  → statsapi.mlb.com (no auth required)

@@ -1,7 +1,7 @@
 /**
  * vegasBlend.js
  *
- * Blends HRSauce model scores with Vegas-implied probabilities to produce
+ * Blends StatFax model scores with Vegas-implied probabilities to produce
  * a calibrated final score. Vegas HR-prop lines represent aggregated sharp
  * money and are the strongest publicly available market signal for single-game
  * player props. Anchoring to them corrects overconfidence in the model,
@@ -188,7 +188,7 @@ export function bestPriceFromBooks(oddsObject) {
 // ---------------------------------------------------------------------------
 
 /**
- * Convert a probability to a score on the 0-100 HRSauce scale.
+ * Convert a probability to a score on the 0-100 StatFax scale.
  *
  * Calibration constant: PROB_AT_MAX_SCORE (0.28 — 28% implied probability maps
  * to a score of 100). This reflects the empirical PRIME HR rate; a batter

@@ -2,7 +2,7 @@
   "name": "statfax-brain",
   "private": true,
   "type": "module",
-  "description": "StatFax MLB home-run probability engine + data pipeline — the headless 'brain'. No UI. Forked from HRSauce.",
+  "description": "StatFax MLB home-run probability engine + data pipeline — the headless 'brain' behind statfax.online.",
   "scripts": {
     "test": "node --test test/*.test.mjs",
     "serve": "node server/serve.mjs",

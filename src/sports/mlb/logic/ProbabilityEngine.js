@@ -1,5 +1,5 @@
 /**
- * ProbabilityEngine — HRSauce HR probability scoring
+ * ProbabilityEngine — StatFax HR probability scoring
  *
  * Score breakdown:
  *   45% Batter quality  (ISO, HR rate, launch angle, pull rate, hot bat, who's due, Statcast)

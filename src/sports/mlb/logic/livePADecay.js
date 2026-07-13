@@ -76,7 +76,7 @@ export function estimateRemainingPAs(battingOrder, currentInning) {
  *   - remainingPAs === 0 → probability is 0 → returns score 0
  *   - remainingPAs >= AVG_GAME_PAS → full game ahead → returns original score
  *
- * @param {number} score - Original 0-100 HRSauce score (pre-game)
+ * @param {number} score - Original 0-100 StatFax score (pre-game)
  * @param {number} remainingPAs - Integer [0, AVG_GAME_PAS] from estimateRemainingPAs()
  * @returns {number} Decayed score [0, 100]
  */

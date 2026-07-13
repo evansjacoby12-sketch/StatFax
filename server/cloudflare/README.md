@@ -22,7 +22,7 @@ new token** → **Fine-grained tokens**.
 
 - **Token name:** `statfax-cron-worker` (or whatever)
 - **Resource owner:** your account
-- **Repository access:** Only select repositories → `HRSauce`
+- **Repository access:** Only select repositories → `StatFax`
 - **Repository permissions:**
   - **Contents:** Read and write  *(what `repository_dispatch` actually checks)*
   - **Metadata:** Read-only *(required — fine-grained tokens always need this)*

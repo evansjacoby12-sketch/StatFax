@@ -7,7 +7,7 @@
  * the current backtest log each run and writes them to
  * dist/ensemble-weights.json. loadMLModel() reads that file; scoreWithML()
  * applies sigmoid(intercept + Σwᵢxᵢ) to the same feature vector the trainer
- * used and converts the probability back to the 0-100 HRSauce scale via the
+ * used and converts the probability back to the 0-100 StatFax scale via the
  * same `prob / 0.28 * 100` mapping the rule path uses.
  *
  * If the weights file is missing or malformed, loadMLModel() returns null and
@@ -312,7 +312,7 @@ let _loggedFeatureMismatch = false;
  */
 export const ENSEMBLE_README = `
 =============================================================
-  HRSauce — Ensemble Guide (Phase 3, learned stacker)
+  StatFax — Ensemble Guide (Phase 3, learned stacker)
 =============================================================
 
 CURRENT STATE

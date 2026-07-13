@@ -1,5 +1,5 @@
 /**
- * hrPoller — background HR detection for HRSauce
+ * hrPoller — background HR detection for StatFax
  *
  * Uses expo-background-fetch + expo-task-manager to check live MLB games
  * for new home runs every ~5 minutes (iOS may stretch the interval; the OS

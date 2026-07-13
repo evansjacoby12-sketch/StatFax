@@ -76,7 +76,7 @@ const NWS_BASE = 'https://api.weather.gov';
 // NWS rejects requests without a User-Agent that includes contact info.
 // Identify our app + a way to reach the maintainer.
 const NWS_UA =
-  'StatFax/1.0 (https://github.com/evansjacoby12-sketch/HRSauce, evansjacoby12@gmail.com)';
+  'StatFax/1.0 (https://github.com/evansjacoby12-sketch/StatFax, evansjacoby12@gmail.com)';
 
 // How many hourly buckets to include per game, starting at first-pitch
 // hour. 7 covers a ~4h game plus pre-pitch + post-final buffer so the
