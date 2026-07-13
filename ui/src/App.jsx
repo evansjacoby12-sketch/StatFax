@@ -34,6 +34,7 @@ import FindPlays from './components/FindPlays.jsx'
 import LearnCenter from './components/LearnCenter.jsx'
 import WorkspaceShell from './components/WorkspaceShell.jsx'
 import NFLBoard from './components/NFLBoard.jsx'
+import { loadNFLSnapshot } from '../../src/sports/nfl/api/NFLService.js'
 import ToastStack, { toast } from './components/Toast.jsx'
 import InstallPrompt from './components/InstallPrompt.jsx'
 import Confetti from './components/Confetti.jsx'
@@ -130,6 +131,8 @@ export default function App() {
   const [slipIds, setSlipIds] = useState(() => store.load('slip', []))
   const [autoRefresh, setAutoRefresh] = useState(() => store.load('autoRefresh', false))
   const [sport, setSport] = useState(() => (store.load('sport', 'mlb') === 'nfl' ? 'nfl' : 'mlb'))
+  const [nflSnapshot, setNflSnapshot] = useState(null)
+  const [nflRefreshing, setNflRefreshing] = useState(false)
   const [view, setView] = useState(() => (staleReturn ? 'board' : (viewFromHash() || store.load('view', 'board'))))
   const [liveScores, setLiveScores] = useState(() => store.load('liveScores', true))
   const [eliLevel, setEliLevel] = useState(() => store.load('eliLevel', 'eli5')) // 'eli5' | 'eli15'
@@ -188,6 +191,18 @@ export default function App() {
     return () => window.removeEventListener('hashchange', onHash)
   }, [])
   useEffect(() => store.save('liveScores', liveScores), [liveScores])
+
+  const refreshNFL = useCallback(async () => {
+    setNflRefreshing(true)
+    try { setNflSnapshot(await loadNFLSnapshot({ demoFallback: true })) }
+    finally { setNflRefreshing(false) }
+  }, [])
+  useEffect(() => {
+    if (sport !== 'nfl') return undefined
+    refreshNFL()
+    const timer = setInterval(refreshNFL, 30_000)
+    return () => clearInterval(timer)
+  }, [refreshNFL, sport])
 
   // Publish the sticky chrome height so the board column-header can stick right
   // below it — robust to the filter bar wrapping at any width.
@@ -582,6 +597,9 @@ export default function App() {
   }, [all])
 
   if (sport === 'nfl') {
+    const nflData = nflSnapshot
+    const nflPlayers = nflData?.players || []
+    const nflLive = nflPlayers.some((player) => player.live?.isLive)
     const openMlb = (nextView = 'board') => {
       setSport('mlb')
       setView(nextView)
@@ -594,19 +612,19 @@ export default function App() {
             <Header
               sport="nfl"
               onSportChange={(next) => setSport(next)}
-              meta={{ week: 'Demo Week', modelMetrics: null, generatedAt: null }}
-              counts={{ games: 6, total: 8, shown: 8 }}
-              onRefresh={() => toast.info('NFL live feed is not connected yet')}
+              meta={{ week: nflData?.meta?.week || 'NFL', modelMetrics: null, generatedAt: nflData?.generatedAt || null, sourceMode: nflData?.source?.mode || 'demo', oddsStatus: nflData?.source?.providers?.odds || null }}
+              counts={{ games: nflData?.meta?.games || 0, total: nflPlayers.length, shown: nflPlayers.length }}
+              onRefresh={refreshNFL}
               onOpenModel={() => openMlb('results')}
               onOpenLegend={() => { openMlb('board'); setLearnTab('glossary') }}
-              onToggleLive={() => toast.info('NFL live mode will activate with the data feed')}
+              onToggleLive={() => toast.info(nflLive ? 'Live NFL updates refresh every 30 seconds' : 'No NFL game is live right now')}
               onCycleEli={() => setEliLevel((value) => nextEliLevel(value))}
-              liveScores={false}
+              liveScores={nflLive}
               eliLevel={eliLevel}
-              refreshing={false}
+              refreshing={nflRefreshing}
               gradeCounts={{}}
-              total={8}
-              games={[]}
+              total={nflPlayers.length}
+              games={nflData?.games || []}
               onOpenGuide={() => { openMlb('board'); setLearnTab('guide') }}
               onOpenHowTo={() => { openMlb('board'); setLearnTab('playbook') }}
               onOpenBuilder={() => { openMlb('board'); setBetLabTab('builder') }}
@@ -619,8 +637,8 @@ export default function App() {
               onOpenSettings={() => { openMlb('board'); setShowSettings(true) }}
             />
           </div>
-          <main className="main nfl-main"><NFLBoard /></main>
-          <footer className="foot"><span className="dim">StatFax NFL · Touchdown markets</span></footer>
+          <main className="main nfl-main"><NFLBoard snapshot={nflData} /></main>
+          <footer className="foot"><span className="dim">StatFax NFL · TD, yardage and reception props</span></footer>
           <ToastStack />
         </div>
       </EliLevelContext.Provider>

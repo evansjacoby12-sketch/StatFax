@@ -46,6 +46,12 @@ function statfaxData() {
           const src = path.join(DIST_DIR, f)
           if (fs.existsSync(src)) fs.copyFileSync(src, path.join(outData, f))
         }
+        const nflSrc = path.join(DIST_DIR, 'nfl', 'daily.json')
+        if (fs.existsSync(nflSrc)) {
+          const nflOut = path.join(outData, 'nfl')
+          fs.mkdirSync(nflOut, { recursive: true })
+          fs.copyFileSync(nflSrc, path.join(nflOut, 'daily.json'))
+        }
       } catch (e) {
         this.warn(`could not copy data into build: ${e.message}`)
       }

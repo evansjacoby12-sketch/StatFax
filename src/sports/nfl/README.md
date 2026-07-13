@@ -1,33 +1,47 @@
-# `src/sports/nfl/` — NFL scoring + data
+# `src/sports/nfl/` — NFL prop scoring + data
 
-**Status: scaffolding only.** No scoring engine, no API wrapper, no
-data. The sport-picker dropdown shows "NFL — Coming Soon" until this
-directory has a working pipeline.
+The NFL workspace supports QB, RB, WR, and TE props across Anytime TD,
+First TD, 2+ TD, passing yards, receptions, receiving yards, rushing
+yards, rushing + receiving yards, and passing + rushing yards.
 
-## What needs to ship before NFL goes live
+## Modules
 
-1. **`api/NFLService.js`** — wrapper for an NFL stats API. Options:
-   - SportsDataIO (commercial, comprehensive)
-   - nflfastR data (free, but R-centric — would need conversion)
-   - ESPN's undocumented API (fragile but free)
-2. **`data/stadiums.json`** — 32 NFL stadiums with location, surface
-   (turf vs grass), roof type, elevation, weather exposure.
-3. **`logic/ScoringEngine.js`** — Multi-stat prop scoring. Different
-   from MLB and NBA:
-   - Per-position prop universe is broad (QB pass yards/TDs, RB rush
-     yards, WR receptions, TE longest catch, K field goals, etc.)
-   - Weekly cadence not daily — slate is Thu/Sun/Mon, not every night
-   - Injury reports + practice participation drive much of the
-     opportunity-share math
-4. **`server/sports/nfl/fetch-slate.mjs`** — daily during the week,
-   writes to R2 as `nfl/daily.json`. Different rate-limiting profile
-   since the slate doesn't change as often as MLB's.
-5. **Snapshot contract** — define NFL `Snapshot` typedef. Likely has
-   `playersByPosition` rather than `scoredBatters`, plus injury report
-   data and snap-share projections.
-6. **NFL cron workflow** — fires Tue (injury reports), Thu (TNF
-   lineups), Sat (final inactives), Sun (gameday). Different from
-   MLB's every-10-minutes schedule.
+- `data/demoSlate.js` is the safe local fallback and documents the UI
+  snapshot contract.
+- `api/NFLService.js` loads `nfl/daily.json`, validates it, and merges
+  partial live player updates.
+- `logic/propEligibility.js` applies position and minimum-line rules.
+- `logic/ScoringEngine.js` blends projection, role, defense by
+  position, home/away split, weather, price, and live pace.
+- `logic/signals.js` creates TD, reception, passing, rushing, receiving,
+  red-zone, workload, and split badges.
+- `logic/weather.js` applies small, market-specific outdoor effects.
 
-See [`../README.md`](../README.md) for the per-sport directory pattern
-and [`../mlb/`](../mlb/) for the reference implementation.
+## Historical data
+
+Run `npm run nfl:history` to build `dist/nfl/history.json` from nflverse
+weekly player and play-by-play releases from the 2020 season onward.
+The lighter `npm run nfl:history:quick` skips play-by-play-derived
+red-zone, weather, and defense-by-position features.
+
+The UI remains in disclosed demo mode until a current-week projection,
+injury, live-stat, and sportsbook-odds provider writes an NFL daily
+snapshot matching this contract.
+
+## Current slate
+
+Run `npm run nfl:slate` to write `dist/nfl/daily.json`. The pipeline uses
+ESPN for the schedule, active rosters, injury status, and live boxscores;
+joins `dist/nfl/history.json` when the nflverse history build is present;
+and adds live SportsGameOdds prices when `SPORTSGAMEODDS_API_KEY` is set.
+Without an odds key, model-reference lines remain clearly unpriced.
+CI caches the full history build, including play-by-play-derived red-zone
+usage and defense allowed by position, so the large download is paid only
+when the history builder changes.
+
+An optional `dist/nfl/availability.json` (or `NFL_AVAILABILITY_PATH`) can
+overlay official inactive and practice-participation updates. Out, IR, PUP,
+suspended, and inactive players are removed; Doubtful, DNP, Questionable,
+and Limited players receive explicit opportunity discounts. Run
+`npm run nfl:backtest` after the history build to produce leakage-safe
+walk-forward metrics at `dist/nfl/backtest.json`.

@@ -3,15 +3,18 @@
 ## Product
 Mobile-first player-prop analytics dashboard. MLB is intentionally limited to home-run markets. NFL is intentionally limited to Anytime Touchdown and First Touchdown Scorer markets. Preserve dense, fast scanning for experienced users while keeping essential decisions legible and touch-friendly.
 
-## NFL Touchdown Board
+## NFL Prop Board
 - Use the same StatFax shell, sport switcher, typography, spacing, card treatment, and silver-violet interaction language as MLB.
-- The primary NFL market control has exactly two modes: `Anytime TD` and `First TD Scorer`. Anytime TD is the default.
-- The ranked first scan is rank, full player name, position/team, opponent and game time, model touchdown probability, sportsbook odds, implied probability, and model edge.
-- Supporting signals prioritize projected red-zone opportunity, goal-line role, route/snap share, opponent touchdown allowance, injury/inactive risk, and game total/team implied points.
+- Support QB, RB, WR, and TE. The market control includes Anytime TD, First TD, 2+ TD, passing yards, receptions, receiving yards, rushing yards, rushing + receiving, and passing + rushing.
+- Keep a compact market rail and a Board/Cards view control; cards are the deeper scan while the board remains the fastest ranked comparison.
+- The first scan is full player name, position/team, opponent and game time, model probability, line/odds when available, and model edge.
+- Supporting signals prioritize red-zone targets/touches, goal-line role, route/snap share, opponent allowance by position, TD/yardage/reception streaks, home/away splits, injury/inactive risk, and team implied points.
+- QB cards include completions/attempts. Every card includes a small weather impact line and a clear live/pregame state.
 - Position and team filters are compact; the default board covers RB, WR, TE, and relevant rushing QBs.
 - First TD Scorer must visibly communicate its higher variance and show probability/price without presenting long odds as inherently valuable.
+- 2+ TD is a first-class filter/market and must never be inferred from Anytime TD probability without an explicit multi-score model output.
 - Injury, questionable, inactive, and role-change states require text plus icon/color. Missing odds or uncertain workload must remain explicit.
-- Player selection opens a football-specific research surface; it must not reuse baseball terminology or metrics.
+- Player selection opens a football-specific research surface with eligibility, recent game log, red-zone role, defense-vs-position, splits, weather, and live pace. It must not reuse baseball terminology or metrics.
 - Mobile keeps the ranked board as full-width cards/rows with 44px actions, stable probability and odds columns, and no horizontal page overflow.
 
 ## Visual identity

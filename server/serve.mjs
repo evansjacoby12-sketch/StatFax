@@ -56,10 +56,19 @@ function runSlate(reason) {
   console.log(`[serve] slate refresh (${reason})…`)
   const child = spawn(process.execPath, [path.join(ROOT, 'server', 'fetch-slate.mjs')], { cwd: ROOT, stdio: 'inherit' })
   child.on('exit', (code) => {
-    refreshing = false
-    lastRun = Date.now()
-    lastOk = code === 0
-    console.log(`[serve] slate ${code === 0 ? 'ok' : 'FAILED (' + code + ')'} in ${((Date.now() - t0) / 1000).toFixed(0)}s`)
+    const nfl = spawn(process.execPath, [path.join(ROOT, 'server', 'sports', 'nfl', 'fetch-nfl-slate.mjs')], { cwd: ROOT, stdio: 'inherit' })
+    nfl.on('exit', (nflCode) => {
+      refreshing = false
+      lastRun = Date.now()
+      lastOk = code === 0 && nflCode === 0
+      console.log(`[serve] pipelines ${lastOk ? 'ok' : `FAILED (mlb=${code}, nfl=${nflCode})`} in ${((Date.now() - t0) / 1000).toFixed(0)}s`)
+    })
+    nfl.on('error', (e) => {
+      refreshing = false
+      lastRun = Date.now()
+      lastOk = false
+      console.warn(`[serve] NFL slate spawn error: ${e.message}`)
+    })
   })
   child.on('error', (e) => {
     refreshing = false
