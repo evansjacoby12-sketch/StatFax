@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import Icon from './Icon.jsx'
 import CommandTabs from './CommandTabs.jsx'
+import NFLBetLab from './NFLBetLab.jsx'
 import NFL_DEMO_SNAPSHOT from '../../../src/sports/nfl/data/demoSlate.js'
 import { NFL_PROP_MARKET_LIST, eligiblePropMarkets, eligibilityReason } from '../../../src/sports/nfl/logic/propEligibility.js'
 import { scoreNFLSnapshot, scoreNFLProp } from '../../../src/sports/nfl/logic/ScoringEngine.js'
@@ -8,8 +9,9 @@ import { loadNFLSnapshot } from '../../../src/sports/nfl/api/NFLService.js'
 import { filterNFLTickets, nflLegKey, nflTicketsCSV, settleNFLTicket, summarizeNFLTickets, ticketExportText } from '../lib/nflTickets.js'
 
 const VIEW_TABS = [
-  { id: 'cards', label: 'Cards', icon: 'LayoutGrid' },
+  { id: 'signals', label: 'Signals', icon: 'Zap' },
   { id: 'board', label: 'Board', icon: 'List' },
+  { id: 'bet-lab', label: 'Bet Lab', icon: 'Beaker' },
   { id: 'performance', label: 'Performance', icon: 'Gauge' },
   { id: 'tickets', label: 'Tickets', icon: 'ClipboardList' },
 ]
@@ -213,7 +215,7 @@ function PlayerResearch({ player, marketId, onClose, inSlip, onToggleSlip }) {
 export default function NFLBoard({ snapshot: suppliedSnapshot = null }) {
   const [snapshot, setSnapshot] = useState(() => suppliedSnapshot || NFL_DEMO_SNAPSHOT)
   const [marketId, setMarketId] = useState('anytime_td')
-  const [view, setView] = useState('cards')
+  const [view, setView] = useState('signals')
   const [query, setQuery] = useState('')
   const [position, setPosition] = useState('all')
   const [team, setTeam] = useState('all')
@@ -278,6 +280,13 @@ export default function NFLBoard({ snapshot: suppliedSnapshot = null }) {
     setTickets((current) => [ticket, ...current].slice(0, 50))
     setSlip(new Set())
   }
+  const addComboToSlip = (combo) => {
+    setSlip((current) => {
+      const next = new Set(current)
+      for (const leg of combo.legs) next.add(leg.key)
+      return next
+    })
+  }
   const exportTicket = async (ticket) => {
     const text = ticketExportText(ticket)
     if (navigator.share) { try { await navigator.share({ title: 'StatFax NFL ticket', text }); return } catch {} }
@@ -293,15 +302,15 @@ export default function NFLBoard({ snapshot: suppliedSnapshot = null }) {
   }
 
   return <div className="nfl-workspace nfl-prop-workspace">
-    <div className="nfl-workspace-head"><div><span className="nfl-eyebrow"><Icon name="Shield" size={13} /> NFL prop engine</span><h1>NFL Prop Board</h1><p>QB, RB, WR and TE markets powered by role, opponent, form, splits, weather and live pace.</p></div><CommandTabs tabs={VIEW_TABS} value={view} onChange={setView} label="NFL view" className="nfl-view-tabs" variant="workspace" /></div>
+    <div className="nfl-workspace-head"><div><span className="nfl-eyebrow"><Icon name="Shield" size={13} /> NFL prop engine</span><h1>NFL Signals</h1><p>Slate-ranked QB, RB, WR and TE signals powered by role, matchup, form, lineup, weather, price and live pace.</p></div><CommandTabs tabs={VIEW_TABS} value={view} onChange={setView} label="NFL view" className="nfl-view-tabs" variant="workspace" /></div>
     <div className={`nfl-demo-banner is-${snapshotStale ? 'critical' : snapshot.dataHealth?.status || 'ready'}`} role="status" aria-live="polite"><Icon name={snapshotStale || snapshot.dataHealth?.status === 'critical' || !snapshot.dataQuality?.playByPlay ? 'TriangleAlert' : 'CircleCheck'} size={15} /><span><b>{snapshotStale ? 'NFL pipeline update delayed' : snapshot.source?.mode === 'demo' ? 'Demo slate' : snapshot.dataHealth?.status === 'ready' ? 'All NFL feeds healthy' : snapshot.dataQuality?.playByPlay ? 'NFL core data connected' : 'NFL data connected · limited context'}</b> {snapshotStale ? 'The published slate is more than 45 minutes old. Open Performance for feed details.' : snapshot.dataHealth?.issues?.length ? `${snapshot.dataHealth.issues.length} supporting feed${snapshot.dataHealth.issues.length === 1 ? '' : 's'} limited. Open Performance for details.` : 'Red-zone, depth, availability, weather, defense and tracking coverage are active.'}</span></div>
-    {view === 'performance' ? <NFLPerformance snapshot={snapshot} /> : view === 'tickets' ? <NFLTicketCenter slipLegs={slipLegs} tickets={tickets} onSave={saveTicket} onClear={() => setSlip(new Set())} onExport={exportTicket} onCSV={exportCSV} /> : <>
+    {view === 'performance' ? <NFLPerformance snapshot={snapshot} /> : view === 'tickets' ? <NFLTicketCenter slipLegs={slipLegs} tickets={tickets} onSave={saveTicket} onClear={() => setSlip(new Set())} onExport={exportTicket} onCSV={exportCSV} /> : view === 'bet-lab' ? <NFLBetLab snapshot={snapshot} slip={slip} onAddCombo={addComboToSlip} onOpenTickets={() => setView('tickets')} /> : <>
       <div className="nfl-market-rail" role="tablist" aria-label="NFL prop market">{NFL_PROP_MARKET_LIST.map((market) => <button key={market.id} role="tab" aria-selected={marketId === market.id} className={marketId === market.id ? 'active' : ''} onClick={() => setMarketId(market.id)}><Icon name={MARKET_ICONS[market.id]} size={13} />{market.shortLabel}</button>)}</div>
       {marketId === 'first_td' && <div className="nfl-variance-note"><Icon name="TriangleAlert" size={14} /><span><b>First TD is high variance.</b> Listed offense receives {pct(snapshot.firstTdReserve?.listedOffense ?? .86, 0)}; other offense {pct(snapshot.firstTdReserve?.otherOffense ?? .06, 0)}, defense/special teams {pct(snapshot.firstTdReserve?.defenseSpecialTeams ?? .06, 0)}, and no touchdown {pct(snapshot.firstTdReserve?.noTouchdown ?? .02, 0)} are modeled separately.</span></div>}
       {marketId === 'two_plus_td' && <div className="nfl-variance-note"><Icon name="Flame" size={14} /><span><b>2+ TD is calibrated separately.</b> Multi-score probability is evaluated independently from Anytime TD.</span></div>}
       <div className="nfl-layout"><section className="nfl-board-panel" aria-label="Ranked NFL props">
       <div className="nfl-filters nfl-prop-filters"><label className="nfl-search"><Icon name="Search" size={15} /><span className="sr-only">Search players</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search players, teams, matchups" /></label><select value={position} onChange={(event) => setPosition(event.target.value)} aria-label="Position"><option value="all">All positions</option>{['QB', 'RB', 'WR', 'TE'].map((item) => <option key={item}>{item}</option>)}</select><select value={team} onChange={(event) => setTeam(event.target.value)} aria-label="Team"><option value="all">All teams</option>{teams.map((item) => <option key={item}>{item}</option>)}</select><select value={game} onChange={(event) => setGame(event.target.value)} aria-label="Game"><option value="all">All games</option>{games.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select><button className={`nfl-two-filter ${twoPlusOnly ? 'active' : ''}`} aria-pressed={twoPlusOnly} onClick={() => setTwoPlusOnly((value) => !value)}><Icon name="Flame" size={13} />2+ TD filter</button></div>
-      {view === 'cards' ? <div className="nfl-card-grid">{players.map((player) => <PlayerCard key={player.id} player={player} marketId={marketId} watched={watched.has(player.id)} inSlip={slip.has(`${player.id}:${marketId}`)} onSelect={setSelected} onToggleWatch={(item) => toggleSet(setWatched, item.id)} onToggleSlip={(item) => toggleSet(setSlip, `${item.id}:${marketId}`)} />)}</div> : <><div className="nfl-board-head nfl-prop-board-head" aria-hidden="true"><span>#</span><span>Player</span><span>Model %</span><span>Market</span><span>Edge</span><span>Signals</span><span /></div><div className="nfl-player-list">{players.map((player, index) => <BoardRow key={player.id} player={player} rank={index + 1} marketId={marketId} watched={watched.has(player.id)} inSlip={slip.has(`${player.id}:${marketId}`)} onSelect={setSelected} onToggleWatch={(item) => toggleSet(setWatched, item.id)} onToggleSlip={(item) => toggleSet(setSlip, `${item.id}:${marketId}`)} />)}</div></>}
+      {view === 'signals' ? <div className="nfl-card-grid">{players.map((player) => <PlayerCard key={player.id} player={player} marketId={marketId} watched={watched.has(player.id)} inSlip={slip.has(`${player.id}:${marketId}`)} onSelect={setSelected} onToggleWatch={(item) => toggleSet(setWatched, item.id)} onToggleSlip={(item) => toggleSet(setSlip, `${item.id}:${marketId}`)} />)}</div> : <><div className="nfl-board-head nfl-prop-board-head" aria-hidden="true"><span>#</span><span>Player</span><span>Model %</span><span>Market</span><span>Edge</span><span>Signals</span><span /></div><div className="nfl-player-list">{players.map((player, index) => <BoardRow key={player.id} player={player} rank={index + 1} marketId={marketId} watched={watched.has(player.id)} inSlip={slip.has(`${player.id}:${marketId}`)} onSelect={setSelected} onToggleWatch={(item) => toggleSet(setWatched, item.id)} onToggleSlip={(item) => toggleSet(setSlip, `${item.id}:${marketId}`)} />)}</div></>}
       {!players.length && <div className="nfl-empty"><Icon name="Search" size={22} /><b>No eligible players match</b><button onClick={() => { setQuery(''); setPosition('all'); setTeam('all'); setGame('all'); setTwoPlusOnly(false) }}>Clear filters</button></div>}
     </section><aside className="nfl-decision-rail" aria-label="NFL slate summary"><section className="nfl-slate-card"><div><span>Prop engine</span><strong>{snapshot.dataQuality?.playByPlay ? 'Full context ready' : 'Core model ready'}</strong></div><b className="nfl-rating mono">{players.length}</b><ul><li><Icon name="Check" size={12} /> {NFL_PROP_MARKET_LIST.length} position-aware markets</li><li><Icon name="Activity" size={12} /> {liveCount} live player{liveCount === 1 ? '' : 's'} in this view</li><li><Icon name="Shield" size={12} /> {snapshot.dataQuality?.defenseByPosition ? 'Defense splits connected' : 'Defense splits limited'}</li></ul></section>{featured && <section className="nfl-featured-card"><span>Top {NFL_PROP_MARKET_LIST.find((market) => market.id === marketId)?.shortLabel}</span><h2>{featured.name}</h2><p>{featured.team} vs {featured.opponent} · {liveLabel(featured)}</p><div><b className="mono">{pct(featured.model.probability)}</b><em>at</em><b className="mono">{marketValue(featured, featured.model, marketId)}</b></div><button onClick={() => toggleSet(setSlip, nflLegKey(featured.id, marketId))}><Icon name={slip.has(nflLegKey(featured.id, marketId)) ? 'Check' : 'Plus'} size={15} />{slip.has(nflLegKey(featured.id, marketId)) ? 'Added to slip' : 'Add selected prop'}</button></section>}<section className="nfl-builder-card"><header>Active workspace</header><div><span><small>Watchlist</small><b>{watched.size} players</b></span><button type="button" onClick={() => setView('tickets')}><small>Prop slip</small><b>{slip.size} legs · {tickets.length} saved</b></button></div></section></aside></div>
     </>}
