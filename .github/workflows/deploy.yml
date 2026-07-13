@@ -61,8 +61,8 @@ jobs:
       - name: Build current NFL snapshot and walk-forward baseline
         run: |
           npm run nfl:history:quick
-          npm run nfl:slate
           npm run nfl:backtest
+          npm run nfl:slate
       - name: Smoke and build UI
         run: |
           npm --prefix ui run smoke
@@ -180,8 +180,8 @@ jobs:
           SPORTSGAMEODDS_API_KEY: ${{ secrets.SPORTSGAMEODDS_API_KEY }}
         run: |
           if [ ! -f dist/nfl/history.json ]; then npm run nfl:history; fi
-          npm run nfl:slate
           npm run nfl:backtest
+          npm run nfl:slate
 
       # Publish the slate + rolling state back to R2 (S3-compatible) so the NEXT
       # run's reconcile reads a fresh "yesterday" snapshot from a DURABLE store

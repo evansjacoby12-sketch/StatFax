@@ -4,7 +4,7 @@ export const NFL_PROP_MARKETS = Object.freeze({
   two_plus_td: { id: 'two_plus_td', label: '2+ Touchdowns', shortLabel: '2+ TD', positions: ['QB', 'RB', 'WR', 'TE'], kind: 'touchdown' },
   passing_yards: { id: 'passing_yards', label: 'Passing Yards', shortLabel: 'Pass Yds', positions: ['QB'], kind: 'yardage', lineMin: 150, projectionKey: 'passingYards' },
   receptions: { id: 'receptions', label: 'Receptions', shortLabel: 'Receptions', positions: ['RB', 'WR', 'TE'], kind: 'volume', lineMin: 3, projectionKey: 'receptions' },
-  receiving_yards: { id: 'receiving_yards', label: 'Receiving Yards', shortLabel: 'Rec Yds', positions: ['RB', 'WR', 'TE'], kind: 'yardage', lineMin: 15, projectionKey: 'receivingYards' },
+  receiving_yards: { id: 'receiving_yards', label: 'Receiving Yards', shortLabel: 'Rec Yds', positions: ['RB', 'WR', 'TE'], kind: 'yardage', lineMin: 150, projectionKey: 'receivingYards' },
   rushing_yards: { id: 'rushing_yards', label: 'Rushing Yards', shortLabel: 'Rush Yds', positions: ['QB', 'RB', 'WR'], kind: 'yardage', lineMin: 40, projectionKey: 'rushingYards' },
   rushing_receiving_yards: { id: 'rushing_receiving_yards', label: 'Rushing + Receiving Yards', shortLabel: 'Rush + Rec', positions: ['RB', 'WR', 'TE'], kind: 'combo', lineMin: 40, projectionKey: 'rushingReceivingYards' },
   passing_rushing_yards: { id: 'passing_rushing_yards', label: 'Passing + Rushing Yards', shortLabel: 'Pass + Rush', positions: ['QB'], kind: 'combo', lineMin: 150, projectionKey: 'passingRushingYards' },

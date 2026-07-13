@@ -61,7 +61,7 @@ function SportSwitcher({ sport = 'mlb', onChange }) {
 }
 
 // Help dropdown anchored to the header info button
-function HelpMenu({ onOpenWeather, onOpenGroups, onOpenBacktest, onOpenHowTo, onOpenSettings, onOpenModel, liveScores, onToggleLive, eliLevel, onCycleEli, refreshing, onRefresh }) {
+function HelpMenu({ sport, onOpenWeather, onOpenGroups, onOpenBacktest, onOpenHowTo, onOpenSettings, onOpenModel, liveScores, onToggleLive, eliLevel, onCycleEli, refreshing, onRefresh }) {
   const [open, setOpen] = useState(false)
   const [toolQuery, setToolQuery] = useState('')
   const ref = useRef(null)
@@ -108,8 +108,20 @@ function HelpMenu({ onOpenWeather, onOpenGroups, onOpenBacktest, onOpenHowTo, on
     }
   }, [open])
 
-  // Each destination opens one workspace; its internal tabs handle the tools.
-  const sections = [
+  const isNFL = sport === 'nfl'
+
+  // Keep each sport's controls scoped to its own workspace. NFL does not expose
+  // MLB-only destinations such as Bet Lab, Find Plays, Proof, or Learn Center.
+  const sections = isNFL ? [
+    {
+      title: 'NFL Board',
+      items: [
+        { label: refreshing ? 'Refreshing NFL Feed…' : 'Refresh NFL Feed', desc: 'Reload games, players, injuries, odds and live stats', icon: refreshing ? 'Loader' : 'RefreshCw', fn: onRefresh },
+        { label: liveScores ? 'Live Updates Active' : 'Pregame Status', desc: liveScores ? 'NFL live data refreshes every 30 seconds' : 'No NFL game is live right now', icon: liveScores ? 'Activity' : 'Clock', fn: onToggleLive },
+        { label: eliLevel === 'eli5' ? 'Plain Explanations' : 'Stats Explanations', desc: 'Switch the detail shown on NFL player cards', icon: eliLevel === 'eli5' ? 'Sparkles' : 'BarChart3', fn: onCycleEli },
+      ],
+    },
+  ] : [
     {
       title: 'Build',
       items: [
@@ -146,19 +158,41 @@ function HelpMenu({ onOpenWeather, onOpenGroups, onOpenBacktest, onOpenHowTo, on
     },
   ]
 
-  const featuredTool = {
+  const featuredTool = isNFL ? {
+    label: refreshing ? 'Refreshing NFL Feed' : 'Refresh NFL Feed',
+    desc: 'Reload games, players, injuries, odds and live stats',
+    icon: refreshing ? 'Loader' : 'RefreshCw',
+    fn: onRefresh,
+    keywords: 'nfl football reload games players injuries odds live stats',
+  } : {
     label: 'Bet Lab',
     desc: 'Analyze model edge and parlay combos',
     icon: 'Beaker',
     fn: onOpenGroups,
     keywords: 'build slips same game saved tickets',
   }
-  const quickTools = [
+  const quickTools = isNFL ? [] : [
     { label: 'Find Plays', meta: 'Discovery', icon: 'ScanSearch', fn: onOpenWeather, keywords: 'weather cheat sheets filtered lists' },
     { label: 'Proof', meta: 'Backtests', icon: 'Activity', fn: onOpenBacktest, keywords: 'validate grades signals historical outcomes' },
     { label: 'Learn', meta: 'Guide', icon: 'GraduationCap', fn: onOpenHowTo, keywords: 'learn center playbook glossary help' },
   ]
-  const utilityTools = [
+  const utilityTools = isNFL ? [
+    {
+      label: 'Status',
+      meta: liveScores ? 'Live updates' : 'Pregame',
+      icon: liveScores ? 'Activity' : 'Clock',
+      fn: onToggleLive,
+      active: liveScores,
+      keywords: 'nfl live status updates pregame',
+    },
+    {
+      label: 'Detail',
+      meta: eliLevel === 'eli5' ? 'Plain text' : 'Stats view',
+      icon: eliLevel === 'eli5' ? 'Sparkles' : 'BarChart3',
+      fn: onCycleEli,
+      keywords: 'nfl explanations detail eli5 stats plain',
+    },
+  ] : [
     { label: 'Model', meta: 'Metrics', icon: 'Gauge', fn: onOpenModel, keywords: 'performance accuracy calibration results' },
     {
       label: 'Scores',
@@ -184,7 +218,7 @@ function HelpMenu({ onOpenWeather, onOpenGroups, onOpenBacktest, onOpenHowTo, on
       keywords: 'refresh slate latest model board',
     },
   ]
-  const settingsTool = {
+  const settingsTool = isNFL ? null : {
     label: 'System settings',
     icon: 'SlidersHorizontal',
     fn: onOpenSettings,
@@ -195,7 +229,7 @@ function HelpMenu({ onOpenWeather, onOpenGroups, onOpenBacktest, onOpenHowTo, on
   const visibleFeatured = toolMatches(featuredTool)
   const visibleQuickTools = quickTools.filter(toolMatches)
   const visibleUtilityTools = utilityTools.filter(toolMatches)
-  const visibleSettings = toolMatches(settingsTool)
+  const visibleSettings = !!settingsTool && toolMatches(settingsTool)
   const hasMobileResults = visibleFeatured || visibleQuickTools.length > 0 || visibleUtilityTools.length > 0 || visibleSettings
   const runMobileTool = (tool) => {
     tool.fn?.()
@@ -284,8 +318,8 @@ function HelpMenu({ onOpenWeather, onOpenGroups, onOpenBacktest, onOpenHowTo, on
                   <Icon name="Ellipsis" size={18} />
                 </span>
                 <span>
-                  <b id="mobile-tools-title">Tools &amp; settings</b>
-                  <small>StatFax navigation</small>
+                  <b id="mobile-tools-title">{isNFL ? 'NFL tools' : 'Tools & settings'}</b>
+                  <small>{isNFL ? 'NFL Board controls' : 'StatFax navigation'}</small>
                 </span>
               </div>
               <button
@@ -306,7 +340,7 @@ function HelpMenu({ onOpenWeather, onOpenGroups, onOpenBacktest, onOpenHowTo, on
                   type="search"
                   value={toolQuery}
                   onChange={(event) => setToolQuery(event.target.value)}
-                  placeholder="Find a tool"
+                  placeholder={isNFL ? 'Find an NFL tool' : 'Find a tool'}
                   autoComplete="off"
                 />
                 {toolQuery && (
@@ -621,6 +655,7 @@ export default function Header({
           </button>
 
           <HelpMenu
+            sport={sport}
             onOpenWeather={onOpenWeather}
             onOpenBuilder={onOpenBuilder}
             onOpenGroups={onOpenGroups}

@@ -19,8 +19,8 @@ test('eligibility enforces positions and exact minimum lines', () => {
   assert.equal(isPropEligible(hill, 'receiving_yards'), true)
   assert.equal(isPropEligible(hill, 'rushing_yards'), true)
   assert.ok(eligiblePropMarkets(allen).some((market) => market.id === 'passing_rushing_yards'))
-  assert.equal(isPropEligible({ ...hill, propLines: { ...hill.propLines, receiving_yards: 14.5 } }, 'receiving_yards'), false)
-  assert.equal(isPropEligible({ ...hill, propLines: { ...hill.propLines, receiving_yards: 15 } }, 'receiving_yards'), true)
+  assert.equal(isPropEligible({ ...hill, propLines: { ...hill.propLines, receiving_yards: 149.5 } }, 'receiving_yards'), false)
+  assert.equal(isPropEligible({ ...hill, propLines: { ...hill.propLines, receiving_yards: 150 } }, 'receiving_yards'), true)
 })
 
 test('2+ TD probability uses multi-score math and remains below Anytime TD', () => {
@@ -31,6 +31,15 @@ test('2+ TD probability uses multi-score math and remains below Anytime TD', () 
   assert.ok(twoPlus.probability > 0)
   assert.ok(twoPlus.probability < anytime.probability)
   assert.notEqual(twoPlus.probability, anytime.probability)
+})
+
+test('unpriced NFL markets stay null and use market-specific grade bands', () => {
+  const henry = player('Derrick Henry')
+  const unpriced = { ...henry, markets: { ...henry.markets, anytime_td: { ...henry.markets.anytime_td, odds: null, probability: .4 } } }
+  const result = scoreNFLProp(unpriced, 'anytime_td')
+  assert.equal(result.odds, null)
+  assert.equal(result.implied, null)
+  assert.notEqual(result.grade, 'SKIP')
 })
 
 test('weather adjustments are small and market-specific', () => {
