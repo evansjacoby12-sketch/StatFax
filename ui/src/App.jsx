@@ -34,6 +34,7 @@ import BackToTop from './components/BackToTop.jsx'
 import PullToRefresh from './components/PullToRefresh.jsx'
 import PickOfDay from './components/PickOfDay.jsx'
 import ReadyRadar from './components/ReadyRadar.jsx'
+import BoardWorkspaceSummary from './components/BoardWorkspaceSummary.jsx'
 import UpdateBanner from './components/UpdateBanner.jsx'
 import ListBuilderView from './components/ListBuilderView.jsx'
 import ToastStack, { toast } from './components/Toast.jsx'
@@ -695,50 +696,65 @@ export default function App() {
             onOpenPitcher={openPitcher}
           />
         ) : (
-          <>
-            {showDayRating && <DayRating
-              rating={data.meta?.dayRating}
-              estHRs={projectedSlateHRs(data.batters)}
-            />}
-            <SlateBrief brief={brief} />
-            {pick && pick.id !== podDismissedId && (
-              <PickOfDay
-                batter={pick}
+          <div className="board-workspace">
+            <section className="board-workspace-main" aria-label="Ranked batter board">
+              <BatterTable
+                batters={filtered}
                 onSelect={(b) => setSelectedId(b.id)}
-                watched={watchlist.has(pick.id)}
-                inSlip={slipSet.has(pick.id)}
+                selectedId={selectedId}
+                sort={filters.sort}
+                dir={filters.dir}
+                onSort={onSort}
+                watchlist={watchlist}
+                slip={slipSet}
                 onToggleWatch={toggleWatch}
                 onToggleSlip={toggleSlip}
                 onOpenPitcher={openPitcher}
-                onDismiss={(b) => setPodDismissedId(b.id)}
+                splitProjected={splitProjected}
+                betaEnabled={betaCeil}
+                signalLimit={2}
+                total={all.length}
+                onClearFilters={clearFilters}
               />
-            )}
-            {betaCeil && (
-              <ReadyRadar
-                batters={all}
-                badges={filters.badges}
-                onChangeBadges={(badges) => patch({ badges })}
-                onSelect={(b) => setSelectedId(b.id)}
+            </section>
+            <aside className="board-decision-rail" aria-label="Slate decisions">
+              <div className="board-slate-pulse">
+                {showDayRating && <DayRating
+                  rating={data.meta?.dayRating}
+                  estHRs={projectedSlateHRs(data.batters)}
+                />}
+                {betaCeil && (
+                  <ReadyRadar
+                    batters={all}
+                    badges={filters.badges}
+                    onChangeBadges={(badges) => patch({ badges })}
+                    onSelect={(b) => setSelectedId(b.id)}
+                  />
+                )}
+              </div>
+              <div className="board-decision-pick">
+                {pick && pick.id !== podDismissedId && (
+                  <PickOfDay
+                    batter={pick}
+                    onSelect={(b) => setSelectedId(b.id)}
+                    watched={watchlist.has(pick.id)}
+                    inSlip={slipSet.has(pick.id)}
+                    onToggleWatch={toggleWatch}
+                    onToggleSlip={toggleSlip}
+                    onOpenPitcher={openPitcher}
+                    onDismiss={(b) => setPodDismissedId(b.id)}
+                  />
+                )}
+              </div>
+              <div className="board-decision-brief"><SlateBrief brief={brief} /></div>
+              <BoardWorkspaceSummary
+                watchCount={watchlist.size}
+                slipCount={slipIds.length}
+                onWatchlist={() => patch({ watchedOnly: true })}
+                onBuilder={() => setShowBuilder(true)}
               />
-            )}
-            <BatterTable
-              batters={filtered}
-              onSelect={(b) => setSelectedId(b.id)}
-              selectedId={selectedId}
-              sort={filters.sort}
-              dir={filters.dir}
-              onSort={onSort}
-              watchlist={watchlist}
-              slip={slipSet}
-              onToggleWatch={toggleWatch}
-              onToggleSlip={toggleSlip}
-              onOpenPitcher={openPitcher}
-              splitProjected={splitProjected}
-              betaEnabled={betaCeil}
-              total={all.length}
-              onClearFilters={clearFilters}
-            />
-          </>
+            </aside>
+          </div>
         )}
       </main>
 

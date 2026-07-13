@@ -22,6 +22,7 @@ export default function BatterRow({
   onToggleSlip,
   onOpenPitcher,
   betaEnabled = false,
+  signalLimit = 2,
 }) {
   const stop = (fn) => (e) => {
     e.stopPropagation()
@@ -350,7 +351,7 @@ export default function BatterRow({
         </div>
 
         <div className="col-signals">
-          <BadgeRow batter={b} max={4} includeBeta={betaEnabled} />
+          <BadgeRow batter={b} max={signalLimit} includeBeta={betaEnabled} showOverflow />
         </div>
 
         <div className="col-actions">

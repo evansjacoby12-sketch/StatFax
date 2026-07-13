@@ -179,16 +179,21 @@ export function Badge({ badge }) {
   )
 }
 
-export function BadgeRow({ batter, max = 99, includeBeta = true }) {
-  const badges = activeBadges(batter)
+export function BadgeRow({ batter, max = 99, includeBeta = true, showOverflow = false }) {
+  const all = activeBadges(batter)
     .filter((b) => includeBeta || (b.key !== 'powerReady' && b.key !== 'barrelReady'))
-    .slice(0, max)
+  const badges = all.slice(0, max)
   if (!badges.length) return null
   return (
     <span className="badge-row">
       {badges.map((b) => (
         <Badge key={b.key} badge={b} />
       ))}
+      {showOverflow && all.length > badges.length && (
+        <span className="badge-overflow mono" title={all.slice(badges.length).map((b) => b.label).join(', ')}>
+          +{all.length - badges.length}
+        </span>
+      )}
     </span>
   )
 }

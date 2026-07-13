@@ -64,6 +64,7 @@ export default function BatterTable({
   onOpenPitcher,
   splitProjected = false,
   betaEnabled = false,
+  signalLimit = 2,
   total = 0,
   onClearFilters,
 }) {
@@ -159,6 +160,7 @@ export default function BatterTable({
               onToggleSlip={onToggleSlip}
               onOpenPitcher={onOpenPitcher}
               betaEnabled={betaEnabled}
+              signalLimit={signalLimit}
             />
           )
           if (firstProj === -1) return batters.map((b, i) => renderRow(b, i + 1))
