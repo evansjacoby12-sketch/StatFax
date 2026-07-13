@@ -1,4 +1,5 @@
 import { normalizePlayerName } from './providers/odds.mjs'
+import { calibrateNFLProbability, correctedNFLProjection } from '../../../src/sports/nfl/logic/calibration.js'
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value))
 const n = (value, fallback = 0) => value == null || value === '' ? fallback : Number.isFinite(Number(value)) ? Number(value) : fallback
@@ -36,6 +37,11 @@ function weighted(games, key, fallback) {
   return weights ? value / weights : fallback
 }
 
+function weightedPresent(games, key, fallback) {
+  const present = games.filter((game) => Number.isFinite(Number(game[key])))
+  return present.length ? weighted(present, key, fallback) : fallback
+}
+
 function touchdownProbability(games, prior) {
   const sample = games.slice(0, 12)
   const weightedHits = sample.reduce((sum, game, index) => sum + (n(game.totalTds) > 0 ? .86 ** index : 0), 0)
@@ -51,16 +57,19 @@ function splitEdge(history, isHome) {
 }
 
 function redZoneUsage(history, games) {
-  const totalGames = Math.max(1, games.length)
+  const recent = games.slice(0, 3)
   const rz = history?.redZone || {}
+  const sum = (key) => recent.reduce((total, game) => total + n(game[key]), 0)
+  const careerPerThree = (key) => Math.round(n(rz[key]) / Math.max(1, games.length) * 3)
   return {
-    redZoneTargetsL3: Math.round(n(rz.redZoneTargets) / totalGames * 3),
-    redZoneTouchesL3: Math.round(n(rz.redZoneCarries) / totalGames * 3),
-    goalLineTouchesL3: Math.round(n(rz.goalLineCarries) / totalGames * 3),
+    redZoneTargetsL3: recent.some((game) => game.redZoneTargets != null) ? sum('redZoneTargets') : careerPerThree('redZoneTargets'),
+    endZoneTargetsL3: recent.some((game) => game.endZoneTargets != null) ? sum('endZoneTargets') : careerPerThree('endZoneTargets'),
+    redZoneTouchesL3: recent.some((game) => game.redZoneCarries != null) ? sum('redZoneCarries') : careerPerThree('redZoneCarries'),
+    goalLineTouchesL3: recent.some((game) => game.goalLineCarries != null) ? sum('goalLineCarries') : careerPerThree('goalLineCarries'),
   }
 }
 
-export function projectNFLPlayer(rosterPlayer, history, { isHome, odds = null, availability = null } = {}) {
+export function projectNFLPlayer(rosterPlayer, history, { isHome, odds = null, availability = null, calibration = {} } = {}) {
   const prior = PRIORS[rosterPlayer.position]
   const games = history?.recentGames || []
   const projections = {
@@ -74,11 +83,17 @@ export function projectNFLPlayer(rosterPlayer, history, { isHome, odds = null, a
   projections.rushingReceivingYards = projections.rushingYards + projections.receivingYards
   projections.passingRushingYards = projections.passingYards + projections.rushingYards
   projections.anytimeTdProbability = touchdownProbability(games, prior.td)
-  projections.firstTdProbability = clamp(projections.anytimeTdProbability * .22, .01, .24)
+  projections.firstTdProbability = clamp(projections.anytimeTdProbability * .22, .005, .24)
   const availabilityMultiplier = availability?.multiplier ?? 1
   for (const key of ['passingYards', 'completions', 'attempts', 'rushingYards', 'receptions', 'receivingYards', 'rushingReceivingYards', 'passingRushingYards']) projections[key] *= availabilityMultiplier
   projections.anytimeTdProbability *= availabilityMultiplier
   projections.firstTdProbability *= availabilityMultiplier
+  const projectionMarkets = {
+    passingYards: 'passing_yards', receptions: 'receptions', receivingYards: 'receiving_yards', rushingYards: 'rushing_yards',
+    rushingReceivingYards: 'rushing_receiving_yards', passingRushingYards: 'passing_rushing_yards',
+  }
+  for (const [key, marketId] of Object.entries(projectionMarkets)) projections[key] = correctedNFLProjection(projections[key], calibration[marketId])
+  projections.anytimeTdProbability = calibrateNFLProbability(projections.anytimeTdProbability, calibration.anytime_td)
   for (const key of ['passingYards', 'completions', 'attempts', 'rushingYards', 'receptions', 'receivingYards', 'rushingReceivingYards', 'passingRushingYards']) projections[key] = Math.round(projections[key] * 10) / 10
   projections.anytimeTdProbability = Math.round(projections.anytimeTdProbability * 1000) / 1000
   projections.firstTdProbability = Math.round(projections.firstTdProbability * 1000) / 1000
@@ -94,16 +109,21 @@ export function projectNFLPlayer(rosterPlayer, history, { isHome, odds = null, a
   for (const [marketId, line] of Object.entries(referenceLines)) markets[marketId] = { line, odds: null, source: 'model_reference' }
   for (const [marketId, quote] of Object.entries(odds?.markets || {})) markets[marketId] = { ...markets[marketId], ...quote }
   const propLines = Object.fromEntries(Object.entries(markets).filter(([, quote]) => Number.isFinite(Number(quote.line))).map(([id, quote]) => [id, Number(quote.line)]))
-  const targetShare = weighted(games, 'targetShare', rosterPlayer.position === 'WR' ? .18 : rosterPlayer.position === 'TE' ? .14 : .08)
+  const targetShare = n(rosterPlayer.depthChart?.targetShare, weighted(games, 'targetShare', rosterPlayer.position === 'WR' ? .18 : rosterPlayer.position === 'TE' ? .14 : .08))
+  const snapShare = n(rosterPlayer.depthChart?.snapShare, weightedPresent(games, 'snapShare', prior.snapShare))
+  const redZone = redZoneUsage(history, games)
+  const redZoneTotal = redZone.redZoneTargetsL3 + redZone.redZoneTouchesL3
+  const roleLabel = rosterPlayer.depthChart?.role || (rosterPlayer.roleRank === 1 ? 'Primary role' : rosterPlayer.roleRank === 2 ? 'Secondary role' : 'Rotation role')
   return {
     projections,
     markets,
     propLines,
     recentGames: games.slice(0, 8),
-    usage: { snapShare: prior.snapShare, targetShare: clamp(targetShare, 0, .45), ...redZoneUsage(history, games), redZoneOpportunityShare: clamp(projections.anytimeTdProbability * .75, .05, .6), goalLineOpportunityShare: clamp(projections.anytimeTdProbability * .65, .03, .55) },
+    usage: { snapShare: clamp(snapShare, .05, 1), targetShare: clamp(targetShare, 0, .45), carryShare: rosterPlayer.depthChart?.carryShare ?? null, ...redZone, redZoneOpportunityShare: clamp(redZoneTotal ? redZoneTotal / 18 : projections.anytimeTdProbability * .75, .03, .65), goalLineOpportunityShare: clamp(rosterPlayer.depthChart?.goalLineShare ?? (redZone.goalLineTouchesL3 ? redZone.goalLineTouchesL3 / 10 : projections.anytimeTdProbability * .65), .02, .6), roleRank: rosterPlayer.roleRank || null, roleLabel, depthSource: rosterPlayer.depthChart ? 'overlay' : 'historical-role' },
     splits: { home: history?.splits?.home?.tdRate ?? null, away: history?.splits?.away?.tdRate ?? null, activeEdge: splitEdge(history, isHome) },
     historyMatch: history ? { id: history.id, games: games.length, seasons: [...new Set(games.map((game) => game.season))] } : null,
     availability: availability || { eligible: true, multiplier: 1, label: 'Active', tone: 'good', reason: 'active' },
+    modelCalibration: calibration,
   }
 }
 

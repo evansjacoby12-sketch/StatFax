@@ -45,3 +45,21 @@ suspended, and inactive players are removed; Doubtful, DNP, Questionable,
 and Limited players receive explicit opportunity discounts. Run
 `npm run nfl:backtest` after the history build to produce leakage-safe
 walk-forward metrics at `dist/nfl/backtest.json`.
+
+## Current-context overlays
+
+The slate pipeline accepts three timestamped, provider-neutral overlays. Stale
+files remain visible as limited coverage and are not presented as current.
+
+- `dist/nfl/depth-chart.json` or `NFL_DEPTH_CHART_PATH`: `{ generatedAt,
+  players: [{ espnId, name, depthRank, role, snapShare, targetShare,
+  carryShare, goalLineShare }] }`
+- `dist/nfl/availability.json` or `NFL_AVAILABILITY_PATH`: `{ generatedAt,
+  players: [{ espnId, name, status, practiceParticipation, active }] }`
+- `dist/nfl/weather.json` or `NFL_WEATHER_PATH`: `{ generatedAt, games:
+  [{ gameId, tempF, windMph, precipProbability, roof, source }] }`
+
+The NFL UI stores watchlists, active slips, and up to 50 settled tickets in
+local storage. Tickets settle from live/final player stats; First TD legs use
+the scorer identifier when the live feed supplies it and void safely when a
+final feed cannot identify the scorer.

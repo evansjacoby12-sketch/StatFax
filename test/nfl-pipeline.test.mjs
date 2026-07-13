@@ -4,9 +4,11 @@ import assert from 'node:assert/strict'
 import { parseESPNRoster, parseESPNScoreboard, parseESPNSummary, selectCurrentNFLSlate } from '../server/sports/nfl/providers/espn.mjs'
 import { parseSportsGameOdds } from '../server/sports/nfl/providers/odds.mjs'
 import { indexNFLHistory, matchHistoryPlayer, projectNFLPlayer } from '../server/sports/nfl/projections.mjs'
-import { buildNFLSnapshot, defenseProfile } from '../server/sports/nfl/fetch-nfl-slate.mjs'
+import { buildNFLSnapshot, defenseProfile, normalizeFirstTouchdownProbabilities } from '../server/sports/nfl/fetch-nfl-slate.mjs'
 import { assessPlayerAvailability, indexAvailability, externalAvailabilityFor } from '../server/sports/nfl/availability.mjs'
 import { evaluateNFLHistory } from '../server/sports/nfl/backtest.mjs'
+import { calibrateNFLProbability, correctedNFLProjection } from '../src/sports/nfl/logic/calibration.js'
+import { depthFor, indexDepthChart, indexWeather, overlayFreshness, weatherFor } from '../server/sports/nfl/context-overlays.mjs'
 
 const event = (id, date, week = 1, state = 'pre') => ({
   id, date, season: { year: 2026, slug: 'regular-season' }, week: { number: week },
@@ -84,6 +86,33 @@ test('defense profile ranks opponent position allowance and emits market factors
   assert.ok(profile.factors.rushing_yards > 1)
 })
 
+test('calibration maps correct probability and projection bias', () => {
+  assert.equal(calibrateNFLProbability(.5, { buckets: [{ samples: 100, predicted: .5, observed: .3 }] }), .3)
+  assert.equal(correctedNFLProjection(250, { correction: -12.5 }), 237.5)
+})
+
+test('depth and weather overlays match stable IDs and enforce freshness', () => {
+  const depth = indexDepthChart({ generatedAt: '2026-09-01T00:00:00Z', players: [{ espnId: '7', name: 'Runner', depthRank: 1 }] })
+  const weather = indexWeather({ generatedAt: '2026-09-01T00:00:00Z', games: [{ gameId: 'g1', tempF: 55 }] })
+  assert.equal(depthFor({ espnId: '7', name: 'Runner' }, depth).depthRank, 1)
+  assert.equal(weatherFor({ id: 'g1' }, weather).tempF, 55)
+  assert.equal(overlayFreshness('2026-09-01T00:00:00Z', new Date('2026-09-01T12:00:00Z'), 24).fresh, true)
+  assert.equal(overlayFreshness('2026-09-01T00:00:00Z', new Date('2026-09-03T00:00:00Z'), 24).fresh, false)
+})
+
+test('First TD probabilities are normalized within each game', () => {
+  const players = [
+    { gameId: 'g1', projections: { anytimeTdProbability: .6 }, usage: { redZoneOpportunityShare: .5, roleRank: 1 }, markets: { first_td: {} } },
+    { gameId: 'g1', projections: { anytimeTdProbability: .3 }, usage: { redZoneOpportunityShare: .2, roleRank: 2 }, markets: { first_td: {} } },
+    { gameId: 'g2', projections: { anytimeTdProbability: .4 }, usage: { redZoneOpportunityShare: .3, roleRank: 1 }, markets: { first_td: {} } },
+  ]
+  normalizeFirstTouchdownProbabilities(players)
+  const gameOne = players.filter((player) => player.gameId === 'g1')
+  assert.ok(Math.abs(gameOne.reduce((sum, player) => sum + player.projections.firstTdProbability, 0) - .86) < .001)
+  assert.equal(players[2].projections.firstTdProbability, .86)
+  assert.ok(players[0].projections.firstTdProbability > players[1].projections.firstTdProbability)
+})
+
 test('full NFL snapshot build joins schedule, rosters, injuries, and live contract', async () => {
   const scoreboard = { events: [event('game-1', '2026-09-10T00:00:00Z', 2)] }
   const fetchImpl = async (url) => {
@@ -100,6 +129,8 @@ test('full NFL snapshot build joins schedule, rosters, injuries, and live contra
   assert.equal(snapshot.meta.games, 1)
   assert.equal(snapshot.players.length, 6)
   assert.ok(snapshot.players.every((player) => ['QB', 'RB', 'WR', 'TE'].includes(player.position)))
+  assert.equal(snapshot.dataQuality.playByPlay, false)
+  assert.ok(snapshot.players.every((player) => player.markets.first_td.source === 'game_normalized_model'))
 })
 
 test('availability gate excludes inactive players and discounts practice risks', () => {
@@ -124,8 +155,11 @@ test('walk-forward NFL backtest emits probability and projection metrics without
   assert.equal(result.markets.passing_yards.type, 'projection')
   assert.equal(result.markets.passing_yards.samples, 6)
   assert.ok(result.markets.passing_yards.mae > 0)
+  assert.ok(Number.isFinite(result.markets.passing_yards.correction))
+  assert.equal(result.markets.passing_yards.correction, -result.markets.passing_yards.bias)
   assert.equal(result.markets.anytime_td.type, 'probability')
   assert.equal(result.markets.anytime_td.samples, 6)
   assert.ok(result.markets.anytime_td.brier >= 0 && result.markets.anytime_td.brier <= 1)
   assert.ok(result.markets.anytime_td.buckets.length > 0)
+  assert.ok(result.markets.anytime_td.buckets.every((bucket) => bucket.samples > 0))
 })

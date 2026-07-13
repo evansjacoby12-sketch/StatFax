@@ -129,6 +129,10 @@ export function parseESPNSummary(payload, game) {
   for (const value of byPlayer.values()) value.totalTds = n(value.rushingTds) + n(value.receivingTds)
   const headerCompetition = payload?.header?.competitions?.[0] || {}
   const weather = headerCompetition.weather || payload?.gameInfo?.weather || {}
+  const situation = payload?.situation || headerCompetition.situation || {}
+  const possession = String(situation.possession || situation.possessionText || '')
+  const firstTouchdownPlay = (payload?.scoringPlays || []).find((play) => /touchdown/i.test(`${play.type?.text || ''} ${play.text || ''}`))
+  const firstTouchdownAthlete = firstTouchdownPlay?.participants?.[0]?.athlete || firstTouchdownPlay?.athletes?.[0] || null
   return {
     players: [...byPlayer.values()],
     injuries: (payload?.injuries || []).flatMap((team) => (team.injuries || []).map((injury) => ({
@@ -138,9 +142,22 @@ export function parseESPNSummary(payload, game) {
       roof: game.venue.indoor ? 'dome' : 'outdoor',
       tempF: n(weather.temperature, null),
       windMph: n(weather.wind?.speed ?? weather.windSpeed, null),
+      precipProbability: n(weather.precipitationProbability ?? weather.precipProbability, null),
       description: weather.displayValue || weather.conditionId || null,
+      updatedAt: new Date().toISOString(),
     },
     progress: gameProgress(game.status),
+    situation: {
+      possession,
+      downDistance: situation.downDistanceText || situation.shortDownDistanceText || null,
+      lastPlay: situation.lastPlay?.text || payload?.drives?.current?.plays?.at?.(-1)?.text || null,
+    },
+    firstTouchdown: firstTouchdownPlay ? {
+      known: true,
+      espnId: firstTouchdownAthlete?.id ? String(firstTouchdownAthlete.id) : null,
+      name: firstTouchdownAthlete?.displayName || firstTouchdownAthlete?.fullName || null,
+      text: firstTouchdownPlay.text || null,
+    } : { known: false, espnId: null, name: null, text: null },
   }
 }
 

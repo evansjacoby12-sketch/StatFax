@@ -74,7 +74,7 @@ def compact_week(row):
         "receivingYards": integer(row.get("receiving_yards")),
         "receivingTds": integer(row.get("receiving_tds")),
         "targetShare": round(number(row.get("target_share")), 4),
-        "snapShare": None,
+        "snapShare": round(number(row.get("snap_share") or row.get("offense_pct")), 4) or None,
         # TD-scorer props only settle on a player's own rush/receiving score;
         # a QB throwing a touchdown is not an Anytime TD scorer result.
         "totalTds": integer(row.get("rushing_tds")) + integer(row.get("receiving_tds")),
@@ -133,7 +133,9 @@ def nested_counter():
 
 def build_play_context(seasons, position_by_id):
     usage = defaultdict(lambda: {"redZoneTargets": 0, "endZoneTargets": 0, "redZoneCarries": 0, "goalLineCarries": 0, "touchdowns": 0})
+    usage_by_game = defaultdict(lambda: defaultdict(lambda: {"redZoneTargets": 0, "endZoneTargets": 0, "redZoneCarries": 0, "goalLineCarries": 0}))
     defense = nested_counter()
+    defense_by_season = defaultdict(nested_counter)
     weather_by_game = {}
     first_touchdown_by_game = {}
     for season in seasons:
@@ -144,6 +146,7 @@ def build_play_context(seasons, position_by_id):
                 continue
             game_id = row.get("game_id")
             defteam = row.get("defteam")
+            season = integer(row.get("season"))
             yardline = number(row.get("yardline_100"), 999)
             receiver_id = row.get("receiver_player_id")
             rusher_id = row.get("rusher_player_id")
@@ -162,21 +165,29 @@ def build_play_context(seasons, position_by_id):
 
             if yardline <= 20 and integer(row.get("pass_attempt")) == 1 and receiver_id:
                 usage[receiver_id]["redZoneTargets"] += 1
+                usage_by_game[receiver_id][game_id]["redZoneTargets"] += 1
                 if yardline <= 10:
                     usage[receiver_id]["endZoneTargets"] += 1
+                    usage_by_game[receiver_id][game_id]["endZoneTargets"] += 1
                 position = position_by_id.get(receiver_id)
                 if defteam and position in POSITIONS:
                     defense[defteam][position]["games"].add(game_id)
                     defense[defteam][position]["redZoneTargets"] += 1
+                    defense_by_season[season][defteam][position]["games"].add(game_id)
+                    defense_by_season[season][defteam][position]["redZoneTargets"] += 1
 
             if yardline <= 20 and integer(row.get("rush_attempt")) == 1 and rusher_id:
                 usage[rusher_id]["redZoneCarries"] += 1
+                usage_by_game[rusher_id][game_id]["redZoneCarries"] += 1
                 if yardline <= 5:
                     usage[rusher_id]["goalLineCarries"] += 1
+                    usage_by_game[rusher_id][game_id]["goalLineCarries"] += 1
                 position = position_by_id.get(rusher_id)
                 if defteam and position in POSITIONS:
                     defense[defteam][position]["games"].add(game_id)
                     defense[defteam][position]["redZoneCarries"] += 1
+                    defense_by_season[season][defteam][position]["games"].add(game_id)
+                    defense_by_season[season][defteam][position]["redZoneCarries"] += 1
 
             if touchdown:
                 scorer_id = row.get("td_player_id") or receiver_id or rusher_id
@@ -188,6 +199,8 @@ def build_play_context(seasons, position_by_id):
                     if defteam and position in POSITIONS:
                         defense[defteam][position]["games"].add(game_id)
                         defense[defteam][position]["touchdowns"] += 1
+                        defense_by_season[season][defteam][position]["games"].add(game_id)
+                        defense_by_season[season][defteam][position]["touchdowns"] += 1
 
             if defteam:
                 for player_id, yards_key, target_key in (
@@ -199,18 +212,25 @@ def build_play_context(seasons, position_by_id):
                     if player_id and position in POSITIONS:
                         defense[defteam][position]["games"].add(game_id)
                         defense[defteam][position][yards_key] += integer(row.get(target_key))
+                        defense_by_season[season][defteam][position]["games"].add(game_id)
+                        defense_by_season[season][defteam][position][yards_key] += integer(row.get(target_key))
 
-    compact_defense = {}
-    for team, positions in defense.items():
-        compact_defense[team] = {}
-        for position, values in positions.items():
-            games = len(values["games"])
-            compact_defense[team][position] = {
-                key: (round(value / games, 4) if games and key != "games" else value)
-                for key, value in values.items() if key != "games"
-            }
-            compact_defense[team][position]["games"] = games
-    return usage, compact_defense, weather_by_game, first_touchdown_by_game
+    def compact_table(table):
+        compact = {}
+        for team, positions in table.items():
+            compact[team] = {}
+            for position, values in positions.items():
+                games = len(values["games"])
+                compact[team][position] = {
+                    key: (round(value / games, 4) if games else value)
+                    for key, value in values.items() if key != "games"
+                }
+                compact[team][position]["games"] = games
+        return compact
+
+    compact_defense = compact_table(defense)
+    compact_by_season = {str(season): compact_table(table) for season, table in defense_by_season.items()}
+    return usage, usage_by_game, compact_defense, compact_by_season, weather_by_game, first_touchdown_by_game
 
 
 def main():
@@ -228,10 +248,11 @@ def main():
         parser.error("StatFax NFL history starts at 2020")
     seasons = list(range(args.from_season, args.to_season + 1))
     players, position_by_id = build_player_history(seasons)
-    usage, defense, weather, first_touchdowns = ({}, {}, {}, {}) if args.skip_pbp else build_play_context(seasons, position_by_id)
+    usage, usage_by_game, defense, defense_by_season, weather, first_touchdowns = ({}, {}, {}, {}, {}, {}) if args.skip_pbp else build_play_context(seasons, position_by_id)
     for player_id, entry in players.items():
         entry["redZone"] = usage.get(player_id, {})
         for game in entry["recentGames"]:
+            game.update(usage_by_game.get(player_id, {}).get(game.get("gameId"), {}))
             if game.get("gameId") in first_touchdowns:
                 game["firstTd"] = 1 if first_touchdowns[game["gameId"]] == player_id else 0
     payload = {
@@ -247,7 +268,14 @@ def main():
         },
         "players": list(players.values()),
         "defenseAllowedByPosition": defense,
+        "defenseAllowedBySeason": defense_by_season,
         "weatherByGame": weather,
+        "coverage": {
+            "playByPlay": not args.skip_pbp,
+            "redZone": bool(usage),
+            "defenseByPosition": bool(defense),
+            "firstTouchdown": bool(first_touchdowns),
+        },
     }
     output = Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)

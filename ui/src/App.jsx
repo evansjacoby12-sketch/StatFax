@@ -600,10 +600,6 @@ export default function App() {
     const nflData = nflSnapshot
     const nflPlayers = nflData?.players || []
     const nflLive = nflPlayers.some((player) => player.live?.isLive)
-    const openMlb = (nextView = 'board') => {
-      setSport('mlb')
-      setView(nextView)
-    }
     return (
       <LiveModeContext.Provider value={false}>
       <EliLevelContext.Provider value={eliLevel}>
@@ -615,8 +611,6 @@ export default function App() {
               meta={{ week: nflData?.meta?.week || 'NFL', modelMetrics: null, generatedAt: nflData?.generatedAt || null, sourceMode: nflData?.source?.mode || 'demo', oddsStatus: nflData?.source?.providers?.odds || null }}
               counts={{ games: nflData?.meta?.games || 0, total: nflPlayers.length, shown: nflPlayers.length }}
               onRefresh={refreshNFL}
-              onOpenModel={() => openMlb('results')}
-              onOpenLegend={() => { openMlb('board'); setLearnTab('glossary') }}
               onToggleLive={() => toast.info(nflLive ? 'Live NFL updates refresh every 30 seconds' : 'No NFL game is live right now')}
               onCycleEli={() => setEliLevel((value) => nextEliLevel(value))}
               liveScores={nflLive}
@@ -625,16 +619,6 @@ export default function App() {
               gradeCounts={{}}
               total={nflPlayers.length}
               games={nflData?.games || []}
-              onOpenGuide={() => { openMlb('board'); setLearnTab('guide') }}
-              onOpenHowTo={() => { openMlb('board'); setLearnTab('playbook') }}
-              onOpenBuilder={() => { openMlb('board'); setBetLabTab('builder') }}
-              onOpenWeather={() => { openMlb('board'); setFindPlaysTab('weather') }}
-              onOpenListBuilder={() => { openMlb('board'); setFindPlaysTab('list-builder') }}
-              onOpenGroups={() => { openMlb('board'); setBetLabTab('explore') }}
-              onOpenSGP={() => { openMlb('board'); setBetLabTab('same-game') }}
-              onOpenSplits={() => { openMlb('board'); setFindPlaysTab('cheat-sheet') }}
-              onOpenBacktest={() => { openMlb('board'); setShowBacktest(true) }}
-              onOpenSettings={() => { openMlb('board'); setShowSettings(true) }}
             />
           </div>
           <main className="main nfl-main"><NFLBoard snapshot={nflData} /></main>

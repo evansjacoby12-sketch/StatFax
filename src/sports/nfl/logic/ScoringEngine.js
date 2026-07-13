@@ -1,6 +1,7 @@
 import { NFL_PROP_MARKETS, isPropEligible, propLineFor } from './propEligibility.js'
 import { buildNFLSignals } from './signals.js'
 import { nflWeatherImpact } from './weather.js'
+import { calibrateNFLProbability } from './calibration.js'
 
 const clamp = (value, min = 0.01, max = 0.99) => Math.max(min, Math.min(max, value))
 const logistic = (value) => 1 / (1 + Math.exp(-value))
@@ -36,10 +37,15 @@ function liveMean(player, market, pregameMean) {
   const keys = {
     passing_yards: 'passingYards', receptions: 'receptions', receiving_yards: 'receivingYards', rushing_yards: 'rushingYards',
   }
-  if (market.id === 'rushing_receiving_yards') return Number(liveStats.rushingYards || 0) + Number(liveStats.receivingYards || 0) + pregameMean * (1 - progress)
-  if (market.id === 'passing_rushing_yards') return Number(liveStats.passingYards || 0) + Number(liveStats.rushingYards || 0) + pregameMean * (1 - progress)
+  const trailing = live.gameScript === 'trailing'
+  const leading = live.gameScript === 'leading'
+  const passLean = ['passing_yards', 'receiving_yards', 'receptions', 'passing_rushing_yards'].includes(market.id)
+  const rushLean = ['rushing_yards', 'rushing_receiving_yards'].includes(market.id)
+  const script = trailing ? (passLean ? 1.08 : rushLean ? .94 : 1) : leading ? (passLean ? .96 : rushLean ? 1.06 : 1) : 1
+  if (market.id === 'rushing_receiving_yards') return Number(liveStats.rushingYards || 0) + Number(liveStats.receivingYards || 0) + pregameMean * (1 - progress) * script
+  if (market.id === 'passing_rushing_yards') return Number(liveStats.passingYards || 0) + Number(liveStats.rushingYards || 0) + pregameMean * (1 - progress) * script
   const current = Number(liveStats[keys[market.id]] || 0)
-  return current + pregameMean * (1 - progress)
+  return current + pregameMean * (1 - progress) * script
 }
 
 function distributionScale(market, mean) {
@@ -71,6 +77,15 @@ function splitFactor(player) {
   return clamp(1 + Number(player?.splits?.activeEdge || 0), 0.9, 1.1)
 }
 
+function probabilityGrade(probability, marketId, score, hasPrice) {
+  if (hasPrice) return score >= 72 ? 'PRIME' : score >= 58 ? 'STRONG' : score >= 45 ? 'LEAN' : 'SKIP'
+  const bands = marketId === 'first_td' ? [.12, .08, .045]
+    : marketId === 'two_plus_td' ? [.18, .10, .055]
+      : marketId === 'anytime_td' ? [.48, .36, .24]
+        : [.65, .57, .50]
+  return probability >= bands[0] ? 'PRIME' : probability >= bands[1] ? 'STRONG' : probability >= bands[2] ? 'LEAN' : 'SKIP'
+}
+
 export function scoreNFLProp(player, marketId) {
   const market = NFL_PROP_MARKETS[marketId]
   const eligible = isPropEligible(player, marketId)
@@ -86,6 +101,7 @@ export function scoreNFLProp(player, marketId) {
 
   if (market.kind === 'touchdown') {
     probability = touchdownProbability(player, marketId)
+    if (marketId === 'two_plus_td') probability = calibrateNFLProbability(probability, player?.modelCalibration?.two_plus_td)
   } else {
     mean = projectionMean(player, market)
     mean = liveMean(player, market, mean) * weather.factor * defense * role * split
@@ -95,19 +111,21 @@ export function scoreNFLProp(player, marketId) {
 
   if (market.kind === 'touchdown') probability *= weather.factor * defense * role * split
   probability = clamp(probability)
-  const odds = Number(player?.markets?.[marketId]?.odds)
+  const rawOdds = player?.markets?.[marketId]?.odds
+  const odds = rawOdds == null || rawOdds === '' ? null : Number(rawOdds)
   const implied = americanImpliedProbability(odds)
   const edge = implied == null ? null : probability - implied
   const score = Math.round(clamp(probability * 100 + (edge == null ? 0 : edge * 75), 0, 100))
-  const grade = score >= 72 ? 'PRIME' : score >= 58 ? 'STRONG' : score >= 45 ? 'LEAN' : 'SKIP'
+  const grade = probabilityGrade(probability, marketId, score, implied != null)
   const reasons = [
     `${Math.round((role - 1) * 100)}% role adjustment`,
     `${Math.round((defense - 1) * 100)}% defense-vs-${player.position} adjustment`,
     weather.label,
     `${player.isHome ? 'Home' : 'Away'} split ${Number(player?.splits?.activeEdge || 0) >= 0 ? '+' : ''}${Math.round(Number(player?.splits?.activeEdge || 0) * 100)}%`,
+    player?.usage?.roleLabel || 'Role not confirmed',
   ]
 
-  return { marketId, eligible, probability, score, grade, line, odds: Number.isFinite(odds) ? odds : null, implied, edge, mean, weather, defenseFactor: defense, roleFactor: role, signals: buildNFLSignals(player), reasons }
+  return { marketId, eligible, probability, score, grade, line, odds: Number.isFinite(odds) && odds !== 0 ? odds : null, implied, edge, mean, weather, defenseFactor: defense, roleFactor: role, signals: buildNFLSignals(player), reasons }
 }
 
 export function scoreNFLSnapshot(snapshot, marketId) {

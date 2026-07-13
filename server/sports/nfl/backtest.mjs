@@ -12,7 +12,7 @@ const EPS = 1e-6
 const MARKET_SPECS = {
   passing_yards: { positions: ['QB'], value: (g) => +g.passingYards || 0, min: 150 },
   receptions: { positions: ['RB', 'WR', 'TE'], value: (g) => +g.receptions || 0, min: 3 },
-  receiving_yards: { positions: ['RB', 'WR', 'TE'], value: (g) => +g.receivingYards || 0, min: 15 },
+  receiving_yards: { positions: ['RB', 'WR', 'TE'], value: (g) => +g.receivingYards || 0, min: 150 },
   rushing_yards: { positions: ['QB', 'RB', 'WR'], value: (g) => +g.rushingYards || 0, min: 40 },
   rushing_receiving_yards: { positions: ['RB', 'WR', 'TE'], value: (g) => (+g.rushingYards || 0) + (+g.receivingYards || 0), min: 40 },
   passing_rushing_yards: { positions: ['QB'], value: (g) => (+g.passingYards || 0) + (+g.rushingYards || 0), min: 150 },
@@ -47,7 +47,13 @@ function calibrationBuckets(records) {
     const bucket = buckets[Math.min(9, Math.floor(record.probability * 10))]
     bucket.predictions += 1; bucket.predicted += record.probability; bucket.observed += record.outcome
   }
-  return buckets.filter((bucket) => bucket.predictions).map((bucket) => ({ ...bucket, predicted: bucket.predicted / bucket.predictions, observed: bucket.observed / bucket.predictions }))
+  return buckets.filter((bucket) => bucket.predictions).map((bucket) => ({
+    from: bucket.from,
+    to: bucket.to,
+    samples: bucket.predictions,
+    predicted: bucket.predicted / bucket.predictions,
+    observed: bucket.observed / bucket.predictions,
+  }))
 }
 
 function probabilityMetrics(records) {
@@ -66,6 +72,7 @@ function regressionMetrics(records) {
     rmse: Math.sqrt(errors.reduce((sum, error) => sum + error ** 2, 0) / errors.length),
     bias: errors.reduce((sum, error) => sum + error, 0) / errors.length,
     within10: errors.filter((error) => Math.abs(error) <= 10).length / errors.length,
+    correction: -(errors.reduce((sum, error) => sum + error, 0) / errors.length),
   }
 }
 
@@ -88,11 +95,11 @@ export function evaluateNFLHistory(history) {
     }
   }
   return {
-    version: 1,
+    version: 2,
     sport: 'nfl',
     generatedAt: new Date().toISOString(),
     seasons: history?.seasons || [],
-    methodology: 'Rolling player-level walk-forward baseline; every forecast uses only earlier games.',
+    methodology: 'Rolling player-level walk-forward baseline; every forecast uses only earlier games. Probability buckets and projection bias corrections are consumed by the current slate.',
     markets: {
       ...Object.fromEntries(Object.entries(numeric).map(([id, records]) => [id, { type: 'projection', ...regressionMetrics(records) }])),
       ...Object.fromEntries(Object.entries(touchdown).map(([id, records]) => [id, { type: 'probability', ...probabilityMetrics(records) }])),
