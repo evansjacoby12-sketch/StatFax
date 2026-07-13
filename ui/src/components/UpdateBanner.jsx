@@ -69,11 +69,14 @@ export default function UpdateBanner() {
   return (
     <div className="update-banner" role="status" aria-live="polite">
       <Icon name="RefreshCw" size={15} className="ub-spark" />
-      <span className="ub-txt">New version available</span>
-      <button className="ub-refresh" onClick={() => window.location.reload()}>
-        Refresh
+      <span className="ub-copy">
+        <strong>Update ready</strong>
+        <small>Latest version available</small>
+      </span>
+      <button type="button" className="ub-refresh" onClick={() => window.location.reload()}>
+        Reload
       </button>
-      <button className="ub-x" onClick={() => setDismissed(true)} aria-label="Dismiss">
+      <button type="button" className="ub-x" onClick={() => setDismissed(true)} aria-label="Dismiss update">
         <Icon name="X" size={14} />
       </button>
     </div>
