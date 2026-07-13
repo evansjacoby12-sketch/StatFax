@@ -8475,7 +8475,7 @@ button.th:focus-visible {
   .drawer {
     inset: 0;
     margin: auto;
-    width: min(620px, calc(100vw - 48px));
+    width: min(1040px, calc(100vw - 48px));
     height: min(88vh, 940px);
     border-radius: 20px !important;
     border: 1px solid rgba(255, 255, 255, 0.1) !important;
@@ -8483,6 +8483,84 @@ button.th:focus-visible {
     animation: drawerPop 0.28s cubic-bezier(0.34, 1.45, 0.64, 1);
   }
 }
+
+/* Phase 3 player research workspace: a fixed decision rail beside a focused,
+   independently scrolling evidence pane. */
+.player-research-shell {
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+.player-research-main {
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: rgba(2, 3, 4, 0.28);
+}
+.research-decision-rail {
+  position: relative;
+  width: 308px;
+  min-width: 308px;
+  padding: 22px 20px 18px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-right: 1px solid rgba(255,255,255,0.07);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--rail-accent) 10%, transparent), transparent 220px),
+    rgba(7,8,10,0.7);
+}
+.research-rail-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  color: var(--text-faint);
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+}
+.research-rail-close:hover { color: #fff; border-color: var(--border-soft); background: rgba(255,255,255,0.04); }
+.research-rail-identity { min-width: 0; padding-right: 28px; display: flex; align-items: center; gap: 13px; }
+.research-rail-identity > img {
+  width: 62px;
+  height: 62px;
+  flex: none;
+  object-fit: cover;
+  border: 2px solid color-mix(in srgb, var(--rail-accent) 48%, transparent);
+  border-radius: 13px;
+  background: var(--card-2);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--rail-accent) 18%, transparent);
+}
+.research-rail-identity h2 { max-width: 172px; overflow: hidden; color: #fff; font-family: var(--display); font-size: 19px; font-weight: 800; line-height: 1.1; text-overflow: ellipsis; white-space: nowrap; }
+.research-identity-chips { margin-top: 7px; display: flex; align-items: center; gap: 6px; }
+.research-identity-chips > span:first-child { padding: 2px 5px; color: var(--text-faint); border: 1px solid var(--border-soft); border-radius: 4px; font-family: var(--mono); font-size: 8px; font-weight: 800; }
+.research-rail-metrics { margin-top: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.research-rail-metrics > div { min-width: 0; padding: 13px 10px; text-align: center; border: 1px solid var(--border-soft); border-radius: 11px; background: rgba(0,0,0,0.2); }
+.research-rail-metrics small { display: block; color: var(--text-faint); font-size: 7px; font-weight: 800; letter-spacing: 0.07em; text-transform: uppercase; }
+.research-rail-metrics strong { display: block; margin-top: 5px; color: #fff; font-size: 22px; font-weight: 900; }
+.research-context-list { margin: 16px 0 0; display: grid; gap: 0; }
+.research-context-list > div { min-width: 0; padding: 9px 0; display: flex; align-items: center; justify-content: space-between; gap: 10px; border-bottom: 1px solid rgba(255,255,255,0.045); }
+.research-context-list dt { color: var(--text-faint); font-size: 10px; }
+.research-context-list dd { min-width: 0; overflow: hidden; color: var(--text); font-size: 10.5px; font-weight: 700; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
+.research-context-list > div:last-child dd { color: var(--accent); }
+.research-thesis-label { margin: 18px 0 10px; display: flex; align-items: center; gap: 6px; color: var(--text-faint); font-size: 8px; font-weight: 900; letter-spacing: 0.08em; text-transform: uppercase; }
+.research-reasons { display: grid; gap: 11px; }
+.research-reason { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 7px; color: var(--text-dim); font-size: 11px; line-height: 1.42; }
+.research-reason-icon { width: 20px; height: 20px; display: grid; place-items: center; border: 1px solid color-mix(in srgb, currentColor 25%, transparent); border-radius: 6px; background: color-mix(in srgb, currentColor 7%, transparent); }
+.research-rail-actions { margin-top: auto; padding-top: 16px; display: grid; gap: 8px; }
+.research-rail-actions button { min-height: 40px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; color: var(--text-dim); border: 1px solid var(--border-soft); border-radius: 9px; background: rgba(255,255,255,0.025); font-size: 10px; font-weight: 800; }
+.research-rail-actions > div { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.research-rail-actions .research-add { color: #fff; border-color: color-mix(in srgb, var(--rail-accent) 55%, transparent); background: color-mix(in srgb, var(--rail-accent) 10%, transparent); }
+.research-rail-actions .research-add.on { color: var(--strong); border-color: color-mix(in srgb, var(--strong) 55%, transparent); background: color-mix(in srgb, var(--strong) 10%, transparent); }
+.research-rail-actions button.on { color: var(--prime); border-color: color-mix(in srgb, var(--prime) 40%, transparent); background: color-mix(in srgb, var(--prime) 8%, transparent); }
+.research-mobile-thesis { display: none; }
 @keyframes drawerPop {
   from {
     transform: scale(0.93) translateY(16px);
@@ -10621,18 +10699,20 @@ button.th:focus-visible {
 
 @media (max-width: 560px) {
   .drawer {
-    top: 7.5vh !important;
-    top: 7.5dvh !important;
-    height: 92.5vh !important;
-    height: 92.5dvh !important;
+    top: 0 !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+    border-radius: 0 !important;
     background:
       linear-gradient(180deg, color-mix(in srgb, var(--accent) 5%, transparent), transparent 180px),
       #090a0c !important;
   }
   .drawer::before { display: none !important; }
-  .drawer-grab { height: 24px !important; }
-  .drawer-grab::before { top: 9px !important; width: 44px !important; height: 4px !important; }
+  .drawer-grab { display: none !important; }
   .drawer > .drawer-head { display: none !important; }
+  .player-research-shell { min-height: 0; flex: 1; flex-direction: column; }
+  .player-research-main { min-height: 0; flex: 1; }
+  .research-decision-rail { display: none; }
 
   .mobile-player-head {
     display: block;
@@ -10726,12 +10806,12 @@ button.th:focus-visible {
     z-index: 3;
     min-height: 44px;
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     border-top: 1px solid var(--border-soft);
     border-bottom: 1px solid var(--border-soft);
     background: rgba(4,5,6,0.96);
   }
-  .mobile-drawer-tab { position: relative; width: 100%; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 3px; color: var(--text-faint); border: 0; background: transparent; font-size: 8px; font-weight: 800; text-transform: uppercase; touch-action: manipulation; }
+  .mobile-drawer-tab { position: relative; width: 100%; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 2px; color: var(--text-faint); border: 0; background: transparent; font-size: 7.5px; font-weight: 800; text-transform: uppercase; touch-action: manipulation; }
   .mobile-drawer-tab.active { color: #fff; }
   .mobile-drawer-tab.active::after { content: ''; position: absolute; left: 12px; right: 12px; bottom: -1px; height: 2px; border-radius: 2px; background: var(--accent); box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 70%, transparent); }
   .mobile-tab-more { position: relative; min-width: 0; }
@@ -10742,6 +10822,11 @@ button.th:focus-visible {
   .mobile-tab-menu button.active { color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
 
   .drawer-pane { padding: 12px !important; overscroll-behavior: contain; }
+  .research-mobile-thesis { margin-bottom: 10px; padding: 11px; display: block; border: 1px solid color-mix(in srgb, var(--accent) 16%, var(--border-soft)); border-radius: 11px; background: color-mix(in srgb, var(--accent) 3%, rgba(255,255,255,0.015)); }
+  .research-mobile-thesis .research-thesis-label { margin: 0 0 8px; }
+  .research-mobile-thesis .research-reasons { gap: 7px; }
+  .research-mobile-thesis .research-reason { grid-template-columns: 18px minmax(0, 1fr); gap: 6px; font-size: 9px; line-height: 1.35; }
+  .research-mobile-thesis .research-reason-icon { width: 18px; height: 18px; border-radius: 5px; }
   .player-hero-numbers { display: none !important; }
   .plate-matchup-card { padding: 11px !important; margin-bottom: 10px !important; }
   .plate-matchup-card .pm-card-head { margin-bottom: 8px !important; }

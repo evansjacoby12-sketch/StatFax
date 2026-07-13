@@ -155,19 +155,19 @@ function useSavantBIP(playerId, enabled) {
 // ---------------------------------------------------------------------------
 
 const TABS = [
-  { id: 'overview',  label: 'Overview'  },
+  { id: 'overview',  label: 'Summary'   },
   { id: 'matchup',   label: 'Matchup'   },
   { id: 'form',      label: 'Form'      },
+  { id: 'statcast',  label: 'Power'     },
   { id: 'splits',    label: 'Splits'    },
-  { id: 'statcast',  label: 'Statcast'  },
   { id: 'trends',    label: 'Trends'    },
   { id: 'spray',     label: 'Spray'     },
 ]
 
 function TabBar({ active, onChange }) {
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false)
-  const primaryTabs = TABS.slice(0, 3)
-  const moreTabs = TABS.slice(3)
+  const primaryTabs = TABS.slice(0, 4)
+  const moreTabs = TABS.slice(4)
   const moreActive = moreTabs.some((t) => t.id === active)
   // Sliding underline: one absolute bar measured off the active tab so it
   // glides between tabs (same motion language as the board's view toggle).
@@ -228,7 +228,7 @@ function TabBar({ active, onChange }) {
             aria-haspopup="menu"
             aria-expanded={mobileMoreOpen}
           >
-            More · 4 <Icon name="ChevronDown" size={11} />
+            More · 3 <Icon name="ChevronDown" size={11} />
           </button>
           {mobileMoreOpen && (
             <div className="mobile-tab-menu" role="menu">
@@ -303,18 +303,22 @@ export default function PlayerDrawer({ batter: b, batters, onClose, watched, inS
       >
         <button className="drawer-grab" onClick={onClose} aria-label="Close" title="Close" />
         <MobileDrawerHeader b={b} color={color} onClose={onClose} watched={watched} inSlip={inSlip} onToggleWatch={onToggleWatch} onToggleSlip={onToggleSlip} />
-        <DrawerHeader b={b} color={color} onClose={onClose} watched={watched} inSlip={inSlip} onToggleWatch={onToggleWatch} onToggleSlip={onToggleSlip} />
-        <TabBar active={tab} onChange={setTab} />
-        {/* key={tab} remounts the pane on tab change so the section-stagger
-            entrance animation (.drawer-pane > * in app.css) replays. */}
-        <div key={tab} className="drawer-pane" style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
-          {tab === 'overview'  && <OverviewTab  b={b} color={color} onOpenZone={onOpenZone} liveMode={liveMode} />}
-          {tab === 'matchup'   && <MatchupTab   b={b} batters={batters} onOpenZone={onOpenZone} onOpenPitcher={onOpenPitcher} />}
-          {tab === 'form'      && <FormTab      b={b} />}
-          {tab === 'splits'    && <SplitsTab    b={b} />}
-          {tab === 'statcast'  && <StatcastTab  b={b} />}
-          {tab === 'trends'    && <TrendsTab    b={b} />}
-          {tab === 'spray'     && <SprayTab     b={b} />}
+        <div className="player-research-shell">
+          <DesktopResearchRail b={b} color={color} onClose={onClose} watched={watched} inSlip={inSlip} onToggleWatch={onToggleWatch} onToggleSlip={onToggleSlip} />
+          <div className="player-research-main">
+            <TabBar active={tab} onChange={setTab} />
+            {/* key={tab} remounts the pane on tab change so the section-stagger
+                entrance animation (.drawer-pane > * in app.css) replays. */}
+            <div key={tab} className="drawer-pane" style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
+              {tab === 'overview'  && <OverviewTab  b={b} color={color} onOpenZone={onOpenZone} liveMode={liveMode} />}
+              {tab === 'matchup'   && <MatchupTab   b={b} batters={batters} onOpenZone={onOpenZone} onOpenPitcher={onOpenPitcher} />}
+              {tab === 'form'      && <FormTab      b={b} />}
+              {tab === 'splits'    && <SplitsTab    b={b} />}
+              {tab === 'statcast'  && <StatcastTab  b={b} />}
+              {tab === 'trends'    && <TrendsTab    b={b} />}
+              {tab === 'spray'     && <SprayTab     b={b} />}
+            </div>
+          </div>
         </div>
       </aside>
     </>
@@ -330,6 +334,7 @@ export default function PlayerDrawer({ batter: b, batters, onClose, watched, inS
 function OverviewTab({ b, color, onOpenZone, liveMode }) {
   return (
     <>
+      <ResearchThesis b={b} />
       <HeroNumbers b={b} color={color} />
       <PlateMatchup b={b} onOpenZone={onOpenZone} />
       <ScoutReport b={b} />
@@ -757,6 +762,87 @@ function playerCardText(b) {
   ].filter(Boolean).join(' · ')
   const line3 = best?.american ? `Best odds ${american(best.american)}${best.book ? ` (${bookLabel(best.book)})` : ''}` : null
   return [line1, line2, line3, 'statfax.online'].filter(Boolean).join('\n')
+}
+
+function sharePlayerCard(b) {
+  toast.info('Rendering card…', 1500)
+  sharePickCard(b)
+    .then((how) => { if (how !== 'cancelled') toast.success(how === 'shared' ? 'Card shared' : 'Card downloaded') })
+    .catch(() => toast.warn("Couldn't render the card"))
+}
+
+function ResearchReasons({ b, compact = false }) {
+  const reasons = reasonsForLevel(b, 'eli5').slice(0, 3)
+  if (!reasons.length) return null
+  return (
+    <div className={`research-reasons${compact ? ' compact' : ''}`}>
+      {reasons.map((reason, index) => (
+        <div className="research-reason" key={`${reason.text}-${index}`}>
+          <span className="research-reason-icon" style={{ color: toneColor(reason.tone) }}>
+            <Icon name={eli5IconName(reason.icon)} size={compact ? 12 : 14} />
+          </span>
+          <span>{reason.text}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function DesktopResearchRail({ b, color, onClose, watched, inSlip, onToggleWatch, onToggleSlip }) {
+  const pitcherHand = b.pitcher?.hand ? `${b.pitcher.hand}HP` : null
+  return (
+    <aside className="research-decision-rail" style={{ '--rail-accent': color }}>
+      <button className="research-rail-close" onClick={onClose} aria-label="Close player details">
+        <Icon name="X" size={17} />
+      </button>
+
+      <div className="research-rail-identity">
+        <img src={playerHeadshot(b.playerId, 160)} alt={b.name} />
+        <div>
+          <h2>{b.name}</h2>
+          <div className="research-identity-chips">
+            <span>{b.batSide}HB</span>
+            <GradeChip grade={b.grade} size="sm" score={b.score} />
+          </div>
+        </div>
+      </div>
+
+      <div className="research-rail-metrics">
+        <div><small>HR Probability</small><strong className="mono" style={{ color }}>{pct(b.hrProbability, 1)}</strong></div>
+        <div><small>Model Score</small><strong className="mono">{Math.round(b.score ?? 0)}</strong></div>
+      </div>
+
+      <dl className="research-context-list">
+        <div><dt>Matchup</dt><dd>{b.team} vs {b.opponent?.abbr || b.opponent?.name || '—'}</dd></div>
+        <div><dt>Lineup</dt><dd>{b.battingOrder ? `${ordinal(b.battingOrder)} spot` : (b.lineupConfirmed ? 'Confirmed' : 'Projected')}</dd></div>
+        <div><dt>Pitcher</dt><dd>{b.pitcher?.name || 'TBD'}{pitcherHand ? ` · ${pitcherHand}` : ''}</dd></div>
+      </dl>
+
+      <div className="research-thesis-label"><Icon name="Sparkles" size={12} /> Strongest reasons</div>
+      <ResearchReasons b={b} />
+
+      <div className="research-rail-actions">
+        <button className={`research-add${inSlip ? ' on' : ''}`} onClick={() => onToggleSlip(b)}>
+          <Icon name={inSlip ? 'Check' : 'Plus'} size={14} />{inSlip ? 'In parlay' : 'Add to parlay'}
+        </button>
+        <div>
+          <button className={watched ? 'on' : ''} onClick={() => onToggleWatch(b)}>
+            <Icon name="Star" size={14} style={{ fill: watched ? 'currentColor' : 'none' }} />{watched ? 'Watching' : 'Watch'}
+          </button>
+          <button onClick={() => sharePlayerCard(b)}><Icon name="Share2" size={14} />Share</button>
+        </div>
+      </div>
+    </aside>
+  )
+}
+
+function ResearchThesis({ b }) {
+  return (
+    <section className="research-mobile-thesis">
+      <div className="research-thesis-label"><Icon name="Sparkles" size={12} /> Why it rates</div>
+      <ResearchReasons b={b} compact />
+    </section>
+  )
 }
 
 function DrawerHeader({ b, color, onClose, watched, inSlip, onToggleWatch, onToggleSlip }) {
