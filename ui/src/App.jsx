@@ -15,18 +15,11 @@ import GamesView from './components/GamesView.jsx'
 import PitchersView, { PitcherCard } from './components/PitchersView.jsx'
 import { groupPitchers } from './lib/pitchers.js'
 import WeatherView from './components/WeatherView.jsx'
-import GroupsView from './components/GroupsView.jsx'
-import SameGameView from './components/SameGameView.jsx'
-import CheatSheet from './components/CheatSheet.jsx'
 import BacktestView from './components/BacktestView.jsx'
 import ResultsView from './components/ResultsView.jsx'
 import PlayerDrawer from './components/PlayerDrawer.jsx'
 import ZoneView from './components/ZoneView.jsx'
 import ParlaySlip from './components/ParlaySlip.jsx'
-import ParlayBuilder from './components/ParlayBuilder.jsx'
-import Legend from './components/Legend.jsx'
-import Guide from './components/Guide.jsx'
-import HowToPick from './components/HowToPick.jsx'
 import Settings from './components/Settings.jsx'
 import DayRating from './components/DayRating.jsx'
 import Skeleton from './components/Skeleton.jsx'
@@ -36,7 +29,10 @@ import PickOfDay from './components/PickOfDay.jsx'
 import ReadyRadar from './components/ReadyRadar.jsx'
 import BoardWorkspaceSummary from './components/BoardWorkspaceSummary.jsx'
 import UpdateBanner from './components/UpdateBanner.jsx'
-import ListBuilderView from './components/ListBuilderView.jsx'
+import BetLab from './components/BetLab.jsx'
+import FindPlays from './components/FindPlays.jsx'
+import LearnCenter from './components/LearnCenter.jsx'
+import WorkspaceShell from './components/WorkspaceShell.jsx'
 import ToastStack, { toast } from './components/Toast.jsx'
 import InstallPrompt from './components/InstallPrompt.jsx'
 import Confetti from './components/Confetti.jsx'
@@ -101,15 +97,10 @@ export default function App() {
   const [zoneId, setZoneId] = useState(null)
   // Opposing-pitcher card shown as a popup overlay (entry key: `${pitcherId}-${gamePk}`).
   const [pitcherKey, setPitcherKey] = useState(null)
-  const [showLegend, setShowLegend] = useState(false)
-  const [showGuide, setShowGuide] = useState(false)
-  const [showHowTo, setShowHowTo] = useState(false)
-  const [showGroups, setShowGroups] = useState(false)
-  const [showSGP, setShowSGP] = useState(false)
-  const [showBuilder, setShowBuilder] = useState(false)
-  const [showSplits, setShowSplits] = useState(false)
+  const [learnTab, setLearnTab] = useState(null)
+  const [betLabTab, setBetLabTab] = useState(null)
+  const [findPlaysTab, setFindPlaysTab] = useState(null)
   const [showBacktest, setShowBacktest] = useState(false)
-  const [showListBuilder, setShowListBuilder] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   // Default ON: same-window grouping is the default combos view — those are the
   // combos you can actually bet as one ticket (every leg's lineup confirms before
@@ -273,8 +264,9 @@ export default function App() {
         setView('board')
         setFilters(DEFAULT_FILTERS)
         setSelectedId(null)
-        setShowGroups(false)
-        setShowSGP(false)
+        setBetLabTab(null)
+        setFindPlaysTab(null)
+        setLearnTab(null)
         load()
       }
       store.save('lastSeenAt', Date.now())
@@ -359,19 +351,15 @@ export default function App() {
         else if (zoneId) setZoneId(null)
         else if (selectedId) setSelectedId(null) // drawer stacks above the modals — close it first
         else if (showBacktest) setShowBacktest(false)
-        else if (showListBuilder) setShowListBuilder(false)
-        else if (showSplits) setShowSplits(false)
-        else if (showBuilder) setShowBuilder(false)
-        else if (showGroups) setShowGroups(false)
-        else if (showSGP) setShowSGP(false)
-        else if (showHowTo) setShowHowTo(false)
-        else if (showGuide) setShowGuide(false)
-        else if (showLegend) setShowLegend(false)
+        else if (findPlaysTab) setFindPlaysTab(null)
+        else if (betLabTab) setBetLabTab(null)
+        else if (learnTab) setLearnTab(null)
+        else if (showSettings) setShowSettings(false)
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [selectedId, showLegend, showGuide, showHowTo, zoneId, showGroups, showSGP, showBuilder, showSplits, showBacktest, showListBuilder, pitcherKey])
+  }, [selectedId, zoneId, findPlaysTab, betLabTab, learnTab, showBacktest, showSettings, pitcherKey])
 
   const patch = useCallback((p) => setFilters((f) => ({ ...f, ...p })), [])
 
@@ -621,7 +609,7 @@ export default function App() {
           onRefresh={forceRefresh}
           onHoldBuild={buildSlate}
           onOpenModel={() => setView('results')}
-          onOpenLegend={() => setShowLegend(true)}
+          onOpenLegend={() => setLearnTab('glossary')}
           autoRefresh={autoRefresh}
           onToggleAuto={() => setAutoRefresh((v) => !v)}
           liveScores={liveScores}
@@ -633,14 +621,14 @@ export default function App() {
           gradeCounts={gradeCounts}
           total={all.length}
           games={data.games}
-          onOpenGuide={() => setShowGuide(true)}
-          onOpenHowTo={() => setShowHowTo(true)}
-          onOpenBuilder={() => setShowBuilder(true)}
-          onOpenWeather={() => setView('weather')}
-          onOpenListBuilder={() => setShowListBuilder(true)}
-          onOpenGroups={() => setShowGroups(true)}
-          onOpenSGP={() => setShowSGP(true)}
-          onOpenSplits={() => setShowSplits(true)}
+          onOpenGuide={() => setLearnTab('guide')}
+          onOpenHowTo={() => setLearnTab('playbook')}
+          onOpenBuilder={() => setBetLabTab('builder')}
+          onOpenWeather={() => setFindPlaysTab('weather')}
+          onOpenListBuilder={() => setFindPlaysTab('list-builder')}
+          onOpenGroups={() => setBetLabTab('explore')}
+          onOpenSGP={() => setBetLabTab('same-game')}
+          onOpenSplits={() => setFindPlaysTab('cheat-sheet')}
           onOpenBacktest={() => setShowBacktest(true)}
           onOpenSettings={() => setShowSettings(true)}
         />
@@ -751,7 +739,7 @@ export default function App() {
                 watchCount={watchlist.size}
                 slipCount={slipIds.length}
                 onWatchlist={() => patch({ watchedOnly: true })}
-                onBuilder={() => setShowBuilder(true)}
+                onBuilder={() => setBetLabTab('builder')}
               />
             </aside>
           </div>
@@ -769,37 +757,32 @@ export default function App() {
         onClear={clearSlip}
         onReplace={replaceSlip}
         onSelect={(b) => setSelectedId(b.id)}
-        onOpenBuilder={() => setShowBuilder(true)}
+        onOpenBuilder={() => setBetLabTab('builder')}
       />
 
-      {showBuilder && (
-        <>
-          <div className="drawer-scrim" onClick={() => setShowBuilder(false)} />
-          <div className="modal groups-modal builder-modal" role="dialog" aria-modal="true" aria-label="Parlay Builder">
-            <button className="drawer-close icon-btn" onClick={() => setShowBuilder(false)} aria-label="Close">
-              <Icon name="X" size={18} />
-            </button>
-            <div className="groups-modal-head">
-              <Icon name="Layers" size={18} />
-              <h2>Parlay Builder</h2>
-            </div>
-            <div className="groups-modal-body">
-              <ParlayBuilder
-                batters={all}
-                legs={slipLegs}
-                slipSet={slipSet}
-                onToggle={toggleSlip}
-                onRemove={removeSlip}
-                onClear={clearSlip}
-                onReplace={replaceSlip}
-                onSelect={(b) => setSelectedId(b.id)}
-                onClose={() => setShowBuilder(false)}
-                favorConsistency={favorConsistency}
-                scorecard={data.meta?.comboScorecard}
-              />
-            </div>
-          </div>
-        </>
+      {betLabTab && (
+        <BetLab
+          key={betLabTab}
+          initialTab={betLabTab}
+          onClose={() => setBetLabTab(null)}
+          batters={all}
+          selectedId={selectedId}
+          onSelect={(b) => setSelectedId(b.id)}
+          scorecard={data.meta?.comboScorecard}
+          generatedAt={data.meta?.generatedAt}
+          windowMode={windowMode}
+          comboConf={comboConf}
+          favorConsistency={favorConsistency}
+          lockedBoard={data.raw?.lockedBoard}
+          slipSet={slipSet}
+          onToggleSlip={toggleSlip}
+          comboLock={comboLock}
+          legs={slipLegs}
+          onRemove={removeSlip}
+          onClear={clearSlip}
+          onReplace={replaceSlip}
+          sgpScorecard={data.meta?.sgpScorecard}
+        />
       )}
 
       {selected && (
@@ -838,104 +821,20 @@ export default function App() {
           </div>
         </>
       )}
-      {showGroups && (
-        <>
-          <div className="drawer-scrim" onClick={() => setShowGroups(false)} />
-          <div className="modal groups-modal" role="dialog" aria-modal="true" aria-label="Parlay Combos">
-            <button className="drawer-close icon-btn" onClick={() => setShowGroups(false)} aria-label="Close">
-              <Icon name="X" size={18} />
-            </button>
-            <div className="groups-modal-head">
-              <Icon name="Layers" size={18} />
-              <h2>Parlay Combos</h2>
-            </div>
-            <div className="groups-modal-body">
-              <GroupsView
-                batters={all}
-                onSelect={(b) => setSelectedId(b.id)}
-                selectedId={selectedId}
-                scorecard={data.meta?.comboScorecard}
-                generatedAt={data.meta?.generatedAt}
-                windowMode={windowMode}
-                comboConf={comboConf}
-                favorConsistency={favorConsistency}
-                lockedBoard={data.raw?.lockedBoard}
-                slipSet={slipSet}
-                onToggleSlip={toggleSlip}
-                comboLock={comboLock}
-              />
-            </div>
-          </div>
-        </>
-      )}
-      {showSGP && (
-        <>
-          <div className="drawer-scrim" onClick={() => setShowSGP(false)} />
-          <div className="modal groups-modal" role="dialog" aria-modal="true" aria-label="Same-Game Parlays">
-            <button className="drawer-close icon-btn" onClick={() => setShowSGP(false)} aria-label="Close">
-              <Icon name="X" size={18} />
-            </button>
-            <div className="groups-modal-head">
-              <Icon name="Zap" size={18} />
-              <h2>Same-Game Parlays</h2>
-            </div>
-            <div className="groups-modal-body">
-              <SameGameView
-                batters={all}
-                onSelect={(b) => setSelectedId(b.id)}
-                favorConsistency={favorConsistency}
-                comboConf={comboConf}
-                sgpScorecard={data.meta?.sgpScorecard}
-              />
-            </div>
-          </div>
-        </>
-      )}
-      {showSplits && (
-        <>
-          <div className="drawer-scrim" onClick={() => setShowSplits(false)} />
-          <div className="modal groups-modal cheat-modal" role="dialog" aria-modal="true" aria-label="Cheat Sheet">
-            <button className="drawer-close icon-btn" onClick={() => setShowSplits(false)} aria-label="Close">
-              <Icon name="X" size={18} />
-            </button>
-            <div className="groups-modal-head">
-              <Icon name="LayoutGrid" size={18} />
-              <h2>Cheat Sheet</h2>
-            </div>
-            <div className="groups-modal-body">
-              <CheatSheet batters={all} onSelect={(b) => setSelectedId(b.id)} onOpenPitcher={openPitcher} />
-            </div>
-          </div>
-        </>
-      )}
-      {showListBuilder && (
-        <>
-          <div className="drawer-scrim" onClick={() => setShowListBuilder(false)} />
-          <div className="modal groups-modal cheat-modal" role="dialog" aria-modal="true" aria-label="List Builder">
-            <button className="drawer-close icon-btn" onClick={() => setShowListBuilder(false)} aria-label="Close">
-              <Icon name="X" size={18} />
-            </button>
-            <div className="groups-modal-head">
-              <Icon name="Filter" size={18} />
-              <h2>List Builder</h2>
-            </div>
-            <div className="groups-modal-body">
-              <ListBuilderView batters={all} onSelect={(b) => { setSelectedId(b.id); setShowListBuilder(false) }} />
-            </div>
-          </div>
-        </>
+      {findPlaysTab && (
+        <FindPlays
+          key={findPlaysTab}
+          initialTab={findPlaysTab}
+          onClose={() => setFindPlaysTab(null)}
+          batters={all}
+          selectedId={selectedId}
+          onSelect={(b) => setSelectedId(b.id)}
+          onOpenPitcher={openPitcher}
+        />
       )}
       {showBacktest && (
-        <>
-          <div className="drawer-scrim" onClick={() => setShowBacktest(false)} />
-          <div className="modal backtest-modal" role="dialog" aria-modal="true" aria-label="Signal Backtest">
-            <button className="drawer-close icon-btn" onClick={() => setShowBacktest(false)} aria-label="Close">
-              <Icon name="X" size={18} />
-            </button>
-            <div className="groups-modal-head">
-              <Icon name="Activity" size={18} />
-              <h2>Signal Backtest</h2>
-            </div>
+        <WorkspaceShell icon="Activity" eyebrow="Evidence workspace" title="Signal Backtest" description="Test a grade-and-signal hypothesis against reconciled historical outcomes before applying it to tonight's board." onClose={() => setShowBacktest(false)} status="Descriptive evidence">
+          <div className="workspace-truth"><Icon name="Info" size={14} /><span><b>Truth disclosure</b> Historical hit-rate lift describes the recorded sample. It does not guarantee the next slate.</span></div>
             <BacktestView
               batters={all}
               onApply={(g, s) => {
@@ -944,34 +843,34 @@ export default function App() {
                 setView('board')
               }}
             />
-          </div>
-        </>
+        </WorkspaceShell>
       )}
-      {showLegend && <Legend onClose={() => setShowLegend(false)} />}
-      {showGuide && <Guide onClose={() => setShowGuide(false)} />}
-      {showHowTo && <HowToPick onClose={() => setShowHowTo(false)} />}
+      {learnTab && <LearnCenter key={learnTab} initialTab={learnTab} onClose={() => setLearnTab(null)} />}
       {showSettings && (
-        <Settings
-          liveScores={liveScores}
-          onToggleLive={() => setLiveScores((v) => !v)}
-          autoRefresh={autoRefresh}
-          onToggleAuto={() => setAutoRefresh((v) => !v)}
-          windowMode={windowMode}
-          onToggleWindows={() => setWindowMode((v) => !v)}
-          showDayRating={showDayRating}
-          onToggleDayRating={() => setShowDayRating((v) => !v)}
-          comboConf={comboConf}
-          onSetComboConf={setComboConf}
-          eliLevel={eliLevel}
-          onSetEli={setEliLevel}
-          splitProjected={splitProjected}
-          onToggleSplit={() => setSplitProjected((v) => !v)}
-          comboLock={comboLock}
-          onToggleComboLock={() => setComboLock((v) => !v)}
-          betaCeil={betaCeil}
-          onToggleBetaCeil={() => setBetaCeil((v) => !v)}
-          onClose={() => setShowSettings(false)}
-        />
+        <WorkspaceShell icon="SlidersHorizontal" eyebrow="Control center" title="Settings" description="Optional behavior and display preferences. Every change is saved locally on this device." onClose={() => setShowSettings(false)} size="settings" status="Saved automatically">
+          <Settings
+            embedded
+            liveScores={liveScores}
+            onToggleLive={() => setLiveScores((v) => !v)}
+            autoRefresh={autoRefresh}
+            onToggleAuto={() => setAutoRefresh((v) => !v)}
+            windowMode={windowMode}
+            onToggleWindows={() => setWindowMode((v) => !v)}
+            showDayRating={showDayRating}
+            onToggleDayRating={() => setShowDayRating((v) => !v)}
+            comboConf={comboConf}
+            onSetComboConf={setComboConf}
+            eliLevel={eliLevel}
+            onSetEli={setEliLevel}
+            splitProjected={splitProjected}
+            onToggleSplit={() => setSplitProjected((v) => !v)}
+            comboLock={comboLock}
+            onToggleComboLock={() => setComboLock((v) => !v)}
+            betaCeil={betaCeil}
+            onToggleBetaCeil={() => setBetaCeil((v) => !v)}
+            onClose={() => setShowSettings(false)}
+          />
+        </WorkspaceShell>
       )}
       <BackToTop />
       <PullToRefresh onRefresh={load} />

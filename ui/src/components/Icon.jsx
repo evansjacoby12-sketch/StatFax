@@ -76,6 +76,8 @@ import {
   Pencil,
   ScanSearch,
   Split,
+  Beaker,
+  GraduationCap,
 } from 'lucide-react'
 
 const REGISTRY = {
@@ -156,6 +158,8 @@ const REGISTRY = {
   Pencil,
   ScanSearch,
   Split,
+  Beaker,
+  GraduationCap,
 }
 
 export default function Icon({ name, size = 16, ...rest }) {

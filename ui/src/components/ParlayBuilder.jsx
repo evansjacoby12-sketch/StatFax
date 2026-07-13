@@ -170,9 +170,9 @@ function LegRow({ b, perLeg, weak, onSelect, onRemove }) {
   )
 }
 
-export default function ParlayBuilder({ batters, legs, slipSet, onToggle, onRemove, onClear, onReplace, onSelect, onClose, favorConsistency = false, scorecard = null }) {
+export default function ParlayBuilder({ batters, legs, slipSet, onToggle, onRemove, onClear, onReplace, onSelect, onClose, favorConsistency = false, scorecard = null, initialTab = 'legs' }) {
   const [wager, setWager] = useState('10')
-  const [tab, setTab] = useState('legs') // legs | build | saved
+  const [tab, setTab] = useState(initialTab) // legs | build | saved
   const [autoSize, setAutoSize] = useState(3)
   const [saved, setSaved] = useState(() => store.load('savedSlips', []))
 

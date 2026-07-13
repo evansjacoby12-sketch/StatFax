@@ -85,26 +85,26 @@ function HelpMenu({ onOpenWeather, onOpenBuilder, onOpenGroups, onOpenSGP, onOpe
     {
       title: 'Parlays',
       items: [
-        { label: 'Weather', desc: 'Park factors, wind & game-time conditions', icon: 'Wind', fn: onOpenWeather },
-        { label: 'Parlay Combos', desc: 'Auto-built chalk, value, lottery combos', icon: 'Layers', fn: onOpenGroups },
-        { label: 'Parlay Builder', desc: 'Build your own slip — live odds, EV & all-hit', icon: 'Sparkles', fn: onOpenBuilder },
-        { label: 'Same-Game Parlays', desc: 'Confirmed-lineup 2–4 leg SGPs', icon: 'Zap', fn: onOpenSGP },
+        { label: 'Bet Lab · Explore', desc: 'Auto-built chalk, value and lottery combos', icon: 'Layers', fn: onOpenGroups },
+        { label: 'Bet Lab · Build', desc: 'Build your own slip with live odds and all-hit', icon: 'Sparkles', fn: onOpenBuilder },
+        { label: 'Bet Lab · Same Game', desc: 'Confirmed-lineup 2–4 leg SGPs', icon: 'Zap', fn: onOpenSGP },
       ],
     },
     {
       title: 'Find plays',
       items: [
-        { label: 'Cheat Sheet', desc: 'HR plays, barrels, weak arms & parks', icon: 'LayoutGrid', fn: onOpenSplits },
-        { label: 'List Builder', desc: 'Filter batters by your own Statcast criteria', icon: 'Filter', fn: onOpenListBuilder },
-        { label: 'Signal Backtest', desc: 'Hit rates by grade and signals', icon: 'Activity', fn: onOpenBacktest },
+        { label: 'Find Plays · Weather', desc: 'Park factors, wind and game-time conditions', icon: 'Wind', fn: onOpenWeather },
+        { label: 'Find Plays · Cheat Sheet', desc: 'HR plays, barrels, weak arms and parks', icon: 'LayoutGrid', fn: onOpenSplits },
+        { label: 'Find Plays · List Builder', desc: 'Filter hitters by your own Statcast criteria', icon: 'Filter', fn: onOpenListBuilder },
+        { label: 'Proof · Signal Backtest', desc: 'Historical hit rates by grade and signal', icon: 'Activity', fn: onOpenBacktest },
       ],
     },
     {
       title: 'Learn',
       items: [
-        { label: 'How to Pick', desc: 'HR-selection playbook strategies', icon: 'Target', fn: onOpenHowTo },
-        { label: 'Guide', desc: 'Learn how the board is structured', icon: 'Info', fn: onOpenGuide },
-        { label: 'Legend', desc: 'Definitions of grades, signals & stats', icon: 'Trophy', fn: onOpenLegend },
+        { label: 'Learn · Playbook', desc: 'HR-selection workflow and checklist', icon: 'Target', fn: onOpenHowTo },
+        { label: 'Learn · Guide', desc: 'How the StatFax workspaces fit together', icon: 'Info', fn: onOpenGuide },
+        { label: 'Learn · Glossary', desc: 'Definitions of grades, signals and stats', icon: 'Trophy', fn: onOpenLegend },
       ],
     },
     {

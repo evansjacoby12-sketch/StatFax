@@ -80,14 +80,14 @@ const CHECKLIST = [
   'For SGPs: confirmed lineup, two legs, independent all-hit understood',
 ]
 
-export default function HowToPick({ onClose }) {
+export default function HowToPick({ onClose, embedded = false }) {
   return (
     <>
-      <div className="drawer-scrim" onClick={onClose} />
-      <div className="modal guide-modal" role="dialog" aria-modal="true" aria-label="How to pick">
-        <button className="drawer-close icon-btn" onClick={onClose} aria-label="Close">
+      {!embedded && <div className="drawer-scrim" onClick={onClose} />}
+      <div className={embedded ? 'learn-embedded' : 'modal guide-modal'} role={embedded ? 'tabpanel' : 'dialog'} aria-modal={embedded ? undefined : 'true'} aria-label="How to pick">
+        {!embedded && <button className="drawer-close icon-btn" onClick={onClose} aria-label="Close">
           <Icon name="X" size={18} />
-        </button>
+        </button>}
         <div className="model-head">
           <h2>
             <Icon name="Target" size={18} /> How to Pick

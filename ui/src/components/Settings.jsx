@@ -13,6 +13,7 @@ export default function Settings({
   eliLevel, onSetEli,
   betaCeil, onToggleBetaCeil,
   onClose,
+  embedded = false,
 }) {
   const groups = [
     {
@@ -39,14 +40,6 @@ export default function Settings({
           on: splitProjected,
           toggle: onToggleSplit,
         },
-        {
-          icon: 'Sparkles',
-          label: 'Explanation level',
-          desc: 'How the "Why" picks are worded across the site. ELI5 = plain English, no jargon. ELI15 = the stats behind each call.',
-          segments: [['eli5', 'ELI5'], ['eli15', 'ELI15']],
-          value: eliLevel,
-          onSet: onSetEli,
-        },
       ],
     },
     {
@@ -62,7 +55,7 @@ export default function Settings({
       ],
     },
     {
-      title: 'Parlay Combos',
+      title: 'Parlays',
       rows: [
         {
           icon: 'Clock',
@@ -89,7 +82,20 @@ export default function Settings({
       ],
     },
     {
-      title: 'Beta (unvalidated)',
+      title: 'Explanation',
+      rows: [
+        {
+          icon: 'Sparkles',
+          label: 'Explanation level',
+          desc: 'Choose plain-English ELI5 wording or the underlying ELI15 statistics anywhere StatFax explains a pick.',
+          segments: [['eli5', 'ELI5'], ['eli15', 'ELI15']],
+          value: eliLevel,
+          onSet: onSetEli,
+        },
+      ],
+    },
+    {
+      title: 'Experimental · unvalidated',
       rows: [
         {
           icon: 'Sparkles',
@@ -104,11 +110,11 @@ export default function Settings({
 
   return (
     <>
-      <div className="drawer-scrim" onClick={onClose} />
-      <div className="modal settings-modal" role="dialog" aria-modal="true" aria-label="Settings">
-        <button className="drawer-close icon-btn" onClick={onClose} aria-label="Close">
+      {!embedded && <div className="drawer-scrim" onClick={onClose} />}
+      <div className={embedded ? 'settings-embedded' : 'modal settings-modal'} role={embedded ? 'tabpanel' : 'dialog'} aria-modal={embedded ? undefined : 'true'} aria-label="Settings">
+        {!embedded && <button className="drawer-close icon-btn" onClick={onClose} aria-label="Close">
           <Icon name="X" size={18} />
-        </button>
+        </button>}
         <div className="model-head">
           <h2>
             <Icon name="SlidersHorizontal" size={18} /> Settings

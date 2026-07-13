@@ -42,14 +42,14 @@ const TOOLS = [
   ['Plus', 'Parlay slip', 'Add legs with the + on a row; the slip shows combined model probability and model-fair price.'],
 ]
 
-export default function Guide({ onClose }) {
+export default function Guide({ onClose, embedded = false }) {
   return (
     <>
-      <div className="drawer-scrim" onClick={onClose} />
-      <div className="modal guide-modal" role="dialog" aria-modal="true" aria-label="Guide">
-        <button className="drawer-close icon-btn" onClick={onClose} aria-label="Close">
+      {!embedded && <div className="drawer-scrim" onClick={onClose} />}
+      <div className={embedded ? 'learn-embedded' : 'modal guide-modal'} role={embedded ? 'tabpanel' : 'dialog'} aria-modal={embedded ? undefined : 'true'} aria-label="Guide">
+        {!embedded && <button className="drawer-close icon-btn" onClick={onClose} aria-label="Close">
           <Icon name="X" size={18} />
-        </button>
+        </button>}
         <div className="model-head">
           <h2>
             <Icon name="Info" size={18} /> Guide
