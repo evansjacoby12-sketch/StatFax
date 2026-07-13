@@ -29,7 +29,7 @@ export function mergeNFLLiveUpdate(snapshot, update) {
     generatedAt: update.generatedAt || snapshot.generatedAt,
     players: snapshot.players.map((player) => {
       const next = byId.get(player.id)
-      return next ? { ...player, ...next, live: { ...player.live, ...next.live, stats: { ...player.live?.stats, ...next.live?.stats } } } : player
+      return next ? { ...player, ...next, lineup: { ...player.lineup, ...next.lineup, ...(next.lineup?.marketFactors ? { projectionAdjusted: false } : {}), redZone: { ...player.lineup?.redZone, ...next.lineup?.redZone }, situations: { ...player.lineup?.situations, ...next.lineup?.situations }, marketFactors: { ...player.lineup?.marketFactors, ...next.lineup?.marketFactors } }, live: { ...player.live, ...next.live, stats: { ...player.live?.stats, ...next.live?.stats } } } : player
     }),
   }
 }

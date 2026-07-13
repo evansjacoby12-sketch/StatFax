@@ -1,0 +1,58 @@
+{
+  "generatedAt": "2026-09-13T16:30:00Z",
+  "confirmedAt": "2026-09-13T16:30:00Z",
+  "source": "provider-name",
+  "teams": [
+    {
+      "team": "BUF",
+      "confirmed": true,
+      "confirmedAt": "2026-09-13T16:30:00Z",
+      "personnel": { "eleven": 0.67, "twelve": 0.2, "thirteen": 0.03, "twentyOne": 0.06, "empty": 0.11, "heavy": 0.07, "noHuddle": 0.14 },
+      "offensiveLine": { "starters": ["LT", "LG", "C", "RG", "RT"], "startersAvailable": 5, "continuity": 0.88, "passProtectionFactor": 1.02, "runBlockingFactor": 1.01 },
+      "defense": { "starters": ["CB1", "CB2", "NB", "FS", "SS"], "secondaryAvailable": 5, "linebackersAvailable": 3, "nickelRate": 0.62, "dimeRate": 0.13, "blitzRate": 0.27, "boxRate": 0.31, "coverageFactor": 1.0, "frontFactor": 1.0 }
+    }
+  ],
+  "players": [
+    {
+      "espnId": "3918298",
+      "name": "Example Player",
+      "team": "BUF",
+      "position": "WR",
+      "active": true,
+      "starter": true,
+      "confirmed": true,
+      "depthOrder": 1,
+      "roleConfidence": 0.96,
+      "expectedSnapShare": 0.9,
+      "routesPerDropback": 0.88,
+      "targetPerRoute": 0.24,
+      "passBlockShare": 0.01,
+      "carryShare": 0.02,
+      "slotShare": 0.36,
+      "wideShare": 0.61,
+      "backfieldShare": 0.01,
+      "inlineShare": 0.0,
+      "motionRate": 0.18,
+      "personnel": { "eleven": 0.72, "twelve": 0.18, "thirteen": 0.02, "twentyOne": 0.04, "empty": 0.13, "heavy": 0.03 },
+      "redZoneSnapShare": 0.91,
+      "insideTenSnapShare": 0.87,
+      "insideFiveSnapShare": 0.79,
+      "endZoneRouteShare": 0.84,
+      "firstReadShare": 0.29,
+      "designedTouchShare": 0.03,
+      "goalLinePackage": true,
+      "twoMinuteShare": 0.94,
+      "noHuddleShare": 0.91,
+      "leadingShare": 0.86,
+      "trailingShare": 0.95,
+      "snapLimit": null,
+      "returnFromAbsence": false,
+      "gameTimeDecision": false,
+      "injuryTrend": "full-full-full",
+      "replacementFor": null,
+      "replacementPriority": 1,
+      "vacatedOpportunityShare": 0,
+      "source": "provider-name"
+    }
+  ]
+}

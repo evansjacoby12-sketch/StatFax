@@ -69,7 +69,7 @@ function redZoneUsage(history, games) {
   }
 }
 
-export function projectNFLPlayer(rosterPlayer, history, { isHome, odds = null, availability = null, calibration = {} } = {}) {
+export function projectNFLPlayer(rosterPlayer, history, { isHome, odds = null, availability = null, lineup = null, calibration = {} } = {}) {
   const prior = PRIORS[rosterPlayer.position]
   const games = history?.recentGames || []
   const projections = {
@@ -84,6 +84,17 @@ export function projectNFLPlayer(rosterPlayer, history, { isHome, odds = null, a
   projections.passingRushingYards = projections.passingYards + projections.rushingYards
   projections.anytimeTdProbability = touchdownProbability(games, prior.td)
   projections.firstTdProbability = clamp(projections.anytimeTdProbability * .22, .005, .24)
+  const lineupFactors = lineup?.marketFactors || {}
+  projections.passingYards *= n(lineupFactors.passing_yards, 1)
+  projections.completions *= n(lineupFactors.passing_yards, 1)
+  projections.attempts *= n(lineupFactors.passing_yards, 1)
+  projections.rushingYards *= n(lineupFactors.rushing_yards, 1)
+  projections.receptions *= n(lineupFactors.receptions, 1)
+  projections.receivingYards *= n(lineupFactors.receiving_yards, 1)
+  projections.rushingReceivingYards = projections.rushingYards + projections.receivingYards
+  projections.passingRushingYards = projections.passingYards + projections.rushingYards
+  projections.anytimeTdProbability *= n(lineupFactors.anytime_td, 1)
+  projections.firstTdProbability *= n(lineupFactors.first_td, 1)
   const availabilityMultiplier = availability?.multiplier ?? 1
   for (const key of ['passingYards', 'completions', 'attempts', 'rushingYards', 'receptions', 'receivingYards', 'rushingReceivingYards', 'passingRushingYards']) projections[key] *= availabilityMultiplier
   projections.anytimeTdProbability *= availabilityMultiplier
@@ -123,6 +134,7 @@ export function projectNFLPlayer(rosterPlayer, history, { isHome, odds = null, a
     splits: { home: history?.splits?.home?.tdRate ?? null, away: history?.splits?.away?.tdRate ?? null, activeEdge: splitEdge(history, isHome) },
     historyMatch: history ? { id: history.id, games: games.length, seasons: [...new Set(games.map((game) => game.season))] } : null,
     availability: availability || { eligible: true, multiplier: 1, label: 'Active', tone: 'good', reason: 'active' },
+    lineup: lineup ? { ...lineup, projectionAdjusted: true } : null,
     modelCalibration: calibration,
   }
 }
