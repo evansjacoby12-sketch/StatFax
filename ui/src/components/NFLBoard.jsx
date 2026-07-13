@@ -19,6 +19,8 @@ const MARKET_ICONS = {
 }
 const GRADE_COLORS = { PRIME: 'var(--prime)', STRONG: 'var(--strong)', LEAN: 'var(--lean)', SKIP: 'var(--skip)' }
 
+const gameKeyFor = (player) => player.gameId || [player.team, player.opponent].filter(Boolean).sort().join('-')
+
 const pct = (value, digits = 1) => value == null ? '—' : `${(value * 100).toFixed(digits)}%`
 const odds = (value) => value == null ? '—' : value > 0 ? `+${value}` : String(value)
 const number = (value, digits = 0) => value == null || !Number.isFinite(Number(value)) ? '—' : Number(value).toFixed(digits)
@@ -175,6 +177,7 @@ export default function NFLBoard({ snapshot: suppliedSnapshot = null }) {
   const [query, setQuery] = useState('')
   const [position, setPosition] = useState('all')
   const [team, setTeam] = useState('all')
+  const [game, setGame] = useState('all')
   const [twoPlusOnly, setTwoPlusOnly] = useState(false)
   const [selected, setSelected] = useState(null)
   const [watched, setWatched] = useState(() => new Set(readStorage('statfax:nfl:watchlist', [])))
@@ -197,14 +200,26 @@ export default function NFLBoard({ snapshot: suppliedSnapshot = null }) {
   useEffect(() => { setTickets((current) => current.map((ticket) => settleNFLTicket(ticket, snapshot))) }, [snapshot])
 
   const teams = useMemo(() => [...new Set(snapshot.players.map((player) => player.team))].sort(), [snapshot])
+  const games = useMemo(() => {
+    const matchups = new Map()
+    for (const player of snapshot.players) {
+      const key = gameKeyFor(player)
+      if (!key || matchups.has(key)) continue
+      const label = player.isHome ? `${player.opponent} @ ${player.team}` : `${player.team} @ ${player.opponent}`
+      matchups.set(key, label)
+    }
+    return [...matchups].map(([id, label]) => ({ id, label }))
+  }, [snapshot])
+  useEffect(() => { if (game !== 'all' && !games.some((item) => item.id === game)) setGame('all') }, [game, games])
   const players = useMemo(() => {
     const normalized = query.trim().toLowerCase()
     return scoreNFLSnapshot(snapshot, marketId)
       .filter((player) => position === 'all' || player.position === position)
       .filter((player) => team === 'all' || player.team === team)
+      .filter((player) => game === 'all' || gameKeyFor(player) === game)
       .filter((player) => !normalized || `${player.name} ${player.team} ${player.opponent} ${player.position}`.toLowerCase().includes(normalized))
       .filter((player) => !twoPlusOnly || scoreNFLProp(player, 'two_plus_td').probability >= .08)
-  }, [marketId, position, query, snapshot, team, twoPlusOnly])
+  }, [game, marketId, position, query, snapshot, team, twoPlusOnly])
   const featured = players[0] || null
   const liveCount = players.filter((player) => player.live?.isLive).length
   const toggleSet = (setter, id) => setter((current) => { const next = new Set(current); next.has(id) ? next.delete(id) : next.add(id); return next })
@@ -245,9 +260,9 @@ export default function NFLBoard({ snapshot: suppliedSnapshot = null }) {
       {marketId === 'first_td' && <div className="nfl-variance-note"><Icon name="TriangleAlert" size={14} /><span><b>First TD is high variance.</b> Listed offense receives {pct(snapshot.firstTdReserve?.listedOffense ?? .86, 0)}; other offense {pct(snapshot.firstTdReserve?.otherOffense ?? .06, 0)}, defense/special teams {pct(snapshot.firstTdReserve?.defenseSpecialTeams ?? .06, 0)}, and no touchdown {pct(snapshot.firstTdReserve?.noTouchdown ?? .02, 0)} are modeled separately.</span></div>}
       {marketId === 'two_plus_td' && <div className="nfl-variance-note"><Icon name="Flame" size={14} /><span><b>2+ TD is calibrated separately.</b> Multi-score probability is evaluated independently from Anytime TD.</span></div>}
       <div className="nfl-layout"><section className="nfl-board-panel" aria-label="Ranked NFL props">
-      <div className="nfl-filters nfl-prop-filters"><label className="nfl-search"><Icon name="Search" size={15} /><span className="sr-only">Search players</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search players, teams, matchups" /></label><select value={position} onChange={(event) => setPosition(event.target.value)} aria-label="Position"><option value="all">All positions</option>{['QB', 'RB', 'WR', 'TE'].map((item) => <option key={item}>{item}</option>)}</select><select value={team} onChange={(event) => setTeam(event.target.value)} aria-label="Team"><option value="all">All teams</option>{teams.map((item) => <option key={item}>{item}</option>)}</select><button className={`nfl-two-filter ${twoPlusOnly ? 'active' : ''}`} aria-pressed={twoPlusOnly} onClick={() => setTwoPlusOnly((value) => !value)}><Icon name="Flame" size={13} />2+ TD filter</button></div>
+      <div className="nfl-filters nfl-prop-filters"><label className="nfl-search"><Icon name="Search" size={15} /><span className="sr-only">Search players</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search players, teams, matchups" /></label><select value={position} onChange={(event) => setPosition(event.target.value)} aria-label="Position"><option value="all">All positions</option>{['QB', 'RB', 'WR', 'TE'].map((item) => <option key={item}>{item}</option>)}</select><select value={team} onChange={(event) => setTeam(event.target.value)} aria-label="Team"><option value="all">All teams</option>{teams.map((item) => <option key={item}>{item}</option>)}</select><select value={game} onChange={(event) => setGame(event.target.value)} aria-label="Game"><option value="all">All games</option>{games.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select><button className={`nfl-two-filter ${twoPlusOnly ? 'active' : ''}`} aria-pressed={twoPlusOnly} onClick={() => setTwoPlusOnly((value) => !value)}><Icon name="Flame" size={13} />2+ TD filter</button></div>
       {view === 'cards' ? <div className="nfl-card-grid">{players.map((player) => <PlayerCard key={player.id} player={player} marketId={marketId} watched={watched.has(player.id)} inSlip={slip.has(`${player.id}:${marketId}`)} onSelect={setSelected} onToggleWatch={(item) => toggleSet(setWatched, item.id)} onToggleSlip={(item) => toggleSet(setSlip, `${item.id}:${marketId}`)} />)}</div> : <><div className="nfl-board-head nfl-prop-board-head" aria-hidden="true"><span>#</span><span>Player</span><span>Model %</span><span>Market</span><span>Edge</span><span>Signals</span><span /></div><div className="nfl-player-list">{players.map((player, index) => <BoardRow key={player.id} player={player} rank={index + 1} marketId={marketId} watched={watched.has(player.id)} inSlip={slip.has(`${player.id}:${marketId}`)} onSelect={setSelected} onToggleWatch={(item) => toggleSet(setWatched, item.id)} onToggleSlip={(item) => toggleSet(setSlip, `${item.id}:${marketId}`)} />)}</div></>}
-      {!players.length && <div className="nfl-empty"><Icon name="Search" size={22} /><b>No eligible players match</b><button onClick={() => { setQuery(''); setPosition('all'); setTeam('all'); setTwoPlusOnly(false) }}>Clear filters</button></div>}
+      {!players.length && <div className="nfl-empty"><Icon name="Search" size={22} /><b>No eligible players match</b><button onClick={() => { setQuery(''); setPosition('all'); setTeam('all'); setGame('all'); setTwoPlusOnly(false) }}>Clear filters</button></div>}
     </section><aside className="nfl-decision-rail" aria-label="NFL slate summary"><section className="nfl-slate-card"><div><span>Prop engine</span><strong>{snapshot.dataQuality?.playByPlay ? 'Full context ready' : 'Core model ready'}</strong></div><b className="nfl-rating mono">{players.length}</b><ul><li><Icon name="Check" size={12} /> {NFL_PROP_MARKET_LIST.length} position-aware markets</li><li><Icon name="Activity" size={12} /> {liveCount} live player{liveCount === 1 ? '' : 's'} in this view</li><li><Icon name="Shield" size={12} /> {snapshot.dataQuality?.defenseByPosition ? 'Defense splits connected' : 'Defense splits limited'}</li></ul></section>{featured && <section className="nfl-featured-card"><span>Top {NFL_PROP_MARKET_LIST.find((market) => market.id === marketId)?.shortLabel}</span><h2>{featured.name}</h2><p>{featured.team} vs {featured.opponent} · {liveLabel(featured)}</p><div><b className="mono">{pct(featured.model.probability)}</b><em>at</em><b className="mono">{marketValue(featured, featured.model, marketId)}</b></div><button onClick={() => toggleSet(setSlip, nflLegKey(featured.id, marketId))}><Icon name={slip.has(nflLegKey(featured.id, marketId)) ? 'Check' : 'Plus'} size={15} />{slip.has(nflLegKey(featured.id, marketId)) ? 'Added to slip' : 'Add selected prop'}</button></section>}<section className="nfl-builder-card"><header>Active workspace</header><div><span><small>Watchlist</small><b>{watched.size} players</b></span><button type="button" onClick={() => setView('tickets')}><small>Prop slip</small><b>{slip.size} legs · {tickets.length} saved</b></button></div></section></aside></div>
     </>}
     <PlayerResearch player={selected} marketId={marketId} onClose={() => setSelected(null)} inSlip={selected ? slip.has(`${selected.id}:${marketId}`) : false} onToggleSlip={(item) => toggleSet(setSlip, `${item.id}:${marketId}`)} />
