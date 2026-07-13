@@ -633,6 +633,7 @@ export default function App() {
           </div>
           <main className="main nfl-main"><NFLBoard snapshot={nflData} view={nflView} onViewChange={setNflView} /></main>
           <footer className="foot"><span className="dim">StatFax NFL · TD, yardage and reception props</span></footer>
+          <UpdateBanner />
           <ToastStack />
         </div>
         <nav
