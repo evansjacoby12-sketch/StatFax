@@ -9,6 +9,8 @@ name: Build slate + deploy
 
 on:
   workflow_dispatch: {}
+  pull_request:
+    branches: [main]
   # The Cloudflare worker (server/cloudflare) fires this every 10 min on CF's
   # reliable cron — GitHub's own `schedule` trigger is best-effort and gets
   # dropped almost entirely (≈1 run in 22h observed), which left the slate stale.
@@ -39,7 +41,35 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  nfl-ci:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: |
+          npm install
+          npm --prefix ui install
+      - name: Test NFL engine and pipeline
+        run: npm test
+      - name: Build current NFL snapshot and walk-forward baseline
+        run: |
+          npm run nfl:history:quick
+          npm run nfl:slate
+          npm run nfl:backtest
+      - name: Smoke and build UI
+        run: |
+          npm --prefix ui run smoke
+          npm --prefix ui run build
+
   build-deploy:
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -151,6 +181,7 @@ jobs:
         run: |
           if [ ! -f dist/nfl/history.json ]; then npm run nfl:history; fi
           npm run nfl:slate
+          npm run nfl:backtest
 
       # Publish the slate + rolling state back to R2 (S3-compatible) so the NEXT
       # run's reconcile reads a fresh "yesterday" snapshot from a DURABLE store
@@ -186,6 +217,11 @@ jobs:
             aws s3 cp "dist/nfl/daily.json" "s3://$R2_BUCKET/nfl/daily.json" --endpoint-url "$ENDPOINT" \
               --content-type application/json --cache-control no-cache \
               && echo "R2: published nfl/daily.json"
+          fi
+          if [ -f "dist/nfl/backtest.json" ]; then
+            aws s3 cp "dist/nfl/backtest.json" "s3://$R2_BUCKET/nfl/backtest.json" --endpoint-url "$ENDPOINT" \
+              --content-type application/json --cache-control no-cache \
+              && echo "R2: published nfl/backtest.json"
           fi
 
       # LLM soft-factor layer (injuries/lineups/weather/bullpen → dist/context.json).

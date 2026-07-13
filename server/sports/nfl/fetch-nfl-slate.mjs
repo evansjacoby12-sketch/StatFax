@@ -5,11 +5,13 @@ import { fileURLToPath } from 'node:url'
 import { fetchESPNRoster, fetchESPNSeason, fetchESPNSummary, selectCurrentNFLSlate } from './providers/espn.mjs'
 import { fetchNFLOdds, normalizePlayerName } from './providers/odds.mjs'
 import { indexNFLHistory, matchHistoryPlayer, playerRoleScore, projectNFLPlayer } from './projections.mjs'
+import { assessPlayerAvailability, externalAvailabilityFor, indexAvailability } from './availability.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.resolve(__dirname, '..', '..', '..')
 const DEFAULT_HISTORY = path.join(ROOT, 'dist', 'nfl', 'history.json')
 const DEFAULT_OUTPUT = path.join(ROOT, 'dist', 'nfl', 'daily.json')
+const DEFAULT_AVAILABILITY = process.env.NFL_AVAILABILITY_PATH || path.join(ROOT, 'dist', 'nfl', 'availability.json')
 const LIMITS = { QB: 2, RB: 4, WR: 6, TE: 4 }
 
 const n = (value, fallback = 0) => value == null || value === '' ? fallback : Number.isFinite(Number(value)) ? Number(value) : fallback
@@ -49,10 +51,8 @@ export function defenseProfile(history, team, position) {
   }
 }
 
-function rosterStatus(player) {
-  const status = player.injury?.status || player.rosterStatus || 'Active'
-  const warn = /out|doubt|question|injur|reserve|pup/i.test(status)
-  return { status: player.injury?.detail ? `${status} · ${player.injury.detail}` : status, statusTone: warn ? 'warn' : 'good' }
+function rosterStatus(player, availability) {
+  return { status: availability?.label || player.rosterStatus || 'Active', statusTone: availability?.tone === 'good' ? 'good' : 'warn' }
 }
 
 function liveLabel(game) {
@@ -71,12 +71,14 @@ function limitRoster(players, historyIndex) {
   return [...groups.entries()].flatMap(([position, rows]) => rows.sort((a, b) => b.score - a.score || a.player.name.localeCompare(b.player.name)).slice(0, LIMITS[position] || 0))
 }
 
-export async function buildNFLSnapshot({ now = new Date(), fetchImpl = fetch, historyPath = DEFAULT_HISTORY, oddsApiKey = process.env.SPORTSGAMEODDS_API_KEY } = {}) {
+export async function buildNFLSnapshot({ now = new Date(), fetchImpl = fetch, historyPath = DEFAULT_HISTORY, availabilityPath = DEFAULT_AVAILABILITY, oddsApiKey = process.env.SPORTSGAMEODDS_API_KEY } = {}) {
   const year = new Date(now).getUTCFullYear()
   const schedule = await fetchESPNSeason(year, fetchImpl)
   const games = selectCurrentNFLSlate(schedule, now)
   const history = await readJSON(historyPath)
   const historyIndex = indexNFLHistory(history)
+  const availabilityPayload = await readJSON(availabilityPath)
+  const availabilityIndex = indexAvailability(availabilityPayload)
   const oddsResult = await fetchNFLOdds(oddsApiKey, fetchImpl)
   const teams = [...new Set(games.flatMap((game) => [game.home.abbr, game.away.abbr]))]
   const rosterResults = await Promise.all(teams.map(async (team) => {
@@ -97,9 +99,12 @@ export async function buildNFLSnapshot({ now = new Date(), fetchImpl = fetch, hi
       const opponent = game[side === 'home' ? 'away' : 'home'].abbr
       for (const { player, history: playerHistory } of limitRoster(rosters.get(team) || [], historyIndex)) {
         const quote = oddsResult.players.get(normalizePlayerName(player.name)) || null
-        const model = projectNFLPlayer(player, playerHistory, { isHome: side === 'home', odds: quote })
+        const externalAvailability = externalAvailabilityFor(player, availabilityIndex)
+        const availability = assessPlayerAvailability(player, externalAvailability)
+        if (!availability.eligible) continue
+        const model = projectNFLPlayer(player, playerHistory, { isHome: side === 'home', odds: quote, availability })
         const liveStats = liveById.get(player.espnId) || {}
-        const report = rosterStatus(player)
+        const report = rosterStatus(player, availability)
         players.push({
           id: player.id,
           espnId: player.espnId,
@@ -138,7 +143,8 @@ export async function buildNFLSnapshot({ now = new Date(), fetchImpl = fetch, hi
       mode: 'live',
       historicalFrom: history?.seasons?.[0] ?? 2020,
       historicalThrough: history?.seasons?.at?.(-1) ?? null,
-      providers: { schedule: 'espn', rosters: 'espn', injuries: 'espn', live: 'espn', history: history ? 'nflverse' : 'position-priors', odds: oddsResult.status === 'ok' ? 'sportsgameodds' : oddsResult.status },
+      providers: { schedule: 'espn', rosters: 'espn', injuries: 'espn', practice: availabilityPayload ? 'availability-snapshot' : 'espn-when-reported', live: 'espn', history: history ? 'nflverse' : 'position-priors', odds: oddsResult.status === 'ok' ? 'sportsgameodds' : oddsResult.status },
+      availabilityGeneratedAt: availabilityIndex.generatedAt,
       notes: ['ESPN endpoints are keyless and undocumented; failures retain the last published snapshot.', 'Model-reference lines are used when no sportsbook quote is available.'],
     },
     meta: { week: anchor ? `${anchor.seasonType === 'preseason' ? 'Preseason ' : 'Week '}${anchor.week}` : 'No active slate', season: anchor?.season ?? year, seasonType: anchor?.seasonType ?? null, games: games.length, weatherUpdatedAt: new Date().toISOString() },

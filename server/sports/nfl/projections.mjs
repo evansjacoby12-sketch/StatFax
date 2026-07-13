@@ -60,7 +60,7 @@ function redZoneUsage(history, games) {
   }
 }
 
-export function projectNFLPlayer(rosterPlayer, history, { isHome, odds = null } = {}) {
+export function projectNFLPlayer(rosterPlayer, history, { isHome, odds = null, availability = null } = {}) {
   const prior = PRIORS[rosterPlayer.position]
   const games = history?.recentGames || []
   const projections = {
@@ -75,6 +75,10 @@ export function projectNFLPlayer(rosterPlayer, history, { isHome, odds = null } 
   projections.passingRushingYards = projections.passingYards + projections.rushingYards
   projections.anytimeTdProbability = touchdownProbability(games, prior.td)
   projections.firstTdProbability = clamp(projections.anytimeTdProbability * .22, .01, .24)
+  const availabilityMultiplier = availability?.multiplier ?? 1
+  for (const key of ['passingYards', 'completions', 'attempts', 'rushingYards', 'receptions', 'receivingYards', 'rushingReceivingYards', 'passingRushingYards']) projections[key] *= availabilityMultiplier
+  projections.anytimeTdProbability *= availabilityMultiplier
+  projections.firstTdProbability *= availabilityMultiplier
   for (const key of ['passingYards', 'completions', 'attempts', 'rushingYards', 'receptions', 'receivingYards', 'rushingReceivingYards', 'passingRushingYards']) projections[key] = Math.round(projections[key] * 10) / 10
   projections.anytimeTdProbability = Math.round(projections.anytimeTdProbability * 1000) / 1000
   projections.firstTdProbability = Math.round(projections.firstTdProbability * 1000) / 1000
@@ -99,6 +103,7 @@ export function projectNFLPlayer(rosterPlayer, history, { isHome, odds = null } 
     usage: { snapShare: prior.snapShare, targetShare: clamp(targetShare, 0, .45), ...redZoneUsage(history, games), redZoneOpportunityShare: clamp(projections.anytimeTdProbability * .75, .05, .6), goalLineOpportunityShare: clamp(projections.anytimeTdProbability * .65, .03, .55) },
     splits: { home: history?.splits?.home?.tdRate ?? null, away: history?.splits?.away?.tdRate ?? null, activeEdge: splitEdge(history, isHome) },
     historyMatch: history ? { id: history.id, games: games.length, seasons: [...new Set(games.map((game) => game.season))] } : null,
+    availability: availability || { eligible: true, multiplier: 1, label: 'Active', tone: 'good', reason: 'active' },
   }
 }
 

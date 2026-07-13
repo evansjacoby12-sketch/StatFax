@@ -14,6 +14,7 @@
     "nfl:history": "python server/sports/nfl/build-history.py --from-season 2020",
     "nfl:history:quick": "python server/sports/nfl/build-history.py --from-season 2020 --skip-pbp",
     "nfl:slate": "node server/sports/nfl/fetch-nfl-slate.mjs",
+    "nfl:backtest": "node server/sports/nfl/backtest.mjs",
     "lab:pull": "node model-lab/pull-data.mjs",
     "lab:backtest": "node model-lab/backtest.mjs",
     "lab:train": "node model-lab/train-logreg.mjs",

@@ -76,6 +76,7 @@ export function parseESPNRoster(payload, teamAbbr) {
       injury: injury ? {
         status: injury.status || injury.type?.description || 'Injury report',
         detail: injury.details?.detail || injury.details?.type || null,
+        practiceParticipation: injury.practiceStatus || injury.practiceParticipation || injury.details?.practiceStatus || injury.details?.fantasyStatus?.displayDescription || null,
         date: injury.date || null,
       } : null,
     }

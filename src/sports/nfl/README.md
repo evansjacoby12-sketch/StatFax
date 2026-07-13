@@ -38,3 +38,10 @@ Without an odds key, model-reference lines remain clearly unpriced.
 CI caches the full history build, including play-by-play-derived red-zone
 usage and defense allowed by position, so the large download is paid only
 when the history builder changes.
+
+An optional `dist/nfl/availability.json` (or `NFL_AVAILABILITY_PATH`) can
+overlay official inactive and practice-participation updates. Out, IR, PUP,
+suspended, and inactive players are removed; Doubtful, DNP, Questionable,
+and Limited players receive explicit opportunity discounts. Run
+`npm run nfl:backtest` after the history build to produce leakage-safe
+walk-forward metrics at `dist/nfl/backtest.json`.

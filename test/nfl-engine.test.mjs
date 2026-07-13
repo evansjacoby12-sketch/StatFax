@@ -19,6 +19,8 @@ test('eligibility enforces positions and exact minimum lines', () => {
   assert.equal(isPropEligible(hill, 'receiving_yards'), true)
   assert.equal(isPropEligible(hill, 'rushing_yards'), true)
   assert.ok(eligiblePropMarkets(allen).some((market) => market.id === 'passing_rushing_yards'))
+  assert.equal(isPropEligible({ ...hill, propLines: { ...hill.propLines, receiving_yards: 14.5 } }, 'receiving_yards'), false)
+  assert.equal(isPropEligible({ ...hill, propLines: { ...hill.propLines, receiving_yards: 15 } }, 'receiving_yards'), true)
 })
 
 test('2+ TD probability uses multi-score math and remains below Anytime TD', () => {

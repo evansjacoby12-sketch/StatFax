@@ -5,6 +5,8 @@ import { parseESPNRoster, parseESPNScoreboard, parseESPNSummary, selectCurrentNF
 import { parseSportsGameOdds } from '../server/sports/nfl/providers/odds.mjs'
 import { indexNFLHistory, matchHistoryPlayer, projectNFLPlayer } from '../server/sports/nfl/projections.mjs'
 import { buildNFLSnapshot, defenseProfile } from '../server/sports/nfl/fetch-nfl-slate.mjs'
+import { assessPlayerAvailability, indexAvailability, externalAvailabilityFor } from '../server/sports/nfl/availability.mjs'
+import { evaluateNFLHistory } from '../server/sports/nfl/backtest.mjs'
 
 const event = (id, date, week = 1, state = 'pre') => ({
   id, date, season: { year: 2026, slug: 'regular-season' }, week: { number: week },
@@ -98,4 +100,32 @@ test('full NFL snapshot build joins schedule, rosters, injuries, and live contra
   assert.equal(snapshot.meta.games, 1)
   assert.equal(snapshot.players.length, 6)
   assert.ok(snapshot.players.every((player) => ['QB', 'RB', 'WR', 'TE'].includes(player.position)))
+})
+
+test('availability gate excludes inactive players and discounts practice risks', () => {
+  const index = indexAvailability({ generatedAt: '2026-09-09T20:00:00Z', players: [
+    { espnId: '1', name: 'Out Player', status: 'Out', active: false },
+    { name: 'Limited Player', status: 'Questionable', practiceParticipation: 'Limited Practice' },
+  ] })
+  const out = assessPlayerAvailability({ espnId: '1', name: 'Out Player', rosterStatus: 'Active' }, externalAvailabilityFor({ espnId: '1', name: 'Out Player' }, index))
+  const limited = assessPlayerAvailability({ espnId: '2', name: 'Limited Player', rosterStatus: 'Active' }, externalAvailabilityFor({ espnId: '2', name: 'Limited Player' }, index))
+  assert.equal(out.eligible, false)
+  assert.equal(out.multiplier, 0)
+  assert.equal(limited.eligible, true)
+  assert.ok(limited.multiplier > 0 && limited.multiplier < 1)
+})
+
+test('walk-forward NFL backtest emits probability and projection metrics without future leakage', () => {
+  const games = Array.from({ length: 10 }, (_, index) => ({
+    season: 2025, week: index + 1, passingYards: 210 + index * 8, rushingYards: 30 + index * 2,
+    receivingYards: 0, receptions: 0, totalTds: index % 3 === 0 ? 1 : 0,
+  }))
+  const result = evaluateNFLHistory({ seasons: [2025], players: [{ id: 'qb', name: 'QB', position: 'QB', recentGames: games }] })
+  assert.equal(result.markets.passing_yards.type, 'projection')
+  assert.equal(result.markets.passing_yards.samples, 6)
+  assert.ok(result.markets.passing_yards.mae > 0)
+  assert.equal(result.markets.anytime_td.type, 'probability')
+  assert.equal(result.markets.anytime_td.samples, 6)
+  assert.ok(result.markets.anytime_td.brier >= 0 && result.markets.anytime_td.brier <= 1)
+  assert.ok(result.markets.anytime_td.buckets.length > 0)
 })

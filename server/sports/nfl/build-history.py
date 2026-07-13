@@ -135,6 +135,7 @@ def build_play_context(seasons, position_by_id):
     usage = defaultdict(lambda: {"redZoneTargets": 0, "endZoneTargets": 0, "redZoneCarries": 0, "goalLineCarries": 0, "touchdowns": 0})
     defense = nested_counter()
     weather_by_game = {}
+    first_touchdown_by_game = {}
     for season in seasons:
         url = PBP_URL.format(season=season)
         print(f"play by play {season}", file=sys.stderr)
@@ -180,6 +181,8 @@ def build_play_context(seasons, position_by_id):
             if touchdown:
                 scorer_id = row.get("td_player_id") or receiver_id or rusher_id
                 if scorer_id:
+                    if game_id and game_id not in first_touchdown_by_game:
+                        first_touchdown_by_game[game_id] = scorer_id
                     usage[scorer_id]["touchdowns"] += 1
                     position = position_by_id.get(scorer_id)
                     if defteam and position in POSITIONS:
@@ -207,7 +210,7 @@ def build_play_context(seasons, position_by_id):
                 for key, value in values.items() if key != "games"
             }
             compact_defense[team][position]["games"] = games
-    return usage, compact_defense, weather_by_game
+    return usage, compact_defense, weather_by_game, first_touchdown_by_game
 
 
 def main():
@@ -225,9 +228,12 @@ def main():
         parser.error("StatFax NFL history starts at 2020")
     seasons = list(range(args.from_season, args.to_season + 1))
     players, position_by_id = build_player_history(seasons)
-    usage, defense, weather = ({}, {}, {}) if args.skip_pbp else build_play_context(seasons, position_by_id)
+    usage, defense, weather, first_touchdowns = ({}, {}, {}, {}) if args.skip_pbp else build_play_context(seasons, position_by_id)
     for player_id, entry in players.items():
         entry["redZone"] = usage.get(player_id, {})
+        for game in entry["recentGames"]:
+            if game.get("gameId") in first_touchdowns:
+                game["firstTd"] = 1 if first_touchdowns[game["gameId"]] == player_id else 0
     payload = {
         "version": 1,
         "sport": "nfl",
