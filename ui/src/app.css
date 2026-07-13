@@ -14900,6 +14900,16 @@ button.th:focus-visible {
 .nfl-signal-filter.zero-count:not(.active) { opacity: .48; }
 .nfl-signal-filter:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .nfl-prop-filters { grid-template-columns: minmax(210px, 1fr) 130px 120px 150px 132px; align-items: stretch; }
+.nfl-prop-filters .select-wrap {
+  width: 100%;
+  height: 40px;
+  min-width: 0;
+  padding-inline: 10px;
+  border-color: var(--border-soft);
+  background: rgba(255,255,255,.025);
+}
+.nfl-prop-filters .sel-btn { font-size: 10px; font-weight: 750; text-transform: uppercase; }
+.nfl-prop-filters .sel-menu { width: max-content; min-width: 100%; max-width: min(320px, calc(100vw - 24px)); }
 .nfl-two-filter {
   min-height: 40px;
   padding: 0 10px;

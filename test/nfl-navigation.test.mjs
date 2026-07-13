@@ -11,14 +11,15 @@ test('NFL header receives sport scope and cannot wire MLB workspace actions', as
   assert.match(header, /const isNFL = sport === 'nfl'/)
 })
 
-test('NFL board exposes aligned position, team, and game filters', async () => {
+test('NFL board exposes aligned themed multi-select position, team, and game filters', async () => {
   const [board, styles] = await Promise.all([readFile(new URL('../ui/src/components/NFLBoard.jsx', import.meta.url), 'utf8'), readFile(new URL('../ui/src/app.css', import.meta.url), 'utf8')])
-  assert.match(board, /aria-label="Position"/)
-  assert.match(board, /aria-label="Team"/)
-  assert.match(board, /aria-label="Game"/)
-  assert.match(board, /<option value="all">All games<\/option>/)
-  assert.match(board, /gameKeyFor\(player\) === game/)
+  assert.match(board, /<Select multi value=\{positionFilters\}[\s\S]*?ariaLabel="Positions"/)
+  assert.match(board, /<Select multi value=\{teamFilters\}[\s\S]*?ariaLabel="Teams"/)
+  assert.match(board, /<Select multi value=\{gameFilters\}[\s\S]*?ariaLabel="Games"/)
+  assert.match(board, /label: 'All games'/)
+  assert.match(board, /gameFilters\.has\(String\(gameKeyFor\(player\)\)\)/)
   assert.match(styles, /\.nfl-prop-filters \{[^}]*align-items: stretch/)
+  assert.match(styles, /\.nfl-prop-filters \.select-wrap/)
 })
 
 test('NFL player research uses the approved tabbed evidence workspace', async () => {
