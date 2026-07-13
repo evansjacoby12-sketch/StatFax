@@ -519,7 +519,7 @@ export default function Header({
               <span>{sport === 'nfl' ? 'players' : 'batters'}</span>
             </span>
             {sport === 'mlb' && <FirstPitchCountdown games={games} />}
-            {sport === 'nfl' && <span className="nfl-header-demo"><Icon name="Beaker" size={10} /> demo slate</span>}
+            {sport === 'nfl' && <span className="nfl-header-demo"><Icon name={meta.sourceMode === 'demo' ? 'Beaker' : 'Activity'} size={10} /> {meta.sourceMode === 'demo' ? 'demo slate' : 'live feed'}</span>}
             {sport === 'mlb' && meta.morningLockAt && (
               <>
                 <span className="dot-sep">·</span>
@@ -550,11 +550,11 @@ export default function Header({
 
       <div className="header-right">
         {sport === 'nfl' && (
-          <div className="metric-pill model-health nfl-feed-health" title="NFL interface demo; live data feed not connected">
-            <span className="model-health-gauge" aria-hidden="true"><Icon name="Beaker" size={15} /></span>
+          <div className="metric-pill model-health nfl-feed-health" title={meta.sourceMode === 'demo' ? 'NFL demo fallback' : `NFL feed connected · odds ${meta.oddsStatus || 'unknown'}`}>
+            <span className="model-health-gauge" aria-hidden="true"><Icon name={meta.sourceMode === 'demo' ? 'Beaker' : 'Activity'} size={15} /></span>
             <span className="model-health-copy">
-              <span className="model-health-main"><strong>Demo</strong><small>NFL feed</small></span>
-              <span className="model-health-meta"><span>Offline</span></span>
+              <span className="model-health-main"><strong>{meta.sourceMode === 'demo' ? 'Demo' : 'Live'}</strong><small>NFL feed</small></span>
+              <span className="model-health-meta"><span>{meta.sourceMode === 'demo' ? 'Fallback' : meta.oddsStatus === 'ok' ? 'Odds on' : 'Stats on'}</span></span>
             </span>
           </div>
         )}
