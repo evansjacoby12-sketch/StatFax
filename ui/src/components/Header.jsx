@@ -34,7 +34,7 @@ function FirstPitchCountdown({ games = [] }) {
 }
 
 // Help dropdown anchored to the header info button
-function HelpMenu({ onOpenWeather, onOpenBuilder, onOpenGroups, onOpenSGP, onOpenSplits, onOpenBacktest, onOpenListBuilder, onOpenGuide, onOpenHowTo, onOpenLegend, onOpenSettings, onOpenModel, liveScores, onToggleLive, eliLevel, onCycleEli, refreshing, onRefresh }) {
+function HelpMenu({ onOpenWeather, onOpenGroups, onOpenBacktest, onOpenHowTo, onOpenSettings, onOpenModel, liveScores, onToggleLive, eliLevel, onCycleEli, refreshing, onRefresh }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
   const triggerRef = useRef(null)
@@ -79,32 +79,30 @@ function HelpMenu({ onOpenWeather, onOpenBuilder, onOpenGroups, onOpenSGP, onOpe
     }
   }, [open])
 
-  // Grouped so the menu reads as: betting tools → finding plays → learning →
-  // app settings, instead of one flat 9-item wall.
+  // Each destination opens one workspace; its internal tabs handle the tools.
   const sections = [
     {
-      title: 'Parlays',
+      title: 'Build',
       items: [
-        { label: 'Bet Lab · Explore', desc: 'Auto-built chalk, value and lottery combos', icon: 'Layers', fn: onOpenGroups },
-        { label: 'Bet Lab · Build', desc: 'Build your own slip with live odds and all-hit', icon: 'Sparkles', fn: onOpenBuilder },
-        { label: 'Bet Lab · Same Game', desc: 'Confirmed-lineup 2–4 leg SGPs', icon: 'Zap', fn: onOpenSGP },
+        { label: 'Bet Lab', desc: 'Explore combos, build slips, same-game plays and saved tickets', icon: 'Beaker', fn: onOpenGroups },
       ],
     },
     {
-      title: 'Find plays',
+      title: 'Discover',
       items: [
-        { label: 'Find Plays · Weather', desc: 'Park factors, wind and game-time conditions', icon: 'Wind', fn: onOpenWeather },
-        { label: 'Find Plays · Cheat Sheet', desc: 'HR plays, barrels, weak arms and parks', icon: 'LayoutGrid', fn: onOpenSplits },
-        { label: 'Find Plays · List Builder', desc: 'Filter hitters by your own Statcast criteria', icon: 'Filter', fn: onOpenListBuilder },
-        { label: 'Proof · Signal Backtest', desc: 'Historical hit rates by grade and signal', icon: 'Activity', fn: onOpenBacktest },
+        { label: 'Find Plays', desc: 'Weather, cheat sheets and your own filtered lists', icon: 'ScanSearch', fn: onOpenWeather },
+      ],
+    },
+    {
+      title: 'Validate',
+      items: [
+        { label: 'Proof', desc: 'Test grades and signals against historical outcomes', icon: 'Activity', fn: onOpenBacktest },
       ],
     },
     {
       title: 'Learn',
       items: [
-        { label: 'Learn · Playbook', desc: 'HR-selection workflow and checklist', icon: 'Target', fn: onOpenHowTo },
-        { label: 'Learn · Guide', desc: 'How the StatFax workspaces fit together', icon: 'Info', fn: onOpenGuide },
-        { label: 'Learn · Glossary', desc: 'Definitions of grades, signals and stats', icon: 'Trophy', fn: onOpenLegend },
+        { label: 'Learn Center', desc: 'Playbook, product guide and searchable glossary', icon: 'GraduationCap', fn: onOpenHowTo },
       ],
     },
     {
@@ -114,7 +112,7 @@ function HelpMenu({ onOpenWeather, onOpenBuilder, onOpenGroups, onOpenSGP, onOpe
         { label: liveScores ? 'Live Scores On' : 'Pregame View', desc: liveScores ? 'Tap to pause live scores and innings' : 'Tap to enable live scores and innings', icon: liveScores ? 'Activity' : 'Clock', fn: onToggleLive, mobileOnly: true },
         { label: eliLevel === 'eli5' ? 'Plain Explanations' : 'Stats Explanations', desc: 'Switch explanation depth', icon: eliLevel === 'eli5' ? 'Sparkles' : 'BarChart3', fn: onCycleEli, mobileOnly: true },
         { label: refreshing ? 'Refreshing Slate…' : 'Refresh Slate', desc: 'Reload the latest model board', icon: refreshing ? 'Loader' : 'RefreshCw', fn: onRefresh, mobileOnly: true },
-        { label: 'Settings', desc: 'Live updates, refresh rate, combo window', icon: 'SlidersHorizontal', fn: onOpenSettings },
+        { label: 'Settings', desc: 'Display, updates, parlays and experimental controls', icon: 'SlidersHorizontal', fn: onOpenSettings },
       ],
     },
   ]
