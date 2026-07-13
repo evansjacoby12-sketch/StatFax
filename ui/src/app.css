@@ -161,6 +161,7 @@
   .board-slate-pulse .dr-sum { min-height: 59px; padding: 6px 9px; gap: 7px; align-content: center; }
   .board-slate-pulse .dr-score { width: 38px; min-height: 38px; }
   .board-slate-pulse .dr-score strong { font-size: 16px; }
+  .board-slate-pulse .dr-score small { display: none; }
   .board-slate-pulse .dr-head { font-size: 8px; letter-spacing: .07em; }
   .board-slate-pulse .dr-signal-copy { gap: 3px; }
   .board-slate-pulse .dr-signal-line { display: block; }
@@ -5843,11 +5844,13 @@ button.th:focus-visible {
 }
 .dr-sum::-webkit-details-marker { display: none; }
 .dr-score {
-  width: 44px;
+  width: 52px;
   min-height: 42px;
-  display: flex;
+  display: grid;
+  grid-auto-flow: column;
+  place-content: center;
   align-items: baseline;
-  justify-content: center;
+  column-gap: 2px;
   padding: 0 4px;
   border: 1px solid rgba(227, 227, 231, 0.12);
   border-radius: 10px;
@@ -5857,7 +5860,7 @@ button.th:focus-visible {
   font-variant-numeric: tabular-nums;
 }
 .dr-score strong { color: #fff; font-size: 18px; line-height: 1; }
-.dr-score small { margin-left: 1px; color: var(--text-faint); font-size: 7px; font-weight: 700; }
+.dr-score small { color: var(--text-faint); font-size: 7px; font-weight: 700; line-height: 1; }
 .dr-signal-copy { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
 .dr-head {
   color: var(--text-faint);
@@ -13661,6 +13664,7 @@ button.th:focus-visible {
 /* Ready Radar: beta-only bridge from the two advisory signals to the board's
    existing AND-capable signal filters. Compact enough to preserve board scan. */
 .ready-radar {
+  container: ready-radar / inline-size;
   margin: 0 0 10px;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.07);
@@ -13748,6 +13752,21 @@ button.th:focus-visible {
     min-height: 38px;
     border-top: 1px solid rgba(255, 255, 255, 0.045);
     border-left: 0;
+  }
+}
+
+/* The desktop decision rail is only 330-380px even on a wide viewport. Size
+   the Radar from its own container so the result never overflows that rail. */
+@container ready-radar (max-width: 520px) {
+  .ready-radar-body { grid-template-columns: 1fr; }
+  .ready-radar-top {
+    min-height: 38px;
+    border-top: 1px solid rgba(255, 255, 255, 0.045);
+    border-left: 0;
+  }
+  .ready-radar-empty {
+    min-height: 38px;
+    border-top: 1px solid rgba(255, 255, 255, 0.045);
   }
 }
 
