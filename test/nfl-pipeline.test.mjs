@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { parseESPNDepthChartHTML, parseESPNRoster, parseESPNScoreboard, parseESPNSummary, selectCurrentNFLSlate } from '../server/sports/nfl/providers/espn.mjs'
+import { fetchESPNDepthChart, fetchESPNRoster, parseESPNDepthChart, parseESPNDepthChartHTML, parseESPNRoster, parseESPNScoreboard, parseESPNSummary, selectCurrentNFLSlate } from '../server/sports/nfl/providers/espn.mjs'
 import { nearestHourlyForecast } from '../server/sports/nfl/providers/weather.mjs'
 import { parseSportsGameOdds } from '../server/sports/nfl/providers/odds.mjs'
 import { indexNFLHistory, matchHistoryPlayer, projectNFLPlayer } from '../server/sports/nfl/projections.mjs'
@@ -34,6 +34,28 @@ test('ESPN depth chart parser preserves position, order, stable ID and availabil
   const players = parseESPNDepthChartHTML(html, 'BUF')
   assert.equal(players.length, 2)
   assert.deepEqual(players.map((player) => [player.espnId, player.position, player.depthRank, player.status]), [['1', 'RB', 1, 'Active'], ['2', 'RB', 2, 'Questionable']])
+})
+
+test('ESPN providers use JSON depth charts and numeric roster fallback', async () => {
+  const depthPayload = { depthchart: [{ name: '3WR 1TE', positions: { rb: { position: { abbreviation: 'RB' }, athletes: [{ id: '7', displayName: 'Test Back', injuries: [] }] } } }] }
+  assert.equal(parseESPNDepthChart(depthPayload, 'BUF')[0].role, 'Starter')
+  const depthURLs = []
+  const depth = await fetchESPNDepthChart('BUF', async (url) => {
+    depthURLs.push(url)
+    return new Response(JSON.stringify(depthPayload), { status: 200 })
+  })
+  assert.match(depthURLs[0], /depthcharts/)
+  assert.equal(depth[0].espnId, '7')
+
+  const rosterURLs = []
+  const players = await fetchESPNRoster('BUF', async (url) => {
+    rosterURLs.push(url)
+    return url.includes('/buf/')
+      ? new Response('{}', { status: 404 })
+      : new Response(JSON.stringify(roster('BUF')), { status: 200 })
+  }, '1')
+  assert.match(rosterURLs[1], /teams\/1\/roster/)
+  assert.equal(players.length, 3)
 })
 
 test('weather forecast chooses the kickoff hour and health reports missing feeds', () => {
@@ -162,6 +184,8 @@ test('full NFL snapshot build joins schedule, rosters, injuries, and live contra
   assert.equal(snapshot.players.length, 6)
   assert.ok(snapshot.players.every((player) => ['QB', 'RB', 'WR', 'TE'].includes(player.position)))
   assert.equal(snapshot.dataQuality.playByPlay, false)
+  assert.equal(snapshot.dataQuality.officialAvailability, true)
+  assert.equal(snapshot.source.providers.practice, 'espn-roster-reports')
   assert.ok(snapshot.players.every((player) => player.markets.first_td.source === 'game_normalized_model'))
 })
 
