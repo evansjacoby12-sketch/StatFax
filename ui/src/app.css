@@ -314,6 +314,20 @@
 .slate-meta b {
   color: var(--text);
 }
+.slate-batter-count {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+}
+.slate-batter-values {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+  line-height: 1;
+}
+.slate-batter-values > * {
+  line-height: inherit;
+}
 .header-right {
   display: flex;
   align-items: center;

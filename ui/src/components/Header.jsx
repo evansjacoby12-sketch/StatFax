@@ -379,8 +379,13 @@ export default function Header({
             <span className="dot-sep">·</span>
             <span>{counts.games} games</span>
             <span className="dot-sep slate-batters">·</span>
-            <span className="slate-batters">
-              <b className="mono" style={{ color: 'var(--accent)' }}>{counts.shown}</b> / {counts.total} batters
+            <span className="slate-batters slate-batter-count">
+              <span className="mono slate-batter-values">
+                <b style={{ color: 'var(--accent)' }}>{counts.shown}</b>
+                <span>/</span>
+                <span>{counts.total}</span>
+              </span>
+              <span>batters</span>
             </span>
             <FirstPitchCountdown games={games} />
             {meta.morningLockAt && (
