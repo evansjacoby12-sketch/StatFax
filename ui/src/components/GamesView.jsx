@@ -42,6 +42,26 @@ function computeGameOfDay(batters) {
   return g
 }
 
+function gameOpportunity(game, groups) {
+  const bats = [...(groups?.away || []), ...(groups?.home || [])]
+  const targets = bats
+    .filter((b) => (b.grade?.label || 'SKIP') !== 'SKIP')
+    .sort((a, b) => (b.hrProbability ?? 0) - (a.hrProbability ?? 0) || (b.score ?? 0) - (a.score ?? 0))
+  const sample = bats[0]
+  const expectedHRs = bats.reduce((sum, b) => sum + (Number.isFinite(b.expectedHRs) ? b.expectedHRs : 0), 0)
+  const envScore = Number.isFinite(sample?.envScore) ? Math.round(sample.envScore) : null
+  const park = Number.isFinite(sample?.gameParkHRFactor) ? sample.gameParkHRFactor : null
+  const hr9s = [
+    game?.awayPitcher?.season?.hrPer9,
+    game?.homePitcher?.season?.hrPer9,
+    ...bats.map((b) => b.pitcher?.season?.hrPer9),
+  ].filter(Number.isFinite)
+  const maxHr9 = hr9s.length ? Math.max(...hr9s) : null
+  const vulnerability = maxHr9 == null ? 'Unknown' : maxHr9 >= 1.3 ? 'High' : maxHr9 >= 1 ? 'Average' : 'Low'
+  const envLabel = envScore == null ? 'Unknown' : envScore >= 70 ? 'Strong' : envScore <= 45 ? 'Suppressed' : 'Neutral'
+  return { targets, sample, expectedHRs, envScore, park, maxHr9, vulnerability, envLabel }
+}
+
 function GodPitcher({ p, onOpenPitcher, gamePk }) {
   if (!p?.name) return null
   const hr9 = p.season?.hrPer9
@@ -162,6 +182,15 @@ export default function GamesView({ games, batters, onSelect, selectedId, watchl
     })
     .sort((a, b) => phase(a) - phase(b) || new Date(a.gameDate) - new Date(b.gameDate))
 
+  const god = computeGameOfDay(batters)
+  const [view, setView] = useState('extractor')
+  const [selectedGamePk, setSelectedGamePk] = useState(() => god?.gamePk || ordered[0]?.gamePk)
+  const selectedGame = ordered.find((g) => g.gamePk === selectedGamePk) || ordered[0]
+
+  useEffect(() => {
+    if (selectedGame && selectedGame.gamePk !== selectedGamePk) setSelectedGamePk(selectedGame.gamePk)
+  }, [selectedGame?.gamePk, selectedGamePk])
+
   if (!ordered.length) {
     return (
       <div className="empty" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '64px', color: 'var(--text-faint)', gap: '12px' }}>
@@ -172,12 +201,6 @@ export default function GamesView({ games, batters, onSelect, selectedId, watchl
   }
 
   const ctx = { onSelect, selectedId, watchlist, slip, onToggleWatch, onToggleSlip, onOpenPitcher }
-  const god = computeGameOfDay(batters)
-  const [view, setView] = useState('extractor')
-  const topTargets = [...batters]
-    .filter((b) => !b.game?.isFinal && (b.grade?.label || 'SKIP') !== 'SKIP')
-    .sort((a, b) => (b.hrProbability ?? 0) - (a.hrProbability ?? 0) || (b.score ?? 0) - (a.score ?? 0))
-    .slice(0, 3)
 
   return (
     <>
@@ -206,21 +229,37 @@ export default function GamesView({ games, batters, onSelect, selectedId, watchl
           Detail Silos
         </button>
       </div>
-      <div className="games-desktop-layout">
-        <GameOfDay god={god} onSelect={onSelect} onOpenPitcher={onOpenPitcher} />
-        <div className="games-grid">
-          {ordered.map((g, i) =>
-            view === 'extractor' ? (
-              <ExtractorCard key={g.gamePk} game={g} groups={byGame.get(g.gamePk)} idx={i} {...ctx} />
-            ) : (
-              <GameCard key={g.gamePk} game={g} groups={byGame.get(g.gamePk)} idx={i} {...ctx} />
-            ),
+      <div className="games-desktop-layout games-command-center">
+        <aside className="games-navigator" aria-label="Game matchups">
+          <div className="games-nav-head"><span>Matchups</span><b>{ordered.length} games</b></div>
+          <div className="games-nav-list">
+            {ordered.map((g, i) => (
+              <GameNavItem
+                key={g.gamePk}
+                game={g}
+                groups={byGame.get(g.gamePk)}
+                active={g.gamePk === selectedGame?.gamePk}
+                featured={g.gamePk === god?.gamePk}
+                onClick={() => setSelectedGamePk(g.gamePk)}
+                idx={i}
+              />
+            ))}
+          </div>
+        </aside>
+        <div className="games-workspace">
+          {selectedGame && (
+            <MatchupWorkspace
+              game={selectedGame}
+              groups={byGame.get(selectedGame.gamePk)}
+              view={view}
+              featured={selectedGame.gamePk === god?.gamePk}
+              {...ctx}
+            />
           )}
         </div>
       </div>
       <div className="games-mobile-layout">
         <MobileGameOfDay god={god} />
-        <MobileTopTargets targets={topTargets} onSelect={onSelect} />
         <div className="mobile-slate-head">
           <span>Matchups</span>
           <span>{ordered.length} games</span>
@@ -255,6 +294,109 @@ function MobileGameOfDay({ god }) {
   )
 }
 
+function GameNavItem({ game: g, groups, active, featured, onClick, idx }) {
+  const info = gameOpportunity(g, groups)
+  const status = g.isFinal ? 'Final' : g.isLive ? `${(g.inningHalf || '').slice(0, 3)} ${g.currentInning || ''}`.trim() : gameTime(g.gameDate) || 'TBD'
+  return (
+    <button className={`games-nav-item${active ? ' active' : ''}${g.isLive ? ' live' : ''}`} onClick={onClick} aria-current={active ? 'true' : undefined} style={{ '--i': Math.min(idx, 12) }}>
+      <span className="games-nav-title"><strong>{g.awayTeam?.abbr} @ {g.homeTeam?.abbr}</strong><small className={g.isLive ? 'live' : ''}>{status}</small></span>
+      <span className="games-nav-pitchers">{lastName(g.awayPitcher?.name) || 'TBD'} vs {lastName(g.homePitcher?.name) || 'TBD'}</span>
+      <span className="games-nav-foot">
+        <span className={`games-nav-env ${info.envLabel.toLowerCase()}`}><Icon name="Gauge" size={11} />{info.envLabel}</span>
+        {featured && <span className="games-nav-featured"><Icon name="Flame" size={10} />Top game</span>}
+        <span className="games-nav-xhr"><b className="mono">{num(info.expectedHRs, 1)}</b><small>EXP HR</small></span>
+      </span>
+    </button>
+  )
+}
+
+function MatchupWorkspace({ game: g, groups, view, featured, onSelect, selectedId, watchlist, slip, onToggleWatch, onToggleSlip, onOpenPitcher }) {
+  const info = gameOpportunity(g, groups)
+  const live = g.isLive || g.isFinal
+  const status = g.isFinal ? 'Final' : g.isLive ? `${(g.inningHalf || '').slice(0, 3)} ${g.currentInning || ''}`.trim() : gameTime(g.gameDate) || 'TBD'
+  const wind = info.sample?.weather && !info.sample.weather.roofClosed
+    ? interpretWind(info.sample.weather, g.homeTeam?.abbr, { roofClosed: false })
+    : null
+  const teamCtx = { onSelect, selectedId, watchlist, slip, onToggleWatch, onToggleSlip }
+  return (
+    <section className={`matchup-workspace-card${g.isLive ? ' live' : ''}`}>
+      <header className="matchup-workspace-head">
+        <div className="matchup-workspace-kicker">
+          <span>{featured ? <><Icon name="Flame" size={12} /> Game of the Day</> : 'Matchup workspace'}</span>
+          <span className="mono">{num(info.expectedHRs, 1)} expected HR</span>
+        </div>
+        <div className="matchup-workspace-scoreboard">
+          <WorkspaceTeam team={g.awayTeam} pitcher={g.awayPitcher} score={g.awayScore} showScore={live} gamePk={g.gamePk} onOpenPitcher={onOpenPitcher} />
+          <div className="matchup-workspace-status"><b className={g.isLive ? 'live' : ''}>{status}</b><span>{g.venueName || ''}</span></div>
+          <WorkspaceTeam team={g.homeTeam} pitcher={g.homePitcher} score={g.homeScore} showScore={live} gamePk={g.gamePk} onOpenPitcher={onOpenPitcher} align="right" />
+        </div>
+        <div className="matchup-workspace-metrics">
+          <WorkspaceMetric icon="Gauge" label="Environment" value={info.envLabel} tone={info.envScore >= 70 ? 'good' : info.envScore <= 45 ? 'bad' : ''} sub={info.envScore == null ? 'No score' : `${info.envScore}/100`} />
+          <WorkspaceMetric icon="Shield" label="Pitcher vulnerability" value={info.vulnerability} tone={info.vulnerability === 'High' ? 'good' : info.vulnerability === 'Low' ? 'bad' : ''} sub={info.maxHr9 == null ? 'HR/9 unavailable' : `${num(info.maxHr9, 2)} max HR/9`} />
+          <WorkspaceMetric icon="Wind" label="Game conditions" value={wind?.verdict === 'OUT' ? 'Carry boost' : wind?.verdict === 'IN' ? 'Holding in' : info.sample?.weather?.roofClosed ? 'Roof closed' : 'Neutral'} tone={wind?.verdict === 'OUT' ? 'good' : wind?.verdict === 'IN' ? 'bad' : ''} sub={wind?.caption || (info.park == null ? 'No park factor' : `${num(info.park, 2)}× park`)} />
+        </div>
+      </header>
+      <div className="matchup-workspace-body">
+        <WorkspaceTargets team={g.awayTeam} bats={groups.away} view={view} {...teamCtx} />
+        <WorkspaceTargets team={g.homeTeam} bats={groups.home} view={view} {...teamCtx} />
+      </div>
+    </section>
+  )
+}
+
+function WorkspaceTeam({ team, pitcher, score, showScore, gamePk, onOpenPitcher, align = 'left' }) {
+  const logo = teamLogo(team?.id)
+  return (
+    <div className={`matchup-workspace-team ${align}`}>
+      {logo && <img src={logo} alt="" loading="lazy" />}
+      <span><strong>{team?.abbr || '—'}</strong>{pitcher?.id && onOpenPitcher ? <button onClick={() => onOpenPitcher(pitcher.id, gamePk)}>{pitcher.name}</button> : <small>{pitcher?.name || 'TBD'}</small>}</span>
+      {showScore && <b className="mono">{score ?? 0}</b>}
+    </div>
+  )
+}
+
+function WorkspaceMetric({ icon, label, value, tone = '', sub }) {
+  return (
+    <div className={`matchup-workspace-metric ${tone}`}>
+      <Icon name={icon} size={16} />
+      <span><small>{label}</small><strong>{value}</strong></span>
+      <em>{sub}</em>
+    </div>
+  )
+}
+
+function WorkspaceTargets({ team, bats, view, onSelect, selectedId, watchlist, slip, onToggleWatch, onToggleSlip }) {
+  const sorted = [...(bats || [])].sort((a, b) => (b.hrProbability ?? 0) - (a.hrProbability ?? 0) || (b.score ?? 0) - (a.score ?? 0))
+  const visible = view === 'extractor' ? sorted.filter((b) => (b.grade?.label || 'SKIP') !== 'SKIP').slice(0, 5) : sorted
+  return (
+    <div className="matchup-target-column">
+      <div className="matchup-target-head"><span>{team?.name || team?.abbr} targets</span><b>{visible.length}</b></div>
+      <div className="matchup-target-list">
+        {visible.map((b) => (
+          <WorkspaceTargetRow key={b.id} b={b} selected={selectedId === b.id} watched={watchlist.has(b.id)} inSlip={slip.has(b.id)} onSelect={onSelect} onToggleWatch={onToggleWatch} onToggleSlip={onToggleSlip} />
+        ))}
+        {!visible.length && <div className="matchup-target-empty">No qualified targets</div>}
+      </div>
+    </div>
+  )
+}
+
+function WorkspaceTargetRow({ b, selected, watched, inSlip, onSelect, onToggleWatch, onToggleSlip }) {
+  const color = gradeColor(b.grade?.label)
+  const stop = (fn) => (e) => { e.stopPropagation(); fn?.(b) }
+  return (
+    <div className={`matchup-target-row${selected ? ' selected' : ''}`} role="button" tabIndex={0} onClick={() => onSelect?.(b)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect?.(b) } }} style={{ '--target-color': color }}>
+      <span className="matchup-target-avatar"><img src={playerHeadshot(b.playerId, 96)} alt="" loading="lazy" />{b.battingOrder && <small className="mono">#{b.battingOrder}</small>}</span>
+      <span className="matchup-target-player"><strong>{b.name}</strong><span><GradeChip grade={b.grade} size="sm" score={b.score} /><small>{b.batSide} · {b.team}</small></span></span>
+      <span className="matchup-target-prob"><b className="mono">{pct(b.hrProbability, 1)}</b><small>HR PROB</small></span>
+      <span className="matchup-target-actions">
+        <button className={watched ? 'on watch' : ''} onClick={stop(onToggleWatch)} aria-label={watched ? `Remove ${b.name} from watchlist` : `Watch ${b.name}`}><Icon name="Star" size={16} style={{ fill: watched ? 'currentColor' : 'none' }} /></button>
+        <button className={inSlip ? 'on slip' : ''} onClick={stop(onToggleSlip)} aria-label={inSlip ? `Remove ${b.name} from parlay` : `Add ${b.name} to parlay`}><Icon name={inSlip ? 'Check' : 'Plus'} size={17} /></button>
+      </span>
+    </div>
+  )
+}
+
 function MobileTopTargets({ targets, onSelect }) {
   if (!targets.length) return null
   return (
@@ -284,12 +426,13 @@ function MobileTopTargets({ targets, onSelect }) {
   )
 }
 
-function MobileMatchupCard({ game: g, groups, idx = 0, onSelect, onOpenPitcher }) {
-  const [open, setOpen] = useState(idx === 0)
+function MobileMatchupCard({ game: g, groups, idx = 0, onSelect, onOpenPitcher, watchlist, slip, onToggleWatch, onToggleSlip }) {
+  const [open, setOpen] = useState(false)
   const away = [...(groups.away || [])].filter((b) => (b.grade?.label || 'SKIP') !== 'SKIP').sort((a, b) => (b.hrProbability ?? 0) - (a.hrProbability ?? 0))[0]
   const home = [...(groups.home || [])].filter((b) => (b.grade?.label || 'SKIP') !== 'SKIP').sort((a, b) => (b.hrProbability ?? 0) - (a.hrProbability ?? 0))[0]
   const sample = groups.away?.[0] || groups.home?.[0]
-  const env = Number.isFinite(sample?.envScore) ? Math.round(sample.envScore) : null
+  const opportunity = gameOpportunity(g, groups)
+  const env = opportunity.envScore
   const envTone = env == null ? '' : env >= 70 ? 'good' : env <= 45 ? 'bad' : ''
   const status = g.isFinal ? 'Final' : g.isLive ? `${(g.inningHalf || '').slice(0, 3)} ${g.currentInning || ''}`.trim() : gameTime(g.gameDate) || 'TBD'
   return (
@@ -302,10 +445,14 @@ function MobileMatchupCard({ game: g, groups, idx = 0, onSelect, onOpenPitcher }
         </div>
         <MobileTeam team={g.homeTeam} pitcher={g.homePitcher} score={g.homeScore} live={g.isLive || g.isFinal} onOpenPitcher={onOpenPitcher} gamePk={g.gamePk} />
       </div>
+      <div className="mobile-matchup-verdicts">
+        <span className={envTone}><small>Environment</small><b>{opportunity.envLabel}</b></span>
+        <span className={opportunity.vulnerability === 'High' ? 'good' : opportunity.vulnerability === 'Low' ? 'bad' : ''}><small>Vulnerability</small><b>{opportunity.vulnerability}</b></span>
+      </div>
       <GameChips sample={sample} game={g} />
       <div className="mobile-matchup-leaders">
-        <MobileLeader b={away} icon="Crown" onSelect={onSelect} />
-        <MobileLeader b={home} icon="Target" onSelect={onSelect} />
+        <MobileLeader b={away} icon="Award" onSelect={onSelect} watched={away ? watchlist.has(away.id) : false} inSlip={away ? slip.has(away.id) : false} onToggleWatch={onToggleWatch} onToggleSlip={onToggleSlip} />
+        <MobileLeader b={home} icon="Target" onSelect={onSelect} watched={home ? watchlist.has(home.id) : false} inSlip={home ? slip.has(home.id) : false} onToggleWatch={onToggleWatch} onToggleSlip={onToggleSlip} />
       </div>
       {open && (
         <div className="mobile-matchup-detail">
@@ -339,16 +486,20 @@ function MobileTeam({ team, pitcher, score, live, onOpenPitcher, gamePk }) {
   )
 }
 
-function MobileLeader({ b, icon, onSelect }) {
+function MobileLeader({ b, icon, onSelect, watched, inSlip, onToggleWatch, onToggleSlip }) {
   if (!b) return <div className="mobile-leader empty">No qualified target</div>
   const color = gradeColor(b.grade?.label)
+  const stop = (fn) => (e) => { e.stopPropagation(); fn?.(b) }
   return (
-    <button className="mobile-leader" onClick={() => onSelect?.(b)} style={{ '--leader-color': color }}>
+    <div className="mobile-leader" role="button" tabIndex={0} onClick={() => onSelect?.(b)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect?.(b) } }} style={{ '--leader-color': color }}>
       <Icon name={icon} size={16} />
       <span><strong>{b.name}</strong><small>{b.team}{b.battingOrder ? ` · #${b.battingOrder}` : ''}</small></span>
-      <GradeChip grade={b.grade} size="sm" />
       <b className="mono">{pct(b.hrProbability, 1)}</b>
-    </button>
+      <span className="mobile-leader-actions">
+        <button className={watched ? 'on watch' : ''} onClick={stop(onToggleWatch)} aria-label={watched ? `Remove ${b.name} from watchlist` : `Watch ${b.name}`}><Icon name="Star" size={16} style={{ fill: watched ? 'currentColor' : 'none' }} /></button>
+        <button className={inSlip ? 'on slip' : ''} onClick={stop(onToggleSlip)} aria-label={inSlip ? `Remove ${b.name} from parlay` : `Add ${b.name} to parlay`}><Icon name={inSlip ? 'Check' : 'Plus'} size={17} /></button>
+      </span>
+    </div>
   )
 }
 

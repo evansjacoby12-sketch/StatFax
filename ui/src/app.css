@@ -9389,6 +9389,148 @@ button.th:focus-visible {
   .slate-brief, .slate-brief-bar, .slate-brief-spark { animation: none; }
 }
 
+/* Games command center: choose a matchup once, then work its hitters in a
+   stable decision surface. Mobile keeps the same hierarchy as stacked cards. */
+@media (min-width: 561px) {
+  .main:has(.games-command-center) { max-width: 1560px; }
+  .games-command-center {
+    display: grid;
+    grid-template-columns: minmax(250px, 300px) minmax(0, 1fr);
+    align-items: start;
+    gap: 16px;
+    height: calc(100vh - var(--chrome-h, 114px) - 92px);
+    min-height: 560px;
+  }
+  .games-navigator,
+  .games-workspace { min-width: 0; height: 100%; }
+  .games-navigator {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .games-nav-head,
+  .matchup-target-head {
+    min-height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: var(--text-faint);
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+  .games-nav-head { padding: 0 4px 7px; }
+  .games-nav-head b { font-family: var(--mono); font-size: 9px; }
+  .games-nav-list {
+    min-height: 0;
+    display: grid;
+    gap: 7px;
+    overflow-y: auto;
+    padding-right: 5px;
+    scrollbar-width: thin;
+  }
+  .games-nav-item {
+    width: 100%;
+    min-height: 92px;
+    padding: 11px 12px;
+    display: grid;
+    gap: 6px;
+    color: var(--text-dim);
+    text-align: left;
+    border: 1px solid var(--border-soft);
+    border-radius: 12px;
+    background: rgba(17,18,20,.4);
+    transition: background .16s, border-color .16s, transform .16s;
+  }
+  .games-nav-item:hover { background: rgba(255,255,255,.04); border-color: var(--border); }
+  .games-nav-item.active {
+    border-color: rgba(0,216,246,.38);
+    background: linear-gradient(110deg, rgba(0,216,246,.09), rgba(17,18,20,.48) 62%);
+    box-shadow: inset 2px 0 0 var(--accent), 0 10px 28px -22px var(--accent-glow);
+  }
+  .games-nav-item:active { transform: scale(.99); }
+  .games-nav-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .games-nav-title strong { color: #fff; font-family: var(--display); font-size: 15px; letter-spacing: .01em; }
+  .games-nav-title small { color: var(--text-faint); font-family: var(--mono); font-size: 9px; font-weight: 800; text-transform: uppercase; }
+  .games-nav-title small.live { color: var(--bad); }
+  .games-nav-pitchers { overflow: hidden; color: var(--text-faint); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+  .games-nav-foot { display: flex; align-items: center; gap: 7px; }
+  .games-nav-env,
+  .games-nav-featured { display: inline-flex; align-items: center; gap: 4px; font-size: 9px; font-weight: 800; text-transform: uppercase; }
+  .games-nav-env.strong { color: var(--good); }
+  .games-nav-env.suppressed { color: var(--bad); }
+  .games-nav-featured { color: var(--accent); }
+  .games-nav-xhr { margin-left: auto; display: flex; align-items: baseline; gap: 4px; }
+  .games-nav-xhr b { color: #fff; font-size: 13px; }
+  .games-nav-xhr small { color: var(--text-faint); font-size: 7px; font-weight: 800; letter-spacing: .06em; }
+
+  .matchup-workspace-card {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background: rgba(17,18,20,.44);
+    box-shadow: var(--glass-shadow);
+  }
+  .matchup-workspace-card.live { border-color: rgba(239,68,68,.24); }
+  .matchup-workspace-head { flex: none; padding: 15px 17px 14px; border-bottom: 1px solid var(--border-soft); background: linear-gradient(135deg, rgba(255,255,255,.025), transparent 65%); }
+  .matchup-workspace-kicker { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; color: var(--text-faint); font-size: 9px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; }
+  .matchup-workspace-kicker > span { display: inline-flex; align-items: center; gap: 5px; }
+  .matchup-workspace-kicker > span:first-child { color: var(--accent); }
+  .matchup-workspace-scoreboard { display: grid; grid-template-columns: minmax(0,1fr) 132px minmax(0,1fr); align-items: center; gap: 12px; }
+  .matchup-workspace-team { min-width: 0; display: flex; align-items: center; gap: 10px; }
+  .matchup-workspace-team.right { flex-direction: row-reverse; text-align: right; }
+  .matchup-workspace-team img { width: 38px; height: 38px; object-fit: contain; filter: drop-shadow(0 3px 7px rgba(0,0,0,.5)); }
+  .matchup-workspace-team > span { min-width: 0; display: flex; flex-direction: column; }
+  .matchup-workspace-team strong { color: #fff; font-family: var(--display); font-size: 24px; line-height: 1; }
+  .matchup-workspace-team button,
+  .matchup-workspace-team small { overflow: hidden; margin-top: 4px; color: var(--accent); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+  .matchup-workspace-team small { color: var(--text-faint); }
+  .matchup-workspace-team > b { min-width: 34px; color: #fff; font-size: 20px; text-align: center; }
+  .matchup-workspace-status { display: grid; justify-items: center; gap: 5px; text-align: center; }
+  .matchup-workspace-status b { padding: 5px 9px; color: var(--accent); border-radius: 7px; background: rgba(0,216,246,.08); font-family: var(--mono); font-size: 10px; text-transform: uppercase; }
+  .matchup-workspace-status b.live { color: var(--bad); background: rgba(239,68,68,.1); }
+  .matchup-workspace-status span { overflow: hidden; max-width: 128px; color: var(--text-faint); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+  .matchup-workspace-metrics { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; margin-top: 14px; }
+  .matchup-workspace-metric { min-width: 0; min-height: 54px; display: grid; grid-template-columns: 22px minmax(0,1fr); align-items: center; gap: 7px; padding: 8px 10px; color: var(--text-dim); border: 1px solid var(--border-soft); border-radius: 10px; background: rgba(0,0,0,.18); }
+  .matchup-workspace-metric.good { color: var(--good); }
+  .matchup-workspace-metric.bad { color: var(--bad); }
+  .matchup-workspace-metric > span { min-width: 0; display: grid; }
+  .matchup-workspace-metric small { color: var(--text-faint); font-size: 8px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
+  .matchup-workspace-metric strong { overflow: hidden; color: currentColor; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+  .matchup-workspace-metric em { grid-column: 2; margin-top: -7px; overflow: hidden; color: var(--text-faint); font-size: 8px; font-style: normal; text-overflow: ellipsis; white-space: nowrap; }
+  .matchup-workspace-body { min-height: 0; flex: 1; display: grid; grid-template-columns: 1fr 1fr; overflow-y: auto; scrollbar-width: thin; }
+  .matchup-target-column { min-width: 0; padding: 13px 14px 16px; }
+  .matchup-target-column + .matchup-target-column { border-left: 1px solid var(--border-soft); }
+  .matchup-target-head { padding: 0 2px 7px; }
+  .matchup-target-head b { min-width: 20px; padding: 2px 5px; color: var(--text-faint); border-radius: 5px; background: rgba(255,255,255,.05); font-family: var(--mono); text-align: center; }
+  .matchup-target-list { display: grid; gap: 7px; }
+  .matchup-target-row { min-width: 0; min-height: 68px; display: grid; grid-template-columns: 42px minmax(0,1fr) auto 72px; align-items: center; gap: 8px; padding: 7px 8px; border: 1px solid var(--border-soft); border-radius: 11px; background: rgba(255,255,255,.02); cursor: pointer; transition: border-color .16s, background .16s; }
+  .matchup-target-row:hover { border-color: color-mix(in srgb, var(--target-color) 40%, transparent); background: color-mix(in srgb, var(--target-color) 5%, transparent); }
+  .matchup-target-row.selected { border-color: color-mix(in srgb, var(--target-color) 48%, transparent); box-shadow: inset 2px 0 0 var(--target-color); }
+  .matchup-target-avatar { position: relative; width: 40px; height: 40px; }
+  .matchup-target-avatar img { width: 40px; height: 40px; object-fit: cover; border-radius: 50%; background: rgba(255,255,255,.04); }
+  .matchup-target-avatar small { position: absolute; right: -2px; bottom: -2px; min-width: 19px; padding: 1px 3px; color: var(--text-dim); border: 1px solid var(--border); border-radius: 4px; background: #08080a; font-size: 8px; text-align: center; }
+  .matchup-target-player { min-width: 0; display: grid; gap: 5px; }
+  .matchup-target-player > strong { overflow: hidden; color: #fff; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+  .matchup-target-player > span { min-width: 0; display: flex; align-items: center; gap: 6px; }
+  .matchup-target-player .grade-chip { padding: 2px 5px; font-size: 8px; }
+  .matchup-target-player .grade-score { font-size: 8px; }
+  .matchup-target-player small { overflow: hidden; color: var(--text-faint); font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+  .matchup-target-prob { display: flex; flex-direction: column; align-items: flex-end; }
+  .matchup-target-prob b { color: var(--target-color); font-size: 13px; }
+  .matchup-target-prob small { color: var(--text-faint); font-size: 7px; font-weight: 800; letter-spacing: .04em; }
+  .matchup-target-actions { display: flex; gap: 4px; }
+  .matchup-target-actions button { width: 34px; height: 34px; display: grid; place-items: center; color: var(--text-faint); border: 1px solid var(--border-soft); border-radius: 8px; background: rgba(255,255,255,.025); }
+  .matchup-target-actions button:hover { color: #fff; background: rgba(255,255,255,.06); }
+  .matchup-target-actions button.on.watch { color: var(--prime); border-color: rgba(245,166,35,.25); background: rgba(245,166,35,.09); }
+  .matchup-target-actions button.on.slip { color: var(--strong); border-color: rgba(16,185,129,.25); background: rgba(16,185,129,.09); }
+  .matchup-target-empty { min-height: 68px; display: grid; place-items: center; color: var(--text-faint); font-size: 11px; }
+}
+
 /* Mobile Games: matchup-first scoreboard + compact slate leaders. Desktop
    keeps the established extractor/silo presentation. */
 .games-mobile-layout { display: none; }
@@ -9548,6 +9690,13 @@ button.th:focus-visible {
   .mobile-env-score.bad { color: var(--bad); }
   .mobile-matchup .gc-chips { gap: 5px !important; padding: 8px 10px !important; }
   .mobile-matchup .gc-chip { min-height: 28px; padding: 4px 7px !important; font-size: 10px !important; }
+  .mobile-matchup-verdicts { display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid var(--border-soft); background: rgba(0,0,0,.14); }
+  .mobile-matchup-verdicts > span { min-height: 46px; display: grid; place-content: center; gap: 2px; text-align: center; border-right: 1px solid var(--border-soft); }
+  .mobile-matchup-verdicts > span:last-child { border-right: 0; }
+  .mobile-matchup-verdicts small { color: var(--text-faint); font-size: 8px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+  .mobile-matchup-verdicts b { color: var(--text-dim); font-size: 11px; }
+  .mobile-matchup-verdicts .good b { color: var(--good); }
+  .mobile-matchup-verdicts .bad b { color: var(--bad); }
 
   .mobile-matchup-leaders { border-top: 1px solid var(--border-soft); }
   .mobile-leader {
@@ -9555,7 +9704,7 @@ button.th:focus-visible {
     min-height: 52px;
     padding: 6px 10px;
     display: grid;
-    grid-template-columns: 20px minmax(0, 1fr) auto auto;
+    grid-template-columns: 18px minmax(0, 1fr) auto 94px;
     align-items: center;
     gap: 7px;
     color: var(--leader-color, var(--text-faint));
@@ -9568,6 +9717,10 @@ button.th:focus-visible {
   .mobile-leader > b { font-size: 14px; }
   .mobile-leader .grade-chip { font-size: 9px; padding: 2px 5px; }
   .mobile-leader.empty { display: grid; place-items: center; color: var(--text-faint); font-size: 11px; }
+  .mobile-leader-actions { display: flex !important; flex-direction: row !important; gap: 4px; }
+  .mobile-leader-actions button { width: 44px; height: 44px; display: grid; place-items: center; color: var(--text-faint); border: 1px solid var(--border-soft); border-radius: 10px; background: rgba(255,255,255,.025); }
+  .mobile-leader-actions button.on.watch { color: var(--prime); border-color: rgba(245,166,35,.22); background: rgba(245,166,35,.09); }
+  .mobile-leader-actions button.on.slip { color: var(--strong); border-color: rgba(16,185,129,.22); background: rgba(16,185,129,.09); }
 
   .mobile-matchup-detail { padding: 3px 10px 8px; background: rgba(0, 0, 0, 0.14); }
   .mobile-reasons { padding: 8px 0; display: grid; gap: 5px; border-bottom: 1px solid var(--border-soft); }
