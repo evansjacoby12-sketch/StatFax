@@ -7,6 +7,8 @@ import { NFL_PROP_MARKET_LIST, eligiblePropMarkets, eligibilityReason } from '..
 import { scoreNFLSnapshot, scoreNFLProp } from '../../../src/sports/nfl/logic/ScoringEngine.js'
 import { loadNFLSnapshot } from '../../../src/sports/nfl/api/NFLService.js'
 import { filterNFLTickets, nflLegKey, nflTicketsCSV, settleNFLTicket, summarizeNFLTickets, ticketExportText } from '../lib/nflTickets.js'
+import { useEliLevel } from '../lib/eliLevel.js'
+import { nflSignalCaption, nflSignalText } from '../lib/nflExplanations.js'
 
 const VIEW_TABS = [
   { id: 'signals', label: 'Signals', icon: 'Zap' },
@@ -107,6 +109,7 @@ function NFLTicketCenter({ slipLegs, tickets, onSave, onClear, onExport, onCSV }
 }
 
 function PlayerCard({ player, marketId, watched, inSlip, onSelect, onToggleWatch, onToggleSlip }) {
+  const eliLevel = useEliLevel()
   const { model } = player
   const color = GRADE_COLORS[model.grade]
   const weather = model.weather
@@ -121,13 +124,13 @@ function PlayerCard({ player, marketId, watched, inSlip, onSelect, onToggleWatch
         </div>
         <div className="nfl-card-context">
           {isQB && <div><span><Icon name="Radio" size={12} />Comp / Att</span><b className="mono">{number(player.projections?.completions, 1)} / {number(player.projections?.attempts, 1)}</b></div>}
-          <div><span><Icon name="Target" size={12} />Red zone</span><b className="mono">{player.position === 'WR' || player.position === 'TE' ? `${number(player.usage?.redZoneTargetsL3)} targets` : `${number(player.usage?.redZoneTouchesL3)} touches`}</b></div>
-          <div><span><Icon name="Shield" size={12} />Defense vs {player.position}</span><b>{player.defenseVsPosition?.label || 'No split'}</b></div>
+          <div><span><Icon name="Target" size={12} />{eliLevel === 'eli5' ? 'Near end zone' : 'Red zone'}</span><b className="mono">{player.position === 'WR' || player.position === 'TE' ? `${number(player.usage?.redZoneTargetsL3)} targets` : `${number(player.usage?.redZoneTouchesL3)} touches`}</b></div>
+          <div><span><Icon name="Shield" size={12} />{eliLevel === 'eli5' ? 'Matchup' : `Defense vs ${player.position}`}</span><b>{player.defenseVsPosition?.label || 'No split'}</b></div>
           <div><span><Icon name="Wind" size={12} />Weather</span><b className={`tone-${weather.tone}`}>{weather.label}</b></div>
         </div>
         <div className="nfl-card-signals">
-          {model.signals.slice(0, 4).map((signal) => <span key={signal.key} className={`tone-${signal.tone}`}><Icon name={signalIcon(signal)} size={10} />{signal.text}</span>)}
-          {!model.signals.length && <span><Icon name="Info" size={10} />No active streak signal</span>}
+          {model.signals.slice(0, 4).map((signal) => <span key={signal.key} className={`tone-${signal.tone}`}><Icon name={signalIcon(signal)} size={10} />{nflSignalText(signal, eliLevel)}</span>)}
+          {!model.signals.length && <span><Icon name="Info" size={10} />{eliLevel === 'eli5' ? 'No strong recent trend yet' : 'No active streak signal'}</span>}
         </div>
       </button>
       <footer>
@@ -139,6 +142,7 @@ function PlayerCard({ player, marketId, watched, inSlip, onSelect, onToggleWatch
 }
 
 function BoardRow({ player, rank, marketId, watched, inSlip, onSelect, onToggleWatch, onToggleSlip }) {
+  const eliLevel = useEliLevel()
   const { model } = player
   const color = GRADE_COLORS[model.grade]
   return (
@@ -148,13 +152,14 @@ function BoardRow({ player, rank, marketId, watched, inSlip, onSelect, onToggleW
       <div className="nfl-number nfl-model-prob"><strong className="mono" style={{ color }}>{pct(model.probability)}</strong><small>Model</small></div>
       <div className="nfl-number"><strong className="mono">{marketValue(player, model, marketId)}</strong><small>Market</small></div>
       <div className="nfl-number"><strong className={`mono nfl-edge ${model.edge == null ? '' : model.edge >= 0 ? 'positive' : 'negative'}`}>{model.edge == null ? '—' : `${model.edge >= 0 ? '+' : ''}${pct(model.edge)}`}</strong><small>Edge</small></div>
-      <div className="nfl-signals">{model.signals.slice(0, 2).map((signal) => <span key={signal.key}><Icon name={signalIcon(signal)} size={10} />{signal.text}</span>)}</div>
+      <div className="nfl-signals">{model.signals.slice(0, 2).map((signal) => <span key={signal.key}><Icon name={signalIcon(signal)} size={10} />{nflSignalText(signal, eliLevel)}</span>)}</div>
       <div className="nfl-row-actions" onClick={(event) => event.stopPropagation()}><button className={watched ? 'active' : ''} onClick={() => onToggleWatch(player)} aria-label={`Watch ${player.name}`}><Icon name="Star" size={15} /></button><button className={inSlip ? 'active' : ''} onClick={() => onToggleSlip(player)} aria-label={`Add ${player.name} to slip`}><Icon name={inSlip ? 'Check' : 'Plus'} size={15} /></button></div>
     </article>
   )
 }
 
 function PlayerResearch({ player, marketId, onClose, inSlip, onToggleSlip }) {
+  const eliLevel = useEliLevel()
   const [tab, setTab] = useState('overview')
   useEffect(() => { setTab('overview') }, [player?.id])
   if (!player) return null
@@ -184,7 +189,7 @@ function PlayerResearch({ player, marketId, onClose, inSlip, onToggleSlip }) {
       <nav className="nfl-research-tabs" aria-label="Player research sections">{researchTabs.map((item) => <button key={item.id} className={tab === item.id ? 'active' : ''} aria-current={tab === item.id ? 'page' : undefined} onClick={() => setTab(item.id)}><Icon name={item.icon} size={13} />{item.label}</button>)}</nav>
       <div className="nfl-research-body">
         {tab === 'overview' && <div className="nfl-research-view">
-          <section className="nfl-research-panel"><header><span><Icon name="Sparkles" size={14} /> Primary model signals</span><small>{current.signals?.length || 0} active</small></header><div className="nfl-research-signals">{current.signals?.slice(0, 3).map((signal) => <article key={signal.key} className={`tone-${signal.tone}`}><Icon name={signalIcon(signal)} size={15} /><div><b>{signal.text}</b><small>Active model evidence</small></div></article>)}{!current.signals?.length && <div className="nfl-research-empty"><Icon name="Info" size={15} />No active streak or role signal for this market.</div>}</div></section>
+          <section className="nfl-research-panel"><header><span><Icon name="Sparkles" size={14} /> {eliLevel === 'eli5' ? 'Why this player stands out' : 'Primary model signals'}</span><small>{eliLevel === 'eli5' ? 'Plain English' : `${current.signals?.length || 0} active`}</small></header><div className="nfl-research-signals">{current.signals?.slice(0, 3).map((signal) => <article key={signal.key} className={`tone-${signal.tone}`}><Icon name={signalIcon(signal)} size={15} /><div><b>{nflSignalText(signal, eliLevel)}</b><small>{nflSignalCaption(eliLevel)}</small></div></article>)}{!current.signals?.length && <div className="nfl-research-empty"><Icon name="Info" size={15} />{eliLevel === 'eli5' ? 'The model has no strong, easy-to-explain trend for this player yet.' : 'No active streak or role signal for this market.'}</div>}</div></section>
           <section className="nfl-research-panel"><header><span><Icon name="LayoutGrid" size={14} /> Eligible markets</span><small>{scoredMarkets.length} available</small></header><div className="nfl-eligible-grid">{scoredMarkets.map(({ market, model }) => <span key={market.id} className={market.id === marketId ? 'active' : ''} title={eligibilityReason(player, market.id)}><b>{market.shortLabel}</b><em className="mono">{pct(model.probability)}</em><small className="mono">{marketValue(player, model, market.id)}</small></span>)}</div></section>
           <section className="nfl-research-disclosure"><Icon name="Info" size={14} /><p>Model features reflect the history, role, injury, weather and live-game coverage available for this slate. Missing feeds are shown as limited rather than replaced with invented values.</p></section>
         </div>}
