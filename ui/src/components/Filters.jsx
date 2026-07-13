@@ -62,7 +62,7 @@ function ViewToggle({ view, onView }) {
   )
 }
 
-export default function Filters({ value, onChange, gradeCounts, games, badgeCounts, watchCount, view, onView }) {
+export default function Filters({ value, onChange, gradeCounts, games, badgeCounts, watchCount, view, onView, betaEnabled = false }) {
   const v = value
   const liveMode = useLiveMode()
   const [open, setOpen] = useState(false)
@@ -91,8 +91,9 @@ export default function Filters({ value, onChange, gradeCounts, games, badgeCoun
 
   const activeMore =
     v.gamePks.size + (v.confirmedOnly ? 1 : 0) + (v.watchedOnly ? 1 : 0) + (v.hotOnly ? 1 : 0) + (v.precisionOnly ? 1 : 0) + (v.sleepersOnly ? 1 : 0) + v.badges.size
-  const badgeDefs = BADGES.filter((b) => v.badges.has(b.key))
-  const hiddenSignalCount = BADGES.filter((b) => !MOBILE_PRIMARY_SIGNALS.has(b.key) && !v.badges.has(b.key)).length
+  const visibleBadges = BADGES.filter((b) => betaEnabled || (b.key !== 'powerReady' && b.key !== 'barrelReady'))
+  const badgeDefs = visibleBadges.filter((b) => v.badges.has(b.key))
+  const hiddenSignalCount = visibleBadges.filter((b) => !MOBILE_PRIMARY_SIGNALS.has(b.key) && !v.badges.has(b.key)).length
 
   const clearAdvancedFilters = () => onChange({
     gamePks: new Set(),
@@ -381,7 +382,7 @@ export default function Filters({ value, onChange, gradeCounts, games, badgeCoun
             >
               Any
             </button>
-            {BADGES.map((b) => {
+            {visibleBadges.map((b) => {
               const has = v.badges.has(b.key)
               const primary = MOBILE_PRIMARY_SIGNALS.has(b.key) || has
               return (

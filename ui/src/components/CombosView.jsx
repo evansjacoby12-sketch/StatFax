@@ -18,11 +18,11 @@ const CARD = { background: 'rgba(17, 18, 20, 0.45)', border: '1px solid rgba(255
 const H3 = { fontSize: '13px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '16px', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: '8px' }
 
 export default function CombosView({ batters, onSelect, favorConsistency = false }) {
-  // POWER READY (beta) is a beta combo strategy: server builds + logs it for forward-
-  // testing, but it only surfaces (list AND scorecard tallies) when the beta
+  // Ready-signal combos are built + logged for forward testing, but only surface
+  // (list AND scorecard tallies) when the beta
   // switch is on, so non-beta users see zero influence from an unvalidated signal.
   const betaCeil = store.load('betaCeil', false)
-  const showCombo = (c) => betaCeil || c?.strategy !== 'powerReady'
+  const showCombo = (c) => betaCeil || !['powerReady', 'barrelReady'].includes(c?.strategy)
   const [log, setLog] = useState(null)
   const [err, setErr] = useState(null)
   const [comboDay, setComboDay] = useState(null)

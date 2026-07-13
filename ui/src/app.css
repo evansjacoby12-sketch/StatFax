@@ -11011,6 +11011,104 @@ button.th:focus-visible {
   .mobile-tools-sheet { animation: none; }
 }
 
+/* Ready Radar: beta-only bridge from the two advisory signals to the board's
+   existing AND-capable signal filters. Compact enough to preserve board scan. */
+.ready-radar {
+  margin: 0 0 10px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 14px;
+  background:
+    linear-gradient(90deg, rgba(0, 216, 246, 0.035), rgba(245, 166, 35, 0.025)),
+    rgba(10, 11, 13, 0.72);
+  box-shadow: 0 12px 28px -26px rgba(0, 216, 246, 0.65);
+}
+.ready-radar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 28px;
+  padding: 0 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.045);
+}
+.ready-radar-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.ready-radar-beta {
+  color: var(--text-faint);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.ready-radar-body { display: grid; grid-template-columns: minmax(280px, 1fr) minmax(220px, 0.72fr); }
+.ready-radar-lenses { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 4px; gap: 4px; }
+.ready-radar-lens {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 11px;
+  font-weight: 750;
+  cursor: pointer;
+}
+.ready-radar-lens b { color: #fff; font-size: 12px; }
+.ready-radar-lens.on {
+  border-color: rgba(0, 216, 246, 0.25);
+  background: rgba(0, 216, 246, 0.08);
+  color: var(--accent);
+  box-shadow: 0 0 16px rgba(0, 216, 246, 0.06) inset;
+}
+.ready-radar-barrel.on { border-color: rgba(245, 166, 35, 0.26); background: rgba(245, 166, 35, 0.08); color: var(--prime); }
+.ready-radar-both.on { border-color: rgba(245, 166, 35, 0.26); color: var(--prime); }
+.ready-radar-top {
+  min-height: 52px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 10px;
+  border: 0;
+  border-left: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.014);
+  color: #fff;
+  text-align: left;
+  cursor: pointer;
+}
+.ready-radar-top span { min-width: 0; display: flex; flex-direction: column; }
+.ready-radar-top small { color: var(--text-faint); font-size: 8px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; }
+.ready-radar-top strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.ready-radar-top > b { color: var(--prime); font-size: 13px; }
+.ready-radar-empty { display: grid; place-items: center; min-height: 52px; color: var(--text-faint); font-size: 11px; }
+.ready-radar-lens:focus-visible,
+.ready-radar-top:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+@media (max-width: 700px) {
+  .ready-radar-body { grid-template-columns: 1fr; }
+  .ready-radar-top {
+    min-height: 38px;
+    border-top: 1px solid rgba(255, 255, 255, 0.045);
+    border-left: 0;
+  }
+}
+
+@media (max-width: 350px) {
+  .ready-radar-lens { gap: 4px; font-size: 10px; }
+  .ready-radar-lens svg { display: none; }
+}
+
 /* ──────────────────────────────────────────────────────────────────────────
  * Mobile shell: "broadcast glass" polish
  * Connects the compact header, command rail, feature pick, ranked cards and

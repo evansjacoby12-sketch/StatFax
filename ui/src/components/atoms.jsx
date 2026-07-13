@@ -179,8 +179,10 @@ export function Badge({ badge }) {
   )
 }
 
-export function BadgeRow({ batter, max = 99 }) {
-  const badges = activeBadges(batter).slice(0, max)
+export function BadgeRow({ batter, max = 99, includeBeta = true }) {
+  const badges = activeBadges(batter)
+    .filter((b) => includeBeta || (b.key !== 'powerReady' && b.key !== 'barrelReady'))
+    .slice(0, max)
   if (!badges.length) return null
   return (
     <span className="badge-row">

@@ -839,7 +839,8 @@ function DrawerHeader({ b, color, onClose, watched, inSlip, onToggleWatch, onTog
 
 function MobileDrawerHeader({ b, color, onClose, watched, inSlip, onToggleWatch, onToggleSlip }) {
   const [signalsOpen, setSignalsOpen] = useState(false)
-  const allSignals = activeBadges(b)
+  const allSignals = activeBadges(b).filter((signal) =>
+    store.load('betaCeil', false) || (signal.key !== 'powerReady' && signal.key !== 'barrelReady'))
   const hiddenSignalCount = Math.max(0, allSignals.length - 3)
   const shownSignals = signalsOpen ? allSignals : allSignals.slice(0, 3)
   const market = b.vegasImpliedProb

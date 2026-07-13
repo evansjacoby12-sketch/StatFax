@@ -33,6 +33,7 @@ import Skeleton from './components/Skeleton.jsx'
 import BackToTop from './components/BackToTop.jsx'
 import PullToRefresh from './components/PullToRefresh.jsx'
 import PickOfDay from './components/PickOfDay.jsx'
+import ReadyRadar from './components/ReadyRadar.jsx'
 import UpdateBanner from './components/UpdateBanner.jsx'
 import ListBuilderView from './components/ListBuilderView.jsx'
 import ToastStack, { toast } from './components/Toast.jsx'
@@ -159,6 +160,16 @@ export default function App() {
   useEffect(() => store.save('comboConf', comboConf), [comboConf])
   useEffect(() => store.save('comboLock', comboLock), [comboLock])
   useEffect(() => store.save('betaCeil', betaCeil), [betaCeil])
+  useEffect(() => {
+    if (betaCeil) return
+    setFilters((current) => {
+      if (!current.badges.has('powerReady') && !current.badges.has('barrelReady')) return current
+      return {
+        ...current,
+        badges: new Set([...current.badges].filter((key) => key !== 'powerReady' && key !== 'barrelReady')),
+      }
+    })
+  }, [betaCeil])
   useEffect(() => store.save('splitProjected', splitProjected), [splitProjected])
   useEffect(() => store.save('eliLevel', eliLevel), [eliLevel])
   useEffect(() => store.save('podDismissed', podDismissedId), [podDismissedId])
@@ -642,6 +653,7 @@ export default function App() {
           watchCount={watchlist.size}
           view={view}
           onView={setView}
+          betaEnabled={betaCeil}
         />
       </div>
 
@@ -701,6 +713,14 @@ export default function App() {
                 onDismiss={(b) => setPodDismissedId(b.id)}
               />
             )}
+            {betaCeil && (
+              <ReadyRadar
+                batters={all}
+                badges={filters.badges}
+                onChangeBadges={(badges) => patch({ badges })}
+                onSelect={(b) => setSelectedId(b.id)}
+              />
+            )}
             <BatterTable
               batters={filtered}
               onSelect={(b) => setSelectedId(b.id)}
@@ -714,6 +734,7 @@ export default function App() {
               onToggleSlip={toggleSlip}
               onOpenPitcher={openPitcher}
               splitProjected={splitProjected}
+              betaEnabled={betaCeil}
               total={all.length}
               onClearFilters={clearFilters}
             />

@@ -21,6 +21,7 @@ export default function BatterRow({
   onToggleWatch,
   onToggleSlip,
   onOpenPitcher,
+  betaEnabled = false,
 }) {
   const stop = (fn) => (e) => {
     e.stopPropagation()
@@ -56,8 +57,10 @@ export default function BatterRow({
     onLeft: () => onToggleSlip?.(b),
   })
 
-  const strongestSignal = b.powerReady
+  const strongestSignal = betaEnabled && b.powerReady
     ? { label: 'Power Ready (beta)', tone: 'warn', icon: 'Gauge' }
+    : betaEnabled && b.barrelReady
+      ? { label: 'Barrel Ready (beta)', tone: 'warn', icon: 'Flame' }
     : pmScore >= 7
       ? { label: `Pitch ${pmScore.toFixed(1)}`, tone: 'good', icon: 'Target' }
     : dueSetup.n >= 4
@@ -347,7 +350,7 @@ export default function BatterRow({
         </div>
 
         <div className="col-signals">
-          <BadgeRow batter={b} max={4} />
+          <BadgeRow batter={b} max={4} includeBeta={betaEnabled} />
         </div>
 
         <div className="col-actions">
