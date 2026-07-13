@@ -1432,10 +1432,12 @@ async function fetchSavantBatterStatsAll(year = SEASON) {
             const id = Number(p.player_id);
             if (!id || !out[id]) continue;
             if (out[id].launchAngle == null) out[id].launchAngle = pf(p.avg_hit_angle);
-            // hard_hit_percent is the BATTER's hard-hit% (not the pitcher's
-            // hardHitPctAllowed) — this is the field `hh` in the calibration
-            // feature vector. Backfill only when the percentile pass left it null.
-            if (out[id].hardHitPct == null) out[id].hardHitPct = pf(p.hard_hit_percent);
+            // Hard-hit% is the BATTER's % of batted balls ≥95 mph — the field
+            // `hh` in the feature vector. On THIS statcast CSV the column is
+            // `ev95percent` (NOT `hard_hit_percent`, which doesn't exist here) —
+            // reading the wrong name is why hh was 100% null. Prefer ev95percent,
+            // fall back to hard_hit_percent for any other endpoint shape.
+            if (out[id].hardHitPct == null) out[id].hardHitPct = pf(p.ev95percent) ?? pf(p.hard_hit_percent);
             // Ceiling inputs live only on the statcast CSV — always backfill.
             if (out[id].maxEV == null)        out[id].maxEV        = pf(p.max_hit_speed);
             if (out[id].sweetSpotPct == null) out[id].sweetSpotPct = pf(p.anglesweetspotpercent);
@@ -1463,8 +1465,9 @@ async function fetchSavantBatterStatsAll(year = SEASON) {
       const swings   = parseFloat(p.swing)    || 0;
       out[id] = {
         exitVelo:    pf(p.avg_hit_speed),
-        hardHitPct:  p.hard_hit_percent ? pf(p.hard_hit_percent)
-                   : p.hard_hit        ? (parseFloat(p.hard_hit) / attempts) * 100
+        hardHitPct:  p.ev95percent      ? pf(p.ev95percent)          // statcast CSV column
+                   : p.hard_hit_percent ? pf(p.hard_hit_percent)
+                   : p.hard_hit         ? (parseFloat(p.hard_hit) / attempts) * 100
                    : null,
         barrelPct:   p.brl_pa   ? pf(p.brl_pa)
                    : p.barreled ? (parseFloat(p.barreled) / pa) * 100
@@ -3060,6 +3063,11 @@ async function main() {
           // Legacy flat fields — read by reconcile.mjs / combo-engine.js
           recentBarrelPct: (r14 ?? r7).recentBarrelPct,
           recentEV:        (r14 ?? r7).recentEV,
+          // Robust high-end EV (mean of the 5 hardest recent balls) — emitted by
+          // statcastRecent but dropped here in reassembly, which is why the
+          // ceiling's `evhi` term was 100% null. Carry it through so barrelScore
+          // (and the featModel that learns from it) actually sees it.
+          recentEVHi:      (r14 ?? r7).recentEVHi,
           recentBBE:       (r14 ?? r7).recentBBE,
         } : null;
         const veloTrendForPitcher   = opposingPitcher ? (pitcherVeloTrend[opposingPitcher.id] ?? null) : null;
