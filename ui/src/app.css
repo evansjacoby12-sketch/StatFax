@@ -12921,3 +12921,109 @@ button.th:focus-visible {
     gap: 5px;
   }
 }
+
+/* Mobile vibe pass: stadium-light depth and thumb-first polish without changing behavior. */
+@media (max-width: 560px) {
+  html,
+  body,
+  #root {
+    background-color: #000;
+  }
+
+  body::before,
+  body::after {
+    content: '';
+    position: fixed;
+    inset: auto auto 10% -22%;
+    width: 72vw;
+    height: 72vw;
+    max-width: 360px;
+    max-height: 360px;
+    border-radius: 999px;
+    background: radial-gradient(circle, rgba(0, 216, 246, 0.13), transparent 68%);
+    filter: blur(10px);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  body::after {
+    inset: 12% -28% auto auto;
+    background: radial-gradient(circle, rgba(245, 166, 35, 0.12), transparent 70%);
+  }
+
+  .app {
+    position: relative;
+    isolation: isolate;
+  }
+
+  .app::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 120px),
+      repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.018) 0 1px, transparent 1px 48px);
+    mask-image: linear-gradient(180deg, #000 0 36%, transparent 76%);
+    opacity: 0.7;
+  }
+
+  .brand-sub {
+    color: color-mix(in srgb, var(--accent) 58%, var(--text-faint));
+  }
+
+  .filters-row,
+  .mobile-potd-row,
+  .mobile-board-row,
+  .bottom-nav {
+    transform: translateZ(0);
+  }
+
+  .mobile-potd-row::before,
+  .mobile-board-row::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(120deg, rgba(255, 255, 255, 0.09), transparent 32%, transparent 72%, rgba(255, 255, 255, 0.025));
+    opacity: 0.55;
+    pointer-events: none;
+  }
+
+  .rank-medal {
+    width: 18px;
+    height: 18px;
+    display: inline-grid;
+    place-items: center;
+    color: #071012 !important;
+    border-radius: 999px;
+    font-size: 9px !important;
+    box-shadow: 0 0 14px currentColor;
+  }
+
+  .rank-1 { background: linear-gradient(135deg, #ffe08a, #f59e0b); }
+  .rank-2 { background: linear-gradient(135deg, #eef2ff, #94a3b8); }
+  .rank-3 { background: linear-gradient(135deg, #fdba74, #b45309); }
+
+  .mobile-board-signal {
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.025) inset;
+  }
+
+  .mobile-board-action svg,
+  .bottom-nav-btn svg {
+    filter: drop-shadow(0 0 8px color-mix(in srgb, currentColor 30%, transparent));
+  }
+
+  .bottom-nav::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(120deg, rgba(0, 216, 246, 0.38), rgba(255, 255, 255, 0.06), rgba(245, 166, 35, 0.28));
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+}
