@@ -267,8 +267,14 @@ jobs:
       - name: Validate AI HR shadow ledger
         run: npm run validate:ai-shadow
 
+      - name: Grade AI HR shadow projections
+        run: npm run ai:hr-evaluate
+
+      - name: Validate AI HR evaluation report
+        run: npm run validate:ai-evaluation
+
       # The main artifact publish happens before the paid context pass. Persist
-      # these two later artifacts separately so the experiment survives cache
+      # these later artifacts separately so the experiment survives cache
       # eviction and can be graded against final outcomes in Phase 3.
       - name: Publish AI HR artifacts to R2
         continue-on-error: true
@@ -285,7 +291,7 @@ jobs:
             exit 0
           fi
           ENDPOINT="https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com"
-          for f in context.json ai-hr-shadow.json; do
+          for f in context.json ai-hr-shadow.json ai-hr-evaluation.json; do
             if [ -f "dist/$f" ]; then
               aws s3 cp "dist/$f" "s3://$R2_BUCKET/$f" --endpoint-url "$ENDPOINT" \
                 --content-type application/json --cache-control no-cache \

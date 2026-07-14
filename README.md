@@ -88,7 +88,17 @@ Phase 2 runs `npm run ai:hr-shadow` after the context pass and maintains `dist/a
 - a deterministic shadow probability using `direction × confidence × 0.10` in log-odds space, capped at `±0.25` total log-odds;
 - exact signal IDs, notes, model, timestamps, and evidence URLs.
 
-The shadow ledger is a versioned experiment (`mode: "shadow"`, `scoreImpact: false`), is retained for 180 days, and is never read by the production scoring path or UI. Started-game records are frozen while current pregame records can refresh with newer sourced context. Run `npm run validate:ai-shadow` to verify its math and provenance. Phase 3 will reconcile outcomes and compare baseline versus shadow Brier score and calibration before any AI feature is eligible for production.
+The shadow ledger is a versioned experiment (`mode: "shadow"`, `scoreImpact: false`), is retained for 180 days, and is never read by the production scoring path or UI. Started-game records are frozen while current pregame records can refresh with newer sourced context. Run `npm run validate:ai-shadow` to verify its math and provenance.
+
+Phase 3 runs `npm run ai:hr-evaluate` and joins shadow records to reconciled outcomes by exact date, game, and batter. `dist/ai-hr-evaluation.json` reports:
+
+- paired baseline-versus-shadow Brier score and log loss;
+- fixed-bin expected calibration error and calibration tables;
+- a game-clustered 95% confidence interval for paired Brier improvement;
+- breakdowns by net AI direction, context kind, and entity type;
+- pending, settled, and scratched-record coverage.
+
+The promotion gate remains read-only and cannot automatically change production scoring. It requires at least 500 settled batter-games, 30 HR outcomes, 40 distinct games, and 14 settled dates, then requires a positive lower 95% Brier bound, non-worse log loss, and no material calibration regression. Passing means only `eligible-for-review`; `autoPromotion` and `scoreImpact` remain false.
 
 ## K Brain
 
