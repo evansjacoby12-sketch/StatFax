@@ -15151,6 +15151,7 @@ button.th:focus-visible {
 .nfl-card-signals .tone-prime { color: var(--prime); border-color: rgba(214,181,111,.18); }
 .nfl-card-signals .tone-strong { color: var(--strong); border-color: rgba(105,185,158,.18); }
 .nfl-card-signals .tone-warn { color: var(--warn); }
+.nfl-card-signals .tone-bad { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 24%, transparent); background: color-mix(in srgb, var(--bad) 6%, transparent); }
 .nfl-prop-card > footer { min-height: 52px; padding: 7px 10px 9px 14px; display: flex; gap: 6px; border-top: 1px solid var(--border-soft); }
 .nfl-prop-card > footer > button { min-height: 38px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; color: var(--text-faint); border: 1px solid var(--border-soft); border-radius: 9px; background: rgba(255,255,255,.025); font-size: 9px; font-weight: 800; text-transform: uppercase; }
 .nfl-prop-card > footer > button:first-child { width: 40px; }
@@ -15358,6 +15359,7 @@ button.th:focus-visible {
 .nfl-live-analysis p { color: var(--text-dim); font-size: 10px; line-height: 1.55; }
 .tone-good { color: var(--strong) !important; }
 .tone-warn { color: var(--warn) !important; }
+.tone-bad { color: var(--bad) !important; }
 
 @media (max-width: 920px) {
   .nfl-card-grid { grid-template-columns: 1fr; }

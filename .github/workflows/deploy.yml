@@ -189,7 +189,7 @@ jobs:
         env:
           SPORTSGAMEODDS_API_KEY: ${{ secrets.SPORTSGAMEODDS_API_KEY }}
         run: |
-          if [ ! -f dist/nfl/history.json ]; then npm run nfl:history; fi
+          if [ ! -f dist/nfl/history.json ] || ! node -e "const h=require('./dist/nfl/history.json');process.exit(h.version>=2?0:1)"; then npm run nfl:history; fi
           npm run nfl:backtest
           npm run nfl:slate
 

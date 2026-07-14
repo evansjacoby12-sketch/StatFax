@@ -5,7 +5,7 @@ import NFL_DEMO_SNAPSHOT from '../src/sports/nfl/data/demoSlate.js'
 import { loadNFLSnapshot, mergeNFLLiveUpdate, validateNFLSnapshot } from '../src/sports/nfl/api/NFLService.js'
 import { isPropEligible, eligiblePropMarkets } from '../src/sports/nfl/logic/propEligibility.js'
 import { scoreNFLProp, scoreNFLSnapshot } from '../src/sports/nfl/logic/ScoringEngine.js'
-import { nflStreakSignals } from '../src/sports/nfl/logic/signals.js'
+import { buildNFLSignals, nflStreakSignals } from '../src/sports/nfl/logic/signals.js'
 import { nflWeatherImpact } from '../src/sports/nfl/logic/weather.js'
 
 const player = (name) => NFL_DEMO_SNAPSHOT.players.find((item) => item.name === name)
@@ -55,6 +55,47 @@ test('streak badges cover touchdown, reception, passing, rushing, and receiving 
     { season: 2025, week: 1, totalTds: 2, receptions: 4, passingYards: 210, rushingYards: 42, receivingYards: 65 },
   ] })
   assert.deepEqual(new Set(signals.map((signal) => signal.key)), new Set(['touchdown', 'receptions', 'passing', 'rushing', 'receiving']))
+})
+
+test('role, efficiency, matchup, and verified tracking badges use decision-grade thresholds', () => {
+  const signals = buildNFLSignals({
+    position: 'RB',
+    usage: { endZoneTargetsL3: 3, endZoneTargetShare: .5, goalLineTouchesL3: 4, goalToGoOpportunitiesL3: 7, goalToGoOpportunityShare: .7, airYardsShare: .36 },
+    lineup: {
+      carryShare: .48,
+      offensiveLine: { passProtectionFactor: .9 },
+      opponentDefense: { trackingVerified: true, pressureRate: .31, quickPressureRate: .27 },
+      tracking: { verified: true, scoringDriveParticipation: .84, yacAboveExpectationPerReception: 1.8, rushingYardsOverExpectedPerAttempt: .7, averageSeparation: 3.4 },
+    },
+    defenseVsPosition: { percentile: .8, factors: { rushing_yards: 1.06 } },
+    recentGames: [
+      { season: 2025, week: 6, carries: 17, targets: 4 }, { season: 2025, week: 5, carries: 16, targets: 5 },
+      { season: 2025, week: 4, carries: 8, targets: 2 }, { season: 2025, week: 3, carries: 7, targets: 3 },
+      { season: 2025, week: 2, carries: 8, targets: 2 }, { season: 2025, week: 1, carries: 7, targets: 3 },
+    ],
+  })
+  const keys = new Set(signals.map((signal) => signal.key))
+  for (const key of ['end-zone-alpha', 'goal-to-go-dominator', 'opportunity-spike', 'drive-participation', 'committee-risk', 'defense-funnel', 'air-yards-leader', 'yac-creator', 'rushing-over-expected', 'separation-edge', 'protection-mismatch', 'quick-pressure-risk']) assert.ok(keys.has(key), key)
+  assert.equal(signals[0].tone, 'bad')
+})
+
+test('tracking-only badges stay dormant until the source is verified', () => {
+  const signals = buildNFLSignals({ position: 'WR', lineup: { tracking: { verified: false, scoringDriveParticipation: 1, yacAboveExpectationPerReception: 9, averageSeparation: 9 } } })
+  assert.equal(signals.some((signal) => ['drive-participation', 'yac-creator', 'separation-edge'].includes(signal.key)), false)
+})
+
+test('declining opportunity creates a negative scoring-role signal', () => {
+  const signals = buildNFLSignals({ position: 'WR', recentGames: [
+    { season: 2025, week: 6, targets: 4 }, { season: 2025, week: 5, targets: 5 },
+    { season: 2025, week: 4, targets: 12 }, { season: 2025, week: 3, targets: 13 },
+    { season: 2025, week: 2, targets: 12 }, { season: 2025, week: 1, targets: 11 },
+  ] })
+  assert.ok(signals.some((signal) => signal.key === 'scoring-role-lost' && signal.tone === 'bad'))
+})
+
+test('QB keeper threat requires repeated red-zone rushing work', () => {
+  const signals = buildNFLSignals({ position: 'QB', usage: { goalLineTouchesL3: 3 } })
+  assert.ok(signals.some((signal) => signal.key === 'qb-keeper-threat'))
 })
 
 test('snapshot scoring returns only eligible players in score order', () => {

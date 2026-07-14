@@ -34,6 +34,12 @@ const NFL_SIGNAL_FILTERS = [
   { id: 'weather-edge', label: 'Weather Edge', icon: 'Wind', tone: 'silver', match: (player) => Number(player.model.weather?.factor) > 1.005 },
   { id: 'lineup-confirmed', label: 'Lineup', icon: 'UserCheck', tone: 'silver', match: (player) => player.model.signals.some((signal) => signal.key === 'lineup-confirmed') },
   { id: 'snap-limit', label: 'Snap Limit', icon: 'TriangleAlert', tone: 'bad', match: (player) => player.model.signals.some((signal) => signal.key === 'snap-limit') },
+  { id: 'scoring-role', label: 'Scoring Role', icon: 'Crown', tone: 'prime', match: (player) => player.model.signals.some((signal) => ['end-zone-alpha', 'goal-to-go-dominator', 'drive-participation', 'qb-keeper-threat'].includes(signal.key)) },
+  { id: 'opportunity-spike', label: 'Role Spike', icon: 'TrendingUp', tone: 'strong', match: (player) => player.model.signals.some((signal) => signal.key === 'opportunity-spike') },
+  { id: 'efficiency-edge', label: 'Efficiency', icon: 'Gauge', tone: 'strong', match: (player) => player.model.signals.some((signal) => ['air-yards-leader', 'yac-creator', 'rushing-over-expected', 'separation-edge'].includes(signal.key)) },
+  { id: 'defense-funnel', label: 'Funnel', icon: 'Shield', tone: 'accent', match: (player) => player.model.signals.some((signal) => signal.key === 'defense-funnel') },
+  { id: 'committee-risk', label: 'Committee', icon: 'Users', tone: 'bad', match: (player) => player.model.signals.some((signal) => signal.key === 'committee-risk') },
+  { id: 'role-risk', label: 'Role Risk', icon: 'TriangleAlert', tone: 'bad', match: (player) => player.model.signals.some((signal) => ['scoring-role-lost', 'protection-mismatch', 'quick-pressure-risk'].includes(signal.key)) },
 ]
 const GRADE_COLORS = { PRIME: 'var(--prime)', STRONG: 'var(--strong)', LEAN: 'var(--lean)', SKIP: 'var(--skip)' }
 const NFL_TEAM_COLORS = {
@@ -70,6 +76,14 @@ function liveLabel(player) {
 }
 
 function signalIcon(signal) {
+  if (['end-zone-alpha', 'goal-to-go-dominator'].includes(signal.key)) return 'Crown'
+  if (['opportunity-spike', 'air-yards-leader', 'rushing-over-expected'].includes(signal.key)) return 'TrendingUp'
+  if (signal.key === 'drive-participation') return 'Activity'
+  if (signal.key === 'qb-keeper-threat') return 'Zap'
+  if (signal.key === 'defense-funnel') return 'Shield'
+  if (signal.key === 'yac-creator') return 'Sparkles'
+  if (signal.key === 'separation-edge') return 'GitMerge'
+  if (['committee-risk', 'scoring-role-lost', 'protection-mismatch', 'quick-pressure-risk', 'snap-limit'].includes(signal.key)) return 'TriangleAlert'
   if (signal.key === 'touchdown') return 'Flame'
   if (signal.key === 'split') return 'Home'
   if (signal.key.includes('rz') || signal.key === 'goal-line') return 'Target'
@@ -149,7 +163,7 @@ function BoardRow({ player, rank, marketId, watched, inSlip, onSelect, onToggleW
       <div className="nfl-number nfl-model-prob"><strong className="mono" style={{ color }}>{pct(model.probability)}</strong><small>Model</small></div>
       <div className="nfl-number"><strong className="mono">{marketValue(player, model, marketId)}</strong><small>Market</small></div>
       <div className="nfl-number"><strong className={`mono nfl-edge ${model.edge == null ? '' : model.edge >= 0 ? 'positive' : 'negative'}`}>{model.edge == null ? '—' : `${model.edge >= 0 ? '+' : ''}${pct(model.edge)}`}</strong><small>Edge</small></div>
-      <div className="nfl-signals">{model.signals.slice(0, 2).map((signal) => <span key={signal.key}><Icon name={signalIcon(signal)} size={10} />{nflSignalText(signal, eliLevel)}</span>)}</div>
+      <div className="nfl-signals">{model.signals.slice(0, 2).map((signal) => <span key={signal.key} className={`tone-${signal.tone}`}><Icon name={signalIcon(signal)} size={10} />{nflSignalText(signal, eliLevel)}</span>)}</div>
       <div className="nfl-row-actions" onClick={(event) => event.stopPropagation()}><button className={watched ? 'active' : ''} onClick={() => onToggleWatch(player)} aria-label={`Watch ${player.name}`}><Icon name="Star" size={15} /></button><button className={inSlip ? 'active' : ''} onClick={() => onToggleSlip(player)} aria-label={`Add ${player.name} to slip`}><Icon name={inSlip ? 'Check' : 'Plus'} size={15} /></button></div>
     </article>
   )
@@ -186,7 +200,7 @@ function PlayerResearch({ player, marketId, onClose, inSlip, onToggleSlip }) {
       <nav className="nfl-research-tabs" aria-label="Player research sections">{researchTabs.map((item) => <button key={item.id} className={tab === item.id ? 'active' : ''} aria-current={tab === item.id ? 'page' : undefined} onClick={() => setTab(item.id)}><Icon name={item.icon} size={13} />{item.label}</button>)}</nav>
       <div className="nfl-research-body">
         {tab === 'overview' && <div className="nfl-research-view">
-          <section className="nfl-research-panel"><header><span><Icon name="Sparkles" size={14} /> {eliLevel === 'eli5' ? 'Why this player stands out' : 'Primary model signals'}</span><small>{eliLevel === 'eli5' ? 'Plain English' : `${current.signals?.length || 0} active`}</small></header><div className="nfl-research-signals">{current.signals?.slice(0, 3).map((signal) => <article key={signal.key} className={`tone-${signal.tone}`}><Icon name={signalIcon(signal)} size={15} /><div><b>{nflSignalText(signal, eliLevel)}</b><small>{nflSignalCaption(eliLevel)}</small></div></article>)}{!current.signals?.length && <div className="nfl-research-empty"><Icon name="Info" size={15} />{eliLevel === 'eli5' ? 'The model has no strong, easy-to-explain trend for this player yet.' : 'No active streak or role signal for this market.'}</div>}</div></section>
+          <section className="nfl-research-panel"><header><span><Icon name="Sparkles" size={14} /> {eliLevel === 'eli5' ? 'Why this player stands out' : 'Primary model signals'}</span><small>{eliLevel === 'eli5' ? 'Plain English' : `${current.signals?.length || 0} active`}</small></header><div className="nfl-research-signals">{current.signals?.slice(0, 6).map((signal) => <article key={signal.key} className={`tone-${signal.tone}`}><Icon name={signalIcon(signal)} size={15} /><div><b>{nflSignalText(signal, eliLevel)}</b><small>{nflSignalCaption(eliLevel)}</small></div></article>)}{!current.signals?.length && <div className="nfl-research-empty"><Icon name="Info" size={15} />{eliLevel === 'eli5' ? 'The model has no strong, easy-to-explain trend for this player yet.' : 'No active streak or role signal for this market.'}</div>}</div></section>
           <section className="nfl-research-panel"><header><span><Icon name="LayoutGrid" size={14} /> Eligible markets</span><small>{scoredMarkets.length} available</small></header><div className="nfl-eligible-grid">{scoredMarkets.map(({ market, model }) => <span key={market.id} className={market.id === marketId ? 'active' : ''} title={eligibilityReason(player, market.id)}><b>{market.shortLabel}</b><em className="mono">{pct(model.probability)}</em><small className="mono">{marketValue(player, model, market.id)}</small></span>)}</div></section>
           <section className="nfl-research-disclosure"><Icon name="Info" size={14} /><p>Model features reflect the history, role, injury, weather and live-game coverage available for this slate. Missing feeds are shown as limited rather than replaced with invented values.</p></section>
         </div>}

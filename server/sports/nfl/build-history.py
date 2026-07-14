@@ -38,6 +38,11 @@ def integer(value, default=0):
     return int(number(value, default))
 
 
+def optional_number(value, digits=4):
+    parsed = number(value, None)
+    return round(parsed, digits) if parsed is not None else None
+
+
 def stream_csv(url, attempts=3):
     last_error = None
     for attempt in range(attempts):
@@ -73,6 +78,9 @@ def compact_week(row):
         "targets": integer(row.get("targets")),
         "receivingYards": integer(row.get("receiving_yards")),
         "receivingTds": integer(row.get("receiving_tds")),
+        "receivingAirYards": integer(row.get("receiving_air_yards")),
+        "yardsAfterCatch": integer(row.get("receiving_yards_after_catch")),
+        "airYardsShare": optional_number(row.get("receiving_air_yards_share") or row.get("air_yards_share")),
         "targetShare": round(number(row.get("target_share")), 4),
         "snapShare": round(number(row.get("snap_share") or row.get("offense_pct")), 4) or None,
         # TD-scorer props only settle on a player's own rush/receiving score;
@@ -256,7 +264,7 @@ def main():
             if game.get("gameId") in first_touchdowns:
                 game["firstTd"] = 1 if first_touchdowns[game["gameId"]] == player_id else 0
     payload = {
-        "version": 1,
+        "version": 2,
         "sport": "nfl",
         "generatedAt": datetime.now(timezone.utc).isoformat(),
         "seasons": seasons,
