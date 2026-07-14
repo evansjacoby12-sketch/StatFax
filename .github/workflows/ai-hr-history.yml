@@ -1,0 +1,92 @@
+name: AI HR historical replay
+
+on:
+  workflow_dispatch:
+    inputs:
+      from:
+        description: Optional first date (YYYY-MM-DD)
+        required: false
+        type: string
+      to:
+        description: Optional last date (YYYY-MM-DD)
+        required: false
+        type: string
+      max_dates:
+        description: Optional most-recent date count
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-hr-historical-replay
+  cancel-in-progress: false
+
+jobs:
+  replay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Restore latest reconciled MLB outcomes
+        uses: actions/cache/restore@v4
+        with:
+          path: dist/backtest-log.json
+          key: ai-hr-history-${{ github.run_id }}
+          restore-keys: backtest-log-
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Verify engine contracts
+        run: npm test
+
+      - name: Run time-locked historical replay
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          AI_HR_HISTORY_MODEL: ${{ vars.CONTEXT_MODEL || 'claude-haiku-4-5-20251001' }}
+          REPLAY_FROM: ${{ inputs.from }}
+          REPLAY_TO: ${{ inputs.to }}
+          REPLAY_MAX_DATES: ${{ inputs.max_dates }}
+        run: |
+          args=()
+          if [ -n "$REPLAY_FROM" ]; then args+=("--from=$REPLAY_FROM"); fi
+          if [ -n "$REPLAY_TO" ]; then args+=("--to=$REPLAY_TO"); fi
+          if [ -n "$REPLAY_MAX_DATES" ]; then args+=("--max-dates=$REPLAY_MAX_DATES"); fi
+          npm run ai:hr-history -- "${args[@]}"
+
+      - name: Validate historical replay contract
+        run: npm run validate:ai-history
+
+      - name: Add replay result to run summary
+        run: |
+          node - <<'NODE' >> "$GITHUB_STEP_SUMMARY"
+          const fs = require('fs')
+          const replay = JSON.parse(fs.readFileSync('dist/ai-hr-historical.json'))
+          const overall = replay.evaluation.overall
+          console.log('## AI HR historical replay')
+          console.log(`- Dates researched: ${replay.dates.length}`)
+          console.log(`- Accepted signals: ${replay.contexts.reduce((n, c) => n + c.signals.length, 0)}`)
+          console.log(`- Settled batter-games: ${replay.evaluation.coverage.settledRecords}`)
+          console.log(`- HR outcomes: ${overall?.homers ?? 0}`)
+          console.log(`- Brier improvement: ${overall?.comparison?.brierImprovement ?? 'n/a'}`)
+          console.log(`- Log-loss improvement: ${overall?.comparison?.logLossImprovement ?? 'n/a'}`)
+          console.log(`- Gate: ${replay.evaluation.gate.status}`)
+          for (const reason of replay.evaluation.gate.reasons) console.log(`  - ${reason}`)
+          NODE
+
+      - name: Upload replay artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-hr-historical-${{ github.run_id }}
+          path: |
+            dist/ai-hr-historical.json
+            dist/ai-hr-history-shadow.json
+            dist/ai-hr-history-evaluation.json
+          retention-days: 30
