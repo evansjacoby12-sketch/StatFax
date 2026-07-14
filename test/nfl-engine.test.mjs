@@ -100,8 +100,23 @@ test('unapplied lineup factors change scoring while pipeline-adjusted projection
 
 test('live observed snaps and routes override pregame deployment after a real sample', () => {
   const henry = player('Derrick Henry')
-  const basePlayer = { ...henry, lineup: { expectedSnapShare: .7, routesPerDropback: .4, projectionAdjusted: true, marketFactors: {} }, live: { ...henry.live, observedSnaps: 8 } }
+  const basePlayer = { ...henry, lineup: { expectedSnapShare: .7, routesPerDropback: .4, projectionAdjusted: true, marketFactors: {} }, live: { ...henry.live, participationVerified: true, observedSnaps: 8 } }
   const baseline = scoreNFLProp(basePlayer, 'rushing_yards')
   const expanded = scoreNFLProp({ ...basePlayer, live: { ...basePlayer.live, observedSnapShare: .9 } }, 'rushing_yards')
   assert.ok(expanded.mean > baseline.mean)
+})
+
+test('unverified participation cannot alter the live projection', () => {
+  const henry = player('Derrick Henry')
+  const baseline = scoreNFLProp(henry, 'rushing_yards')
+  const unverified = scoreNFLProp({ ...henry, live: { ...henry.live, isLive: true, participationVerified: false, observedSnaps: 12, observedSnapShare: 1 } }, 'rushing_yards')
+  assert.equal(unverified.mean, baseline.mean)
+})
+
+test('hard model gates retain research probability but suppress the grade', () => {
+  const henry = player('Derrick Henry')
+  const held = scoreNFLProp({ ...henry, modelGate: { markets: { anytime_td: { enabled: false, reasons: ['Preseason rehearsal incomplete'] } } } }, 'anytime_td')
+  assert.equal(held.grade, 'HOLD')
+  assert.equal(held.suppressed, true)
+  assert.deepEqual(held.suppressionReasons, ['Preseason rehearsal incomplete'])
 })

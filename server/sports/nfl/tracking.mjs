@@ -27,7 +27,7 @@ export function updateNFLTracking(log = {}, previousSnapshot = null, currentSnap
         if (existing) {
           existing.closing = observation
           existing.observations = Number(existing.observations || 1) + 1
-        } else records.set(id, { id, gameId: player.gameId, kickoffAt: player.kickoffAt, playerId: player.id, playerName: player.name, position: player.position, team: player.team, marketId, opened: observation, closing: observation, observations: 1, status: 'open' })
+        } else records.set(id, { id, gameId: player.gameId, kickoffAt: player.kickoffAt, season: snapshot.meta?.season ?? null, seasonType: snapshot.meta?.seasonType ?? null, week: snapshot.meta?.weekNumber ?? null, playerId: player.id, playerName: player.name, position: player.position, team: player.team, marketId, opened: observation, closing: observation, observations: 1, status: 'open' })
       }
     }
   }
@@ -56,6 +56,7 @@ export function updateNFLTracking(log = {}, previousSnapshot = null, currentSnap
 
 export function summarizeNFLTracking(log = {}) {
   const settled = (log.records || []).filter((record) => record.status === 'settled')
+  const preseasonSettled = settled.filter((record) => /preseason/i.test(String(record.seasonType || ''))).length
   const markets = {}
   for (const record of settled) {
     const bucket = markets[record.marketId] ||= { samples: 0, wins: 0, brierTotal: 0, brierSamples: 0, errorTotal: 0, errorSamples: 0, profit: 0, roiSamples: 0, calibration: new Map() }
@@ -72,5 +73,5 @@ export function summarizeNFLTracking(log = {}) {
     if (Number.isFinite(record.absoluteError)) { bucket.errorTotal += record.absoluteError; bucket.errorSamples++ }
     if (Number.isFinite(record.profit)) { bucket.profit += record.profit; bucket.roiSamples++ }
   }
-  return { updatedAt: log.updatedAt || null, open: (log.records || []).filter((record) => record.status === 'open').length, settled: settled.length, markets: Object.fromEntries(Object.entries(markets).map(([id, value]) => [id, { samples: value.samples, hitRate: value.samples ? value.wins / value.samples : null, brier: value.brierSamples ? value.brierTotal / value.brierSamples : null, mae: value.errorSamples ? value.errorTotal / value.errorSamples : null, profit: value.roiSamples ? value.profit : null, roi: value.roiSamples ? value.profit / value.roiSamples : null, roiSamples: value.roiSamples, calibration: [...value.calibration.values()].map((bin) => ({ ...bin, predicted: bin.predicted / bin.samples, observed: bin.observed / bin.samples })) }])) }
+  return { updatedAt: log.updatedAt || null, open: (log.records || []).filter((record) => record.status === 'open').length, settled: settled.length, preseasonSettled, markets: Object.fromEntries(Object.entries(markets).map(([id, value]) => [id, { samples: value.samples, hitRate: value.samples ? value.wins / value.samples : null, brier: value.brierSamples ? value.brierTotal / value.brierSamples : null, mae: value.errorSamples ? value.errorTotal / value.errorSamples : null, profit: value.roiSamples ? value.profit : null, roi: value.roiSamples ? value.profit / value.roiSamples : null, roiSamples: value.roiSamples, calibration: [...value.calibration.values()].map((bin) => ({ ...bin, predicted: bin.predicted / bin.samples, observed: bin.observed / bin.samples })) }])) }
 }

@@ -8,10 +8,12 @@ import { fetchNFLOdds, normalizePlayerName } from './providers/odds.mjs'
 import { indexNFLHistory, matchHistoryPlayer, playerRoleScore, projectNFLPlayer } from './projections.mjs'
 import { assessPlayerAvailability, externalAvailabilityFor, indexAvailability } from './availability.mjs'
 import { calibrateNFLProbability } from '../../../src/sports/nfl/logic/calibration.js'
+import { scoreNFLProp } from '../../../src/sports/nfl/logic/ScoringEngine.js'
 import { depthFor, indexDepthChart, indexWeather, overlayFreshness, readOptionalJSON, weatherFor } from './context-overlays.mjs'
 import { buildTeamLineup, indexNFLLineups, lineupFor, normalizeTeamLineup, summarizeLineupCoverage, teamLineupFor } from './lineups.mjs'
 import { buildNFLDataHealth } from './health.mjs'
 import { summarizeNFLTracking, updateNFLTracking } from './tracking.mjs'
+import { applyNFLReadiness } from './readiness.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.resolve(__dirname, '..', '..', '..')
@@ -41,16 +43,7 @@ function ordinal(value) {
   return `${value}${value % 10 === 1 ? 'st' : value % 10 === 2 ? 'nd' : value % 10 === 3 ? 'rd' : 'th'}`
 }
 
-export function defenseProfile(history, team, position) {
-  const seasonal = history?.defenseAllowedBySeason || {}
-  const recentSeasons = Object.keys(seasonal).sort((a, b) => Number(b) - Number(a)).slice(0, 2)
-  const table = recentSeasons.length ? Object.fromEntries(Object.keys(history?.defenseAllowedByPosition || {}).map((abbr) => [abbr, Object.fromEntries(['QB', 'RB', 'WR', 'TE'].map((pos) => {
-    const rows = recentSeasons.map((season, index) => ({ entry: seasonal[season]?.[abbr]?.[pos], weight: index === 0 ? .7 : .3 })).filter((row) => row.entry)
-    if (!rows.length) return [pos, null]
-    const totalWeight = rows.reduce((sum, row) => sum + row.weight, 0)
-    const fields = ['touchdowns', 'redZoneTargets', 'redZoneCarries', 'passingYards', 'rushingYards', 'receivingYards', 'games']
-    return [pos, Object.fromEntries(fields.map((field) => [field, rows.reduce((sum, row) => sum + n(row.entry[field]) * row.weight, 0) / totalWeight]))]
-  }).filter(([, value]) => value))])) : (history?.defenseAllowedByPosition || {})
+export function defenseProfileFromTable(table, team, position) {
   const entry = table?.[team]?.[position]
   if (!entry) return { rank: null, percentile: .5, label: `Neutral baseline vs ${position}`, allowedPerGame: null, factors: {} }
   const field = position === 'QB' ? 'passingYards' : position === 'RB' ? 'rushingYards' : 'receivingYards'
@@ -72,6 +65,19 @@ export function defenseProfile(history, team, position) {
     sampleGames: n(entry.games, null),
     factors: { anytime_td: factor, first_td: factor, two_plus_td: factor, passing_yards: factor, receptions: factor, receiving_yards: factor, rushing_yards: factor, rushing_receiving_yards: factor, passing_rushing_yards: factor },
   }
+}
+
+export function defenseProfile(history, team, position) {
+  const seasonal = history?.defenseAllowedBySeason || {}
+  const recentSeasons = Object.keys(seasonal).sort((a, b) => Number(b) - Number(a)).slice(0, 2)
+  const table = recentSeasons.length ? Object.fromEntries(Object.keys(history?.defenseAllowedByPosition || {}).map((abbr) => [abbr, Object.fromEntries(['QB', 'RB', 'WR', 'TE'].map((pos) => {
+    const rows = recentSeasons.map((season, index) => ({ entry: seasonal[season]?.[abbr]?.[pos], weight: index === 0 ? .7 : .3 })).filter((row) => row.entry)
+    if (!rows.length) return [pos, null]
+    const totalWeight = rows.reduce((sum, row) => sum + row.weight, 0)
+    const fields = ['touchdowns', 'redZoneTargets', 'redZoneCarries', 'passingYards', 'rushingYards', 'receivingYards', 'games']
+    return [pos, Object.fromEntries(fields.map((field) => [field, rows.reduce((sum, row) => sum + n(row.entry[field]) * row.weight, 0) / totalWeight]))]
+  }).filter(([, value]) => value))])) : (history?.defenseAllowedByPosition || {})
+  return defenseProfileFromTable(table, team, position)
 }
 
 function rosterStatus(player, availability) {
@@ -107,16 +113,21 @@ export function normalizeFirstTouchdownProbabilities(players, calibration = {}) 
   }
   for (const group of byGame.values()) {
     const weights = group.map((player) => {
+      const markets = { ...player.markets, first_td: { ...player.markets?.first_td } }
+      delete markets.first_td.probability
+      delete markets.first_td.contextAdjusted
+      const scored = scoreNFLProp({ ...player, markets }, 'first_td').probability
       const anytime = n(player.projections?.anytimeTdProbability, .1)
       const redZone = n(player.usage?.redZoneOpportunityShare, .1)
       const role = player.usage?.roleRank === 1 ? 1.12 : player.usage?.roleRank === 2 ? 1 : .88
-      return Math.max(.002, calibrateNFLProbability(anytime * .22, calibration.first_td) * (1 + redZone * .2) * role)
+      const raw = Number.isFinite(scored) ? scored : anytime * .22 * (1 + redZone * .2) * role
+      return Math.max(.002, calibrateNFLProbability(raw, calibration.first_td))
     })
     const total = weights.reduce((sum, value) => sum + value, 0) || 1
     group.forEach((player, index) => {
       const probability = Math.round((weights[index] / total * .86) * 10000) / 10000
       player.projections.firstTdProbability = probability
-      player.markets.first_td = { ...player.markets.first_td, probability, source: 'game_normalized_model' }
+      player.markets.first_td = { ...player.markets.first_td, probability, contextAdjusted: true, source: 'game_normalized_model' }
     })
   }
   return players
@@ -214,6 +225,8 @@ export async function buildNFLSnapshot({ now = new Date(), fetchImpl = fetch, hi
           defenseVsPosition: defenseProfile(history, opponent, player.position),
           weather: { ...(summary?.weather || { roof: game.venue.indoor ? 'dome' : 'outdoor', tempF: null, windMph: null }), ...(weatherFor(game, weatherIndex) || {}) },
           live: {
+            source: 'espn-box-score',
+            participationVerified: false,
             isLive: game.status.state === 'in',
             isFinal: game.status.state === 'post',
             label: liveLabel(game),
@@ -267,7 +280,7 @@ export async function buildNFLSnapshot({ now = new Date(), fetchImpl = fetch, hi
     packageUsage: Boolean(externalLineupPayload?.players?.some((player) => player.personnel || player.routesPerDropback != null || player.routeParticipation != null)),
     offensiveLine: lineupCoverage.offensiveLines,
     defensiveLineup: lineupCoverage.defensiveLineups,
-    liveParticipation: players.filter((player) => player.live?.isLive && Number(player.live?.observedSnapShare) > 0).length,
+    liveParticipation: players.filter((player) => player.live?.isLive && player.live?.participationVerified === true && Number(player.live?.observedSnapShare) > 0).length,
     officialAvailability: availabilityFreshness.fresh && (Boolean(externalAvailabilityPayload) || automaticAvailabilityReady || automaticDepthReady),
     weatherCoverage: Math.max(weatherCoverage, overlayWeatherCoverage),
     weatherFresh: weatherCoverage > 0 || (weatherFreshness.fresh && overlayWeatherCoverage > 0),
@@ -276,7 +289,8 @@ export async function buildNFLSnapshot({ now = new Date(), fetchImpl = fetch, hi
   const generatedAt = new Date(now).toISOString()
   const overlays = { depthChart: depthFreshness, availability: availabilityFreshness, lineups: lineupFreshness, weather: weatherFreshness }
   const dataHealth = buildNFLDataHealth({ generatedAt, games, players, quality: dataQuality, providers: { schedule: providers.schedule, rosters: providers.rosters, depth: providers.depth, lineups: providers.lineups, availability: providers.practice, weather: providers.weather, history: providers.history }, overlayStatus: { depth: depthFreshness, lineups: lineupFreshness, availability: availabilityFreshness, weather: weatherFreshness } })
-  return {
+  const expectedSlateGames = anchor ? schedule.filter((game) => game.season === anchor.season && game.seasonType === anchor.seasonType && game.week === anchor.week).length : 0
+  const snapshot = {
     version: 3,
     sport: 'nfl',
     generatedAt,
@@ -295,10 +309,11 @@ export async function buildNFLSnapshot({ now = new Date(), fetchImpl = fetch, hi
     modelPerformance,
     modelTracking: summarizeNFLTracking(trackingLog),
     firstTdReserve: { listedOffense: .86, otherOffense: .06, defenseSpecialTeams: .06, noTouchdown: .02 },
-    meta: { week: anchor ? `${anchor.seasonType === 'preseason' ? 'Preseason ' : 'Week '}${anchor.week}` : 'No active slate', season: anchor?.season ?? year, seasonType: anchor?.seasonType ?? null, games: games.length, weatherUpdatedAt: new Date().toISOString() },
+    meta: { week: anchor ? `${anchor.seasonType === 'preseason' ? 'Preseason ' : 'Week '}${anchor.week}` : 'No active slate', weekNumber: anchor?.week ?? null, season: anchor?.season ?? year, seasonType: anchor?.seasonType ?? null, games: games.length, expectedSlateGames, seasonScheduleGames: schedule.length, weatherUpdatedAt: new Date().toISOString() },
     games,
     players,
   }
+  return applyNFLReadiness(snapshot, { tracking: snapshot.modelTracking, now })
 }
 
 export async function writeNFLSnapshot(options = {}) {
@@ -309,6 +324,7 @@ export async function writeNFLSnapshot(options = {}) {
   const snapshot = await buildNFLSnapshot(options)
   const tracking = updateNFLTracking(previousTracking, previousSnapshot, snapshot)
   snapshot.modelTracking = summarizeNFLTracking(tracking)
+  applyNFLReadiness(snapshot, { tracking: snapshot.modelTracking, now: options.now || new Date() })
   await fs.mkdir(path.dirname(outputPath), { recursive: true })
   const temporary = `${outputPath}.tmp`
   await fs.writeFile(temporary, JSON.stringify(snapshot, null, 2), 'utf8')

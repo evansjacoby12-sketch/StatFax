@@ -9,10 +9,12 @@ import { buildNFLSnapshot, defenseProfile, normalizeFirstTouchdownProbabilities 
 import { assessPlayerAvailability, indexAvailability, externalAvailabilityFor } from '../server/sports/nfl/availability.mjs'
 import { evaluateNFLHistory } from '../server/sports/nfl/backtest.mjs'
 import { calibrateNFLProbability, correctedNFLProjection } from '../src/sports/nfl/logic/calibration.js'
+import { scoreNFLProp } from '../src/sports/nfl/logic/ScoringEngine.js'
 import { depthFor, indexDepthChart, indexWeather, overlayFreshness, weatherFor } from '../server/sports/nfl/context-overlays.mjs'
 import { buildNFLDataHealth } from '../server/sports/nfl/health.mjs'
 import { summarizeNFLTracking, updateNFLTracking } from '../server/sports/nfl/tracking.mjs'
 import { buildTeamLineup, indexNFLLineups, lineupFor, summarizeLineupCoverage, teamLineupFor } from '../server/sports/nfl/lineups.mjs'
+import { buildNFLReadiness } from '../server/sports/nfl/readiness.mjs'
 
 const event = (id, date, week = 1, state = 'pre') => ({
   id, date, season: { year: 2026, slug: 'regular-season' }, week: { number: week },
@@ -194,6 +196,17 @@ test('First TD probabilities are normalized within each game', () => {
   assert.ok(players[0].projections.firstTdProbability > players[1].projections.firstTdProbability)
 })
 
+test('First TD remains normalized after the production scorer reads context-adjusted probabilities', () => {
+  const players = [
+    { id: 'a', name: 'A', position: 'RB', gameId: 'g1', projections: { anytimeTdProbability: .6, firstTdProbability: .13 }, usage: { redZoneOpportunityShare: .5, roleRank: 1 }, markets: { first_td: {} }, propLines: {}, splits: {}, defenseVsPosition: { factors: { first_td: 1.1 } }, weather: {} },
+    { id: 'b', name: 'B', position: 'WR', gameId: 'g1', projections: { anytimeTdProbability: .3, firstTdProbability: .07 }, usage: { redZoneOpportunityShare: .2, roleRank: 2 }, markets: { first_td: {} }, propLines: {}, splits: {}, defenseVsPosition: { factors: { first_td: .9 } }, weather: {} },
+  ]
+  normalizeFirstTouchdownProbabilities(players)
+  const total = players.reduce((sum, player) => sum + scoreNFLProp(player, 'first_td').probability, 0)
+  assert.ok(Math.abs(total - .86) < .001)
+  assert.ok(players.every((player) => player.markets.first_td.contextAdjusted))
+})
+
 test('full NFL snapshot build joins schedule, rosters, injuries, and live contract', async () => {
   const scoreboard = { events: [event('game-1', '2026-09-10T00:00:00Z', 2)] }
   const fetchImpl = async (url) => {
@@ -248,4 +261,26 @@ test('walk-forward NFL backtest emits probability and projection metrics without
   assert.ok(result.markets.anytime_td.brier >= 0 && result.markets.anytime_td.brier <= 1)
   assert.ok(result.markets.anytime_td.buckets.length > 0)
   assert.ok(result.markets.anytime_td.buckets.every((bucket) => bucket.samples > 0))
+  assert.equal(result.version, 3)
+  assert.equal(result.markets.passing_yards.validationPath, 'production-v3')
+  assert.equal(result.requirements.firstTdGameNormalized, true)
+})
+
+test('receiving-yards replay validates the model below the display eligibility threshold', () => {
+  const games = Array.from({ length: 10 }, (_, index) => ({ season: 2025, week: index + 1, team: 'BUF', opponent: 'MIA', gameId: `2025_${index + 1}_MIA_BUF`, receivingYards: 45 + index, receptions: 4, totalTds: 0 }))
+  const result = evaluateNFLHistory({ seasons: [2025], players: [{ id: 'wr', name: 'WR', position: 'WR', recentGames: games }] })
+  assert.equal(result.markets.receiving_yards.samples, 6)
+  assert.equal(result.markets.receiving_yards.eligibleSegment.samples, 0)
+  assert.ok(Number.isFinite(result.markets.receiving_yards.mae))
+})
+
+test('Week 1 readiness blocks grades until exact replay and preseason settlement gates pass', () => {
+  const markets = Object.fromEntries(['anytime_td', 'first_td', 'two_plus_td', 'passing_yards', 'receptions', 'receiving_yards', 'rushing_yards', 'rushing_receiving_yards', 'passing_rushing_yards'].map((id) => [id, { validationPath: 'production-v3', samples: id.includes('td') ? 6000 : 1200 }]))
+  const snapshot = { games: [{ date: '2026-09-10T00:00:00Z' }], players: Array.from({ length: 24 }, (_, id) => ({ id })), meta: { seasonType: 'regular', weekNumber: 1, expectedSlateGames: 1, seasonScheduleGames: 320 }, dataQuality: { depthChart: true, officialAvailability: true, weatherFresh: true, weatherCoverage: 1, lineupConfirmed: 0, packageUsage: false }, modelPerformance: { version: 3, requirements: { exactProductionScoring: true }, markets } }
+  const blocked = buildNFLReadiness(snapshot, { tracking: { preseasonSettled: 299 }, now: new Date('2026-09-09T12:00:00Z') })
+  assert.equal(blocked.gradesEnabled, false)
+  assert.ok(blocked.blocking.includes('preseason-rehearsal'))
+  const ready = buildNFLReadiness(snapshot, { tracking: { preseasonSettled: 300 }, now: new Date('2026-09-09T12:00:00Z') })
+  assert.equal(ready.gradesEnabled, true)
+  assert.equal(ready.status, 'conditional')
 })

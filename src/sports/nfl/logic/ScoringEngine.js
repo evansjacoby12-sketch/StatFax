@@ -13,7 +13,8 @@ export function americanImpliedProbability(odds) {
 }
 
 function touchdownProbability(player, marketId) {
-  const explicit = Number(player?.markets?.[marketId]?.probability)
+  const rawExplicit = player?.markets?.[marketId]?.probability
+  const explicit = rawExplicit == null || rawExplicit === '' ? NaN : Number(rawExplicit)
   if (Number.isFinite(explicit)) return clamp(explicit)
   const anytime = Number(player?.markets?.anytime_td?.probability ?? player?.projections?.anytimeTdProbability ?? 0.25)
   if (marketId === 'anytime_td') return clamp(anytime)
@@ -80,7 +81,7 @@ function lineupFactor(player, marketId) {
 
 function liveDeploymentFactor(player, marketId) {
   const live = player?.live || {}
-  if (!live.isLive || Number(live.observedSnaps || 0) < 5) return 1
+  if (!live.isLive || live.participationVerified !== true || Number(live.observedSnaps || 0) < 5) return 1
   const expectedSnap = Number(player?.lineup?.expectedSnapShare || player?.usage?.snapShare || 0)
   const observedSnap = Number(live.observedSnapShare)
   let factor = expectedSnap > 0 && Number.isFinite(observedSnap) ? clamp(observedSnap / expectedSnap, .72, 1.28) : 1
@@ -132,14 +133,17 @@ export function scoreNFLProp(player, marketId) {
     probability = logistic((mean - line) / scale)
   }
 
-  if (market.kind === 'touchdown') probability *= weather.factor * defense * role * split * lineup * liveDeployment
+  const contextAdjusted = market.kind === 'touchdown' && player?.markets?.[marketId]?.contextAdjusted === true
+  if (market.kind === 'touchdown' && !contextAdjusted) probability *= weather.factor * defense * role * split * lineup * liveDeployment
   probability = clamp(probability)
   const rawOdds = player?.markets?.[marketId]?.odds
   const odds = rawOdds == null || rawOdds === '' ? null : Number(rawOdds)
   const implied = americanImpliedProbability(odds)
   const edge = implied == null ? null : probability - implied
   const score = Math.round(clamp(probability * 100 + (edge == null ? 0 : edge * 75), 0, 100))
-  const grade = probabilityGrade(probability, marketId, score, implied != null)
+  const gate = player?.modelGate?.markets?.[marketId]
+  const suppressed = gate?.enabled === false
+  const grade = suppressed ? 'HOLD' : probabilityGrade(probability, marketId, score, implied != null)
   const reasons = [
     `${Math.round((role - 1) * 100)}% role adjustment`,
     `${Math.round((rawLineup - 1) * 100)}% lineup projection adjustment`,
@@ -150,7 +154,7 @@ export function scoreNFLProp(player, marketId) {
     player?.usage?.roleLabel || 'Role not confirmed',
   ]
 
-  return { marketId, eligible, probability, score, grade, line, odds: Number.isFinite(odds) && odds !== 0 ? odds : null, implied, edge, mean, weather, defenseFactor: defense, roleFactor: role, signals: buildNFLSignals(player), reasons }
+  return { marketId, eligible, probability, score, grade, suppressed, suppressionReasons: suppressed ? gate.reasons || [] : [], line, odds: Number.isFinite(odds) && odds !== 0 ? odds : null, implied, edge, mean, weather, defenseFactor: defense, roleFactor: role, signals: buildNFLSignals(player), reasons }
 }
 
 export function scoreNFLSnapshot(snapshot, marketId) {
