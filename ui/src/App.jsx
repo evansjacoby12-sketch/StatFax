@@ -34,11 +34,15 @@ import FindPlays from './components/FindPlays.jsx'
 import LearnCenter from './components/LearnCenter.jsx'
 import WorkspaceShell from './components/WorkspaceShell.jsx'
 import NFLBoard from './components/NFLBoard.jsx'
+import NFLLearnCenter from './components/NFLLearnCenter.jsx'
+import NFLCheatSheet from './components/NFLCheatSheet.jsx'
+import SportMobileDock from './components/SportMobileDock.jsx'
 import { loadNFLSnapshot } from '../../src/sports/nfl/api/NFLService.js'
 import ToastStack, { toast } from './components/Toast.jsx'
 import InstallPrompt from './components/InstallPrompt.jsx'
 import Confetti from './components/Confetti.jsx'
 import Icon from './components/Icon.jsx'
+import { SPORT_UI } from './lib/sportUi.js'
 import './app.css'
 
 // Cloudflare Worker base — its /trigger endpoint fires a repository_dispatch
@@ -57,17 +61,6 @@ const STALE_RESET_MS = 30 * 60 * 1000 // 30 min
 // Each view is its own page via a URL hash (#board, #pitchers, …) — bookmarkable
 // and back/forward navigable. Hash routing works as-is on static hosting.
 const VIEWS = new Set(['board', 'games', 'pitchers', 'weather', 'combos', 'results'])
-const BOTTOM_TABS = [
-  { id: 'board', label: 'Board', icon: 'List' },
-  { id: 'games', label: 'Games', icon: 'LayoutGrid' },
-  { id: 'pitchers', label: 'Pitchers', icon: 'Crosshair' },
-  { id: 'results', label: 'Results', icon: 'Activity' },
-]
-const NFL_BOTTOM_TABS = [
-  { id: 'signals', label: 'Signals', icon: 'Zap' },
-  { id: 'bet-lab', label: 'Bet Lab', icon: 'Beaker' },
-  { id: 'performance', label: 'Performance', icon: 'Gauge' },
-]
 const viewFromHash = () => {
   const h = (typeof location !== 'undefined' ? location.hash : '').replace(/^#\/?/, '')
   return VIEWS.has(h) ? h : null
@@ -111,6 +104,8 @@ export default function App() {
   // Opposing-pitcher card shown as a popup overlay (entry key: `${pitcherId}-${gamePk}`).
   const [pitcherKey, setPitcherKey] = useState(null)
   const [learnTab, setLearnTab] = useState(null)
+  const [nflLearnTab, setNflLearnTab] = useState(null)
+  const [showNFLCheatSheet, setShowNFLCheatSheet] = useState(false)
   const [betLabTab, setBetLabTab] = useState(null)
   const [findPlaysTab, setFindPlaysTab] = useState(null)
   const [showBacktest, setShowBacktest] = useState(false)
@@ -383,13 +378,15 @@ export default function App() {
         else if (showBacktest) setShowBacktest(false)
         else if (findPlaysTab) setFindPlaysTab(null)
         else if (betLabTab) setBetLabTab(null)
+        else if (nflLearnTab) setNflLearnTab(null)
+        else if (showNFLCheatSheet) setShowNFLCheatSheet(false)
         else if (learnTab) setLearnTab(null)
         else if (showSettings) setShowSettings(false)
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [selectedId, zoneId, findPlaysTab, betLabTab, learnTab, showBacktest, showSettings, pitcherKey])
+  }, [selectedId, zoneId, findPlaysTab, betLabTab, nflLearnTab, showNFLCheatSheet, learnTab, showBacktest, showSettings, pitcherKey])
 
   const patch = useCallback((p) => setFilters((f) => ({ ...f, ...p })), [])
 
@@ -606,7 +603,6 @@ export default function App() {
     const nflData = nflSnapshot
     const nflPlayers = nflData?.players || []
     const nflLive = nflPlayers.some((player) => player.live?.isLive)
-    const nflBottomNavIndex = NFL_BOTTOM_TABS.findIndex((tab) => tab.id === nflView)
     return (
       <LiveModeContext.Provider value={false}>
       <EliLevelContext.Provider value={eliLevel}>
@@ -627,6 +623,10 @@ export default function App() {
               gradeCounts={{}}
               total={nflPlayers.length}
               games={nflData?.games || []}
+              onOpenHowTo={() => setNflLearnTab('playbook')}
+              onOpenGuide={() => setNflLearnTab('guide')}
+              onOpenLegend={() => setNflLearnTab('glossary')}
+              onOpenSplits={() => setShowNFLCheatSheet(true)}
             />
           </div>
           <main className="main nfl-main"><NFLBoard snapshot={nflData} view={nflView} onViewChange={setNflView} /></main>
@@ -634,27 +634,9 @@ export default function App() {
           <UpdateBanner />
           <ToastStack />
         </div>
-        <nav
-          className="bottom-nav nfl-bottom-nav"
-          aria-label="NFL primary navigation"
-          data-has-active={nflBottomNavIndex >= 0}
-          style={{ '--bottom-nav-index': Math.max(0, nflBottomNavIndex), '--bottom-nav-count': NFL_BOTTOM_TABS.length }}
-        >
-          <span className="bottom-nav-indicator" aria-hidden="true" />
-          {NFL_BOTTOM_TABS.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              className={`bottom-nav-btn ${nflView === tab.id ? 'active' : ''}`}
-              onClick={() => setNflView(tab.id)}
-              aria-current={nflView === tab.id ? 'page' : undefined}
-              aria-label={tab.label}
-            >
-              <Icon name={tab.icon} size={20} />
-              <span className="bottom-nav-label">{tab.label}</span>
-            </button>
-          ))}
-        </nav>
+        {nflLearnTab && <NFLLearnCenter key={nflLearnTab} initialTab={nflLearnTab} onClose={() => setNflLearnTab(null)} />}
+        {showNFLCheatSheet && <NFLCheatSheet snapshot={nflData} onClose={() => setShowNFLCheatSheet(false)} />}
+        <SportMobileDock sport="nfl" value={nflView} onChange={setNflView} />
         </>
       </EliLevelContext.Provider>
       </LiveModeContext.Provider>
@@ -682,7 +664,6 @@ export default function App() {
 
   const { data } = state
   const bottomNavView = view === 'combos' ? 'results' : view
-  const bottomNavIndex = BOTTOM_TABS.findIndex((tab) => tab.id === bottomNavView)
 
   return (
     <LiveModeContext.Provider value={liveScores}>
@@ -975,27 +956,7 @@ export default function App() {
     {/* Bottom nav is a sibling of .app (not a child) so iOS doesn't route its
         touch events through the overflow-y:auto scroll container, which can
         swallow taps on position:fixed descendants in standalone PWA mode. */}
-    <nav
-      className="bottom-nav"
-      aria-label="Primary navigation"
-      data-has-active={bottomNavIndex >= 0}
-      style={{ '--bottom-nav-index': Math.max(0, bottomNavIndex), '--bottom-nav-count': BOTTOM_TABS.length }}
-    >
-      <span className="bottom-nav-indicator" aria-hidden="true" />
-      {BOTTOM_TABS.map((tab) => (
-        <button
-          key={tab.id}
-          type="button"
-          className={`bottom-nav-btn ${bottomNavView === tab.id ? 'active' : ''}`}
-          onClick={() => setView(tab.id)}
-          aria-current={bottomNavView === tab.id ? 'page' : undefined}
-          aria-label={tab.label}
-        >
-          <Icon name={tab.icon} size={20} />
-          <span className="bottom-nav-label">{tab.label}</span>
-        </button>
-      ))}
-    </nav>
+    <SportMobileDock sport="mlb" value={bottomNavView} onChange={setView} tabs={SPORT_UI.mlb.mobileViews} />
     </>
     </EliLevelContext.Provider>
     </LiveModeContext.Provider>

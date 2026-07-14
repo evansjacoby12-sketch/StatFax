@@ -12,14 +12,91 @@ test('NFL header receives sport scope and cannot wire MLB workspace actions', as
 })
 
 test('NFL board exposes aligned themed multi-select position, team, and game filters', async () => {
-  const [board, styles] = await Promise.all([readFile(new URL('../ui/src/components/NFLBoard.jsx', import.meta.url), 'utf8'), readFile(new URL('../ui/src/app.css', import.meta.url), 'utf8')])
-  assert.match(board, /<Select multi value=\{positionFilters\}[\s\S]*?ariaLabel="Positions"/)
-  assert.match(board, /<Select multi value=\{teamFilters\}[\s\S]*?ariaLabel="Teams"/)
-  assert.match(board, /<Select multi value=\{gameFilters\}[\s\S]*?ariaLabel="Games"/)
+  const [board, sharedFilters, styles] = await Promise.all([
+    readFile(new URL('../ui/src/components/NFLBoard.jsx', import.meta.url), 'utf8'),
+    readFile(new URL('../ui/src/components/SportMultiFilterBar.jsx', import.meta.url), 'utf8'),
+    readFile(new URL('../ui/src/app.css', import.meta.url), 'utf8'),
+  ])
+  assert.match(board, /<SportMultiFilterBar[\s\S]*?filters=\{propFilters\}/)
+  assert.match(sharedFilters, /filters\.map\(\(filter\) => <Select[\s\S]*?multi value=\{filter\.value\}/)
+  assert.match(board, /id: 'positions', label: 'Positions', value: positionFilters/)
+  assert.match(board, /id: 'teams', label: 'Teams', value: teamFilters/)
+  assert.match(board, /id: 'games', label: 'Games', value: gameFilters/)
   assert.match(board, /label: 'All games'/)
   assert.match(board, /gameFilters\.has\(String\(gameKeyFor\(player\)\)\)/)
   assert.match(styles, /\.nfl-prop-filters \{[^}]*align-items: stretch/)
   assert.match(styles, /\.nfl-prop-filters \.select-wrap/)
+})
+
+test('NFL signals use distinct glyphs and semantic color families without resizing chips', async () => {
+  const [board, rail, styles] = await Promise.all([
+    readFile(new URL('../ui/src/components/NFLBoard.jsx', import.meta.url), 'utf8'),
+    readFile(new URL('../ui/src/components/SportSignalRail.jsx', import.meta.url), 'utf8'),
+    readFile(new URL('../ui/src/app.css', import.meta.url), 'utf8'),
+  ])
+  for (const tone of ['prime', 'strong', 'lean', 'accent', 'silver', 'bad']) assert.match(board, new RegExp(`tone: '${tone}'`))
+  for (const icon of ['ArrowUp', 'Target', 'Crosshair', 'MapPin', 'Radio', 'Clock', 'Flame', 'TrendingUp', 'Zap', 'BarChart3', 'Shield', 'House', 'Plane', 'Wind', 'UserCheck', 'TriangleAlert']) assert.match(board, new RegExp(`icon: '${icon}'`))
+  assert.match(rail, /data-signal-tone=\{filter\.tone \|\| undefined\}/)
+  assert.match(styles, /\.sport-signal-chip \{[\s\S]*?height: 28px/)
+  assert.match(styles, /\.sport-signal-chip\[data-signal-tone='prime'\] \{ --signal-color: var\(--prime\); \}/)
+  assert.match(styles, /\.sport-signal-chip\.active[\s\S]*?var\(--signal-color\)/)
+  for (const context of ['is-volume', 'is-red-zone', 'is-matchup', 'is-weather']) assert.match(board, new RegExp(`className=.*${context}`))
+  assert.match(styles, /\.nfl-card-context > \.is-red-zone \{ --context-color: var\(--prime\); \}/)
+  assert.match(styles, /\.nfl-card-context > \.is-matchup \{ --context-color: var\(--accent\); \}/)
+  assert.match(styles, /\.nfl-card-context > \.is-weather\.tone-bad \{ --context-color: var\(--bad\); \}/)
+})
+
+test('sport UI contracts share navigation primitives without sharing sport state', async () => {
+  const [app, config, dock] = await Promise.all([
+    readFile(new URL('../ui/src/App.jsx', import.meta.url), 'utf8'),
+    readFile(new URL('../ui/src/lib/sportUi.js', import.meta.url), 'utf8'),
+    readFile(new URL('../ui/src/components/SportMobileDock.jsx', import.meta.url), 'utf8'),
+  ])
+  for (const sport of ['mlb', 'nfl', 'nba']) assert.match(config, new RegExp(`${sport}: Object\\.freeze`))
+  assert.match(config, /nba:[\s\S]*?enabled: false/)
+  assert.match(app, /<SportMobileDock sport="nfl" value=\{nflView\}/)
+  assert.match(app, /<SportMobileDock sport="mlb" value=\{bottomNavView\}/)
+  assert.match(dock, /sportUi\(sport\)/)
+  assert.match(dock, /onChange\(item\.id\)/)
+})
+
+test('NFL Bet Lab follows the MLB four-mode workspace format', async () => {
+  const [mlbLab, nflLab, shell, board] = await Promise.all([
+    readFile(new URL('../ui/src/components/BetLab.jsx', import.meta.url), 'utf8'),
+    readFile(new URL('../ui/src/components/NFLBetLab.jsx', import.meta.url), 'utf8'),
+    readFile(new URL('../ui/src/components/WorkspaceShell.jsx', import.meta.url), 'utf8'),
+    readFile(new URL('../ui/src/components/NFLBoard.jsx', import.meta.url), 'utf8'),
+  ])
+  for (const label of ['Explore combos', 'Custom builder', 'Same game', 'Saved']) {
+    assert.match(mlbLab, new RegExp(`label: '${label}'`))
+    assert.match(nflLab, new RegExp(`label: '${label}'`))
+  }
+  assert.match(nflLab, /<WorkspaceShell[\s\S]*?embedded[\s\S]*?title="Bet Lab"/)
+  assert.match(nflLab, /className="workspace-brief"/)
+  assert.match(nflLab, /tab === 'same-game'[\s\S]*?scope="same-game"/)
+  assert.match(nflLab, /tab === 'saved' && savedContent/)
+  assert.match(shell, /embedded = false/)
+  assert.match(board, /setBetLabView\('saved'\)/)
+  assert.doesNotMatch(board, /BET_LAB_TABS/)
+})
+
+test('NFL owns football-specific Learn Center and Cheat Sheet workspaces', async () => {
+  const [app, header, learn, cheat] = await Promise.all([
+    readFile(new URL('../ui/src/App.jsx', import.meta.url), 'utf8'),
+    readFile(new URL('../ui/src/components/Header.jsx', import.meta.url), 'utf8'),
+    readFile(new URL('../ui/src/components/NFLLearnCenter.jsx', import.meta.url), 'utf8'),
+    readFile(new URL('../ui/src/components/NFLCheatSheet.jsx', import.meta.url), 'utf8'),
+  ])
+  for (const label of ['Playbook', 'Guide', 'Glossary']) assert.match(learn, new RegExp(`label: '${label}'`))
+  for (const label of ['Touchdowns', 'Receiving', 'Rushing', 'Passing']) assert.match(cheat, new RegExp(`label: '${label}'`))
+  assert.match(header, /label: 'NFL Cheat Sheet'/)
+  assert.match(header, /label: 'NFL Learn Center'/)
+  assert.match(header, /function HelpMenu\(\{[^}]*onOpenSplits/)
+  assert.match(app, /onOpenHowTo=\{\(\) => setNflLearnTab\('playbook'\)\}/)
+  assert.match(app, /onOpenSplits=\{\(\) => setShowNFLCheatSheet\(true\)\}/)
+  assert.match(app, /<NFLLearnCenter/)
+  assert.match(app, /<NFLCheatSheet snapshot=\{nflData\}/)
+  assert.doesNotMatch(learn, /home run|hitter|pitcher|barrel|Statcast/i)
 })
 
 test('NFL player research uses the approved tabbed evidence workspace', async () => {

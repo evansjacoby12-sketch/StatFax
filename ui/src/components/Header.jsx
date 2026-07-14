@@ -61,7 +61,7 @@ function SportSwitcher({ sport = 'mlb', onChange }) {
 }
 
 // Help dropdown anchored to the header info button
-function HelpMenu({ sport, onOpenWeather, onOpenGroups, onOpenBacktest, onOpenHowTo, onOpenSettings, onOpenModel, liveScores, onToggleLive, eliLevel, onCycleEli, refreshing, onRefresh }) {
+function HelpMenu({ sport, onOpenWeather, onOpenGroups, onOpenSplits, onOpenBacktest, onOpenHowTo, onOpenSettings, onOpenModel, liveScores, onToggleLive, eliLevel, onCycleEli, refreshing, onRefresh }) {
   const [open, setOpen] = useState(false)
   const [toolQuery, setToolQuery] = useState('')
   const ref = useRef(null)
@@ -110,8 +110,8 @@ function HelpMenu({ sport, onOpenWeather, onOpenGroups, onOpenBacktest, onOpenHo
 
   const isNFL = sport === 'nfl'
 
-  // Keep each sport's controls scoped to its own workspace. NFL does not expose
-  // MLB-only destinations such as Bet Lab, Find Plays, Proof, or Learn Center.
+  // Keep each sport's tools scoped to its own workspace. NFL learning and
+  // discovery destinations use football-only content and model fields.
   const sections = isNFL ? [
     {
       title: 'NFL Board',
@@ -119,6 +119,13 @@ function HelpMenu({ sport, onOpenWeather, onOpenGroups, onOpenBacktest, onOpenHo
         { label: refreshing ? 'Refreshing NFL Feed…' : 'Refresh NFL Feed', desc: 'Reload games, players, injuries, odds and live stats', icon: refreshing ? 'Loader' : 'RefreshCw', fn: onRefresh },
         { label: liveScores ? 'Live Updates Active' : 'Pregame Status', desc: liveScores ? 'NFL live data refreshes every 30 seconds' : 'No NFL game is live right now', icon: liveScores ? 'Activity' : 'Clock', fn: onToggleLive },
         { label: eliLevel === 'eli5' ? 'Plain Explanations' : 'Stats Explanations', desc: 'Switch the detail shown on NFL player cards', icon: eliLevel === 'eli5' ? 'Sparkles' : 'BarChart3', fn: onCycleEli },
+      ],
+    },
+    {
+      title: 'NFL Tools',
+      items: [
+        { label: 'NFL Cheat Sheet', desc: 'Ranked touchdown, receiving, rushing and passing props', icon: 'LayoutGrid', fn: onOpenSplits },
+        { label: 'NFL Learn Center', desc: 'Football playbook, guide and searchable glossary', icon: 'GraduationCap', fn: onOpenHowTo },
       ],
     },
   ] : [
@@ -171,7 +178,10 @@ function HelpMenu({ sport, onOpenWeather, onOpenGroups, onOpenBacktest, onOpenHo
     fn: onOpenGroups,
     keywords: 'build slips same game saved tickets',
   }
-  const quickTools = isNFL ? [] : [
+  const quickTools = isNFL ? [
+    { label: 'Cheat Sheet', meta: 'NFL leaders', icon: 'LayoutGrid', fn: onOpenSplits, keywords: 'nfl football ranked props touchdown receiving rushing passing' },
+    { label: 'Learn', meta: 'NFL guide', icon: 'GraduationCap', fn: onOpenHowTo, keywords: 'nfl football learn center playbook glossary guide' },
+  ] : [
     { label: 'Find Plays', meta: 'Discovery', icon: 'ScanSearch', fn: onOpenWeather, keywords: 'weather cheat sheets filtered lists' },
     { label: 'Proof', meta: 'Backtests', icon: 'Activity', fn: onOpenBacktest, keywords: 'validate grades signals historical outcomes' },
     { label: 'Learn', meta: 'Guide', icon: 'GraduationCap', fn: onOpenHowTo, keywords: 'learn center playbook glossary help' },

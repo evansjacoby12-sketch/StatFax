@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import Icon from './Icon.jsx'
 import CommandTabs from './CommandTabs.jsx'
-import Select from './Select.jsx'
 import NFLBetLab from './NFLBetLab.jsx'
+import SportMarketRail from './SportMarketRail.jsx'
+import SportMultiFilterBar from './SportMultiFilterBar.jsx'
+import SportSignalRail from './SportSignalRail.jsx'
 import NFL_DEMO_SNAPSHOT from '../../../src/sports/nfl/data/demoSlate.js'
 import { NFL_PROP_MARKET_LIST, eligiblePropMarkets, eligibilityReason } from '../../../src/sports/nfl/logic/propEligibility.js'
 import { scoreNFLSnapshot, scoreNFLProp } from '../../../src/sports/nfl/logic/ScoringEngine.js'
@@ -10,37 +12,28 @@ import { loadNFLSnapshot } from '../../../src/sports/nfl/api/NFLService.js'
 import { filterNFLTickets, nflLegKey, nflTicketsCSV, settleNFLTicket, summarizeNFLTickets, ticketExportText } from '../lib/nflTickets.js'
 import { useEliLevel } from '../lib/eliLevel.js'
 import { nflSignalCaption, nflSignalText } from '../lib/nflExplanations.js'
-
-const VIEW_TABS = [
-  { id: 'signals', label: 'Signals', icon: 'Zap' },
-  { id: 'bet-lab', label: 'Bet Lab', icon: 'Beaker' },
-  { id: 'performance', label: 'Performance', icon: 'Gauge' },
-]
-const BET_LAB_TABS = [
-  { id: 'builds', label: 'Builds', icon: 'Beaker' },
-  { id: 'tickets', label: 'Tickets', icon: 'ClipboardList' },
-]
+import { SPORT_UI } from '../lib/sportUi.js'
 const MARKET_ICONS = {
   anytime_td: 'Target', first_td: 'Trophy', two_plus_td: 'Flame', passing_yards: 'BarChart3', receptions: 'Radio',
   receiving_yards: 'TrendingUp', rushing_yards: 'Zap', rushing_receiving_yards: 'GitMerge', passing_rushing_yards: 'GitBranch',
 }
 const NFL_SIGNAL_FILTERS = [
-  { id: 'role-up', label: 'Role Up', icon: 'ArrowUp', match: (player) => player.model.signals.some((signal) => signal.key === 'role-inheritance') },
-  { id: 'goal-line', label: 'Goal-Line', icon: 'Target', match: (player) => player.model.signals.some((signal) => ['goal-line', 'goal-line-package'].includes(signal.key)) },
-  { id: 'red-zone', label: 'Red Zone', icon: 'Crosshair', match: (player) => player.model.signals.some((signal) => ['rz-targets', 'rz-touches'].includes(signal.key)) },
-  { id: 'route-share', label: 'Route Share', icon: 'MapPin', match: (player) => player.model.signals.some((signal) => signal.key === 'route-participation') },
-  { id: 'target-share', label: 'Target Share', icon: 'Radio', match: (player) => player.model.signals.some((signal) => signal.key === 'target-share') },
-  { id: 'snap-share', label: 'Snap Share', icon: 'Clock', match: (player) => player.model.signals.some((signal) => signal.key === 'snap-share') },
-  { id: 'hot', label: 'Hot', icon: 'Flame', match: (player) => player.model.signals.some((signal) => signal.tone === 'hot') },
-  { id: 'rising', label: 'Rising', icon: 'TrendingUp', match: (player) => player.model.signals.some((signal) => Number(signal.games) === 2) },
-  { id: 'td-streak', label: 'TD Streak', icon: 'Zap', match: (player) => player.model.signals.some((signal) => signal.key === 'touchdown') },
-  { id: 'volume-streak', label: 'Volume Streak', icon: 'BarChart3', match: (player) => player.model.signals.some((signal) => ['receptions', 'passing', 'rushing', 'receiving'].includes(signal.key)) },
-  { id: 'matchup-edge', label: 'Matchup Edge', icon: 'Shield', match: (player) => Number(player.model.defenseFactor) >= 1.04 },
-  { id: 'home-edge', label: 'Home Edge', icon: 'House', match: (player) => player.isHome && Number(player.splits?.activeEdge) >= .04 },
-  { id: 'road-edge', label: 'Road Edge', icon: 'Plane', match: (player) => !player.isHome && Number(player.splits?.activeEdge) >= .04 },
-  { id: 'weather-edge', label: 'Weather Edge', icon: 'Wind', match: (player) => Number(player.model.weather?.factor) > 1.005 },
-  { id: 'lineup-confirmed', label: 'Lineup', icon: 'UserCheck', match: (player) => player.model.signals.some((signal) => signal.key === 'lineup-confirmed') },
-  { id: 'snap-limit', label: 'Snap Limit', icon: 'TriangleAlert', match: (player) => player.model.signals.some((signal) => signal.key === 'snap-limit') },
+  { id: 'role-up', label: 'Role Up', icon: 'ArrowUp', tone: 'prime', match: (player) => player.model.signals.some((signal) => signal.key === 'role-inheritance') },
+  { id: 'goal-line', label: 'Goal-Line', icon: 'Target', tone: 'prime', match: (player) => player.model.signals.some((signal) => ['goal-line', 'goal-line-package'].includes(signal.key)) },
+  { id: 'red-zone', label: 'Red Zone', icon: 'Crosshair', tone: 'prime', match: (player) => player.model.signals.some((signal) => ['rz-targets', 'rz-touches'].includes(signal.key)) },
+  { id: 'route-share', label: 'Route Share', icon: 'MapPin', tone: 'strong', match: (player) => player.model.signals.some((signal) => signal.key === 'route-participation') },
+  { id: 'target-share', label: 'Target Share', icon: 'Radio', tone: 'strong', match: (player) => player.model.signals.some((signal) => signal.key === 'target-share') },
+  { id: 'snap-share', label: 'Snap Share', icon: 'Clock', tone: 'strong', match: (player) => player.model.signals.some((signal) => signal.key === 'snap-share') },
+  { id: 'hot', label: 'Hot', icon: 'Flame', tone: 'lean', match: (player) => player.model.signals.some((signal) => signal.tone === 'hot') },
+  { id: 'rising', label: 'Rising', icon: 'TrendingUp', tone: 'lean', match: (player) => player.model.signals.some((signal) => Number(signal.games) === 2) },
+  { id: 'td-streak', label: 'TD Streak', icon: 'Zap', tone: 'lean', match: (player) => player.model.signals.some((signal) => signal.key === 'touchdown') },
+  { id: 'volume-streak', label: 'Volume Streak', icon: 'BarChart3', tone: 'strong', match: (player) => player.model.signals.some((signal) => ['receptions', 'passing', 'rushing', 'receiving'].includes(signal.key)) },
+  { id: 'matchup-edge', label: 'Matchup Edge', icon: 'Shield', tone: 'accent', match: (player) => Number(player.model.defenseFactor) >= 1.04 },
+  { id: 'home-edge', label: 'Home Edge', icon: 'House', tone: 'accent', match: (player) => player.isHome && Number(player.splits?.activeEdge) >= .04 },
+  { id: 'road-edge', label: 'Road Edge', icon: 'Plane', tone: 'accent', match: (player) => !player.isHome && Number(player.splits?.activeEdge) >= .04 },
+  { id: 'weather-edge', label: 'Weather Edge', icon: 'Wind', tone: 'silver', match: (player) => Number(player.model.weather?.factor) > 1.005 },
+  { id: 'lineup-confirmed', label: 'Lineup', icon: 'UserCheck', tone: 'silver', match: (player) => player.model.signals.some((signal) => signal.key === 'lineup-confirmed') },
+  { id: 'snap-limit', label: 'Snap Limit', icon: 'TriangleAlert', tone: 'bad', match: (player) => player.model.signals.some((signal) => signal.key === 'snap-limit') },
 ]
 const GRADE_COLORS = { PRIME: 'var(--prime)', STRONG: 'var(--strong)', LEAN: 'var(--lean)', SKIP: 'var(--skip)' }
 const NFL_TEAM_COLORS = {
@@ -81,20 +74,6 @@ function signalIcon(signal) {
   if (signal.key === 'split') return 'Home'
   if (signal.key.includes('rz') || signal.key === 'goal-line') return 'Target'
   return 'TrendingUp'
-}
-
-function NFLSignalRail({ values, counts, total, onToggleFilter, onClear, open, onToggle }) {
-  return <div className={`nfl-signal-filter-rail ${open ? '' : 'is-collapsed'}`} aria-label="Filter NFL props by signal">
-    <button type="button" className="nfl-signal-filter-label" aria-expanded={open} aria-controls="nfl-signal-filter-list" onClick={onToggle} title={open ? 'Collapse signals' : 'Expand signals'}><Icon name="SlidersHorizontal" size={12} /><span>Signals</span><Icon name={open ? 'ChevronUp' : 'ChevronDown'} size={11} className="nfl-signal-filter-chevron" /></button>
-    {open && <div className="nfl-signal-filter-scroll" id="nfl-signal-filter-list">
-      <button type="button" className={`nfl-signal-filter ${values.size === 0 ? 'active' : ''}`} aria-pressed={values.size === 0} onClick={onClear}><span>Any</span><b className="mono">{total}</b></button>
-      {NFL_SIGNAL_FILTERS.map((filter) => {
-        const count = counts[filter.id] || 0
-        const active = values.has(filter.id)
-        return <button type="button" key={filter.id} className={`nfl-signal-filter ${active ? 'active' : ''} ${count === 0 ? 'zero-count' : ''}`} aria-pressed={active} onClick={() => onToggleFilter(filter.id)}><Icon name={filter.icon} size={11} /><span>{filter.label}</span><b className="mono">{count}</b></button>
-      })}
-    </div>}
-  </div>
 }
 
 function NFLPerformance({ snapshot }) {
@@ -158,10 +137,10 @@ function PlayerCard({ player, marketId, watched, inSlip, onSelect, onToggleWatch
           <div><small>{['anytime_td', 'first_td', 'two_plus_td'].includes(marketId) ? 'Odds / edge' : 'Line / edge'}</small><span><b className="mono">{marketValue(player, model, marketId)}</b><em className={`mono ${model.edge == null ? '' : model.edge >= 0 ? 'positive' : 'negative'}`}>{model.edge == null ? 'No price' : `${model.edge >= 0 ? '+' : ''}${pct(model.edge)}`}</em></span></div>
         </div>
         <div className="nfl-card-context">
-          {isQB && <div><span><Icon name="Radio" size={12} />Comp / Att</span><b className="mono">{number(player.projections?.completions, 1)} / {number(player.projections?.attempts, 1)}</b></div>}
-          <div><span><Icon name="Target" size={12} />{eliLevel === 'eli5' ? 'Near end zone' : 'Red zone'}</span><b className="mono">{player.position === 'WR' || player.position === 'TE' ? `${number(player.usage?.redZoneTargetsL3)} targets` : `${number(player.usage?.redZoneTouchesL3)} touches`}</b></div>
-          <div><span><Icon name="Shield" size={12} />{eliLevel === 'eli5' ? 'Matchup' : `Defense vs ${player.position}`}</span><b>{player.defenseVsPosition?.label || 'No split'}</b></div>
-          <div><span><Icon name="Wind" size={12} />Weather</span><b className={`tone-${weather.tone}`}>{weather.label}</b></div>
+          {isQB && <div className="is-volume"><span><Icon name="Radio" size={12} />Comp / Att</span><b className="mono">{number(player.projections?.completions, 1)} / {number(player.projections?.attempts, 1)}</b></div>}
+          <div className="is-red-zone"><span><Icon name="Target" size={12} />{eliLevel === 'eli5' ? 'Near end zone' : 'Red zone'}</span><b className="mono">{player.position === 'WR' || player.position === 'TE' ? `${number(player.usage?.redZoneTargetsL3)} targets` : `${number(player.usage?.redZoneTouchesL3)} touches`}</b></div>
+          <div className="is-matchup"><span><Icon name="Shield" size={12} />{eliLevel === 'eli5' ? 'Matchup' : `Defense vs ${player.position}`}</span><b>{player.defenseVsPosition?.label || 'No split'}</b></div>
+          <div className={`is-weather tone-${weather.tone}`}><span><Icon name="Wind" size={12} />Weather</span><b>{weather.label}</b></div>
         </div>
         <div className="nfl-card-signals">
           {model.signals.slice(0, 4).map((signal) => <span key={signal.key} className={`tone-${signal.tone}`}><Icon name={signalIcon(signal)} size={10} />{nflSignalText(signal, eliLevel)}</span>)}
@@ -265,7 +244,7 @@ export default function NFLBoard({ snapshot: suppliedSnapshot = null, view: cont
   const [twoPlusOnly, setTwoPlusOnly] = useState(false)
   const [signalFilters, setSignalFilters] = useState(() => new Set())
   const [signalsOpen, setSignalsOpen] = useState(true)
-  const [betLabView, setBetLabView] = useState('builds')
+  const [betLabView, setBetLabView] = useState('explore')
   const [selected, setSelected] = useState(null)
   const [watched, setWatched] = useState(() => new Set(readStorage('statfax:nfl:watchlist', [])))
   const [slip, setSlip] = useState(() => new Set(readStorage('statfax:nfl:slip', [])))
@@ -350,7 +329,7 @@ export default function NFLBoard({ snapshot: suppliedSnapshot = null, view: cont
     })
   }
   const openBetLabTickets = () => {
-    setBetLabView('tickets')
+    setBetLabView('saved')
     setView('bet-lab')
   }
   const exportTicket = async (ticket) => {
@@ -366,17 +345,22 @@ export default function NFLBoard({ snapshot: suppliedSnapshot = null, view: cont
     anchor.href = url; anchor.download = `statfax-nfl-tickets-${new Date().toISOString().slice(0, 10)}.csv`; anchor.click()
     URL.revokeObjectURL(url)
   }
+  const propFilters = [
+    { id: 'positions', label: 'Positions', value: positionFilters, onChange: setPositionFilters, options: [{ value: '', label: 'All positions' }, ...['QB', 'RB', 'WR', 'TE'].map((item) => ({ value: item, label: item }))] },
+    { id: 'teams', label: 'Teams', value: teamFilters, onChange: setTeamFilters, options: [{ value: '', label: 'All teams' }, ...teams.map((item) => ({ value: item, label: item }))] },
+    { id: 'games', label: 'Games', value: gameFilters, onChange: setGameFilters, options: [{ value: '', label: 'All games' }, ...games.map((item) => ({ value: String(item.id), label: item.label }))] },
+  ]
 
   return <div className="nfl-workspace nfl-prop-workspace">
-    <div className="nfl-workspace-head"><div><span className="nfl-eyebrow"><Icon name="Shield" size={13} /> NFL prop engine</span><h1>NFL Signals</h1><p>Slate-ranked QB, RB, WR and TE signals powered by role, matchup, form, lineup, weather, price and live pace.</p></div><CommandTabs tabs={VIEW_TABS} value={view} onChange={setView} label="NFL view" className="nfl-view-tabs" variant="workspace" /></div>
+    <div className="nfl-workspace-head"><div><span className="nfl-eyebrow"><Icon name="Shield" size={13} /> NFL prop engine</span><h1>NFL Signals</h1><p>Slate-ranked QB, RB, WR and TE signals powered by role, matchup, form, lineup, weather, price and live pace.</p></div><CommandTabs tabs={SPORT_UI.nfl.primaryViews} value={view} onChange={setView} label="NFL view" className="nfl-view-tabs" variant="workspace" /></div>
     <div className={`nfl-demo-banner is-${snapshotStale ? 'critical' : snapshot.dataHealth?.status || 'ready'}`} role="status" aria-live="polite"><Icon name={snapshotStale || snapshot.dataHealth?.status === 'critical' || !snapshot.dataQuality?.playByPlay ? 'TriangleAlert' : 'CircleCheck'} size={15} /><span><b>{snapshotStale ? 'NFL pipeline update delayed' : snapshot.source?.mode === 'demo' ? 'Demo slate' : snapshot.dataHealth?.status === 'ready' ? 'All NFL feeds healthy' : snapshot.dataQuality?.playByPlay ? 'NFL core data connected' : 'NFL data connected · limited context'}</b> {snapshotStale ? 'The published slate is more than 45 minutes old. Open Performance for feed details.' : snapshot.dataHealth?.issues?.length ? `${snapshot.dataHealth.issues.length} supporting feed${snapshot.dataHealth.issues.length === 1 ? '' : 's'} limited. Open Performance for details.` : 'Red-zone, depth, availability, weather, defense and tracking coverage are active.'}</span></div>
-    {view === 'performance' ? <NFLPerformance snapshot={snapshot} /> : view === 'bet-lab' ? <div className="nfl-bet-lab-workspace"><div className="nfl-bet-lab-tabs"><CommandTabs tabs={BET_LAB_TABS} value={betLabView} onChange={setBetLabView} label="Bet Lab view" variant="workspace" /></div>{betLabView === 'tickets' ? <NFLTicketCenter slipLegs={slipLegs} tickets={tickets} onSave={saveTicket} onClear={() => setSlip(new Set())} onExport={exportTicket} onCSV={exportCSV} /> : <NFLBetLab snapshot={snapshot} slip={slip} onAddCombo={addComboToSlip} onOpenTickets={() => setBetLabView('tickets')} />}</div> : <>
-      <div className="nfl-market-rail" role="tablist" aria-label="NFL prop market">{NFL_PROP_MARKET_LIST.map((market) => <button key={market.id} role="tab" aria-selected={marketId === market.id} className={marketId === market.id ? 'active' : ''} onClick={() => setMarketId(market.id)}><Icon name={MARKET_ICONS[market.id]} size={13} />{market.shortLabel}</button>)}</div>
+    {view === 'performance' ? <NFLPerformance snapshot={snapshot} /> : view === 'bet-lab' ? <div className="nfl-bet-lab-workspace"><NFLBetLab snapshot={snapshot} slip={slip} slipLegs={slipLegs} tab={betLabView} onTabChange={setBetLabView} onAddCombo={addComboToSlip} onToggleLeg={(key) => toggleSet(setSlip, key)} onClearSlip={() => setSlip(new Set())} onSaveTicket={saveTicket} savedContent={<NFLTicketCenter slipLegs={slipLegs} tickets={tickets} onSave={saveTicket} onClear={() => setSlip(new Set())} onExport={exportTicket} onCSV={exportCSV} />} /></div> : <>
+      <SportMarketRail sport="nfl" markets={NFL_PROP_MARKET_LIST} value={marketId} onChange={setMarketId} icons={MARKET_ICONS} ariaLabel="NFL prop market" />
       {marketId === 'first_td' && <div className="nfl-variance-note"><Icon name="TriangleAlert" size={14} /><span><b>First TD is high variance.</b> Listed offense receives {pct(snapshot.firstTdReserve?.listedOffense ?? .86, 0)}; other offense {pct(snapshot.firstTdReserve?.otherOffense ?? .06, 0)}, defense/special teams {pct(snapshot.firstTdReserve?.defenseSpecialTeams ?? .06, 0)}, and no touchdown {pct(snapshot.firstTdReserve?.noTouchdown ?? .02, 0)} are modeled separately.</span></div>}
       {marketId === 'two_plus_td' && <div className="nfl-variance-note"><Icon name="Flame" size={14} /><span><b>2+ TD is calibrated separately.</b> Multi-score probability is evaluated independently from Anytime TD.</span></div>}
-      <NFLSignalRail values={signalFilters} counts={signalCounts} total={filteredPool.length} onToggleFilter={toggleSignalFilter} onClear={() => setSignalFilters(new Set())} open={signalsOpen} onToggle={() => setSignalsOpen((open) => !open)} />
+      <SportSignalRail sport="nfl" filters={NFL_SIGNAL_FILTERS} values={signalFilters} counts={signalCounts} total={filteredPool.length} onToggleFilter={toggleSignalFilter} onClear={() => setSignalFilters(new Set())} open={signalsOpen} onToggleOpen={() => setSignalsOpen((open) => !open)} />
       <div className="nfl-layout"><section className="nfl-board-panel" aria-label="Ranked NFL props">
-      <div className="nfl-filters nfl-prop-filters"><label className="nfl-search"><Icon name="Search" size={15} /><span className="sr-only">Search players</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search players, teams, matchups" /></label><Select multi value={positionFilters} onChange={setPositionFilters} ariaLabel="Positions" options={[{ value: '', label: 'All positions' }, ...['QB', 'RB', 'WR', 'TE'].map((item) => ({ value: item, label: item }))]} /><Select multi value={teamFilters} onChange={setTeamFilters} ariaLabel="Teams" options={[{ value: '', label: 'All teams' }, ...teams.map((item) => ({ value: item, label: item }))]} /><Select multi value={gameFilters} onChange={setGameFilters} ariaLabel="Games" options={[{ value: '', label: 'All games' }, ...games.map((item) => ({ value: String(item.id), label: item.label }))]} /><button className={`nfl-two-filter ${twoPlusOnly ? 'active' : ''}`} aria-pressed={twoPlusOnly} onClick={() => setTwoPlusOnly((value) => !value)}><Icon name="Flame" size={13} />2+ TD filter</button></div>
+      <SportMultiFilterBar sport="nfl" className="nfl-prop-filters" searchValue={query} onSearch={setQuery} searchPlaceholder="Search players, teams, matchups" filters={propFilters}><button className={`nfl-two-filter ${twoPlusOnly ? 'active' : ''}`} aria-pressed={twoPlusOnly} onClick={() => setTwoPlusOnly((value) => !value)}><Icon name="Flame" size={13} />2+ TD filter</button></SportMultiFilterBar>
       <div className="nfl-card-grid">{players.map((player) => <PlayerCard key={player.id} player={player} marketId={marketId} watched={watched.has(player.id)} inSlip={slip.has(`${player.id}:${marketId}`)} onSelect={setSelected} onToggleWatch={(item) => toggleSet(setWatched, item.id)} onToggleSlip={(item) => toggleSet(setSlip, `${item.id}:${marketId}`)} />)}</div>
       {!players.length && <div className="nfl-empty"><Icon name="Search" size={22} /><b>No eligible players match</b><button onClick={() => { setQuery(''); setPositionFilters(new Set()); setTeamFilters(new Set()); setGameFilters(new Set()); setTwoPlusOnly(false); setSignalFilters(new Set()) }}>Clear filters</button></div>}
     </section><aside className="nfl-decision-rail" aria-label="NFL slate summary"><section className="nfl-slate-card"><div><span>Prop engine</span><strong>{snapshot.dataQuality?.playByPlay ? 'Full context ready' : 'Core model ready'}</strong></div><b className="nfl-rating mono">{players.length}</b><ul><li><Icon name="Check" size={12} /> {NFL_PROP_MARKET_LIST.length} position-aware markets</li><li><Icon name="Activity" size={12} /> {liveCount} live player{liveCount === 1 ? '' : 's'} in this view</li><li><Icon name="Shield" size={12} /> {snapshot.dataQuality?.defenseByPosition ? 'Defense splits connected' : 'Defense splits limited'}</li></ul></section>{featured && <section className="nfl-featured-card"><span>Top {NFL_PROP_MARKET_LIST.find((market) => market.id === marketId)?.shortLabel}</span><h2>{featured.name}</h2><p>{featured.team} vs {featured.opponent} · {liveLabel(featured)}</p><div><b className="mono">{pct(featured.model.probability)}</b><em>at</em><b className="mono">{marketValue(featured, featured.model, marketId)}</b></div><button onClick={() => toggleSet(setSlip, nflLegKey(featured.id, marketId))}><Icon name={slip.has(nflLegKey(featured.id, marketId)) ? 'Check' : 'Plus'} size={15} />{slip.has(nflLegKey(featured.id, marketId)) ? 'Added to slip' : 'Add selected prop'}</button></section>}<section className="nfl-builder-card"><header>Active workspace</header><div><span><small>Watchlist</small><b>{watched.size} players</b></span><button type="button" onClick={openBetLabTickets}><small>Prop slip</small><b>{slip.size} legs · {tickets.length} saved</b></button></div></section></aside></div>

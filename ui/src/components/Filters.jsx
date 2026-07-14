@@ -5,15 +5,8 @@ import Select from './Select.jsx'
 import { GRADE_ORDER, gradeColor, BADGES } from '../lib/badges.js'
 import { SORTS } from '../lib/constants.js'
 import { useLiveMode } from '../lib/liveMode.js'
+import { SPORT_UI } from '../lib/sportUi.js'
 import { hexA } from './atoms.jsx'
-
-const VIEW_TABS = [
-  { id: 'board', label: 'Board', icon: 'List', desc: 'Ranked board' },
-  { id: 'games', label: 'Games', icon: 'LayoutGrid', desc: 'Game-by-game' },
-  { id: 'pitchers', label: 'Pitchers', icon: 'Crosshair', desc: 'Pitcher vulnerability' },
-  { id: 'weather', label: 'Weather', icon: 'Wind', desc: 'Weather report' },
-  { id: 'results', label: 'Results', icon: 'Activity', desc: 'Model track record + combos' },
-]
 
 // Keep the phone panel scan-first. These are the broadest, most actionable
 // signal lenses; every other signal remains one tap away behind "Show more".
@@ -32,7 +25,7 @@ function ViewToggle({ view, onView }) {
       label="Primary workspace"
       value={activeId}
       onChange={onView}
-      tabs={VIEW_TABS.map((tab, index) => ({
+      tabs={SPORT_UI.mlb.primaryViews.map((tab, index) => ({
         ...tab,
         iconSize: 14,
         title: `${tab.desc} — press ${index + 1}`,

@@ -13,14 +13,13 @@ export default function WorkspaceShell({
   children,
   size = 'wide',
   status = 'Saved on this device',
+  embedded = false,
 }) {
-  return (
-    <>
-      <div className="drawer-scrim workspace-scrim" onClick={onClose} />
-      <section className={`modal workspace-modal workspace-${size}`} role="dialog" aria-modal="true" aria-label={title}>
-        <button type="button" className="drawer-close icon-btn workspace-close" onClick={onClose} aria-label={`Close ${title}`}>
+  const workspace = (
+      <section className={`${embedded ? '' : 'modal '}workspace-modal workspace-${size} ${embedded ? 'workspace-embedded' : ''}`.trim()} role={embedded ? 'region' : 'dialog'} aria-modal={embedded ? undefined : true} aria-label={title}>
+        {!embedded && <button type="button" className="drawer-close icon-btn workspace-close" onClick={onClose} aria-label={`Close ${title}`}>
           <Icon name="X" size={18} />
-        </button>
+        </button>}
 
         <header className="workspace-head">
           <div className="workspace-head-icon"><Icon name={icon} size={18} /></div>
@@ -45,6 +44,13 @@ export default function WorkspaceShell({
 
         <div className="workspace-body">{children}</div>
       </section>
+  )
+
+  if (embedded) return workspace
+  return (
+    <>
+      <div className="drawer-scrim workspace-scrim" onClick={onClose} />
+      {workspace}
     </>
   )
 }
