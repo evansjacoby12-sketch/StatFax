@@ -19,7 +19,7 @@ import {
   lookupProb,
 } from '../../src/sports/mlb/logic/isotonicCalibration.js'
 
-export const AI_HR_HISTORICAL_VERSION = 1
+export const AI_HR_HISTORICAL_VERSION = 2
 export const AI_HR_HISTORICAL_MODE = 'historical-replay'
 export const AI_HR_HISTORICAL_BASELINE = 'walk-forward-score-calibration+sim-resolution'
 
@@ -201,7 +201,7 @@ Rules:
  * A historical replay cannot: missing or post-cutoff provenance rejects the
  * whole candidate so a later article cannot leak the target game's result.
  */
-export function normalizeAiHrHistoricalContext({ raw, slate, asOf, model, source = 'claude-historical-web-search' }) {
+export function normalizeAiHrHistoricalContext({ raw, slate, asOf, model, source = 'tavily+openai' }) {
   if (!validIso(asOf)) throw new Error('historical replay cutoff must be ISO')
   const entities = buildAiHrEntityIndex(slate)
   const candidates = Array.isArray(raw?.signals) ? raw.signals : []
@@ -290,6 +290,7 @@ export function buildAiHrHistoricalReplay({ runs, backtestLog, generatedAt = new
     mode: AI_HR_HISTORICAL_MODE,
     scoreImpact: false,
     autoPromotion: false,
+    researchProvider: 'tavily+openai',
     generatedAt: new Date(generatedAt).toISOString(),
     baseline: {
       method: AI_HR_HISTORICAL_BASELINE,
@@ -313,6 +314,7 @@ export function validateAiHrHistoricalReplay(replay) {
   if (replay.version !== AI_HR_HISTORICAL_VERSION) errors.push(`version: expected ${AI_HR_HISTORICAL_VERSION}`)
   if (replay.mode !== AI_HR_HISTORICAL_MODE) errors.push(`mode: expected ${AI_HR_HISTORICAL_MODE}`)
   if (replay.scoreImpact !== false || replay.autoPromotion !== false) errors.push('production controls: historical replay cannot affect scoring or auto-promote')
+  if (replay.researchProvider !== 'tavily+openai') errors.push('researchProvider: expected tavily+openai')
   if (!validIso(replay.generatedAt)) errors.push('generatedAt: expected ISO timestamp')
   if (replay.baseline?.method !== AI_HR_HISTORICAL_BASELINE || replay.baseline?.outcomesExposedToResearchPrompt !== false) errors.push('baseline: invalid leakage controls')
   if (!Array.isArray(replay.dates) || !Array.isArray(replay.contexts) || replay.dates.length !== replay.contexts.length) errors.push('dates/contexts: expected reconciled arrays')
@@ -323,6 +325,7 @@ export function validateAiHrHistoricalReplay(replay) {
     const validation = (() => { try { return assertValidAiHrContext(context) } catch (error) { errors.push(`contexts[${index}]: ${error.message}`); return null } })()
     if (!validation) continue
     if (context.date !== date?.date || context.replay?.asOf !== date?.asOf || !validIso(context.replay?.asOf)) errors.push(`contexts[${index}]: replay date/cutoff does not reconcile`)
+    if (context.source !== 'tavily+openai') errors.push(`contexts[${index}].source: expected tavily+openai`)
     if (date?.latestTrainingDate != null && (!validDate(date.latestTrainingDate) || date.latestTrainingDate >= date.date)) errors.push(`dates[${index}]: walk-forward training reaches target or future date`)
     for (const signal of context.signals) {
       if (signal.evidence.some((item) => !validIso(item.publishedAt) || Date.parse(item.publishedAt) > Date.parse(context.replay.asOf))) errors.push(`contexts[${index}].${signal.id}: evidence violates historical cutoff`)

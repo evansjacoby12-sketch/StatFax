@@ -252,10 +252,11 @@ jobs:
       # dist/context.json). Phase 1 is advisory and cannot touch predictions.
       # Skips itself if the key is unset; a flaky API call emits a valid empty
       # artifact so the board can still deploy.
-      - name: Context pass (Claude)
+      - name: Context pass (Tavily + OpenAI)
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          CONTEXT_MODEL: ${{ vars.CONTEXT_MODEL || 'claude-haiku-4-5-20251001' }}
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          AI_HR_MODEL: ${{ vars.AI_HR_MODEL || 'gpt-5.6-luna' }}
         run: npm run context || true
 
       - name: Validate AI HR context contract
@@ -302,10 +303,10 @@ jobs:
       # Daily one-paragraph board summary → dist/brief.json. Reads the scored
       # board (+ the context flags above) and narrates it; advisory only, never
       # touches predictions. Skips without the key; `|| true` never blocks deploy.
-      - name: Slate brief (Claude)
+      - name: Slate brief (OpenAI)
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          BRIEF_MODEL: ${{ vars.BRIEF_MODEL || 'claude-haiku-4-5-20251001' }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          BRIEF_MODEL: ${{ vars.BRIEF_MODEL || 'gpt-5.6-luna' }}
         run: npm run brief || true
 
       - name: Build UI

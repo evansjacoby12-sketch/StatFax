@@ -29,3 +29,6 @@ EVENT_TYPE  = "slate-refresh"
 #     Expiration:            longest available (or no-expiry org policy)
 #
 #   Then:  cd server/cloudflare && wrangler secret put GITHUB_TOKEN
+#
+#   AI narration endpoints also require:
+#     wrangler secret put OPENAI_API_KEY

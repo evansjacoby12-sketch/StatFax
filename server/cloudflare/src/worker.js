@@ -123,15 +123,52 @@ async function triggerSlateRefresh(env) {
  * POST /parse  { query, grades:[...allowed], signals:[...allowed] }
  *   → { grades:[...], signals:[...] }   (a subset of the allowed lists)
  *
- * The LLM (Claude Haiku) ONLY translates English → the existing filter chips.
+ * OpenAI ONLY translates English → the existing filter chips.
  * It never sees the data or does math — the browser runs the returned filter
  * against the backtest log it already loaded. Cheap (tool-use, tiny prompt,
  * cached system block).
  *
- * Required Worker secret:  ANTHROPIC_API_KEY  (wrangler secret put)
+ * Required Worker secret:  OPENAI_API_KEY  (wrangler secret put)
  * Optional Worker var:     ALLOW_ORIGIN       (default "*"; set to your site)
  */
-const ANTHROPIC_MODEL = 'claude-haiku-4-5-20251001';
+const OPENAI_MODEL = 'gpt-5.6-luna';
+
+function openAiOutputText(payload) {
+  if (typeof payload?.output_text === 'string') return payload.output_text.trim();
+  return (Array.isArray(payload?.output) ? payload.output : [])
+    .flatMap((item) => Array.isArray(item?.content) ? item.content : [])
+    .filter((item) => item?.type === 'output_text' && typeof item.text === 'string')
+    .map((item) => item.text)
+    .join('')
+    .trim();
+}
+
+async function callOpenAiStructured(env, { instructions, input, schema, schemaName, maxOutputTokens }) {
+  const resp = await fetch('https://api.openai.com/v1/responses', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      authorization: `Bearer ${env.OPENAI_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: env.OPENAI_MODEL || OPENAI_MODEL,
+      instructions,
+      input,
+      max_output_tokens: maxOutputTokens,
+      text: { format: { type: 'json_schema', name: schemaName, strict: true, schema } },
+    }),
+  });
+  if (!resp.ok) {
+    const detail = (await resp.text()).slice(0, 300);
+    const error = new Error('LLM error');
+    error.status = resp.status;
+    error.detail = detail;
+    throw error;
+  }
+  const text = openAiOutputText(await resp.json());
+  if (!text) throw new Error('LLM returned no output');
+  return JSON.parse(text);
+}
 
 function corsHeaders(env) {
   return {
@@ -161,27 +198,18 @@ async function handleParse(request, env) {
   const grades = Array.isArray(body.grades) && body.grades.length ? body.grades : ['PRIME', 'STRONG', 'LEAN', 'SKIP'];
   const signals = Array.isArray(body.signals) ? body.signals : [];
   if (!query) return jsonResponse({ grades: [], signals: [] }, 200, env);
-  if (!env.ANTHROPIC_API_KEY) return jsonResponse({ error: 'ANTHROPIC_API_KEY not set on the worker' }, 500, env);
+  if (!env.OPENAI_API_KEY) return jsonResponse({ error: 'OPENAI_API_KEY not set on the worker' }, 500, env);
 
-  const tool = {
-    name: 'apply_filters',
-    description: 'Select the grade tiers and signal flags that match the request.',
-    input_schema: {
-      type: 'object',
-      properties: {
-        grades: {
-          type: 'array',
-          items: { type: 'string', enum: grades },
-          description: 'Grade tiers to include (OR). Empty = all grades.',
-        },
-        signals: {
-          type: 'array',
-          items: { type: 'string', enum: signals },
-          description: 'Signal flags that must ALL be present (AND). Empty = no signal filter.',
-        },
-      },
-      required: ['grades', 'signals'],
+  const schema = {
+    type: 'object',
+    properties: {
+      grades: { type: 'array', items: { type: 'string', enum: grades } },
+      signals: signals.length
+        ? { type: 'array', items: { type: 'string', enum: signals } }
+        : { type: 'array', maxItems: 0, items: { type: 'string' } },
     },
+    required: ['grades', 'signals'],
+    additionalProperties: false,
   };
   const system =
     `You translate a baseball bettor's plain-English request into a StatFax home-run backtest filter.\n` +
@@ -192,36 +220,19 @@ async function handleParse(request, env) {
     `Examples: "hot bats"→signals:["hot"]; "best plays"/"elite"→grades:["PRIME"]; "due hitters"→signals:["due"]; ` +
     `"strong or better"→grades:["PRIME","STRONG"]. Prefer few, confident filters.`;
 
-  let data;
+  let out;
   try {
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-api-key': env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: env.ANTHROPIC_MODEL || ANTHROPIC_MODEL,
-        max_tokens: 256,
-        // Cache the (stable) instructions so repeat queries are cheaper.
-        system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
-        tools: [tool],
-        tool_choice: { type: 'tool', name: 'apply_filters' },
-        messages: [{ role: 'user', content: query }],
-      }),
+    out = await callOpenAiStructured(env, {
+      instructions: system,
+      input: query,
+      schema,
+      schemaName: 'apply_filters',
+      maxOutputTokens: 256,
     });
-    if (!resp.ok) {
-      const detail = (await resp.text()).slice(0, 300);
-      return jsonResponse({ error: 'LLM error', status: resp.status, detail }, 502, env);
-    }
-    data = await resp.json();
   } catch (e) {
-    return jsonResponse({ error: 'LLM unreachable', detail: String(e).slice(0, 200) }, 502, env);
+    return jsonResponse({ error: e.message === 'LLM error' ? 'LLM error' : 'LLM unreachable', status: e.status, detail: e.detail || String(e).slice(0, 200) }, 502, env);
   }
 
-  const use = (data.content || []).find((b) => b.type === 'tool_use');
-  const out = use?.input || { grades: [], signals: [] };
   // Sanitize: never return anything outside the allowed lists.
   const g = (out.grades || []).filter((x) => grades.includes(x));
   const s = (out.signals || []).filter((x) => signals.includes(x));
@@ -239,10 +250,10 @@ async function handleParse(request, env) {
  * buildReasons) into a natural-language paragraph. It is a pure narration
  * layer: it receives facts the engine already decided and rephrases them.
  * It NEVER sees raw data, does math, or influences a score/grade — the
- * number is fixed before this endpoint is ever called. Cheap (Haiku, tiny
- * prompt, cached system block); the browser caches the result per player/day.
+ * number is fixed before this endpoint is ever called. The browser caches the
+ * result per player/day.
  *
- * Required Worker secret:  ANTHROPIC_API_KEY  (wrangler secret put)
+ * Required Worker secret:  OPENAI_API_KEY  (wrangler secret put)
  * Optional Worker var:     ALLOW_ORIGIN       (default "*"; set to your site)
  */
 async function handleExplain(request, env) {
@@ -264,7 +275,7 @@ async function handleExplain(request, env) {
     .slice(0, 14);
 
   if (!reasons.length) return jsonResponse({ text: '' }, 200, env);
-  if (!env.ANTHROPIC_API_KEY) return jsonResponse({ error: 'ANTHROPIC_API_KEY not set on the worker' }, 500, env);
+  if (!env.OPENAI_API_KEY) return jsonResponse({ error: 'OPENAI_API_KEY not set on the worker' }, 500, env);
 
   // Optional context numbers — all pre-computed by the engine. Passed as
   // facts to keep the model grounded, never for it to recompute anything.
@@ -292,37 +303,25 @@ async function handleExplain(request, env) {
     `Player: ${name}\n${facts}\n\nModel reason lines:\n` +
     reasons.map((r) => `- ${r}`).join('\n');
 
-  let data;
+  let result;
   try {
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-api-key': env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
+    result = await callOpenAiStructured(env, {
+      instructions: system,
+      input: userContent,
+      schemaName: 'pick_explanation',
+      maxOutputTokens: 220,
+      schema: {
+        type: 'object',
+        properties: { text: { type: 'string' } },
+        required: ['text'],
+        additionalProperties: false,
       },
-      body: JSON.stringify({
-        model: env.ANTHROPIC_MODEL || ANTHROPIC_MODEL,
-        max_tokens: 220,
-        // Cache the (stable) instruction block so repeat explains are cheaper.
-        system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
-        messages: [{ role: 'user', content: userContent }],
-      }),
     });
-    if (!resp.ok) {
-      const detail = (await resp.text()).slice(0, 300);
-      return jsonResponse({ error: 'LLM error', status: resp.status, detail }, 502, env);
-    }
-    data = await resp.json();
   } catch (e) {
-    return jsonResponse({ error: 'LLM unreachable', detail: String(e).slice(0, 200) }, 502, env);
+    return jsonResponse({ error: e.message === 'LLM error' ? 'LLM error' : 'LLM unreachable', status: e.status, detail: e.detail || String(e).slice(0, 200) }, 502, env);
   }
 
-  const text = (data.content || [])
-    .filter((b) => b.type === 'text')
-    .map((b) => b.text)
-    .join('')
-    .trim();
+  const text = String(result?.text || '').trim();
   return jsonResponse({ text }, 200, env);
 }
 

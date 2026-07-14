@@ -1,7 +1,7 @@
 /**
  * Slate Brief — the daily one-paragraph board summary.
  *
- * After the slate is built, this asks Claude to read TODAY'S already-scored
+ * After the slate is built, this asks OpenAI to read TODAY'S already-scored
  * board and write a short, plain-English brief: the headline plays, the best
  * park/weather spots, and any alert worth knowing before you bet. It emits
  * dist/brief.json for the UI to render at the top of the board.
@@ -12,8 +12,8 @@
  * no research and no math; the grades/probabilities are fixed before it runs.
  *
  * Env:
- *   ANTHROPIC_API_KEY   required — without it the brief is skipped (empty file).
- *   BRIEF_MODEL         optional — defaults to Haiku (cheap).
+ *   OPENAI_API_KEY      required — without it the brief is skipped (empty file).
+ *   BRIEF_MODEL         optional — defaults to the cost-sensitive OpenAI model.
  *   BRIEF_STALE_HOURS   optional — reuse a same-day brief younger than this
  *                       (default 4). The pipeline ticks every ~10 min; this
  *                       keeps it to a few (cheap) calls/day as lineups firm up.
@@ -22,13 +22,14 @@
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { callOpenAiStructured, OPENAI_DEFAULT_MODEL } from './lib/aiProviders.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SLATE_PATH = resolve(__dirname, '../dist/daily.json');
 const CONTEXT_PATH = resolve(__dirname, '../dist/context.json');
 const OUT_PATH = resolve(__dirname, '../dist/brief.json');
 const R2_SLATE = 'https://pub-f7f0c61cfc5840ce8b07ddb42902aa48.r2.dev/daily.json';
-const MODEL = process.env.BRIEF_MODEL || 'claude-haiku-4-5-20251001';
+const MODEL = process.env.BRIEF_MODEL || OPENAI_DEFAULT_MODEL;
 const DRY_RUN = process.argv.includes('--dry-run');
 const STALE_HOURS = Number(process.env.BRIEF_STALE_HOURS || 4);
 
@@ -147,27 +148,26 @@ Write 3-4 sentences (one flowing paragraph, ~60-90 words). Rules:
 - No preamble, no markdown, no bullet points, no title. Just the paragraph.`;
 }
 
-async function callClaude(prompt) {
-  const resp = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'x-api-key': process.env.ANTHROPIC_API_KEY,
-      'anthropic-version': '2023-06-01',
+async function callOpenAiBrief(prompt) {
+  const response = await callOpenAiStructured({
+    apiKey: process.env.OPENAI_API_KEY,
+    model: MODEL,
+    instructions: 'Return the requested StatFax slate brief in the text field. Use only supplied facts.',
+    input: prompt,
+    schemaName: 'slate_brief',
+    maxOutputTokens: 320,
+    schema: {
+      type: 'object',
+      properties: { text: { type: 'string' } },
+      required: ['text'],
+      additionalProperties: false,
     },
-    body: JSON.stringify({
-      model: MODEL,
-      max_tokens: 320,
-      messages: [{ role: 'user', content: prompt }],
-    }),
   });
-  if (!resp.ok) throw new Error(`Anthropic API ${resp.status}: ${(await resp.text()).slice(0, 200)}`);
-  const data = await resp.json();
-  return (data.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('').trim();
+  return String(response.value?.text || '').trim();
 }
 
 async function main() {
-  const base = { date: null, generatedAt: new Date().toISOString(), model: MODEL, source: 'claude', text: '' };
+  const base = { date: null, generatedAt: new Date().toISOString(), model: MODEL, source: 'openai', text: '' };
   let slate;
   try {
     slate = await loadSlate();
@@ -189,8 +189,8 @@ async function main() {
     console.log('[brief] --dry-run: prompt built (' + prompt.length + ' chars), no API call');
     return write({ ...base, skipped: true, dryRun: true });
   }
-  if (!process.env.ANTHROPIC_API_KEY) {
-    console.warn('[brief] ANTHROPIC_API_KEY not set — skipping (model predictions unaffected)');
+  if (!process.env.OPENAI_API_KEY) {
+    console.warn('[brief] OPENAI_API_KEY not set — skipping (model predictions unaffected)');
     return write({ ...base, skipped: true });
   }
   if (priorIsFresh(slate.date)) {
@@ -200,7 +200,7 @@ async function main() {
     return; // leave the existing file in place
   }
   try {
-    const text = await callClaude(prompt);
+    const text = await callOpenAiBrief(prompt);
     write({ ...base, text, primeCount: sum.primeCount, strongCount: sum.strongCount });
   } catch (e) {
     console.warn(`[brief] pass failed (non-fatal): ${e.message}`);

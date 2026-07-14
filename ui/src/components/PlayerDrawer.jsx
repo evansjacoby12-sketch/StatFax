@@ -2216,7 +2216,7 @@ function LiveSection({ b }) {
 }
 
 // ---------------------------------------------------------------------------
-// ExplainPick — one-tap plain-English "why this pick", narrated by Claude Haiku
+// ExplainPick — one-tap plain-English "why this pick", narrated by OpenAI
 // from the model's already-computed reason lines. Lazy (fires only on tap),
 // cached per player/day, and read-only: it explains the score, never changes
 // it. Silently absent when the worker URL isn't configured or there are no

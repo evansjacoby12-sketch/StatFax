@@ -1,8 +1,8 @@
 /**
  * Context pass — the LLM "soft-factor" layer.
  *
- * Once a day, after the slate is built, this asks Claude (with web search) to
- * research the unstructured stuff the stats model is blind to — injuries,
+ * Once a day, after the slate is built, Tavily retrieves time-bounded sources
+ * and OpenAI extracts the unstructured factors the stats model is blind to — injuries,
  * scratches/rest-day risk, call-up pitchers with no track record, bullpen
  * usage, and game-time weather — and emits dist/context.json using the strict
  * AI HR context contract. Every accepted signal is tied to a slate-owned
@@ -13,9 +13,9 @@
  * pitcher with no season sample). It's advisory.
  *
  * Env:
- *   ANTHROPIC_API_KEY   required — without it the pass is skipped (empty file).
- *   CONTEXT_MODEL       optional — defaults to Haiku (cheap). Bump to
- *                       claude-sonnet-4-6 / claude-opus-4-8 for sharper research.
+ *   TAVILY_API_KEY      required for source retrieval.
+ *   OPENAI_API_KEY      required for strict structured extraction.
+ *   AI_HR_MODEL         optional OpenAI extraction model.
  * Flags:  --dry-run     build the prompt + write a stub, no API call (testing).
  */
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
@@ -25,15 +25,16 @@ import {
   assertValidAiHrContext,
   emptyAiHrContext,
   normalizeAiHrContext,
-  summarizeAiHrTargets,
   validateAiHrContext,
 } from './lib/aiHrContext.mjs';
+import { researchAiHrSignals } from './lib/aiHrResearch.mjs';
+import { OPENAI_DEFAULT_MODEL } from './lib/aiProviders.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SLATE_PATH = resolve(__dirname, '../dist/daily.json');
 const OUT_PATH = resolve(__dirname, '../dist/context.json');
 const R2_SLATE = 'https://pub-f7f0c61cfc5840ce8b07ddb42902aa48.r2.dev/daily.json';
-const MODEL = process.env.CONTEXT_MODEL || 'claude-haiku-4-5-20251001';
+const MODEL = process.env.AI_HR_MODEL || process.env.CONTEXT_MODEL || OPENAI_DEFAULT_MODEL;
 const DRY_RUN = process.argv.includes('--dry-run');
 // The pipeline ticks every ~10 min; only re-run the (paid) research this often.
 const STALE_HOURS = Number(process.env.CONTEXT_STALE_HOURS || 3);
@@ -65,75 +66,13 @@ async function loadSlate() {
   return res.json();
 }
 
-function buildPrompt(sum) {
-  return `You are a careful MLB home-run research extractor. For tonight's slate (${sum.date}), research CURRENT news and return ONLY sourced facts the statistical HR model cannot reliably obtain from its numeric feeds. Use web search for official lineups, injuries, pitcher roles, roof/weather changes, and bullpen availability.
-
-ALLOWED GAME, PITCHER, AND BULLPEN TARGETS:
-${sum.games.map((g) => `- ${g.entityKey} | ${g.matchup} | ${g.gameDate || '?'} @ ${g.venue || '?'}\n  pitchers: ${g.pitchers.map((p) => `${p.entityKey}=${p.name}`).join('; ') || 'none'}\n  bullpens: ${g.bullpens.map((b) => `${b.entityKey}=${b.team}`).join('; ')}`).join('\n')}
-
-ALLOWED BATTER TARGETS:
-${sum.batters.map((b) => `- ${b.entityKey} | ${b.name} (${b.team}, ${b.grade}, vs ${b.opposingPitcher || '?'})`).join('\n')}
-
-Emit only meaningful candidate HR features:
-- starter change, opener risk, or a documented pitch limit
-- confirmed lineup status, injury, or scratch risk for a listed batter
-- game-time weather or roof status that changed or is not yet stable
-- bullpen overuse or key reliever unavailability
-- a call-up or season debut with insufficient MLB history
-
-Return STRICT JSON only (no prose, no markdown fences):
-{"signals":[{"entityKey":"<EXACT allowed key above>","kind":"starter-change|opener-risk|pitch-limit|lineup-status|injury|scratch-risk|weather|roof|bullpen|callup|other","direction":"boost|suppress|uncertain","severity":"alert|warn|info","confidence":0.0,"note":"<one concise factual sentence>","observedAt":"<ISO timestamp>","expiresAt":"<ISO timestamp no more than 24h later>","evidence":[{"url":"https://<direct source URL>","title":"<source title>","publishedAt":"<ISO timestamp or null>"}]}]}
-
-Rules:
-- entityKey MUST exactly match one of the allowed keys. Never invent an ID.
-- Every signal MUST have at least one direct http/https evidence URL. No source means omit it.
-- direction is always from the affected BATTER'S HR perspective: boost means more HR-friendly, suppress means less HR-friendly, and uncertain means the effect is unknown.
-- For a pitcher target, direction describes the effect on batters facing that pitcher. For a bullpen target, it describes the effect on opposing batters facing that bullpen.
-- direction is a hypothesis for later backtesting, NOT a probability adjustment.
-- Do not output probabilities, score changes, multipliers, weights, locks, or betting recommendations.
-- Prefer official MLB/team/venue/weather sources and current reporting. Avoid rumor-only social posts.
-- If nothing trustworthy is found, return {"signals":[]}.`;
-}
-
-function parseSignals(text) {
-  const m = text.match(/\{[\s\S]*\}/); // first JSON object, tolerant of stray prose
-  if (!m) return { signals: [] };
-  try {
-    const obj = JSON.parse(m[0]);
-    return { signals: Array.isArray(obj.signals) ? obj.signals : [] };
-  } catch {
-    return { signals: [] };
-  }
-}
-
-async function callClaude(prompt) {
-  const resp = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'x-api-key': process.env.ANTHROPIC_API_KEY,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      max_tokens: 2000,
-      tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 8 }],
-      messages: [{ role: 'user', content: prompt }],
-    }),
-  });
-  if (!resp.ok) throw new Error(`Anthropic API ${resp.status}: ${(await resp.text()).slice(0, 200)}`);
-  const data = await resp.json();
-  const text = (data.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('\n');
-  return text;
-}
-
 async function main() {
   const generatedAt = new Date().toISOString();
   const empty = (extra = {}) => emptyAiHrContext({
     date: slate?.date || null,
     generatedAt,
     model: MODEL,
-    source: 'claude-web-search',
+    source: 'tavily+openai',
     ...extra,
   });
   let slate;
@@ -143,15 +82,12 @@ async function main() {
     console.warn(`[context] no slate: ${e.message}`);
     return write(empty({ skipped: true, error: e.message }));
   }
-  const sum = summarizeAiHrTargets(slate);
-  const prompt = buildPrompt(sum);
-
   if (DRY_RUN) {
-    console.log('[context] --dry-run: prompt built (' + prompt.length + ' chars), no API call');
+    console.log('[context] --dry-run: provider calls skipped');
     return write(empty({ skipped: true, dryRun: true }));
   }
-  if (!process.env.ANTHROPIC_API_KEY) {
-    console.warn('[context] ANTHROPIC_API_KEY not set — skipping (model predictions unaffected)');
+  if (!process.env.TAVILY_API_KEY || !process.env.OPENAI_API_KEY) {
+    console.warn('[context] TAVILY_API_KEY / OPENAI_API_KEY not set — skipping (model predictions unaffected)');
     return write(empty({ skipped: true }));
   }
   // The pipeline ticks every ~10 min; reuse a recent good run instead of paying
@@ -163,14 +99,16 @@ async function main() {
     return; // leave the existing file in place
   }
   try {
-    const text = await callClaude(prompt);
-    write(normalizeAiHrContext({
-      raw: parseSignals(text),
+    const research = await researchAiHrSignals({ slate, generatedAt, model: MODEL });
+    const context = normalizeAiHrContext({
+      raw: research.raw,
       slate,
       generatedAt,
-      model: MODEL,
-      source: 'claude-web-search',
-    }));
+      model: research.model,
+      source: research.provider,
+    });
+    context.research = research.audit;
+    write(context);
   } catch (e) {
     console.warn(`[context] pass failed (non-fatal): ${e.message}`);
     write(empty({ skipped: true, error: e.message }));

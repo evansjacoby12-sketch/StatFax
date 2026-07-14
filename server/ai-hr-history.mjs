@@ -11,7 +11,6 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
   assertValidAiHrHistoricalReplay,
-  buildAiHrHistoricalPrompt,
   buildAiHrHistoricalReplay,
   buildAiHrHistoricalSlate,
   buildAiHrWalkForwardBaseline,
@@ -19,6 +18,8 @@ import {
   normalizeAiHrHistoricalContext,
   selectAiHrHistoricalDates,
 } from './lib/aiHrHistorical.mjs'
+import { researchAiHrSignals } from './lib/aiHrResearch.mjs'
+import { OPENAI_DEFAULT_MODEL } from './lib/aiProviders.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const DIST = resolve(__dirname, '../dist')
@@ -26,7 +27,7 @@ const BACKTEST_PATH = resolve(DIST, 'backtest-log.json')
 const OUT_PATH = resolve(DIST, 'ai-hr-historical.json')
 const SHADOW_PATH = resolve(DIST, 'ai-hr-history-shadow.json')
 const EVALUATION_PATH = resolve(DIST, 'ai-hr-history-evaluation.json')
-const MODEL = process.env.AI_HR_HISTORY_MODEL || process.env.CONTEXT_MODEL || 'claude-haiku-4-5-20251001'
+const MODEL = process.env.AI_HR_HISTORY_MODEL || process.env.AI_HR_MODEL || OPENAI_DEFAULT_MODEL
 const MLB_API = 'https://statsapi.mlb.com/api/v1'
 
 function arg(name) {
@@ -70,48 +71,6 @@ async function mapLimit(items, limit, worker) {
   return results
 }
 
-function parseSignals(text) {
-  const unfenced = String(text || '').replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim()
-  const start = unfenced.indexOf('{')
-  const end = unfenced.lastIndexOf('}')
-  if (start < 0 || end <= start) return { signals: [] }
-  try {
-    const parsed = JSON.parse(unfenced.slice(start, end + 1))
-    return { signals: Array.isArray(parsed?.signals) ? parsed.signals : [] }
-  } catch {
-    return { signals: [] }
-  }
-}
-
-async function callClaude(prompt) {
-  let lastError
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    try {
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          'x-api-key': process.env.ANTHROPIC_API_KEY,
-          'anthropic-version': '2023-06-01',
-        },
-        body: JSON.stringify({
-          model: MODEL,
-          max_tokens: 3000,
-          tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 8 }],
-          messages: [{ role: 'user', content: prompt }],
-        }),
-      })
-      if (!response.ok) throw new Error(`Anthropic ${response.status}: ${(await response.text()).slice(0, 300)}`)
-      const data = await response.json()
-      return (data.content || []).filter((block) => block.type === 'text').map((block) => block.text).join('\n')
-    } catch (error) {
-      lastError = error
-      if (attempt < 3) await wait(1500 * attempt)
-    }
-  }
-  throw lastError
-}
-
 async function hydrateHistoricalSlate(backtestLog, date) {
   const baseline = buildAiHrWalkForwardBaseline(backtestLog, date)
   if (baseline.audit.latestTrainingDate && baseline.audit.latestTrainingDate >= date) throw new Error(`walk-forward leak on ${date}`)
@@ -133,7 +92,9 @@ async function hydrateHistoricalSlate(backtestLog, date) {
 
 async function main() {
   if (!existsSync(BACKTEST_PATH)) throw new Error(`missing ${BACKTEST_PATH}`)
-  if (!DRY_RUN && !process.env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY is required unless --dry-run is used')
+  if (!DRY_RUN && (!process.env.TAVILY_API_KEY || !process.env.OPENAI_API_KEY)) {
+    throw new Error('TAVILY_API_KEY and OPENAI_API_KEY are required unless --dry-run is used')
+  }
   const backtestLog = JSON.parse(readFileSync(BACKTEST_PATH, 'utf8'))
   const dates = selectAiHrHistoricalDates(backtestLog, { from: FROM, to: TO, maxDates: MAX_DATES })
   if (!dates.length) throw new Error('no exact-game historical dates matched the requested range')
@@ -143,23 +104,21 @@ async function main() {
   for (const [index, date] of dates.entries()) {
     const { slate, baselineAudit } = await hydrateHistoricalSlate(backtestLog, date)
     const asOf = historicalAsOf(slate, 60)
-    const prompt = buildAiHrHistoricalPrompt(slate, asOf)
     let raw = { signals: [] }
-    let researchError = null
+    let research = null
     if (!DRY_RUN) {
-      try {
-        raw = parseSignals(await callClaude(prompt))
-      } catch (error) {
-        researchError = error.message
-        console.warn(`[ai-hr-history] ${date} research failed: ${researchError}`)
-      }
+      research = await researchAiHrSignals({ slate, generatedAt: asOf, historical: true, model: MODEL })
+      raw = research.raw
     }
-    const context = normalizeAiHrHistoricalContext({ raw, slate, asOf, model: MODEL })
+    const context = normalizeAiHrHistoricalContext({
+      raw,
+      slate,
+      asOf,
+      model: research?.model || MODEL,
+      source: research?.provider || 'tavily+openai',
+    })
     if (DRY_RUN) context.dryRun = true
-    if (researchError) {
-      context.skipped = true
-      context.error = researchError
-    }
+    if (research) context.research = research.audit
     runs.push({ date, slate, baselineAudit, asOf, context })
     console.log(`[ai-hr-history] ${index + 1}/${dates.length} ${date}: ${Object.keys(slate.scoredBatters).length} baseline rows, ${context.stats.accepted}/${context.stats.requested} signals accepted`)
   }

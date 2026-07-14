@@ -93,19 +93,19 @@ app calls directly from the browser:
 | `/explain` | POST | Plain-English "why this pick" narration for the player card. |
 | `/savant-bip` | GET | CORS proxy for Baseball Savant batted-ball data (spray chart). |
 
-`/parse` and `/explain` call Claude Haiku, so they need an Anthropic key set
-as a Worker secret:
+`/parse` and `/explain` use OpenAI structured outputs, so they need an OpenAI
+key set as a Worker secret:
 
 ```sh
-wrangler secret put ANTHROPIC_API_KEY
-# paste your sk-ant-... key when prompted
+wrangler secret put OPENAI_API_KEY
+# paste your OpenAI API key when prompted
 ```
 
 Both are **narration-only** — they translate English ↔ existing model
 output and never see raw data, do math, or influence any prediction. The
 HR scores are computed deterministically on GitHub Actions before the app
 ever loads, so the Worker cannot change a grade or probability. Optional:
-set `ANTHROPIC_MODEL` (Worker var) to override the default Haiku model, and
+set `OPENAI_MODEL` (Worker var) to override the default cost-sensitive model, and
 `ALLOW_ORIGIN` to lock CORS to your site instead of `*`.
 
 The browser reaches these via `VITE_WORKER_URL` (set at UI build time to the
