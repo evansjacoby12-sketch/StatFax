@@ -123,7 +123,8 @@ export default function PitchersView({ batters, kDistByPitcher = {}, liveKsByPit
 }
 
 // ─── K Brain view ────────────────────────────────────────────────────────────
-const TREND_ICON = { up: '↑', down: '↓', flat: '→' }
+const TREND_ICON = { up: 'TrendingUp', down: 'TrendingDown', flat: 'Minus' }
+const TREND_LABEL = { up: 'Trending up', down: 'Trending down', flat: 'Stable trend' }
 const TREND_COLOR = { up: 'var(--strong)', down: 'var(--bad)', flat: 'var(--text-faint)' }
 const CONF_COLOR = { high: 'var(--strong)', med: 'var(--accent)', low: 'var(--text-faint)' }
 
@@ -220,93 +221,128 @@ function KBrainView({ pitchers, liveKsByPitcher = {} }) {
         const oppTeam = e.targets[0]?.team || '?'
         const myLine = lines[e.key]
         const myLineNum = myLine !== undefined && myLine !== '' ? parseFloat(myLine) : null
-        const myProb = myLineNum != null && Number.isFinite(myLineNum) ? kOverProb(ek.lambda, myLineNum) : null
+        const myProb = myLineNum != null && Number.isFinite(myLineNum) && myLineNum >= 0 && myLineNum <= 15
+          ? kOverProb(ek.lambda, myLineNum)
+          : null
         const liveK = liveKsByPitcher[e.key]
         const projection = projectedK(ek)
 
         return (
-          <div key={e.key} className={`kbrain-card ${detailsOpen[e.key] ? 'is-expanded' : ''}`} style={{ background: 'rgba(16,24,48,0.45)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '12px', padding: '14px 16px' }}>
-            {/* Header */}
-            <div className="kbrain-card-head" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px', flexWrap: 'wrap' }}>
-              <img src={playerHeadshot(e.pitcher.id, 60)} alt="" loading="lazy" style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover', background: 'rgba(255,255,255,0.04)', flexShrink: 0 }} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: '800', fontSize: '14px', color: '#fff' }}>{e.pitcher.name}</div>
-                <div style={{ fontSize: '11px', color: 'var(--text-faint)' }}>
-                  {e.pitcher.hand}HP · vs {oppTeam}
-                  {e.game?.gameDate && <span> · {gameTime(e.game.gameDate)}</span>}
+          <article key={e.key} className={`kbrain-card ${detailsOpen[e.key] ? 'is-expanded' : ''}`}>
+            <header className="kbrain-card-head">
+              <div className="kbrain-identity">
+                <img className="kbrain-headshot" src={playerHeadshot(e.pitcher.id, 96)} alt="" loading="lazy" />
+                <div className="kbrain-identity-copy">
+                  <div className="kbrain-pitcher-name">{e.pitcher.name}</div>
+                  <div className="kbrain-matchup">
+                    {e.pitcher.hand}HP · vs {oppTeam}
+                    {e.game?.gameDate && <span> · {gameTime(e.game.gameDate)}</span>}
+                  </div>
+                  <div className="kbrain-projection-meta">
+                    <span style={{ color: CONF_COLOR[ek.conf] }}>{ek.conf} confidence</span>
+                    <span>{Number.isFinite(ek.expIP) ? `${ek.expIP.toFixed(1)} expected IP` : 'Workload unavailable'}</span>
+                  </div>
+                </div>
+                {liveK && (
+                  <div className="kbrain-live">
+                    <strong>{liveK.ks} K</strong>
+                    <span>live{liveK.ip != null ? ` · ${liveK.ip} IP` : ''}</span>
+                  </div>
+                )}
+              </div>
+              <div className="kbrain-projection" title={`80% uncertainty interval: ${ek.lo}–${ek.hi} K`}>
+                <strong>{Number.isFinite(projection) ? projection.toFixed(1) : '—'}</strong>
+                <span>Projected K</span>
+                <small>{Number.isFinite(ek.lo) && Number.isFinite(ek.hi) ? `80% range ${ek.lo}–${ek.hi}` : 'Point estimate'}</small>
+              </div>
+            </header>
+
+            <section className="kbrain-book" aria-label="Sportsbook strikeout line evaluator">
+              <div className="kbrain-book-field">
+                <label htmlFor={`k-line-${e.key}`}>
+                  <span>Sportsbook line</span>
+                  <small>Enter the listed strikeout total</small>
+                </label>
+                <input
+                  id={`k-line-${e.key}`}
+                  type="number"
+                  step="0.5"
+                  min="0"
+                  max="15"
+                  inputMode="decimal"
+                  placeholder="6.5"
+                  value={lines[e.key] ?? ''}
+                  onChange={(ev) => setLines((prev) => ({ ...prev, [e.key]: ev.target.value }))}
+                />
+              </div>
+              <div className="kbrain-book-result" aria-live="polite">
+                <strong>{myProb != null && Number.isFinite(myProb) ? `${(myProb * 100).toFixed(0)}%` : '—'}</strong>
+                <span>{myProb != null && Number.isFinite(myProb) ? `chance to go over ${myLineNum}` : 'Enter a line to calculate over probability'}</span>
+              </div>
+            </section>
+
+            <section className="kbrain-drivers" aria-label="Primary projection drivers">
+              <div className="kbrain-section-label">Why this projection</div>
+              <div className="kbrain-driver-list">
+                <div className="kbrain-driver">
+                  <Icon name="Gauge" size={15} />
+                  <span>
+                    <strong>{Number.isFinite(ek.expIP) ? `${ek.expIP.toFixed(1)} IP` : '—'}</strong>
+                    <small>{Number.isFinite(ek.expBF) ? `${Math.round(ek.expBF)} expected batters` : 'Expected workload'}</small>
+                  </span>
+                </div>
+                <div className="kbrain-driver">
+                  <Icon name="Users" size={15} />
+                  <span>
+                    <strong>{pct(ek.oppK, 1)}</strong>
+                    <small>Opponent K rate</small>
+                  </span>
+                </div>
+                <div className="kbrain-driver" style={{ '--driver-color': TREND_COLOR[ek.trend] }}>
+                  <Icon name={TREND_ICON[ek.trend]} size={15} />
+                  <span>
+                    <strong>{pct(ek.adjustedKRate, 1)}</strong>
+                    <small>Adjusted K rate · {TREND_LABEL[ek.trend]}</small>
+                  </span>
                 </div>
               </div>
-              {liveK && (
-                <div style={{ textAlign: 'center', flexShrink: 0, background: 'rgba(99,220,99,0.12)', border: '1px solid rgba(99,220,99,0.25)', borderRadius: '8px', padding: '4px 10px' }}>
-                  <div style={{ fontSize: '20px', fontWeight: '900', color: 'var(--strong)', lineHeight: 1 }}>{liveK.ks}K</div>
-                  <div style={{ fontSize: '9px', color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>live{liveK.ip != null ? ` · ${liveK.ip} IP` : ''}</div>
-                </div>
-              )}
-              <div style={{ textAlign: 'right', flexShrink: 0 }} title={`80% uncertainty interval: ${ek.lo}–${ek.hi} K`}>
-                <div style={{ fontSize: '22px', fontWeight: '900', color: '#fff', lineHeight: 1 }}>{Number.isFinite(projection) ? `${projection.toFixed(1)} K` : '—'}</div>
-                <div style={{ fontSize: '10px', color: 'var(--text-faint)' }}>projected strikeouts</div>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', flexShrink: 0 }}>
-                <span style={{ fontSize: '16px', color: TREND_COLOR[ek.trend] }}>{TREND_ICON[ek.trend]}</span>
-                <span style={{ fontSize: '9px', color: CONF_COLOR[ek.conf], textTransform: 'uppercase', letterSpacing: '0.04em' }}>{ek.conf}</span>
-              </div>
-            </div>
+            </section>
 
-            {/* Environment + model adjustment chips */}
-            <div className="kbrain-adjustments" style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '8px' }}>
-              {ek.tempF != null && (
-                <span style={{ fontSize: '10px', padding: '2px 7px', borderRadius: '4px', background: 'rgba(255,255,255,0.05)', color: ek.tempAdj < 0.97 ? 'var(--bad)' : ek.tempAdj > 1.02 ? 'var(--strong)' : 'var(--text-faint)' }}>
-                  {Math.round(ek.tempF)}°F{ek.tempAdj < 0.97 ? ' ❄ cold' : ek.tempAdj > 1.02 ? ' ☀ warm' : ''}
-                </span>
-              )}
-              {ek.umpireAdj != null && ek.umpireAdj !== 1 && (
-                <span style={{ fontSize: '10px', padding: '2px 7px', borderRadius: '4px', background: 'rgba(255,255,255,0.05)', color: ek.umpireAdj > 1.01 ? 'var(--strong)' : 'var(--bad)' }}>
-                  UMP {ek.umpireAdj > 1.01 ? '+ K zone' : '− K zone'}
-                </span>
-              )}
-              {ek.parkKAdj != null && ek.parkKAdj !== 1 && (
-                <span style={{ fontSize: '10px', padding: '2px 7px', borderRadius: '4px', background: 'rgba(255,255,255,0.05)', color: ek.parkKAdj < 0.97 ? 'var(--bad)' : ek.parkKAdj > 1.02 ? 'var(--strong)' : 'var(--text-faint)' }}>
-                  park {ek.parkKAdj > 1 ? `+${((ek.parkKAdj - 1) * 100).toFixed(0)}%` : `${((ek.parkKAdj - 1) * 100).toFixed(0)}%`} K
-                </span>
-              )}
-              {ek.tttoPenalty != null && ek.tttoPenalty < 0.97 && (
-                <span style={{ fontSize: '10px', padding: '2px 7px', borderRadius: '4px', background: 'rgba(255,255,255,0.05)', color: 'var(--bad)' }} title="Third-time-through-order K decay">
-                  TTTO −{((1 - ek.tttoPenalty) * 100).toFixed(0)}%
-                </span>
-              )}
-              {ek.vegasTrim != null && ek.vegasTrim < 1 && (
-                <span style={{ fontSize: '10px', padding: '2px 7px', borderRadius: '4px', background: 'rgba(255,255,255,0.05)', color: 'var(--bad)' }} title="Elite-contact lineup → earlier hook risk">
-                  lineup pressure −{((1 - ek.vegasTrim) * 100).toFixed(0)}%
-                </span>
-              )}
-            </div>
-
-            {/* Sportsbook line input */}
-            <div className="kbrain-book" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '11px', color: 'var(--text-faint)', flexShrink: 0 }}>Book line:</span>
-              <input
-                type="number"
-                step="0.5"
-                min="0"
-                max="15"
-                placeholder="e.g. 6.5"
-                value={lines[e.key] ?? ''}
-                onChange={(ev) => setLines((prev) => ({ ...prev, [e.key]: ev.target.value }))}
-                style={{ width: '70px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '4px 8px', color: '#fff', fontSize: '12px', fontFamily: 'monospace' }}
+            <div className="kbrain-context">
+              <div className="kbrain-section-label">Model &amp; matchup context</div>
+              <div className="kbrain-adjustments">
+                {ek.tempF != null && (
+                  <span style={{ color: ek.tempAdj < 0.97 ? 'var(--bad)' : ek.tempAdj > 1.02 ? 'var(--strong)' : 'var(--text-faint)' }}>
+                    {Math.round(ek.tempF)}°F{ek.tempAdj < 0.97 ? ' · cold' : ek.tempAdj > 1.02 ? ' · warm' : ''}
+                  </span>
+                )}
+                {ek.umpireAdj != null && ek.umpireAdj !== 1 && (
+                  <span style={{ color: ek.umpireAdj > 1.01 ? 'var(--strong)' : 'var(--bad)' }}>
+                    Umpire {ek.umpireAdj > 1.01 ? '+ K zone' : '− K zone'}
+                  </span>
+                )}
+                {ek.parkKAdj != null && ek.parkKAdj !== 1 && (
+                  <span style={{ color: ek.parkKAdj < 0.97 ? 'var(--bad)' : ek.parkKAdj > 1.02 ? 'var(--strong)' : 'var(--text-faint)' }}>
+                    Park {ek.parkKAdj > 1 ? `+${((ek.parkKAdj - 1) * 100).toFixed(0)}%` : `${((ek.parkKAdj - 1) * 100).toFixed(0)}%`} K
+                  </span>
+                )}
+                {ek.tttoPenalty != null && ek.tttoPenalty < 0.97 && (
+                  <span style={{ color: 'var(--bad)' }} title="Third-time-through-order K decay">
+                    TTTO −{((1 - ek.tttoPenalty) * 100).toFixed(0)}%
+                  </span>
+                )}
+                {ek.vegasTrim != null && ek.vegasTrim < 1 && (
+                  <span style={{ color: 'var(--bad)' }} title="Elite-contact lineup creates earlier hook risk">
+                    Lineup pressure −{((1 - ek.vegasTrim) * 100).toFixed(0)}%
+                  </span>
+                )}
+              </div>
+              <KBrainH2H
+                targets={e.targets}
+                open={!!h2hOpen[e.key]}
+                onToggle={() => setH2hOpen((prev) => ({ ...prev, [e.key]: !prev[e.key] }))}
               />
-              {myProb != null && Number.isFinite(myProb) && (
-                <span style={{ fontSize: '12px', fontWeight: '700', color: myProb >= 0.55 ? 'var(--strong)' : myProb >= 0.40 ? '#c69a57' : 'var(--bad)' }}>
-                  {(myProb * 100).toFixed(0)}% over · {myProb >= 0.55 ? 'value ✓' : myProb <= 0.35 ? 'fade ✗' : 'neutral'}
-                </span>
-              )}
             </div>
-
-            {/* H2H K matchup */}
-            <KBrainH2H
-              targets={e.targets}
-              open={!!h2hOpen[e.key]}
-              onToggle={() => setH2hOpen((prev) => ({ ...prev, [e.key]: !prev[e.key] }))}
-            />
             <button
               className="kbrain-card-toggle"
               onClick={() => setDetailsOpen((prev) => ({ ...prev, [e.key]: !prev[e.key] }))}
@@ -315,7 +351,7 @@ function KBrainView({ pitchers, liveKsByPitcher = {} }) {
               {detailsOpen[e.key] ? 'Show less' : 'More context'}
               <Icon name={detailsOpen[e.key] ? 'ChevronUp' : 'ChevronDown'} size={14} />
             </button>
-          </div>
+          </article>
         )
       })}
       </div>

@@ -19749,3 +19749,286 @@ button.th:focus-visible {
     padding-block: 6px !important;
   }
 }
+
+/* K Brain: projection-first decision cards. */
+.kbrain-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(540px, 100%), 1fr));
+  align-items: start;
+  gap: 12px;
+}
+
+.kbrain-card {
+  min-width: 0;
+  padding: 0 !important;
+  overflow: hidden;
+  border: 1px solid var(--border) !important;
+  border-radius: 16px !important;
+  background: rgba(15, 14, 21, 0.82) !important;
+}
+
+.kbrain-card-head {
+  min-height: 112px;
+  margin: 0 !important;
+  padding: 16px;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px !important;
+  border-bottom: 0;
+}
+
+.kbrain-identity {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 50px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 11px;
+}
+
+.kbrain-headshot {
+  width: 50px;
+  height: 50px;
+  object-fit: cover;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.kbrain-identity-copy { min-width: 0; }
+.kbrain-pitcher-name {
+  overflow: hidden;
+  color: #fff;
+  font-family: var(--display);
+  font-size: 17px;
+  font-weight: 850;
+  letter-spacing: -0.025em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kbrain-matchup { margin-top: 3px; color: var(--text-faint); font-size: 10px; }
+.kbrain-projection-meta {
+  margin-top: 7px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px 10px;
+  color: var(--text-dim);
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+.kbrain-projection-meta span + span::before { margin-right: 10px; color: var(--text-faint); content: '•'; }
+
+.kbrain-live {
+  min-width: 52px;
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border: 1px solid color-mix(in srgb, var(--strong) 28%, transparent);
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--strong) 10%, transparent);
+}
+.kbrain-live strong { color: var(--strong); font-family: var(--mono); font-size: 15px; line-height: 1; }
+.kbrain-live span { margin-top: 4px; color: var(--text-faint); font-size: 7px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; }
+
+.kbrain-projection {
+  min-width: 94px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+}
+.kbrain-projection > strong {
+  color: #fff;
+  font-family: var(--mono);
+  font-size: 36px;
+  font-weight: 900;
+  letter-spacing: -0.055em;
+  line-height: 0.92;
+}
+.kbrain-projection > span {
+  margin-top: 7px;
+  color: var(--text-dim);
+  font-size: 9px;
+  font-weight: 850;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+.kbrain-projection > small { margin-top: 3px; color: var(--text-faint); font-size: 8px; }
+
+.kbrain-book {
+  min-height: 82px;
+  margin: 0 16px;
+  padding: 12px 14px;
+  display: grid !important;
+  grid-template-columns: minmax(220px, 1fr) minmax(150px, 0.8fr);
+  align-items: center;
+  gap: 16px;
+  border: 1px solid var(--border-soft) !important;
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.018);
+}
+.kbrain-book-field { min-width: 0; display: flex; align-items: center; gap: 12px; }
+.kbrain-book-field label { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.kbrain-book-field label > span { color: var(--text-dim); font-size: 10px; font-weight: 800; text-transform: uppercase; }
+.kbrain-book-field label > small { color: var(--text-faint); font-size: 8px; line-height: 1.25; }
+.kbrain-book input {
+  flex: none;
+  width: 84px !important;
+  height: 44px !important;
+  padding: 0 10px !important;
+  color: #fff !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 10px !important;
+  background: rgba(255, 255, 255, 0.045) !important;
+  font-family: var(--mono) !important;
+  font-size: 15px !important;
+  font-weight: 750;
+}
+.kbrain-book input:focus { border-color: var(--accent) !important; outline: 2px solid transparent; box-shadow: 0 0 0 2px var(--accent-glow); }
+.kbrain-book-result { min-width: 0; display: flex; flex-direction: column; align-items: flex-end; text-align: right; }
+.kbrain-book-result strong { color: var(--accent); font-family: var(--mono); font-size: 25px; font-weight: 900; line-height: 1; }
+.kbrain-book-result span { margin-top: 5px; color: var(--text-dim); font-size: 9px; font-weight: 750; line-height: 1.25; }
+
+.kbrain-drivers { padding: 14px 16px 16px; }
+.kbrain-section-label {
+  margin-bottom: 8px;
+  color: var(--text-faint);
+  font-size: 8px;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.kbrain-driver-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+.kbrain-driver {
+  min-width: 0;
+  min-height: 58px;
+  padding: 9px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.018);
+}
+.kbrain-driver > svg { flex: none; color: var(--driver-color, var(--accent)); }
+.kbrain-driver > span { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.kbrain-driver strong { overflow: hidden; color: #fff; font-family: var(--mono); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.kbrain-driver small { overflow: hidden; color: var(--text-faint); font-size: 7px; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
+
+.kbrain-context {
+  display: none;
+  padding: 13px 16px;
+  border-top: 1px solid var(--border-soft);
+  background: rgba(255, 255, 255, 0.012);
+}
+.kbrain-card.is-expanded .kbrain-context { display: block; }
+.kbrain-context .kbrain-section-label { margin-bottom: 9px; }
+.kbrain-context .kbrain-adjustments {
+  margin: 0 !important;
+  padding: 0 0 11px;
+  display: flex !important;
+  flex-wrap: wrap;
+  gap: 6px;
+  border: 0;
+}
+.kbrain-context .kbrain-adjustments:empty { display: none !important; }
+.kbrain-context .kbrain-adjustments > span {
+  padding: 4px 7px;
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.025);
+  font-size: 9px;
+  font-weight: 700;
+}
+.kbrain-context .kbrain-h2h { margin: 0 !important; padding: 0 !important; }
+.kbrain-context .kbrain-h2h-trigger { min-height: 40px; }
+
+.kbrain-card-toggle {
+  width: 100%;
+  min-height: 44px;
+  margin: 0;
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  color: var(--text-faint);
+  border: 0;
+  border-top: 1px solid var(--border-soft);
+  border-radius: 0;
+  background: rgba(255, 255, 255, 0.012);
+  font-size: 9px;
+  font-weight: 850;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.kbrain-card-toggle:hover,
+.kbrain-card-toggle[aria-expanded='true'] { color: var(--accent); background: rgba(255, 255, 255, 0.025); }
+
+@media (max-width: 560px) {
+  .kbrain-list { grid-template-columns: minmax(0, 1fr); }
+  .kbrain-card-head {
+    min-height: 0;
+    padding: 12px 10px 10px;
+    grid-template-columns: minmax(0, 1fr) !important;
+    align-items: stretch;
+    gap: 12px !important;
+  }
+  .kbrain-identity { grid-template-columns: 44px minmax(0, 1fr) auto; gap: 9px; }
+  .kbrain-headshot { width: 44px; height: 44px; border-radius: 10px; }
+  .kbrain-pitcher-name { font-size: 15px; }
+  .kbrain-matchup { font-size: 9px; }
+  .kbrain-projection-meta { margin-top: 5px; gap: 3px 7px; font-size: 7px; }
+  .kbrain-projection-meta span + span::before { margin-right: 7px; }
+  .kbrain-live { min-width: 46px; padding: 5px 6px; }
+  .kbrain-live strong { font-size: 13px; }
+  .kbrain-projection {
+    min-width: 0;
+    padding: 10px 12px;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: baseline;
+    column-gap: 10px;
+    text-align: left;
+    border: 1px solid var(--border-soft);
+    border-radius: 11px;
+    background: rgba(255, 255, 255, 0.018);
+  }
+  .kbrain-projection > strong { grid-row: 1 / 3; font-size: 34px; }
+  .kbrain-projection > span { margin: 0; align-self: end; font-size: 8px; }
+  .kbrain-projection > small { margin: 2px 0 0; align-self: start; }
+  .kbrain-card:not(.is-expanded) .kbrain-book { display: grid !important; }
+  .kbrain-book {
+    min-height: 0;
+    margin: 0 10px;
+    padding: 11px;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+  .kbrain-book-field { justify-content: space-between; }
+  .kbrain-book-field label > small { max-width: 160px; }
+  .kbrain-book input { width: 90px !important; height: 44px !important; font-size: 16px !important; }
+  .kbrain-book-result { align-items: flex-start; text-align: left; }
+  .kbrain-book-result strong { font-size: 24px; }
+  .kbrain-drivers { padding: 12px 10px; }
+  .kbrain-driver-list { gap: 5px; }
+  .kbrain-driver {
+    min-height: 70px;
+    padding: 8px 5px;
+    flex-direction: column;
+    justify-content: center;
+    gap: 5px;
+    text-align: center;
+  }
+  .kbrain-driver > span { align-items: center; }
+  .kbrain-driver strong { font-size: 11px; }
+  .kbrain-driver small { max-width: 86px; font-size: 6.5px; white-space: normal; }
+  .kbrain-context { padding: 12px 10px; }
+  .kbrain-card-toggle { width: 100%; min-height: 44px; margin: 0; }
+}

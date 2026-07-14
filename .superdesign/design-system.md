@@ -106,9 +106,11 @@ Mobile-first player-prop analytics dashboard. MLB is intentionally limited to ho
 
 ## Mobile K Brain
 - Search is 44px. Filter families are visually separated and horizontally scrollable without page-level overflow.
-- Each arm card leads with pitcher/matchup, estimated K, range, trend/confidence, and the three most useful over probabilities.
-- Remaining K lines, model adjustments, sportsbook input, and H2H detail use progressive disclosure.
-- Avoid rendering the complete probability ladder as the default first scan.
+- Each arm card leads with pitcher/matchup and one decimal projected-K hero; confidence and expected innings sit directly beside that point estimate while the uncertainty range remains quiet secondary context.
+- The sportsbook-line evaluator stays visible and reports only the modeled chance to go over the entered line. Never label a probability as value, fade, or neutral without sportsbook odds.
+- Show exactly three compact primary drivers: expected workload, opponent strikeout rate, and adjusted pitcher strikeout rate/recent trend.
+- Weather, umpire, park, TTTO, lineup pressure, and batter H2H use one progressive-disclosure section.
+- Do not render a probability ladder.
 
 ## Mobile Results
 - Use a 2x2 KPI grid, then a compact Grades/Calibration segment instead of showing two narrow charts side by side.

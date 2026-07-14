@@ -1,5 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 
 import {
   K_CALIBRATION,
@@ -147,4 +148,12 @@ test('K projection helpers use the expected total, not the uncertainty range', (
   assert.equal(summary.exactCount, 1)
   assert.equal(summary.withinCount, 2, 'within-one accuracy uses the rounded whole-K projection')
   assert.ok(Math.abs(summary.mae - (4 / 3)) < 1e-9, 'MAE keeps the decimal projection')
+})
+
+test('K Brain UI is projection-first and does not invent betting value without odds', () => {
+  const source = readFileSync(new URL('../ui/src/components/PitchersView.jsx', import.meta.url), 'utf8')
+  assert.match(source, /Projected K/)
+  assert.match(source, /chance to go over/)
+  assert.match(source, /Why this projection/)
+  assert.doesNotMatch(source, /value ✓|fade ✗|neutral/)
 })
