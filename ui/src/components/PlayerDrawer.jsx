@@ -10,7 +10,7 @@ import { interpretWind } from '../lib/wind.js'
 import { playerHeadshot, teamAbbr } from '../lib/teams.js'
 import { toolGrades, heatBreakdown, scoutVerdict, gradeLabel, hrSetup } from '../lib/scout.js'
 import { blastOf, blastVsHandOf } from '../lib/groups.js'
-import { estimatedKs } from '../lib/pitchers.js'
+import { estimatedKs, projectedK } from '../lib/pitchers.js'
 import { useLiveMode } from '../lib/liveMode.js'
 import { useEliLevel, reasonsForLevel } from '../lib/eliLevel.js'
 import { toast } from './Toast.jsx'
@@ -1431,6 +1431,7 @@ function PitcherSection({ b, batters, onOpenPitcher }) {
   const s = p.season || {}
   const lineup = (batters || []).filter(x => x.gamePk === b.gamePk && x.team === b.team)
   const estK = estimatedKs(p, lineup)
+  const kProjection = projectedK(estK)
   const split = b.batSide === 'L' ? p.splits?.vl : p.splits?.vr
   const rf = p.recentForm
   const canOpen = !!onOpenPitcher && p.id != null
@@ -1454,7 +1455,11 @@ function PitcherSection({ b, batters, onOpenPitcher }) {
         <Cell k="ERA" v={num(s.era, 2)} />
         <Cell k="HR/9" v={num(s.hrPer9, 2)} tone={s.hrPer9 >= 1.3 ? 'good' : s.hrPer9 <= 0.9 ? 'bad' : null} />
         <Cell k="K/9" v={num(s.kPer9, 1)} />
-        <Cell k="Est K" v={estK ? `${Math.round(estK.k)}` : '—'} title={estK ? `Projected K: ${estK.lo}–${estK.hi}` : 'Need a season K sample.'} />
+        <Cell
+          k="Projected K"
+          v={Number.isFinite(kProjection) ? kProjection.toFixed(1) : '—'}
+          title={Number.isFinite(kProjection) ? `Projected strikeouts: ${kProjection.toFixed(1)} K. 80% uncertainty interval: ${estK.lo}–${estK.hi} K.` : 'Need a season K sample.'}
+        />
         <Cell k="WHIP" v={num(s.whip, 2)} />
         <Cell k="IP" v={num(s.ip, 1)} />
         <Cell k="GB/FB" v={battedBallLabel(s.goAo)} tone={ballTone(s.goAo)} title="League ~1.15." />

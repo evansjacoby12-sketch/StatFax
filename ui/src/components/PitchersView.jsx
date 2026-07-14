@@ -3,7 +3,15 @@ import Icon from './Icon.jsx'
 import { loadBacktestLog } from '../lib/backtestLog.js'
 import CommandTabs from './CommandTabs.jsx'
 import { GradeChip, ScoreRing, ProbBar, Stat } from './atoms.jsx'
-import { groupPitchers, pitchUsage, effSide, K_LINES, kOverProb } from '../lib/pitchers.js'
+import {
+  groupPitchers,
+  pitchUsage,
+  effSide,
+  K_LINES,
+  kOverProb,
+  projectedK,
+  summarizeKProjectionResults,
+} from '../lib/pitchers.js'
 import { pct, num, rate, gameTime } from '../lib/format.js'
 import { teamColor, teamLogo, playerHeadshot, hexToRgba } from '../lib/teams.js'
 import { useLiveMode } from '../lib/liveMode.js'
@@ -178,7 +186,7 @@ function KBrainView({ pitchers, liveKsByPitcher = {} }) {
         />
         {/* Filter chips row */}
         <div className="kbrain-filter-row" style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
-          <span style={{ fontSize: '10px', color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', marginRight: '2px' }}>Min K</span>
+          <span style={{ fontSize: '10px', color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', marginRight: '2px' }}>Min projected K</span>
           {[0, 4.5, 5.5, 6.5, 7.5].map((v) => (
             <button key={v} style={filterBtnStyle(minK === v)} onClick={() => setMinK(v)}>
               {v === 0 ? 'All' : `${v}+`}
@@ -191,12 +199,12 @@ function KBrainView({ pitchers, liveKsByPitcher = {} }) {
             </button>
           ))}
           <span style={{ fontSize: '10px', color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 2px 0 8px' }}>Sort</span>
-          <button style={filterBtnStyle(sortBy === 'k')} onClick={() => setSortBy('k')}>Est K</button>
+          <button style={filterBtnStyle(sortBy === 'k')} onClick={() => setSortBy('k')}>Projected K</button>
           <button style={filterBtnStyle(sortBy === 'time')} onClick={() => setSortBy('time')}>Game Time</button>
         </div>
         {/* Result count */}
         <div className="kbrain-result-count" style={{ fontSize: '10px', color: 'var(--text-faint)' }}>
-          {arms.length} pitcher{arms.length !== 1 ? 's' : ''} · Poisson K distribution · enter the book line to see edge
+          {arms.length} pitcher{arms.length !== 1 ? 's' : ''} · projected strikeouts · enter the book line to see over probability
         </div>
       </div>
 
@@ -215,6 +223,7 @@ function KBrainView({ pitchers, liveKsByPitcher = {} }) {
         const myProb = myLineNum != null && Number.isFinite(myLineNum) ? kOverProb(ek.lambda, myLineNum) : null
         const showLines = K_LINES.filter((l) => (ek.probs[l] ?? 0) >= 0.03)
         const liveK = liveKsByPitcher[e.key]
+        const projection = projectedK(ek)
 
         return (
           <div key={e.key} className={`kbrain-card ${detailsOpen[e.key] ? 'is-expanded' : ''}`} style={{ background: 'rgba(16,24,48,0.45)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '12px', padding: '14px 16px' }}>
@@ -234,9 +243,9 @@ function KBrainView({ pitchers, liveKsByPitcher = {} }) {
                   <div style={{ fontSize: '9px', color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>live{liveK.ip != null ? ` · ${liveK.ip} IP` : ''}</div>
                 </div>
               )}
-              <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                <div style={{ fontSize: '22px', fontWeight: '900', color: '#fff', lineHeight: 1 }}>{ek.k.toFixed(1)}</div>
-                <div style={{ fontSize: '10px', color: 'var(--text-faint)' }}>est K ({ek.lo}–{ek.hi})</div>
+              <div style={{ textAlign: 'right', flexShrink: 0 }} title={`80% uncertainty interval: ${ek.lo}–${ek.hi} K`}>
+                <div style={{ fontSize: '22px', fontWeight: '900', color: '#fff', lineHeight: 1 }}>{Number.isFinite(projection) ? `${projection.toFixed(1)} K` : '—'}</div>
+                <div style={{ fontSize: '10px', color: 'var(--text-faint)' }}>projected strikeouts</div>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', flexShrink: 0 }}>
                 <span style={{ fontSize: '16px', color: TREND_COLOR[ek.trend] }}>{TREND_ICON[ek.trend]}</span>
@@ -348,22 +357,15 @@ function KBrainView({ pitchers, liveKsByPitcher = {} }) {
         if (!resultsByDate) return null
         const dates = Object.keys(resultsByDate).sort().slice(-7).reverse()
         if (!dates.length) return null
-        let totalHits = 0, totalGraded = 0
-        for (const d of dates) {
-          for (const e of resultsByDate[d] || []) {
-            if (e.actualK != null) {
-              totalGraded++
-              if (e.actualK >= e.lo && e.actualK <= e.hi) totalHits++
-            }
-          }
-        }
+        const recentResults = dates.flatMap((d) => resultsByDate[d] || [])
+        const projectionSummary = summarizeKProjectionResults(recentResults)
         return (
           <details className="kbrain-record" style={{ marginTop: '20px', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '16px' }}>
             <summary className="kbrain-record-summary" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-              <span style={{ fontSize: '12px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-faint)' }}>K-prop record</span>
-              {totalGraded > 0 && (
-                <span style={{ fontSize: '11px', color: totalHits / totalGraded >= 0.65 ? 'var(--strong)' : totalHits / totalGraded >= 0.45 ? '#c69a57' : 'var(--bad)' }}>
-                  {totalHits}/{totalGraded} within range ({(totalHits / totalGraded * 100).toFixed(0)}% hit rate)
+              <span style={{ fontSize: '12px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-faint)' }}>K projection accuracy</span>
+              {projectionSummary.n > 0 && (
+                <span style={{ fontSize: '11px', color: projectionSummary.mae <= 1 ? 'var(--strong)' : projectionSummary.mae <= 1.75 ? '#c69a57' : 'var(--bad)' }}>
+                  MAE {projectionSummary.mae.toFixed(1)} K · {projectionSummary.withinCount}/{projectionSummary.n} within 1 K
                 </span>
               )}
               <Icon className="kbrain-record-chevron" name="ChevronDown" size={14} />
@@ -377,13 +379,16 @@ function KBrainView({ pitchers, liveKsByPitcher = {} }) {
                   <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '5px' }}>{d}</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
                     {rows.map((e, i) => {
-                      const hit = e.actualK >= e.lo && e.actualK <= e.hi
+                      const projection = projectedK(e)
+                      const error = Number.isFinite(projection) ? e.actualK - projection : null
+                      const hit = Number.isFinite(error) && Math.abs(error) <= 1
                       return (
                         <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', padding: '4px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: '6px' }}>
                           <span style={{ flex: 1, fontWeight: '600', color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{e.name}</span>
-                          <span className="mono" style={{ color: 'var(--text-faint)', flexShrink: 0 }}>est {e.lo}–{e.hi}</span>
+                          <span className="mono" style={{ color: 'var(--text-faint)', flexShrink: 0 }}>proj {Number.isFinite(projection) ? projection.toFixed(1) : '—'} K</span>
                           <span className="mono" style={{ color: '#fff', fontWeight: '700', flexShrink: 0 }}>actual {e.actualK}</span>
-                          <Icon name={hit ? 'Check' : 'X'} size={13} style={{ flexShrink: 0, color: hit ? 'var(--strong)' : 'var(--bad)' }} aria-label={hit ? 'within range' : 'outside range'} />
+                          {Number.isFinite(error) && <span className="mono" style={{ color: hit ? 'var(--strong)' : 'var(--bad)', flexShrink: 0 }}>{error >= 0 ? '+' : ''}{error.toFixed(1)}</span>}
+                          <Icon name={hit ? 'Check' : 'X'} size={13} style={{ flexShrink: 0, color: hit ? 'var(--strong)' : 'var(--bad)' }} aria-label={hit ? 'within one strikeout' : 'more than one strikeout off'} />
                         </div>
                       )
                     })}
@@ -494,8 +499,8 @@ function KBrainH2H({ targets, open, onToggle }) {
 }
 
 // Build K-prop parlay combos across pitchers. Ranks pitchers by estimated K
-// count, then builds 2-leg and 3-leg combos with a suggested line (round down
-// from the est K midpoint so the target is realistic) and combined probability.
+// count, then builds 2-leg and 3-leg combos with a suggested line below the
+// single-number K projection so the target is realistic.
 function buildKParlays(pitchers) {
   const pool = pitchers
     .filter((e) => e.estK && Number.isFinite(e.estK.k) && e.estK.k >= 4)
@@ -510,7 +515,7 @@ function buildKParlays(pitchers) {
   return combos
 }
 
-// Suggest a K line: floor to nearest 0.5 below the est midpoint so the line
+// Suggest a K line: floor to nearest 0.5 below the projected total so the line
 // is hittable (e.g. est 7.2 → offer 6.5+, not 7.5+).
 function kLine(estK) {
   return Math.floor(estK.k * 2) / 2  // floor to nearest 0.5
@@ -546,7 +551,7 @@ function KParlaySection({ pitchers, open, onToggle }) {
                         <span style={{ fontWeight: '700', color: '#fff' }}>{e.pitcher.name}</span>
                         <span style={{ fontSize: '10px', color: 'var(--accent)' }}>
                           <b>{line}+ K</b>
-                          <span style={{ color: 'var(--text-faint)', marginLeft: '4px' }}>est {e.estK.lo}–{e.estK.hi} vs {oppTeam}</span>
+                          <span style={{ color: 'var(--text-faint)', marginLeft: '4px' }}>proj {projectedK(e.estK)?.toFixed(1)} K vs {oppTeam}</span>
                         </span>
                       </span>
                       {i < c.legs.length - 1 && <span style={{ color: 'var(--text-faint)', fontSize: '11px', fontWeight: '700' }}>+</span>}
@@ -690,6 +695,7 @@ function PvpRow({ e, tier, onSelect }) {
   const sgp2 = sgpLegs(e.targets, 2)
   const sgp3 = sgpLegs(e.targets, 3)
   const reasons = pvpReasons(e)
+  const kProjection = projectedK(e.estK)
   return (
     <article className={`pvp-row ${open ? 'is-open' : ''}`}>
       <div className="pvp-identity">
@@ -713,7 +719,7 @@ function PvpRow({ e, tier, onSelect }) {
 
       <div className="pvp-stats mono">
         <span><b>{num(s.hrPer9, 2)}</b><small>HR/9</small></span>
-        <span title={e.estK ? `Projected strikeouts: ${e.estK.lo}–${e.estK.hi} (≈${e.estK.expIP.toFixed(1)} IP vs a ${pct(e.estK.oppK, 0)}-K lineup)` : undefined}><b className="is-accent">{e.estK ? Math.round(e.estK.k) : '—'}</b><small>Est K</small></span>
+        <span title={Number.isFinite(kProjection) ? `Projected strikeouts: ${kProjection.toFixed(1)} K (80% interval ${e.estK.lo}–${e.estK.hi}; ≈${e.estK.expIP.toFixed(1)} IP vs a ${pct(e.estK.oppK, 0)}-K lineup)` : undefined}><b className="is-accent">{Number.isFinite(kProjection) ? kProjection.toFixed(1) : '—'}</b><small>Proj K</small></span>
         <span><b>{sav.exitVeloAgainst != null ? num(sav.exitVeloAgainst, 0) : '—'}</b><small>EV</small></span>
       </div>
 
@@ -816,6 +822,7 @@ export function PitcherCard({ entry, onSelect, selectedId, watchlist, slip }) {
   const verdictDetail = attackSide
     ? `${attackSide === 'L' ? 'Left-handed' : 'Right-handed'} bats own the cleaner path${Number.isFinite(attackRate) ? ` at ${num(attackRate, 2)} HR/9` : ''}.`
     : 'No meaningful platoon advantage is available in the current sample.'
+  const kProjection = projectedK(entry.estK)
 
   return (
     <section id={`pcard-${entry.key}`} className={`pcard ${isFinal ? 'final' : ''} ${scoutingOpen ? 'scouting-open' : ''}`} style={{
@@ -871,7 +878,7 @@ export function PitcherCard({ entry, onSelect, selectedId, watchlist, slip }) {
       }}>
         <Stat label="HR/9" value={num(season.hrPer9, 2)} tone={tone(season.hrPer9, { hi: 1.4, lo: 0.9 })} />
         <Stat label="Gopher pitch" value={worst?.rv > 0.5 ? worst.name : 'No flag'} sub={worst?.rv > 0.5 ? `+${worst.rv.toFixed(1)} RV/100` : 'Below warning line'} tone={worst?.rv > 0.5 ? 'bad' : undefined} />
-        <Stat label="Est K" value={entry.estK ? `${Math.round(entry.estK.k)}` : '—'} sub={entry.estK ? `${entry.estK.lo}–${entry.estK.hi}` : null} />
+        <Stat label="Projected K" value={Number.isFinite(kProjection) ? kProjection.toFixed(1) : '—'} sub={entry.estK ? `${entry.estK.conf || 'low'} confidence` : null} />
         <Stat label="ERA" value={num(season.era, 2)} tone={tone(season.era, { hi: 4.6, lo: 3.0 })} />
         <Stat label="Barrel%" value={sav.barrelPctAllowed != null ? num(sav.barrelPctAllowed, 1) : '—'} tone={tone(sav.barrelPctAllowed, { hi: 9, lo: 6 })} />
         <Stat label="EV against" value={sav.exitVeloAgainst != null ? `${num(sav.exitVeloAgainst, 1)}` : '—'} tone={tone(sav.exitVeloAgainst, { hi: 90, lo: 87 })} />

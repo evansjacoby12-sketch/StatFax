@@ -14,6 +14,39 @@ import {
 
 export { K_LINES, effSide, estimatedKs, kBrain, kOverProb }
 
+// The actionable K Brain output is the expected strikeout total. The model's
+// lo/hi values are uncertainty bounds, not the projection itself. Accept both
+// live distribution objects and frozen result rows for backward compatibility.
+export function projectedK(value) {
+  if (Number.isFinite(value)) return value
+  if (!value || typeof value !== 'object') return null
+  if (Number.isFinite(value.k)) return value.k
+  if (Number.isFinite(value.lambda)) return value.lambda
+  if (Number.isFinite(value.estK)) return value.estK
+  if (Number.isFinite(value.lo) && Number.isFinite(value.hi)) return (value.lo + value.hi) / 2
+  return null
+}
+
+export function summarizeKProjectionResults(rows, within = 1) {
+  let n = 0
+  let absoluteError = 0
+  let withinCount = 0
+  for (const row of rows || []) {
+    const projection = projectedK(row)
+    if (!Number.isFinite(projection) || !Number.isFinite(row?.actualK)) continue
+    const error = Math.abs(row.actualK - projection)
+    n++
+    absoluteError += error
+    if (error <= within) withinCount++
+  }
+  return {
+    n,
+    mae: n ? absoluteError / n : null,
+    within,
+    withinCount,
+  }
+}
+
 // Effective batter side vs this arm — a switch hitter bats opposite the pitcher.
 // Which batter hand to attack with = the side the starter allows more HR/9 to.
 export function attackSideFor(pitcher) {
