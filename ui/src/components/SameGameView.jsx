@@ -126,7 +126,7 @@ export default function SameGameView({ batters, onSelect, favorConsistency = fal
             const lv = VERDICT_META[live.code]
             const cashed = live.started && g.legs.length > 0 && live.hits >= g.legs.length
             return (
-              <section className={`grp-card sgp-card tone-${g.tone}${cashed ? ' cashed' : ''}`} key={g.gamePk} style={{ '--gc': c, '--i': Math.min(idx, 8) }} title={cashed ? 'Cashed — every leg homered' : undefined}>
+              <section className={`grp-card grp-ticket-card sgp-card sgp-ticket-card tone-${g.tone}${cashed ? ' cashed' : ''}`} data-size={size} key={g.gamePk} style={{ '--gc': c, '--i': Math.min(idx, 8) }} title={cashed ? 'Cashed — every leg homered' : undefined}>
                 <header className="grp-head sgp-card-head">
                   <div className="sgp-card-title">
                     <span className="grp-legbadge">{size}-LEG SGP</span>
@@ -160,12 +160,16 @@ export default function SameGameView({ batters, onSelect, favorConsistency = fal
                     <Icon name="Copy" size={12} />
                   </button>
                 </header>
-                <div className="grp-sub dim sgp-card-prob">
-                  <span className="sgp-hit-main">
-                    <small>Model all-hit</small>
-                    <b className="mono">{pct(g.combo, g.combo < 0.01 ? 2 : 1)}</b>
+                <div className="grp-ticket-summary sgp-ticket-summary">
+                  <span className="grp-ticket-price">
+                    <small className="grp-ticket-kicker">All-hit chance</small>
+                    <strong className="mono">{pct(g.combo, g.combo < 0.01 ? 2 : 1)}</strong>
                   </span>
-                  <span className="sgp-hit-detail">Independent estimate · no uplift</span>
+                  <span className="grp-ticket-return sgp-ticket-method">
+                    <span>Same-game model</span>
+                    <b>Independent</b>
+                    <small>No correlation uplift</small>
+                  </span>
                 </div>
                 <ul className="grp-legs">
                   {g.legs.map((b, i) => {
