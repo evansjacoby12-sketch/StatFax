@@ -142,6 +142,29 @@ test('provider requests retry throttling and transient failures', async () => {
   assert.deepEqual(openAi.value, { ok: true })
 })
 
+test('OpenAI insufficient quota fails immediately instead of retrying', async () => {
+  let attempts = 0
+  await assert.rejects(callOpenAiStructured({
+    apiKey: 'openai-test',
+    model: 'gpt-test',
+    instructions: 'Extract.',
+    input: 'Source.',
+    schemaName: 'quota_fixture',
+    schema: {
+      type: 'object',
+      properties: { ok: { type: 'boolean' } },
+      required: ['ok'],
+      additionalProperties: false,
+    },
+    sleepImpl: async () => {},
+    fetchImpl: async () => {
+      attempts++
+      return response({ error: { code: 'insufficient_quota' } }, 429)
+    },
+  }), /insufficient_quota/)
+  assert.equal(attempts, 1)
+})
+
 test('evidence binding drops invented URLs and overwrites model metadata', () => {
   const sources = [{
     url: 'https://example.com/lineup',

@@ -54,8 +54,10 @@ async function fetchJsonWithRetry({
           lastError = new Error(`${label} returned invalid JSON: ${error instanceof Error ? error.message : String(error)}`)
         }
       } else {
-        const error = new Error(`${label} ${response.status}: ${(await response.text()).slice(0, 300)}`)
-        const retryable = response.status === 429 || response.status >= 500
+        const body = await response.text()
+        const error = new Error(`${label} ${response.status}: ${body.slice(0, 300)}`)
+        const quotaExhausted = /"code"\s*:\s*"insufficient_quota"/i.test(body)
+        const retryable = !quotaExhausted && (response.status === 429 || response.status >= 500)
         if (!retryable || attempt === attempts) throw error
         lastError = error
       }
