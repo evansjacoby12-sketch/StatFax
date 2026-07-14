@@ -772,6 +772,12 @@ export function PitcherCard({ entry, onSelect, selectedId, watchlist, slip }) {
   const liveMode = useLiveMode()
   const live = liveMode && game?.isLive
   const isFinal = game?.isFinal
+  const vulnScore = Math.round(vuln?.score ?? 0)
+  const attackRate = attackSide === 'L' ? lH : attackSide === 'R' ? rH : null
+  const verdictTitle = vulnScore >= 70 ? 'Attackable power matchup' : vulnScore >= 50 ? 'Selective power matchup' : 'Tough power matchup'
+  const verdictDetail = attackSide
+    ? `${attackSide === 'L' ? 'Left-handed' : 'Right-handed'} bats own the cleaner path${Number.isFinite(attackRate) ? ` at ${num(attackRate, 2)} HR/9` : ''}.`
+    : 'No meaningful platoon advantage is available in the current sample.'
 
   return (
     <section id={`pcard-${entry.key}`} className={`pcard ${isFinal ? 'final' : ''} ${scoutingOpen ? 'scouting-open' : ''}`} style={{
@@ -786,10 +792,14 @@ export function PitcherCard({ entry, onSelect, selectedId, watchlist, slip }) {
     }}>
       <div className="pcard-accent" style={{ background: hexToRgba(color, 0.08), position: 'absolute', inset: 0, zIndex: 0 }} />
 
-      {/* Header */}
+      {/* Decision hero */}
       <header className="pcard-head" style={{ display: 'flex', gap: '14px', alignItems: 'center', marginBottom: '16px', position: 'relative', zIndex: 1 }}>
-        <img className="pcard-photo" src={playerHeadshot(pitcher.id, 96)} alt={pitcher.name} loading="lazy" style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover', background: 'rgba(255,255,255,0.03)' }} />
+        <span className="pcard-photo-silo">
+          <img className="pcard-photo" src={playerHeadshot(pitcher.id, 120)} alt={pitcher.name} loading="lazy" />
+          {logo && <img className="pcard-team-mark" src={logo} alt="" loading="lazy" />}
+        </span>
         <div className="pcard-id" style={{ flex: '1', minWidth: '0' }}>
+          <div className="pcard-kicker">Pitcher blueprint {matchup && <><i /> <span>{matchup}</span></>}</div>
           <div className="pcard-name" style={{ fontSize: '15px', fontWeight: '800', color: '#fff' }}>{pitcher.name}</div>
           <div className="pcard-sub" style={{ fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--text-dim)', flexWrap: 'wrap', marginTop: '2px' }}>
             {logo && <img className="pcard-logo" src={logo} alt="" loading="lazy" style={{ width: '14px', height: '14px' }} />}
@@ -807,6 +817,11 @@ export function PitcherCard({ entry, onSelect, selectedId, watchlist, slip }) {
         </div>
       </header>
 
+      <div className={`pcard-verdict ${vulnScore >= 70 ? 'is-attackable' : vulnScore < 50 ? 'is-tough' : ''}`}>
+        <Icon name={vulnScore >= 70 ? 'TriangleAlert' : vulnScore < 50 ? 'Shield' : 'Crosshair'} size={16} />
+        <span><b>{verdictTitle}</b><small>{verdictDetail}</small></span>
+      </div>
+
       {/* Driver stats */}
       <div className="pcard-stats" style={{ 
         display: 'grid', 
@@ -817,7 +832,7 @@ export function PitcherCard({ entry, onSelect, selectedId, watchlist, slip }) {
         zIndex: 1 
       }}>
         <Stat label="HR/9" value={num(season.hrPer9, 2)} tone={tone(season.hrPer9, { hi: 1.4, lo: 0.9 })} />
-        <Stat label="K/9" value={num(season.kPer9, 1)} tone={tone(season.kPer9, { hi: 10, lo: 6.5, invert: true })} />
+        <Stat label="Gopher pitch" value={worst?.rv > 0.5 ? worst.name : 'No flag'} sub={worst?.rv > 0.5 ? `+${worst.rv.toFixed(1)} RV/100` : 'Below warning line'} tone={worst?.rv > 0.5 ? 'bad' : undefined} />
         <Stat label="Est K" value={entry.estK ? `${Math.round(entry.estK.k)}` : '—'} sub={entry.estK ? `${entry.estK.lo}–${entry.estK.hi}` : null} />
         <Stat label="ERA" value={num(season.era, 2)} tone={tone(season.era, { hi: 4.6, lo: 3.0 })} />
         <Stat label="Barrel%" value={sav.barrelPctAllowed != null ? num(sav.barrelPctAllowed, 1) : '—'} tone={tone(sav.barrelPctAllowed, { hi: 9, lo: 6 })} />
@@ -827,6 +842,19 @@ export function PitcherCard({ entry, onSelect, selectedId, watchlist, slip }) {
           value={Number.isFinite(x.xEra) ? num(x.xEra, 2) : Number.isFinite(x.xwOba) ? rate(x.xwOba) : '—'}
         />
       </div>
+
+      {attackSide && (
+        <div className="pcard-attack-blueprint">
+          <span className={attackSide === 'L' ? 'on' : ''}>
+            <small>{attackSide === 'L' ? 'Primary attack side' : 'Opposite side'}</small>
+            <b>{attackSide === 'L' ? 'Left-handed bats' : 'Lefties'} <em className="mono">{lH != null ? num(lH, 2) : '—'} HR/9</em></b>
+          </span>
+          <span className={attackSide === 'R' ? 'on' : ''}>
+            <small>{attackSide === 'R' ? 'Primary attack side' : 'Opposite side'}</small>
+            <b>{attackSide === 'R' ? 'Right-handed bats' : 'Righties'} <em className="mono">{rH != null ? num(rH, 2) : '—'} HR/9</em></b>
+          </span>
+        </div>
+      )}
 
       {attackSide && (
         <div className="pcard-attack" style={{ 
@@ -891,6 +919,7 @@ export function PitcherCard({ entry, onSelect, selectedId, watchlist, slip }) {
                 }}
               >
                 <span className="ptarget-ord mono" style={{ color: 'var(--text-faint)' }}>{b.battingOrder || '–'}</span>
+                <img className="ptarget-photo" src={playerHeadshot(b.playerId, 96)} alt="" loading="lazy" />
                 <span className={`ptarget-name ${liveMode && b.liveContext?.isHRThisGame ? 'hr-glow' : ''}`} style={{ flex: '1', display: 'flex', alignItems: 'center', gap: '3px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   <span style={{ fontWeight: '600', color: '#fff', textOverflow: 'ellipsis', overflow: 'hidden' }}>{b.name}</span>
                   <span className={`bathand ${attackSide && effSide(b.batSide, pitcher.hand) === attackSide ? 'pa-match' : ''}`} style={{
@@ -906,6 +935,7 @@ export function PitcherCard({ entry, onSelect, selectedId, watchlist, slip }) {
                     {b.batSide}
                   </span>
                 </span>
+                <span className="ptarget-probability mono">{pct(b.hrProbability, 1)}<small>HR</small></span>
                 <GradeChip grade={b.grade} size="sm" score={b.score} />
               </li>
             ))}
@@ -950,6 +980,13 @@ export function PitcherCard({ entry, onSelect, selectedId, watchlist, slip }) {
 
         {/* Pitch mix + splits/fatigue */}
         <div className="pcard-side" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div className="pcard-secondary-metrics">
+            <span><small>K/9</small><b className="mono">{num(season.kPer9, 1)}</b></span>
+            <span><small>ERA</small><b className="mono">{num(season.era, 2)}</b></span>
+            <span><small>Barrel%</small><b className="mono">{sav.barrelPctAllowed != null ? num(sav.barrelPctAllowed, 1) : '—'}</b></span>
+            <span><small>EV against</small><b className="mono">{sav.exitVeloAgainst != null ? num(sav.exitVeloAgainst, 1) : '—'}</b></span>
+            <span><small>{Number.isFinite(x.xEra) ? 'xERA' : 'xwOBA'}</small><b className="mono">{Number.isFinite(x.xEra) ? num(x.xEra, 2) : Number.isFinite(x.xwOba) ? rate(x.xwOba) : '—'}</b></span>
+          </div>
           {usage.length > 0 && (
             <div className="pcard-mix">
               <h4 className="pcard-h4" style={{ fontSize: '11px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-faint)', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '8px' }}>

@@ -18564,3 +18564,272 @@ button.th:focus-visible {
   .mobile-dl-proof-metrics > span { min-width: 26px; }
   .mobile-dl-actions { margin-left: -13px; }
 }
+
+/* ============ Pitcher Attack Blueprint ============ */
+.pitcher-drawer { width: min(600px, 100vw); }
+.pitcher-drawer-body { padding: 0; }
+.pitcher-drawer .pcard { margin: 0; border-radius: 0 !important; }
+
+.pcard {
+  padding: 0 !important;
+  overflow: hidden;
+  border: 1px solid var(--border) !important;
+  border-radius: 18px !important;
+  background: rgba(10, 9, 15, 0.96) !important;
+  box-shadow: 0 18px 50px -34px rgba(0, 0, 0, 0.95) !important;
+}
+.pcard > :not(.pcard-accent) { position: relative; z-index: 1; }
+.pcard-accent {
+  z-index: 0 !important;
+  background: linear-gradient(145deg, color-mix(in srgb, var(--tc) 10%, transparent), transparent 36%) !important;
+  pointer-events: none;
+}
+.pcard-head {
+  min-height: 104px;
+  margin: 0 !important;
+  padding: 20px 22px 16px;
+  display: grid !important;
+  grid-template-columns: 66px minmax(0, 1fr) 58px;
+  align-items: center !important;
+  gap: 14px !important;
+  border-bottom: 1px solid var(--border-soft);
+  background: rgba(15, 14, 21, 0.72);
+}
+.pcard-photo-silo {
+  width: 66px;
+  height: 72px;
+  position: relative;
+  display: grid;
+  place-items: end center;
+  overflow: visible;
+  border: 1px solid color-mix(in srgb, var(--tc) 32%, var(--border));
+  border-radius: 14px;
+  background: radial-gradient(circle at 50% 28%, color-mix(in srgb, var(--tc) 22%, transparent), transparent 66%), rgba(255, 255, 255, 0.025);
+}
+.pcard-photo-silo .pcard-photo {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+  object-position: center bottom;
+  border: 0 !important;
+  border-radius: 13px !important;
+  background: transparent !important;
+}
+.pcard-team-mark {
+  width: 22px;
+  height: 22px;
+  position: absolute;
+  right: -5px;
+  bottom: -5px;
+  padding: 3px;
+  border: 2px solid #0f0e15;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--tc) 70%, #111);
+}
+.pcard-kicker {
+  min-width: 0;
+  margin-bottom: 5px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  color: var(--text-faint);
+  font-size: 8px;
+  font-weight: 850;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.pcard-kicker i { width: 3px; height: 3px; flex: none; border-radius: 50%; background: var(--border); }
+.pcard-kicker span { overflow: hidden; color: var(--accent); text-overflow: ellipsis; }
+.pcard-name { font-family: var(--display); font-size: 21px !important; line-height: 1.1; }
+.pcard-sub { margin-top: 7px !important; color: var(--text-faint) !important; font-size: 10px !important; font-weight: 700; }
+.pcard-sub .pcard-logo { display: none; }
+.pcard-hand { padding: 2px 6px; }
+.pcard-vuln { flex-direction: column-reverse; gap: 4px !important; }
+.pcard-vgrade { font-size: 9px !important; letter-spacing: 0.08em !important; }
+
+.pcard-verdict {
+  min-height: 56px;
+  margin: 14px 20px 12px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--prime);
+  border: 1px solid color-mix(in srgb, var(--prime) 22%, transparent);
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--prime) 8%, transparent);
+}
+.pcard-verdict.is-attackable { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 22%, transparent); background: color-mix(in srgb, var(--bad) 7%, transparent); }
+.pcard-verdict.is-tough { color: var(--strong); border-color: color-mix(in srgb, var(--strong) 22%, transparent); background: color-mix(in srgb, var(--strong) 7%, transparent); }
+.pcard-verdict > svg { flex: none; }
+.pcard-verdict > span { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.pcard-verdict b { color: var(--text); font-size: 12px; }
+.pcard-verdict small { color: var(--text-dim); font-size: 10px; line-height: 1.35; }
+
+.pcard-stats {
+  margin: 0 !important;
+  padding: 0 20px 12px !important;
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 8px !important;
+  border: 0 !important;
+}
+.pcard-stats .stat {
+  min-width: 0;
+  min-height: 72px;
+  padding: 10px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-soft);
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.022);
+  text-align: center;
+}
+.pcard-stats .stat:nth-child(2) { order: 3; }
+.pcard-stats .stat:nth-child(3) { order: 2; }
+.pcard-stats .stat:nth-child(n+4) { display: none !important; }
+.pcard-stats .stat-label { font-size: 8px; font-weight: 850; letter-spacing: 0.06em; text-transform: uppercase; }
+.pcard-stats .stat-value { margin-top: 5px; font-size: 16px; font-weight: 850; }
+.pcard-stats .stat-sub { margin-top: 3px; font-size: 8px; }
+
+.pcard > .pcard-attack { display: none !important; }
+.pcard-attack-blueprint {
+  margin: 0 20px 16px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  overflow: hidden;
+  border: 1px solid var(--border-soft);
+  border-radius: 11px;
+  background: rgba(0, 0, 0, 0.2);
+}
+.pcard-attack-blueprint > span { min-width: 0; min-height: 58px; padding: 10px 12px; display: flex; flex-direction: column; justify-content: center; opacity: 0.5; }
+.pcard-attack-blueprint > span + span { border-left: 1px solid var(--border-soft); }
+.pcard-attack-blueprint > span.on { opacity: 1; background: color-mix(in srgb, var(--strong) 7%, transparent); }
+.pcard-attack-blueprint small { color: var(--text-faint); font-size: 8px; font-weight: 850; letter-spacing: 0.06em; text-transform: uppercase; }
+.pcard-attack-blueprint b { margin-top: 6px; display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--text-dim); font-size: 11px; }
+.pcard-attack-blueprint .on b,
+.pcard-attack-blueprint .on em { color: var(--strong); }
+.pcard-attack-blueprint em { flex: none; color: var(--text-faint); font-size: 9px; font-style: normal; }
+
+.pcard-cols {
+  margin: 0 !important;
+  padding: 0 20px 18px;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1.15fr) minmax(220px, 0.85fr) !important;
+  align-items: start;
+  gap: 20px !important;
+}
+.pcard-h4 { min-height: 26px; margin: 0 0 8px !important; font-size: 9px !important; letter-spacing: 0.09em !important; }
+.pcard-targets .ptarget-list { gap: 6px !important; }
+.pcard-targets .ptarget {
+  min-height: 58px;
+  padding: 7px 8px !important;
+  display: grid !important;
+  grid-template-columns: 18px 40px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 7px !important;
+  border: 1px solid var(--border-soft) !important;
+  border-radius: 11px !important;
+  background: rgba(255, 255, 255, 0.018) !important;
+}
+.pcard-targets .ptarget:hover,
+.pcard-targets .ptarget.selected { background: rgba(184, 183, 216, 0.05) !important; border-color: rgba(184, 183, 216, 0.18) !important; }
+.ptarget-photo { width: 40px; height: 40px; object-fit: contain; object-position: center bottom; border: 1px solid var(--border); border-radius: 9px; background: rgba(255,255,255,.025); }
+.pcard-targets .ptarget-name { min-width: 0; font-size: 12px; }
+.ptarget-probability { min-width: 42px; color: var(--text); font-size: 10px; font-weight: 800; text-align: right; }
+.ptarget-probability small { margin-left: 3px; color: var(--text-faint); font: 750 7px var(--sans); }
+.pcard-targets .grade-chip { justify-self: end; }
+.pcard-sgp-toggle { min-height: 36px; }
+
+.pcard-side { gap: 15px !important; }
+.pcard-secondary-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.pcard-secondary-metrics > span { min-width: 0; min-height: 45px; padding: 6px 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 1px solid var(--border-soft); border-radius: 8px; background: rgba(255,255,255,.018); text-align: center; }
+.pcard-secondary-metrics small { color: var(--text-faint); font-size: 7px; font-weight: 800; text-transform: uppercase; }
+.pcard-secondary-metrics b { margin-top: 4px; color: var(--text); font-size: 10px; }
+.pcard-mix,
+.pcard-splits { padding: 12px; border: 1px solid var(--border-soft); border-radius: 11px; background: rgba(255,255,255,.014); }
+.pcard-side .mix-row { min-height: 23px; }
+.pcard-side .mix-worst { padding: 7px 8px; border: 1px solid color-mix(in srgb, var(--bad) 20%, transparent); border-radius: 7px; background: color-mix(in srgb, var(--bad) 7%, transparent); }
+.pcard-side .split-grid > div { min-height: 45px; display: flex; flex-direction: column; justify-content: center; }
+.pcard-scout-toggle { display: none; }
+
+@media (max-width: 560px) {
+  .pitcher-drawer { width: 100vw; height: 100dvh; border-left: 0; border-radius: 0 !important; }
+  .pitcher-drawer-body { padding: 0 !important; }
+  .pitcher-drawer .drawer-close { position: fixed; top: 12px; right: 12px; width: 40px; height: 40px; border-radius: 50%; }
+  .pitcher-drawer .pcard { min-height: 100%; border: 0 !important; }
+  .pcard-head {
+    min-height: 92px;
+    padding: 16px 56px 13px 13px !important;
+    grid-template-columns: 54px minmax(0, 1fr) 48px !important;
+    gap: 10px !important;
+  }
+  .pitcher-drawer .pcard-head { position: sticky !important; top: 0; z-index: 4 !important; backdrop-filter: blur(18px); }
+  .pcard-photo-silo { width: 54px; height: 60px; border-radius: 12px; }
+  .pcard-photo-silo .pcard-photo { border-radius: 11px !important; }
+  .pcard-team-mark { width: 19px; height: 19px; }
+  .pcard-kicker { font-size: 7px; }
+  .pcard-name { font-size: 18px !important; }
+  .pcard-sub { margin-top: 5px !important; font-size: 9px !important; }
+  .pcard-vuln .score-ring { width: 44px !important; height: 44px !important; }
+  .pcard-vgrade { font-size: 7px !important; }
+  .pcard-verdict { min-height: 54px; margin: 11px 11px 9px; padding: 9px 10px; }
+  .pcard-verdict b { font-size: 11px; }
+  .pcard-verdict small { font-size: 9px; }
+  .pcard-stats { padding: 0 10px 9px !important; gap: 6px !important; }
+  .pcard-stats .stat:nth-child(2) { display: flex !important; }
+  .pcard-stats .stat { min-height: 64px !important; padding: 7px 5px !important; }
+  .pcard-stats .stat-label { font-size: 7px; }
+  .pcard-stats .stat-value { font-size: 13px; }
+  .pcard-stats .stat-sub { font-size: 7px; }
+  .pcard-attack-blueprint { margin: 0 10px 11px; }
+  .pcard-attack-blueprint > span { min-height: 55px; padding: 8px; }
+  .pcard-attack-blueprint b { margin-top: 5px; display: block; font-size: 10px; }
+  .pcard-attack-blueprint em { margin-top: 3px; display: block; }
+  .pcard-cols { padding: 0 !important; grid-template-columns: minmax(0, 1fr) !important; gap: 0 !important; }
+  .pcard-targets .pcard-h4 { min-height: 36px; padding: 0 11px; border-block: 1px solid var(--border-soft); }
+  .pcard-targets .ptarget-list { gap: 0 !important; }
+  .pcard-targets .ptarget {
+    min-height: 56px;
+    padding: 7px 9px !important;
+    grid-template-columns: 16px 36px minmax(0, 1fr) auto auto;
+    gap: 6px !important;
+    border-width: 0 0 1px !important;
+    border-radius: 0 !important;
+  }
+  .ptarget-photo { width: 36px; height: 40px; border-radius: 8px; }
+  .pcard-targets .ptarget-name { font-size: 11px; }
+  .ptarget-probability { min-width: 37px; font-size: 9px; }
+  .pcard-targets .grade-score { display: none; }
+  .pcard:not(.scouting-open) .pcard-targets .ptarget:nth-child(n+4) { display: none !important; }
+  .pcard-side { display: none !important; padding: 11px; border-top: 1px solid var(--border-soft); background: rgba(0,0,0,.12); }
+  .pcard.scouting-open .pcard-side { display: flex !important; }
+  .pcard-secondary-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .pcard-sgp-toggle { display: none !important; }
+  .pcard-scout-toggle {
+    width: 100%;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    color: var(--accent);
+    border-top: 1px solid var(--border-soft);
+    background: rgba(255,255,255,.018);
+    font-size: 9px;
+    font-weight: 850;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+}
+
+@media (max-width: 360px) {
+  .pcard-targets .ptarget { grid-template-columns: 14px 34px minmax(0, 1fr) 34px auto; gap: 5px !important; }
+  .ptarget-photo { width: 34px; height: 38px; }
+  .pcard-targets .grade-chip { padding-inline: 4px; font-size: 8px; }
+  .ptarget-probability { min-width: 34px; }
+}
