@@ -8,14 +8,26 @@ const LEAGUE_WHIFF_PCT = 24.5
 const LEAGUE_SWSTR_PCT = 11.0
 const STAB_BF = 150
 
-// Measured 2026-07-09 on 133 reconciled pitcher-games. The raw projection ran
-// 0.56 K high; 0.92 applies most of the measured recenter while the sample grows.
-export const K_CALIBRATION = 0.92
+// Rechecked 2026-07-14: the 211-start tracker remained +0.53 K high, including
+// +0.50 across 56 starts after the prior 0.92 recenter. A 0.86 factor removes
+// most of that persistent bias without applying the small-sample optimum (~0.83).
+export const K_CALIBRATION = 0.86
+export const K_MODEL_VERSION = 2
 export const K_LINES = [3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5, 10.5]
 
 export function effSide(batSide, pitcherHand) {
   if (batSide === 'S') return pitcherHand === 'L' ? 'R' : 'L'
   return batSide || 'R'
+}
+
+export function orderPitcherGameLogs(splits) {
+  const appearances = [...(splits || [])]
+    .sort((a, b) => (b.date || '').localeCompare(a.date || ''))
+  const startsOnly = appearances.filter((game) => (parseInt(game.stat?.gamesStarted, 10) || 0) > 0)
+  return {
+    appearances,
+    starts: startsOnly.length ? startsOnly : appearances,
+  }
 }
 
 function poissonCDF(k, lambda) {
@@ -73,10 +85,13 @@ function umpireKAdjustment(umpire) {
  *
  * @returns {null|{
  *   k:number, lo:number, hi:number, lambda:number, probs:Object,
- *   expIP:number, ipSD:number, oppK:number, trend:string, conf:string,
+ *   expIP:number, expBF:number, ipSD:number, volumeSource:string,
+ *   oppK:number, trend:string, conf:string,
  *   boost:number, splitKRate:number|null, swStrPct:number|null,
  *   whiffPct:number|null, tempAdj:number, umpireAdj:number,
- *   parkKAdj:number, tttoPenalty:number, vegasTrim:number, tempF:number|null
+ *   parkKAdj:number, tttoPenalty:number, vegasTrim:number,
+ *   adjustedKRate:number, calibration:number, modelVersion:number,
+ *   tempF:number|null
  * }}
  */
 export function kBrain(pitcher, targets, { weather, umpire, parkFactorK } = {}) {
@@ -173,32 +188,35 @@ export function kBrain(pitcher, targets, { weather, umpire, parkFactorK } = {}) 
 
   const vegasTrim = oppK < 0.185 ? 0.95 : 1.0
   const recentSix = recentStarts.slice(0, 6)
-  const pitchValues = recentSix.map((start) => start.pitches)
-    .filter((value) => Number.isFinite(value) && value > 50)
-  const bfValues = recentSix.map((start) => start.bf ?? (Number.isFinite(start.ip) ? start.ip * BF_PER_IP : null))
-    .filter(Number.isFinite)
+  const pitchVolumeStarts = recentSix.filter((start) => (
+    Number.isFinite(start.pitches) && start.pitches > 50 && Number.isFinite(start.bf) && start.bf > 0
+  ))
 
   let expIP
   let ipSD
   let expBF
-  if (pitchValues.length >= 2 && bfValues.length >= 2) {
-    const avgPitches = pitchValues.reduce((sum, value) => sum + value, 0) / pitchValues.length
-    const avgBF = bfValues.reduce((sum, value) => sum + value, 0) / bfValues.length
+  let volumeSource
+  if (pitchVolumeStarts.length >= 2) {
+    const avgPitches = pitchVolumeStarts.reduce((sum, start) => sum + start.pitches, 0) / pitchVolumeStarts.length
+    const avgBF = pitchVolumeStarts.reduce((sum, start) => sum + start.bf, 0) / pitchVolumeStarts.length
     const pitchesPerBF = Math.max(3.5, Math.min(4.5, avgPitches / avgBF))
     expBF = Math.max(3.5 * BF_PER_IP, Math.min(7.5 * BF_PER_IP, (avgPitches * vegasTrim) / pitchesPerBF))
     expIP = expBF / BF_PER_IP
     ipSD = 0.8
+    volumeSource = 'recent-pitches-bf'
   } else {
     const ipValues = recentSix.map((start) => start.ip).filter(Number.isFinite)
     if (ipValues.length >= 2) {
       expIP = ipValues.reduce((sum, value) => sum + value, 0) / ipValues.length
       const variance = ipValues.reduce((sum, value) => sum + (value - expIP) ** 2, 0) / ipValues.length
       ipSD = Math.sqrt(variance)
+      volumeSource = 'recent-ip'
     } else {
       expIP = Number.isFinite(recentForm?.ip) && recentForm?.games > 0
         ? recentForm.ip / recentForm.games
         : 5.3
       ipSD = 1.2
+      volumeSource = 'season-ip'
     }
     expIP = Math.max(3.5, Math.min(7.5, expIP))
     expBF = Math.max(3.5 * BF_PER_IP, Math.min(7.5 * BF_PER_IP, expIP * BF_PER_IP * vegasTrim))
@@ -261,7 +279,9 @@ export function kBrain(pitcher, targets, { weather, umpire, parkFactorK } = {}) 
     lambda,
     probs,
     expIP,
+    expBF,
     ipSD,
+    volumeSource,
     oppK,
     trend,
     conf,
@@ -274,6 +294,9 @@ export function kBrain(pitcher, targets, { weather, umpire, parkFactorK } = {}) 
     parkKAdj,
     tttoPenalty,
     vegasTrim,
+    adjustedKRate,
+    calibration: K_CALIBRATION,
+    modelVersion: K_MODEL_VERSION,
     tempF: weather?.tempF ?? null,
   }
 }

@@ -2,8 +2,10 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
 import {
+  K_CALIBRATION,
   K_LINES,
   kBrain,
+  orderPitcherGameLogs,
 } from '../src/sports/mlb/logic/kBrain.js'
 import {
   groupPitchers,
@@ -50,9 +52,10 @@ test('canonical K Brain emits the complete server/UI contract', () => {
 
   assert.ok(result)
   for (const field of [
-    'k', 'lo', 'hi', 'lambda', 'probs', 'expIP', 'ipSD', 'oppK',
+    'k', 'lo', 'hi', 'lambda', 'probs', 'expIP', 'expBF', 'ipSD', 'volumeSource', 'oppK',
     'trend', 'conf', 'boost', 'splitKRate', 'swStrPct', 'whiffPct',
-    'tempAdj', 'umpireAdj', 'parkKAdj', 'tttoPenalty', 'vegasTrim', 'tempF',
+    'tempAdj', 'umpireAdj', 'parkKAdj', 'tttoPenalty', 'vegasTrim',
+    'adjustedKRate', 'calibration', 'modelVersion', 'tempF',
   ]) {
     assert.ok(Object.hasOwn(result, field), `missing K snapshot field: ${field}`)
   }
@@ -62,6 +65,9 @@ test('canonical K Brain emits the complete server/UI contract', () => {
   assert.equal(result.trend, 'up')
   assert.equal(result.parkKAdj, 1.04, 'explicit server park factor wins over pitcher fallback')
   assert.equal(result.ipSD, 0.8)
+  assert.equal(result.volumeSource, 'recent-pitches-bf')
+  assert.equal(result.expBF, 22.5)
+  assert.equal(result.calibration, K_CALIBRATION)
   assert.ok(result.lo <= result.lambda && result.lambda <= result.hi)
 
   let previous = 1
@@ -71,6 +77,28 @@ test('canonical K Brain emits the complete server/UI contract', () => {
     assert.ok(result.probs[line] <= previous, 'over probability must fall as the line rises')
     previous = result.probs[line]
   }
+})
+
+test('K volume falls back to recent innings when actual batters faced are absent', () => {
+  const withoutBF = {
+    ...PITCHER,
+    recentForm: {
+      ...PITCHER.recentForm,
+      recentStarts: PITCHER.recentForm.recentStarts.map(({ bf, ...start }) => start),
+    },
+  }
+  const result = kBrain(withoutBF, TARGETS)
+  assert.equal(result.volumeSource, 'recent-ip')
+  assert.ok(Number.isFinite(result.expBF))
+})
+
+test('starter history excludes interleaved relief appearances but preserves all workload logs', () => {
+  const relief = { date: '2026-07-12', stat: { gamesStarted: 0, inningsPitched: '1.0' } }
+  const newestStart = { date: '2026-07-10', stat: { gamesStarted: 1, inningsPitched: '6.0' } }
+  const olderStart = { date: '2026-07-05', stat: { gamesStarted: 1, inningsPitched: '5.0' } }
+  const ordered = orderPitcherGameLogs([olderStart, relief, newestStart])
+  assert.deepEqual(ordered.appearances, [relief, newestStart, olderStart])
+  assert.deepEqual(ordered.starts, [newestStart, olderStart])
 })
 
 test('UI imports the canonical K Brain instead of maintaining a second model', () => {

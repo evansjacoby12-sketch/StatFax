@@ -262,7 +262,10 @@ import {
   sgpScorecard,
   freezeComboInputs,
 } from './parlay-combos.mjs';
-import { kBrain as computeKDist } from '../src/sports/mlb/logic/kBrain.js';
+import {
+  kBrain as computeKDist,
+  orderPitcherGameLogs,
+} from '../src/sports/mlb/logic/kBrain.js';
 
 // Intraday board history — append a compact snapshot of TODAY's canonical combos
 // (one per strategy/size) + lineup-confirmation state on every run, so we can
@@ -1035,8 +1038,11 @@ async function fetchPitcherRecentForm(pitcherId) {
     const splits = data.stats?.[0]?.splits || [];
     if (!splits.length) return null;
 
-    const ordered = [...splits].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-    const lastN   = ordered.slice(0, 5);
+    const { appearances: ordered, starts: orderedStarts } = orderPitcherGameLogs(splits);
+    // A projected starter may have made a relief appearance between starts.
+    // Keep those appearances for the short-rest workload signal below, but do
+    // not let them collapse the starter's expected innings or recent K rate.
+    const lastN = orderedStarts.slice(0, 5);
 
     // Per-game rows for the last 10 starts — powers the "Recent Starts"
     // table in PlayerDetailModal. Aggregate stats above stay 5-game so
@@ -1055,7 +1061,7 @@ async function fetchPitcherRecentForm(pitcherId) {
       135:'SD',136:'SEA',137:'SF',138:'STL',139:'TB',140:'TEX',141:'TOR',142:'MIN',
       143:'PHI',144:'ATL',145:'CWS',146:'MIA',147:'NYY',158:'MIL',
     };
-    const recentStarts = ordered.slice(0, 10).map(g => {
+    const recentStarts = orderedStarts.slice(0, 10).map(g => {
       const stat = g.stat || {};
       const gameIp = parseIP(stat.inningsPitched);
       const gameEr = parseInt(stat.earnedRuns, 10);
@@ -1072,6 +1078,7 @@ async function fetchPitcherRecentForm(pitcherId) {
         k:      Number.isFinite(parseInt(stat.strikeOuts, 10))   ? parseInt(stat.strikeOuts, 10)   : null,
         hr:     Number.isFinite(parseInt(stat.homeRuns, 10))     ? parseInt(stat.homeRuns, 10)     : null,
         pitches: Number.isFinite(parseInt(stat.numberOfPitches, 10)) ? parseInt(stat.numberOfPitches, 10) : null,
+        bf:     Number.isFinite(parseInt(stat.battersFaced, 10)) ? parseInt(stat.battersFaced, 10) : null,
         era:    (Number.isFinite(gameIp) && gameIp > 0 && Number.isFinite(gameEr))
                   ? (gameEr * 9) / gameIp
                   : null,
@@ -1112,7 +1119,7 @@ async function fetchPitcherRecentForm(pitcherId) {
       era:           (er * 9) / ip,
       hrPer9:        (hr * 9) / ip,
       k9:            (k  * 9) / ip,
-      lastStartDate: ordered[0]?.date || null,
+      lastStartDate: orderedStarts[0]?.date || null,
       pitchesL3D,
       recentStarts,
     };
@@ -4503,13 +4510,14 @@ async function main() {
               hi: kd.hi,
               lambda: kd.lambda,
               probs: kd.probs,
-              // INSTRUMENTED 2026-07-09: the +0.56 K over-projection was traced
-              // 100% to IP over-estimation (implied 5.66 vs actual 5.09 IP), so
-              // logging expIP lets us grade the IP model DIRECTLY against
-              // actualIP next — and refine the projection at the mechanism
-              // instead of the blanket λ recenter (which over-trims deep-outing
-              // horses). oppK/conf carried for context.
+              // Preserve workload and rate components so the K audit can
+              // diagnose bias at the mechanism instead of only at final lambda.
               expIP: Number.isFinite(kd.expIP) ? kd.expIP : null,
+              expBF: Number.isFinite(kd.expBF) ? kd.expBF : null,
+              volumeSource: kd.volumeSource || null,
+              adjustedKRate: Number.isFinite(kd.adjustedKRate) ? kd.adjustedKRate : null,
+              calibration: Number.isFinite(kd.calibration) ? kd.calibration : null,
+              modelVersion: kd.modelVersion ?? null,
               oppK:  Number.isFinite(kd.oppK) ? +kd.oppK.toFixed(3) : null,
             };
           });
@@ -4529,7 +4537,12 @@ async function main() {
         const { outcomes: kOutcomes } = await fetchPitcherKsForDate(yesterdayCT);
         const graded = kEsts.map((e) => {
           const actual = kOutcomes.get(e.key);
-          return { ...e, actualK: actual?.k ?? null, actualIP: actual?.ip ?? null };
+          return {
+            ...e,
+            actualK: actual?.k ?? null,
+            actualIP: actual?.ip ?? null,
+            actualBF: actual?.bf ?? null,
+          };
         }).filter((e) => e.actualK != null);
         backtestLog.kProps.resultsByDate[yesterdayCT] = graded;
         const dk = Object.keys(backtestLog.kProps.resultsByDate).sort();
