@@ -66,6 +66,14 @@ function gameMatchup(game) {
   return `${away}@${home}`
 }
 
+export function isPregameMlbGame(game) {
+  if (!game || game.isLive === true || game.isFinal === true) return false
+  const status = clean(game.status, 40).toLowerCase()
+  if (!status) return true
+  return !['final', 'game over', 'completed', 'postponed', 'suspended', 'in progress']
+    .some((value) => status.includes(value))
+}
+
 /**
  * Stable, slate-owned entity keys prevent the LLM from inventing player IDs or
  * attaching a news item to the wrong game in a doubleheader.
@@ -152,12 +160,15 @@ export function buildAiHrEntityIndex(slate) {
 
 export function summarizeAiHrTargets(slate, maxBatters = 28) {
   const entities = buildAiHrEntityIndex(slate)
+  const pregameGamePks = new Set((slate?.games || [])
+    .filter(isPregameMlbGame)
+    .map((game) => Number(game.gamePk)))
   const rows = Object.values(slate?.scoredBatters || {})
   const seen = new Set()
   const batters = rows
     .filter((row) => {
       const key = `batter:${row?.playerId}:${row?.gamePk}`
-      if (!entities.has(key) || seen.has(key)) return false
+      if (!pregameGamePks.has(Number(row?.gamePk)) || !entities.has(key) || seen.has(key)) return false
       seen.add(key)
       return true
     })
@@ -174,7 +185,7 @@ export function summarizeAiHrTargets(slate, maxBatters = 28) {
       }
     })
 
-  const games = (slate?.games || []).filter((game) => finite(game?.gamePk)).map((game) => {
+  const games = (slate?.games || []).filter((game) => finite(game?.gamePk) && isPregameMlbGame(game)).map((game) => {
     const gamePk = Number(game.gamePk)
     return {
       entityKey: `game:${gamePk}`,
@@ -351,6 +362,10 @@ export function validateAiHrContext(context) {
     if (!signal.entityKey || !ENTITY_TYPES.has(signal.entityType)) errors.push(`${at}: invalid entity target`)
     if (!finite(signal.entityId) && !clean(signal.entityId, 30)) errors.push(`${at}.entityId: required`)
     if (!finite(signal.gamePk)) errors.push(`${at}.gamePk: must be finite`)
+    const expectedEntityKey = signal.entityType === 'game'
+      ? `game:${signal.gamePk}`
+      : `${signal.entityType}:${signal.entityId}:${signal.gamePk}`
+    if (signal.entityKey !== expectedEntityKey) errors.push(`${at}.entityKey: does not reconcile with entityType, entityId, and gamePk`)
     if (!clean(signal.entity, 80)) errors.push(`${at}.entity: required`)
     if (!KIND_SET.has(signal.kind)) errors.push(`${at}.kind: unsupported value`)
     if (KIND_SET.has(signal.kind) && !ENTITY_TYPES_BY_KIND[signal.kind].has(signal.entityType)) errors.push(`${at}: kind does not apply to entity type`)

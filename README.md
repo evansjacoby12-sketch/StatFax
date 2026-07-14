@@ -69,7 +69,7 @@ cd ui && npm install && npm run dev   # React board at localhost:5173
 
 **Day Rating (1–5★):** Pitching 45% + Environment 30% + Supply 25%, computed from pre-cap PRIME count to correctly reflect raw slate quality.
 
-### AI HR context — Phase 1
+### AI HR context and shadow projections
 
 `npm run context` researches unstructured, current-day information that the numeric feeds can miss: starter changes, opener or pitch-limit risk, lineup/injury status, roof/weather changes, bullpen availability, and call-ups.
 
@@ -80,7 +80,15 @@ The output at `dist/context.json` is intentionally non-scoring (`mode: "advisory
 - use an allowed HR-context category and entity type;
 - contain no probability, score, multiplier, or weight fields.
 
-Run `npm run validate:ai-context` to enforce the contract. Phase 2 will log hypothetical HR-probability effects in shadow mode; no AI context affects the production HR probability in Phase 1.
+Run `npm run validate:ai-context` to enforce the source contract.
+
+Phase 2 runs `npm run ai:hr-shadow` after the context pass and maintains `dist/ai-hr-shadow.json`. For each affected pregame batter it freezes:
+
+- the engine's published HR probability as the baseline;
+- a deterministic shadow probability using `direction × confidence × 0.10` in log-odds space, capped at `±0.25` total log-odds;
+- exact signal IDs, notes, model, timestamps, and evidence URLs.
+
+The shadow ledger is a versioned experiment (`mode: "shadow"`, `scoreImpact: false`), is retained for 180 days, and is never read by the production scoring path or UI. Started-game records are frozen while current pregame records can refresh with newer sourced context. Run `npm run validate:ai-shadow` to verify its math and provenance. Phase 3 will reconcile outcomes and compare baseline versus shadow Brier score and calibration before any AI feature is eligible for production.
 
 ## K Brain
 

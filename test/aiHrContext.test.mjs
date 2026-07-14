@@ -132,6 +132,28 @@ test('contract rejects any attempt to smuggle probability math into advisory con
   assert.ok(check.errors.some((error) => error.includes('must be after observedAt')))
 })
 
+test('AI research targets exclude games that have already started', () => {
+  const mixedSlate = structuredClone(slate)
+  mixedSlate.games[0].isLive = true
+  mixedSlate.games[0].status = 'In Progress'
+  const summary = summarizeAiHrTargets(mixedSlate)
+  assert.deepEqual(summary.games.map((game) => game.entityKey), ['game:102'])
+  assert.deepEqual(summary.batters.map((batter) => batter.entityKey), ['batter:7:102'])
+})
+
+test('contract rejects an entity key that disagrees with its bound IDs', () => {
+  const context = normalizeAiHrContext({
+    raw: { signals: [sourced()] },
+    slate,
+    generatedAt: '2026-07-15T19:00:00.000Z',
+    model: 'test-model',
+  })
+  context.signals[0].entityId = 999
+  const check = validateAiHrContext(context)
+  assert.equal(check.ok, false)
+  assert.ok(check.errors.some((error) => error.includes('does not reconcile')))
+})
+
 test('empty skipped AI context remains a valid non-scoring pipeline artifact', () => {
   const context = emptyAiHrContext({
     date: '2026-07-15',

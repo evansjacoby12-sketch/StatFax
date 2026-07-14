@@ -87,6 +87,8 @@ Return STRICT JSON only (no prose, no markdown fences):
 Rules:
 - entityKey MUST exactly match one of the allowed keys. Never invent an ID.
 - Every signal MUST have at least one direct http/https evidence URL. No source means omit it.
+- direction is always from the affected BATTER'S HR perspective: boost means more HR-friendly, suppress means less HR-friendly, and uncertain means the effect is unknown.
+- For a pitcher target, direction describes the effect on batters facing that pitcher. For a bullpen target, it describes the effect on opposing batters facing that bullpen.
 - direction is a hypothesis for later backtesting, NOT a probability adjustment.
 - Do not output probabilities, score changes, multipliers, weights, locks, or betting recommendations.
 - Prefer official MLB/team/venue/weather sources and current reporting. Avoid rumor-only social posts.

@@ -114,6 +114,15 @@ jobs:
           key: context-${{ github.run_id }}
           restore-keys: context-
 
+      # Rolling pregame AI experiment. Stores baseline + hypothetical shadow
+      # probabilities for later outcome grading; never feeds the live board.
+      - name: Restore AI HR shadow ledger
+        uses: actions/cache@v4
+        with:
+          path: dist/ai-hr-shadow.json
+          key: ai-hr-shadow-${{ github.run_id }}
+          restore-keys: ai-hr-shadow-
+
       # Carry the prior Slate Brief across runs so its same-day staleness guard
       # can reuse a recent result instead of re-paying the API on every tick.
       - name: Restore slate brief
@@ -251,6 +260,38 @@ jobs:
 
       - name: Validate AI HR context contract
         run: npm run validate:ai-context
+
+      - name: Build AI HR shadow projections
+        run: npm run ai:hr-shadow
+
+      - name: Validate AI HR shadow ledger
+        run: npm run validate:ai-shadow
+
+      # The main artifact publish happens before the paid context pass. Persist
+      # these two later artifacts separately so the experiment survives cache
+      # eviction and can be graded against final outcomes in Phase 3.
+      - name: Publish AI HR artifacts to R2
+        continue-on-error: true
+        env:
+          AWS_ACCESS_KEY_ID:     ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ACCOUNT_ID:         ${{ secrets.R2_ACCOUNT_ID }}
+          R2_BUCKET:             ${{ vars.R2_BUCKET }}
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+          AWS_RESPONSE_CHECKSUM_VALIDATION:  when_required
+        run: |
+          if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$R2_ACCOUNT_ID" ] || [ -z "$R2_BUCKET" ]; then
+            echo "R2 AI publish skipped — R2 credentials are not configured."
+            exit 0
+          fi
+          ENDPOINT="https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com"
+          for f in context.json ai-hr-shadow.json; do
+            if [ -f "dist/$f" ]; then
+              aws s3 cp "dist/$f" "s3://$R2_BUCKET/$f" --endpoint-url "$ENDPOINT" \
+                --content-type application/json --cache-control no-cache \
+                && echo "R2: published $f"
+            fi
+          done
 
       # Daily one-paragraph board summary → dist/brief.json. Reads the scored
       # board (+ the context flags above) and narrates it; advisory only, never
