@@ -4,7 +4,8 @@
  * Given yesterday's published snapshot (the scored batters with their grades +
  * active badges) and the actual game outcomes from MLB's box-score endpoints,
  * this module builds a per-day reconciliation record and appends it to a
- * rolling 30-day backtest log. From the aggregated log it computes per-badge
+ * rolling 30-day operational log plus a compact 180-day model archive. From
+ * the operational log it computes per-badge
  * and per-grade multipliers using the same math the on-device path used to
  * use — sqrt-dampened lift ratios clamped to ±8% — and writes them out as
  * `calibration.json` for tomorrow's cron run to load.
@@ -35,6 +36,7 @@ import { positiveReasonCount, negativeReasonCount } from '../ui/src/lib/combo-en
 
 const MLB_BASE = 'https://statsapi.mlb.com/api/v1';
 const ROLLING_DAYS = 30;
+export const MODEL_HISTORY_DAYS = 180;
 const MIN_SAMPLES_TO_CALIBRATE = 1500;
 
 // ── Significance-scaled clamp band ──────────────────────────────────────────
@@ -273,18 +275,83 @@ export function reconcileOutcomes(predictions, { homerers, played, homerersByKey
   return predictions.map((p) => ({ ...p, homered: didHomer(p), actuallyPlayed: didPlay(p) }));
 }
 
+/** Keep only fields needed for long-horizon model and signal evaluation. */
+export function compactModelRecord(record) {
+  return {
+    playerId:       record?.playerId ?? null,
+    gamePk:         record?.gamePk ?? null,
+    score:          Number.isFinite(record?.score) ? record.score : null,
+    homered:        record?.homered === true,
+    actuallyPlayed: record?.actuallyPlayed !== false,
+    grade:          record?.grade ?? null,
+    badges:         Array.isArray(record?.badges) ? record.badges : [],
+    simHRProb:      Number.isFinite(record?.simHRProb) ? record.simHRProb : null,
+    feat:           record?.feat && typeof record.feat === 'object' ? record.feat : null,
+  };
+}
+
 /**
- * Append yesterday's reconciled records to the rolling log, trim to
- * ROLLING_DAYS, and return the new log. Idempotent — already-present dates
- * are skipped so re-runs don't double-count.
+ * Merge one or more compact model-history archives. Later archives win for a
+ * duplicate date, which lets the locally repaired cache override an older R2
+ * copy. The result is capped to six months so the state remains practical to
+ * fetch on every stateless cron run.
+ */
+export function mergeModelHistories(...histories) {
+  const records = {};
+  const dateSet = new Set();
+  for (const history of histories) {
+    if (!history || typeof history !== 'object') continue;
+    for (const date of [...(history.dates || []), ...Object.keys(history.records || {})]) {
+      const rows = history.records?.[date];
+      if (!Array.isArray(rows)) continue;
+      dateSet.add(date);
+      records[date] = rows;
+    }
+  }
+  const dates = [...dateSet].sort();
+  while (dates.length > MODEL_HISTORY_DAYS) {
+    const oldest = dates.shift();
+    delete records[oldest];
+  }
+  return { version: 1, dates, records };
+}
+
+/**
+ * Copy the current operational rows into the compact model archive. Existing
+ * older archive dates survive, while current dates are overwritten so late-HR
+ * repairs propagate into the durable evidence set.
+ */
+export function syncModelHistory(log) {
+  if (!log || typeof log !== 'object') return log;
+  const currentRecords = {};
+  for (const date of log.dates || []) {
+    if (!Array.isArray(log.records?.[date])) continue;
+    currentRecords[date] = log.records[date].map(compactModelRecord);
+  }
+  return {
+    ...log,
+    modelHistory: mergeModelHistories(
+      log.modelHistory,
+      { dates: Object.keys(currentRecords), records: currentRecords },
+    ),
+  };
+}
+
+/**
+ * Append yesterday's reconciled records to the operational log, copy them to
+ * modelHistory, then trim only the operational side to ROLLING_DAYS.
+ * Idempotent — already-present dates are not double-counted.
  */
 export function appendToLog(log, date, reconciled) {
-  const next = {
+  let next = {
     ...log,   // preserve top-level fields (e.g. settledDates) across appends
     dates:   Array.from(new Set([...(log?.dates || []), date])).sort(),
     records: { ...(log?.records || {}) },
   };
   if (!next.records[date]) next.records[date] = reconciled;
+  // Archive before trimming so the oldest operational day survives the first
+  // schema-v1 migration even when no modelHistory existed on the prior log.
+  next = syncModelHistory(next);
   while (next.dates.length > ROLLING_DAYS) {
     const oldest = next.dates.shift();
     delete next.records[oldest];
@@ -494,7 +561,7 @@ export async function repairRecentDays(log, maxScan = 7) {
   }
   log.settledDates = [...settled].filter(d => log.dates.includes(d));   // prune to rolling window
   if (totalFixed) console.log(`[calib] repair: upgraded ${totalFixed} false-miss record(s) across ${candidates.length} unsettled day(s)`);
-  return log;
+  return syncModelHistory(log);
 }
 
 /**

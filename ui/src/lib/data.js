@@ -158,6 +158,19 @@ function attachOdds(batter, oddsIndex) {
   return { books, best, marketImplied }
 }
 
+// Schema v5 emits one composite-keyed row per batter/game. Keep deduplication
+// here so cached schema-v4 snapshots (composite + bare-id aliases) continue to
+// load correctly during rollout and doubleheaders remain distinct.
+export function uniqueScoredBatters(scoredBatters = {}) {
+  const dedup = new Map()
+  for (const batter of Object.values(scoredBatters || {})) {
+    if (!batter || batter.playerId == null || batter.gamePk == null) continue
+    const id = `${batter.playerId}-${batter.gamePk}`
+    if (!dedup.has(id)) dedup.set(id, batter)
+  }
+  return [...dedup.values()]
+}
+
 export async function loadSlate() {
   // Cache-buster: GitHub Pages' CDN (Fastly) can keep serving a stale daily.json
   // for many minutes even though each deploy republishes it — and `cache:no-store`
@@ -179,18 +192,11 @@ export async function loadSlate() {
     oddsIndexByPk.set(Number(pk), buildOddsIndex(og))
   }
 
-  // The brain emits each batter under two keys (a bare playerId and a
-  // composite `playerId-gamePk`), so Object.values has every row twice.
-  // Dedupe on a stable composite id (also correct for doubleheaders).
-  const dedup = new Map()
-  for (const b of Object.values(d.scoredBatters || {})) {
-    const id = `${b.playerId}-${b.gamePk}`
-    if (!dedup.has(id)) dedup.set(id, b)
-  }
+  const uniqueBatters = uniqueScoredBatters(d.scoredBatters)
 
   const h2hMap = d.h2h || {}
 
-  const batters = [...dedup.values()].map((b) => {
+  const batters = uniqueBatters.map((b) => {
     const id = `${b.playerId}-${b.gamePk}`
     const game = gamesByPk.get(b.gamePk) || null
     const oddsIndex = oddsIndexByPk.get(b.gamePk)

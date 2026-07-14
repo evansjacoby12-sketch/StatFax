@@ -43,10 +43,9 @@
  * @property {Object.<string,number[]>}       homerersByGame   Keyed by gamePk
  *                                                              (Final games only).
  * @property {Object.<string,ScoredBatter>}   scoredBatters
- *   IMPORTANT: keyed by COMPOSITE `${playerId}-${gamePk}` (canonical)
- *   AND legacy `${playerId}` (back-compat for older clients on old OTAs).
- *   The composite key preserves both games of a doubleheader; the legacy
- *   key is last-write-wins. New code should always use the composite.
+ *   Keyed by COMPOSITE `${playerId}-${gamePk}`. Schema v5 removed the legacy
+ *   bare-player alias, cutting the dominant snapshot section roughly in half
+ *   while preserving both games of a doubleheader. Readers still tolerate v4.
  * @property {SlateStats} stats
  * @property {NanDebug[]} _nanDebug  Capped diagnostic list — batters that
  *                                   tripped the NaN fallback during scoring.
@@ -84,9 +83,7 @@
  * @typedef {Object} ScoredBatter
  * @property {number}   playerId
  * @property {number}   gamePk         Which game this row belongs to. The
- *                                     client filters scoredBatters[id] by
- *                                     `row.gamePk === game.gamePk` to handle
- *                                     legacy-key doubleheader collisions.
+ *                                     composite map key is playerId-gamePk.
  * @property {string}   name
  * @property {'L'|'R'|'S'} batSide
  * @property {string}   team
@@ -244,6 +241,7 @@ import {
   extractPredictionRecord,
   reconcileDate,
   repairRecentDays,
+  mergeModelHistories,
   computeMultipliers,
   fetchHomerersForDate,
   fetchPitcherKsForDate,
@@ -2043,7 +2041,10 @@ async function main() {
   try {
     if (existsSync(BACKTEST_OUT_PATH)) {
       const local = JSON.parse(readFileSync(BACKTEST_OUT_PATH, 'utf8'));
+      const remoteModelHistory = backtestLog?.modelHistory;
       if ((local?.dates?.length || 0) > (backtestLog?.dates?.length || 0)) backtestLog = local;
+      const mergedModelHistory = mergeModelHistories(remoteModelHistory, local?.modelHistory);
+      if (mergedModelHistory.dates.length) backtestLog.modelHistory = mergedModelHistory;
       const lc = local?.combos, bc = backtestLog?.combos;
       if (lc?.byDate || bc?.byDate || lc?.lateByDate || bc?.lateByDate || lc?.windowsByDate || bc?.windowsByDate || lc?.fullByDate || bc?.fullByDate || lc?.sgpByDate || bc?.sgpByDate) {
         backtestLog.combos = {
@@ -2088,13 +2089,12 @@ async function main() {
 
   let comboRows = [];
   if (calibSnapshot?.scoredBatters) {
-    // Snapshot stores both composite (`${id}-${gamePk}`) AND legacy (`${id}`)
-    // keys for back-compat — dedupe to composite-only so we don't double-
-    // count each batter in the calibration sample.
+    // Accept both schema-v4 dual-key snapshots and schema-v5 composite-only
+    // snapshots. Dedupe by the row's own identifiers so older cached payloads
+    // remain safe without requiring a hyphenated map key.
     const seen = new Set();
     reconcilePredictions = [];
-    for (const [key, row] of Object.entries(calibSnapshot.scoredBatters)) {
-      if (!key.includes('-')) continue;     // skip legacy id-only keys
+    for (const row of Object.values(calibSnapshot.scoredBatters)) {
       if (!row || !Number.isFinite(row.score)) continue;
       const dedup = `${row.playerId}-${row.gamePk}`;
       if (seen.has(dedup)) continue;
@@ -2118,6 +2118,7 @@ async function main() {
   // log must have >= this many dates. Fewer ⇒ data was lost this run; we refuse to
   // overwrite below this at write time so a bad run can't shrink the cached log.
   const restoredLogDates = backtestLog?.dates?.length || 0;
+  const restoredModelHistoryDates = backtestLog?.modelHistory?.dates?.length || 0;
   backtestLog = await reconcileDate(yesterdayCT, reconcilePredictions, backtestLog, yesterdayOutcomes);
   // Self-heal late-game / transient misses on recent days — a PRIME pick whose
   // HR landed in a late west-coast game after this date was first reconciled
@@ -3093,15 +3094,9 @@ async function main() {
           gameParkKFactor:  stadium?.parkFactorK ?? 1.0,
         } : null;
 
-        // Doubleheader fix: write under BOTH a composite key
-        // `${id}-${gamePk}` (the new canonical lookup) and the legacy
-        // `${id}` (kept for backward compat with clients that haven't
-        // picked up the new OTA yet). For non-doubleheaders the two keys
-        // point to the same single row. For doubleheaders the composite
-        // keys preserve BOTH games while the legacy key is last-wins —
-        // not perfect for old clients on DH days, but those would have
-        // been broken either way; new clients use the composite key and
-        // see both games correctly.
+        // Doubleheader-safe canonical row. Schema v5 publishes this once under
+        // `${id}-${gamePk}`; v4's bare-id alias doubled the network payload and
+        // could only represent one side of a doubleheader anyway.
         const row = {
           playerId:   id,
           name:       batter.name,
@@ -3248,17 +3243,15 @@ async function main() {
         // pre-first-pitch sim; the freeze block below carries it forward for
         // started/Final games (same treatment preGameScore/preGameGrade get).
         row.simHRProb = Number.isFinite(row.hrProbability) ? row.hrProbability : null;
-        // Write under composite key (canonical) + legacy id key (BC).
+        // Composite key is the only published representation in schema v5.
         scoredBatters[`${id}-${game.gamePk}`] = row;
-        scoredBatters[id] = row;
       }
     };
 
     scoreSide(awayIds, game.homePitcher, awayOrder, game.awayTeam.abbr, false, game.homeTeam?.id ?? null);
     scoreSide(homeIds, game.awayPitcher, homeOrder, game.homeTeam.abbr, true,  game.awayTeam?.id ?? null);
   }
-  // Count UNIQUE (player, game) pairs by filtering to composite keys only.
-  const uniqueScored = Object.keys(scoredBatters).filter(k => k.includes('-')).length;
+  const uniqueScored = Object.keys(scoredBatters).length;
   console.log(`[slate] scored ${uniqueScored} batter-game pairs in ${((Date.now() - scoreStart) / 1000).toFixed(2)}s`);
 
   // ─── Math post-process pipeline (Tier 1-3) ────────────────────────────────
@@ -3622,9 +3615,7 @@ async function main() {
   const zoneCount = Object.values(scoredBatters)
     .filter(r => r?.zoneMatchup)
     .length;
-  // Half of zoneCount because composite + legacy keys both point to the
-  // same row, both end up annotated.
-  console.log(`[slate] zone matchup enriched on ${Math.floor(zoneCount / 2)} rows in ${((Date.now() - zoneStart) / 1000).toFixed(2)}s`);
+  console.log(`[slate] zone matchup enriched on ${zoneCount} rows in ${((Date.now() - zoneStart) / 1000).toFixed(2)}s`);
 
   // 8.65) Zone score bonus pass. The base scoreBatter() model doesn't see
   // zone matchup data — that fetch happens AFTER scoring (zones are
@@ -3647,9 +3638,8 @@ async function main() {
   // from the base composite.
   const zoneScoreStart = Date.now();
   let zoneScoreApplied = 0;
-  // Iterate composite keys only — the legacy `${id}` key points at the
-  // same row object so mutating once is enough; iterating both keys
-  // would apply the bonus twice.
+  // Schema-v5 map keys are all composite; keep the guard explicit so malformed
+  // or hand-authored snapshots cannot enter the score pass.
   for (const key of Object.keys(scoredBatters)) {
     if (!key.includes('-')) continue;
     const row = scoredBatters[key];
@@ -3767,9 +3757,7 @@ async function main() {
         liveKsByPitcher[`${pitcherId}-${gamePk}`] = pData;
       }
 
-      // Iterate composite keys only (`${id}-${gamePk}`) — legacy bare-id
-      // keys are a back-compat mirror; tagging only composite keeps the
-      // snapshot internally consistent without double-tagging.
+      // Composite `${id}-${gamePk}` rows keep live tagging doubleheader-safe.
       for (const key of Object.keys(scoredBatters)) {
         if (!key.includes('-')) continue;
         const [pidStr, gpkStr] = key.split('-');
@@ -3895,10 +3883,10 @@ async function main() {
     const linFallback = (s) => Math.max(0.005, Math.min(0.30, 0.025 + s * 0.0015));
     const calibratedRowObjs = [];
     for (const key of Object.keys(scoredBatters)) {
-      if (!key.includes('-')) continue;   // composite keys only — the bare `id`
-      const row = scoredBatters[key];     // alias points at the SAME object, so
-      if (!row || !Number.isFinite(row.score)) continue; // process each once (else
-      if (row.simHRProb === undefined) {  // sim-resolution sees it twice → NaN).
+      if (!key.includes('-')) continue;
+      const row = scoredBatters[key];
+      if (!row || !Number.isFinite(row.score)) continue;
+      if (row.simHRProb === undefined) {
         row.simHRProb = Number.isFinite(row.hrProbability) ? row.hrProbability : null;
       }
       const ruleProb = lookupProb(row.score, scoreToProbTable.table,
@@ -3940,7 +3928,7 @@ async function main() {
     const linFallback = (s) => Math.max(0.005, Math.min(0.3, 0.025 + s * 0.0015));
     let patched = 0;
     for (const key of Object.keys(scoredBatters)) {
-      if (!key.includes('-')) continue; // composite keys only — the bare-id alias is the SAME object (matches every sibling loop; avoids the double-counted patched tally and the dual-key NaN trap if this ever becomes non-idempotent)
+      if (!key.includes('-')) continue;
       const row = scoredBatters[key];
       if (!row || !Number.isFinite(row.score) || Number.isFinite(row.hrProbability)) continue;
       row.hrProbability = scoreToProbTable?.table?.length
@@ -3986,7 +3974,7 @@ async function main() {
     if (ml?.date === date && ml.rows) {
       let frozen = 0, changed = 0;
       for (const key of Object.keys(scoredBatters)) {
-        if (!key.includes('-')) continue; // bare-id alias is the SAME object
+        if (!key.includes('-')) continue;
         const row = scoredBatters[key];
         if (!row || row.playerId == null || started(row.gamePk)) continue;
         const f = ml.rows[`${row.playerId}-${row.gamePk}`];
@@ -4043,7 +4031,7 @@ async function main() {
     const nextByKey = {};
     let stored = 0, frozen = 0;
     for (const key of Object.keys(scoredBatters)) {
-      if (!key.includes('-')) continue; // bare-id alias points at the SAME object
+      if (!key.includes('-')) continue;
       const row = scoredBatters[key];
       if (!row || row.playerId == null) continue;
       const live  = liveByGame.get(row.gamePk)  === true;
@@ -4157,7 +4145,7 @@ async function main() {
     }
     let attached = 0;
     for (const key of Object.keys(scoredBatters)) {
-      if (!key.includes('-')) continue; // bare-id alias is the SAME object
+      if (!key.includes('-')) continue;
       const row = scoredBatters[key];
       const imps = idxByPk.get(row?.gamePk)?.get(nrmName(row?.name));
       if (imps?.length) { row.vegasImpliedProb = imps.reduce((s, x) => s + x, 0) / imps.length; attached++; }
@@ -4166,7 +4154,7 @@ async function main() {
   } catch (e) { console.warn(`[odds] implied-prob attach skipped: ${e?.message}`); }
 
   const payload = {
-    version:     4,
+    version:     5,
     generatedAt: startedAt.toISOString(),
     finishedAt:  new Date().toISOString(),
     date,
@@ -4559,7 +4547,7 @@ async function main() {
         }).filter((e) => e.actualK != null);
         backtestLog.kProps.resultsByDate[yesterdayCT] = graded;
         const dk = Object.keys(backtestLog.kProps.resultsByDate).sort();
-        for (const d of dk.slice(0, -14)) delete backtestLog.kProps.resultsByDate[d];
+        for (const d of dk.slice(0, -180)) delete backtestLog.kProps.resultsByDate[d];
         console.log(`[kbrain] graded ${graded.length} K props for ${yesterdayCT}`);
       }
     }
@@ -4580,12 +4568,14 @@ async function main() {
 
   // Persist calibration state so tomorrow's cron run reads it back.
   // calibration.json is what setActiveCalibration() consumes at startup.
-  // backtest-log.json is the rolling 30-day reconciliation history.
+  // backtest-log.json contains the rolling 30-day operational history plus a
+  // compact 180-day model archive.
   // Both are uploaded by the same workflow step that uploads daily.json.
   writeFileSync(CALIBRATION_OUT_PATH, JSON.stringify(calibration));
   const finalLogDates = backtestLog?.dates?.length || 0;
-  if (finalLogDates < restoredLogDates) {
-    console.error(`[slate-qa] backtest-log REGRESSION: final ${finalLogDates} dates < restored ${restoredLogDates} — REFUSING to overwrite (preserving the richer on-disk log so the cache isn't poisoned).`);
+  const finalModelHistoryDates = backtestLog?.modelHistory?.dates?.length || 0;
+  if (finalLogDates < restoredLogDates || finalModelHistoryDates < restoredModelHistoryDates) {
+    console.error(`[slate-qa] backtest-log REGRESSION: operational ${finalLogDates}/${restoredLogDates}, model history ${finalModelHistoryDates}/${restoredModelHistoryDates} — REFUSING to overwrite (preserving the richer on-disk log so the cache isn't poisoned).`);
   } else {
     writeFileSync(BACKTEST_OUT_PATH, JSON.stringify(backtestLog));
     console.log(`[calib] wrote calibration.json (${(JSON.stringify(calibration).length / 1024).toFixed(1)} KB) + backtest-log.json (${(JSON.stringify(backtestLog).length / 1024).toFixed(1)} KB)`);

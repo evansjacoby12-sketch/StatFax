@@ -59,13 +59,18 @@ test('trainFeatModel: trains + ranks better than noise on a separable synthetic 
     score: 100,
     actuallyPlayed: false,
   })
-  const m = trainFeatModel({ records })
+  const m = trainFeatModel({
+    records: { '2026-07-01': [{ feat: null, homered: false, score: 1 }] },
+    modelHistory: { version: 1, dates, records },
+  })
   assert.equal(m.ready, true)
   assert.equal(m.n, 400)
   assert.equal(m.evaluation, 'temporal-holdout')
   assert.deepEqual(m.holdoutDates, dates.slice(-2))
   assert.equal(m.trainN, 320)
   assert.equal(m.holdoutN, 80)
+  assert.equal(m.historySource, 'modelHistory')
+  assert.equal(m.historyDays, 10)
   assert.ok(Number.isFinite(m.cvAuc) && m.cvAuc > 0.5, `learned signal (cvAuc ${m.cvAuc})`)
   const pHigh = scoreFeatProb({ ...Object.fromEntries(FEAT_KEYS.map((k) => [k, 0])), bs: 80 }, m)
   const pLow = scoreFeatProb({ ...Object.fromEntries(FEAT_KEYS.map((k) => [k, 0])), bs: 20 }, m)

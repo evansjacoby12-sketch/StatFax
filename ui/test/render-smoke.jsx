@@ -32,7 +32,7 @@ import PickOfDay from '../src/components/PickOfDay.jsx'
 import NFLBoard from '../src/components/NFLBoard.jsx'
 
 const SYNTH = {
-  version: 4,
+  version: 5,
   date: '2026-06-03',
   generatedAt: new Date().toISOString(),
   stats: { scoredBatters: 2 },
@@ -126,10 +126,8 @@ function mkBatter(id, name, homered) {
     pitchMix: { fastballPct: 52, breakingPct: 28, offspeedPct: 20, ffPct: 52, slPct: 28, chPct: 20, shape: { ff: { speed: 95, whiff: 20 }, sl: { speed: 85, whiff: 32 }, ch: { speed: 87, whiff: 26 } } },
   }
 }
-SYNTH.scoredBatters['1'] = mkBatter(1, 'Aaron Judge', true)
-SYNTH.scoredBatters['1-1'] = SYNTH.scoredBatters['1']
-SYNTH.scoredBatters['2'] = mkBatter(2, 'Elly De La Cruz', false)
-SYNTH.scoredBatters['2-1'] = SYNTH.scoredBatters['2']
+SYNTH.scoredBatters['1-1'] = mkBatter(1, 'Aaron Judge', true)
+SYNTH.scoredBatters['2-1'] = mkBatter(2, 'Elly De La Cruz', false)
 
 function loadSlate() {
   const p = '../dist/daily.json'

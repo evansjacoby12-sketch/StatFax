@@ -21,7 +21,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const LOG = path.resolve(__dirname, '..', '..', 'dist', 'backtest-log.json')
 
 const log = JSON.parse(fs.readFileSync(LOG, 'utf8'))
-const records = log.records || {}
+const useArchive = Array.isArray(log.modelHistory?.dates) && log.modelHistory.dates.length > 0
+const records = useArchive ? log.modelHistory.records || {} : log.records || {}
 const rows = []
 for (const date of Object.keys(records)) {
   for (const r of records[date]) {
@@ -113,7 +114,7 @@ function cv(method) {
 }
 
 // --- Report ---
-console.log(`\nbacktest-log: ${N} records · ${rows.filter((r) => r.y).length} HR · base rate ${(base * 100).toFixed(2)}%\n`)
+console.log(`\nbacktest-log (${useArchive ? '180-day model archive' : '30-day operational fallback'}): ${N} records · ${rows.filter((r) => r.y).length} HR · base rate ${(base * 100).toFixed(2)}%\n`)
 
 console.log('DISCRIMINATION (ranking quality — depends on the score, not calibration):')
 const scoreAuc = auc(rows, (r) => r.score)

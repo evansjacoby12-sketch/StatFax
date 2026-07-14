@@ -118,9 +118,18 @@ export function trainFeatModel(backtestLog, {
   minN = MIN_N,
   holdoutDays = 5,
   minHoldoutN = 50,
+  historyDays = 90,
 } = {}) {
-  const records = backtestLog?.records || {}
-  const dates = Object.keys(records).sort()
+  const archive = backtestLog?.modelHistory
+  const useArchive = Array.isArray(archive?.dates) && archive.dates.length > 0
+  const records = useArchive ? archive.records || {} : backtestLog?.records || {}
+  const allDates = [...new Set([
+    ...(useArchive ? archive.dates : backtestLog?.dates || []),
+    ...Object.keys(records),
+  ])].sort()
+  const dates = Number.isFinite(historyDays) && historyDays > 0
+    ? allDates.slice(-Math.floor(historyDays))
+    : allDates
   const samples = []
   for (const date of dates) {
     for (const row of records[date] || []) {
@@ -198,6 +207,8 @@ export function trainFeatModel(backtestLog, {
     holdoutN: testSamples.length,
     holdoutDates,
     evaluation: 'temporal-holdout',
+    historySource: useArchive ? 'modelHistory' : 'records',
+    historyDays: dates.length,
   }
 }
 
