@@ -8,6 +8,7 @@ import SportSignalRail from './SportSignalRail.jsx'
 import NFL_DEMO_SNAPSHOT from '../../../src/sports/nfl/data/demoSlate.js'
 import { NFL_PROP_MARKET_LIST, eligiblePropMarkets, eligibilityReason } from '../../../src/sports/nfl/logic/propEligibility.js'
 import { scoreNFLSnapshot, scoreNFLProp } from '../../../src/sports/nfl/logic/ScoringEngine.js'
+import { assessNFLSignals } from '../../../src/sports/nfl/logic/signals.js'
 import { loadNFLSnapshot } from '../../../src/sports/nfl/api/NFLService.js'
 import { nflLegKey, settleNFLTicket } from '../lib/nflTickets.js'
 import { useEliLevel } from '../lib/eliLevel.js'
@@ -90,6 +91,33 @@ function signalIcon(signal) {
   return 'TrendingUp'
 }
 
+const ASSESSMENT_META = {
+  avoid: { icon: 'TriangleAlert', groupLabel: 'Be wary / avoid', detail: 'Read these before considering the bet' },
+  caution: { icon: 'Info', groupLabel: 'Caution', detail: 'Mixed evidence or conditions to monitor' },
+  good: { icon: 'CircleCheck', groupLabel: 'Positive', detail: 'Evidence supporting the player' },
+}
+
+function AssessmentBadge({ signals, compact = false }) {
+  const assessment = assessNFLSignals(signals)
+  const meta = ASSESSMENT_META[assessment.level]
+  return <span className={`nfl-assessment-badge is-${assessment.level} ${compact ? 'is-compact' : ''}`} aria-label={`Bet assessment: ${assessment.label}`}><Icon name={meta.icon} size={compact ? 10 : 13} /><b>{assessment.label}</b>{!compact && <small>{assessment.headline}</small>}</span>
+}
+
+function SignalAssessmentPanel({ signals = [], eliLevel }) {
+  const assessment = assessNFLSignals(signals)
+  const levels = ['avoid', 'caution', 'good']
+  return <div className={`nfl-assessment-panel is-${assessment.level}`}>
+    <div className="nfl-assessment-summary"><AssessmentBadge signals={signals} /><span>{signals.length} active signal{signals.length === 1 ? '' : 's'} · red flags always appear first</span></div>
+    {levels.map((level) => {
+      const group = assessment.groups[level]
+      if (!group.length) return null
+      const meta = ASSESSMENT_META[level]
+      return <section key={level} className={`nfl-assessment-group is-${level}`} aria-label={`${meta.groupLabel} signals`}><header><span><Icon name={meta.icon} size={14} /><b>{meta.groupLabel}</b><em>{group.length}</em></span><small>{meta.detail}</small></header><div className="nfl-research-signals">{group.map((signal) => <article key={signal.key} className={`tone-${signal.tone}`}><Icon name={signalIcon(signal)} size={15} /><div><b>{nflSignalText(signal, eliLevel)}</b><small>{nflSignalCaption(eliLevel)}</small></div></article>)}</div></section>
+    })}
+    {!signals.length && <div className="nfl-research-empty"><Icon name="Info" size={15} />{eliLevel === 'eli5' ? 'There is not enough clear evidence to call this good or bad yet.' : 'No active role, matchup, or streak signal for this market.'}</div>}
+  </div>
+}
+
 function NFLPerformance({ snapshot }) {
   const performance = snapshot.modelPerformance
   const markets = Object.entries(performance?.markets || {})
@@ -128,7 +156,7 @@ function PlayerCard({ player, marketId, watched, inSlip, onSelect, onToggleWatch
   return (
     <article className="nfl-prop-card" style={{ '--nfl-grade': color }}>
       <button className="nfl-card-open" onClick={() => onSelect(player)} aria-label={`Open ${player.name} prop research`}>
-        <div className="nfl-card-hero"><PlayerHeadshotSilo player={player} /><div className="nfl-card-hero-copy"><header><div><span className="nfl-card-name">{player.name}</span><span className="nfl-position">{player.position}</span><span className="nfl-grade" style={{ color }}>{model.grade}</span></div><small className={`nfl-live-state ${player.live?.isLive ? 'is-live' : ''}`}><Icon name={player.live?.isLive ? 'Activity' : 'Clock'} size={11} />{liveLabel(player)}</small></header><div className="nfl-card-matchup"><b>{player.team}</b><Icon name="ChevronRight" size={10} /><span>{player.opponent}</span><i>·</i><span>{player.kickoff}</span><i>·</i><span>{player.isHome ? 'Home' : 'Away'}</span></div></div></div>
+        <div className="nfl-card-hero"><PlayerHeadshotSilo player={player} /><div className="nfl-card-hero-copy"><header><div><span className="nfl-card-name">{player.name}</span><span className="nfl-position">{player.position}</span><span className="nfl-grade" style={{ color }}>{model.grade}</span><AssessmentBadge signals={model.signals} compact /></div><small className={`nfl-live-state ${player.live?.isLive ? 'is-live' : ''}`}><Icon name={player.live?.isLive ? 'Activity' : 'Clock'} size={11} />{liveLabel(player)}</small></header><div className="nfl-card-matchup"><b>{player.team}</b><Icon name="ChevronRight" size={10} /><span>{player.opponent}</span><i>·</i><span>{player.kickoff}</span><i>·</i><span>{player.isHome ? 'Home' : 'Away'}</span></div></div></div>
         <div className="nfl-card-price">
           <div><small>Model probability</small><strong className="mono" style={{ color }}>{pct(model.probability)}</strong></div>
           <div><small>{['anytime_td', 'first_td', 'two_plus_td'].includes(marketId) ? 'Odds / edge' : 'Line / edge'}</small><span><b className="mono">{marketValue(player, model, marketId)}</b><em className={`mono ${model.edge == null ? '' : model.edge >= 0 ? 'positive' : 'negative'}`}>{model.edge == null ? 'No price' : `${model.edge >= 0 ? '+' : ''}${pct(model.edge)}`}</em></span></div>
@@ -159,7 +187,7 @@ function BoardRow({ player, rank, marketId, watched, inSlip, onSelect, onToggleW
   return (
     <article className="nfl-player-row nfl-prop-row" style={{ '--nfl-grade': color }} role="button" tabIndex={0} onClick={() => onSelect(player)} onKeyDown={(event) => { if (event.key === 'Enter') onSelect(player) }}>
       <div className="nfl-rank mono">{rank}</div>
-      <div className="nfl-player-main"><div className="nfl-player-name-line"><b>{player.name}</b><span className="nfl-position">{player.position}</span><span className="nfl-grade" style={{ color }}>{model.grade}</span></div><div className="nfl-matchup"><b>{player.team}</b><Icon name="ChevronRight" size={10} /><span>{player.opponent}</span><i>·</i><span>{liveLabel(player)}</span></div><div className={`nfl-status nfl-status--${player.statusTone}`}><Icon name={player.statusTone === 'warn' ? 'TriangleAlert' : 'CircleCheck'} size={11} />{player.status}</div></div>
+      <div className="nfl-player-main"><div className="nfl-player-name-line"><b>{player.name}</b><span className="nfl-position">{player.position}</span><span className="nfl-grade" style={{ color }}>{model.grade}</span><AssessmentBadge signals={model.signals} compact /></div><div className="nfl-matchup"><b>{player.team}</b><Icon name="ChevronRight" size={10} /><span>{player.opponent}</span><i>·</i><span>{liveLabel(player)}</span></div><div className={`nfl-status nfl-status--${player.statusTone}`}><Icon name={player.statusTone === 'warn' ? 'TriangleAlert' : 'CircleCheck'} size={11} />{player.status}</div></div>
       <div className="nfl-number nfl-model-prob"><strong className="mono" style={{ color }}>{pct(model.probability)}</strong><small>Model</small></div>
       <div className="nfl-number"><strong className="mono">{marketValue(player, model, marketId)}</strong><small>Market</small></div>
       <div className="nfl-number"><strong className={`mono nfl-edge ${model.edge == null ? '' : model.edge >= 0 ? 'positive' : 'negative'}`}>{model.edge == null ? '—' : `${model.edge >= 0 ? '+' : ''}${pct(model.edge)}`}</strong><small>Edge</small></div>
@@ -190,7 +218,7 @@ function PlayerResearch({ player, marketId, onClose, inSlip, onToggleSlip }) {
       <header className="nfl-research-header">
         <button className="nfl-drawer-close" onClick={onClose} aria-label="Close"><Icon name="X" size={18} /></button>
         <span className="nfl-drawer-eyebrow">NFL player research · model confidence</span>
-        <div className="nfl-research-identity"><PlayerHeadshotSilo player={player} variant="workspace" /><div className="nfl-research-identity-copy"><div><h2 id="nfl-drawer-title">{player.name}</h2><span className="nfl-position">{player.position}</span><span className={`nfl-live-state ${player.live?.isLive ? 'is-live' : ''}`}><Icon name={player.live?.isLive ? 'Activity' : 'Clock'} size={11} />{liveLabel(player)}</span></div><p><b>{player.team}</b> vs {player.opponent} · {player.kickoff} · {player.isHome ? 'Home' : 'Away'}</p></div></div>
+        <div className="nfl-research-identity"><PlayerHeadshotSilo player={player} variant="workspace" /><div className="nfl-research-identity-copy"><div><h2 id="nfl-drawer-title">{player.name}</h2><span className="nfl-position">{player.position}</span><span className={`nfl-live-state ${player.live?.isLive ? 'is-live' : ''}`}><Icon name={player.live?.isLive ? 'Activity' : 'Clock'} size={11} />{liveLabel(player)}</span></div><p><b>{player.team}</b> vs {player.opponent} · {player.kickoff} · {player.isHome ? 'Home' : 'Away'}</p><AssessmentBadge signals={current.signals} /></div></div>
         <div className="nfl-research-decision">
           <div className="nfl-research-market"><small>Selected market</small><b>{marketLabel}</b></div>
           <div className="nfl-research-score"><span><small>Model</small><strong className="mono">{pct(current.probability)}</strong></span><span><small>Line / odds</small><strong className="mono">{marketValue(player, current, marketId)}</strong></span><span><small>Edge</small><strong className={`mono ${current.edge == null ? '' : current.edge >= 0 ? 'positive' : 'negative'}`}>{current.edge == null ? 'No price' : `${current.edge >= 0 ? '+' : ''}${pct(current.edge)}`}</strong></span></div>
@@ -200,7 +228,7 @@ function PlayerResearch({ player, marketId, onClose, inSlip, onToggleSlip }) {
       <nav className="nfl-research-tabs" aria-label="Player research sections">{researchTabs.map((item) => <button key={item.id} className={tab === item.id ? 'active' : ''} aria-current={tab === item.id ? 'page' : undefined} onClick={() => setTab(item.id)}><Icon name={item.icon} size={13} />{item.label}</button>)}</nav>
       <div className="nfl-research-body">
         {tab === 'overview' && <div className="nfl-research-view">
-          <section className="nfl-research-panel"><header><span><Icon name="Sparkles" size={14} /> {eliLevel === 'eli5' ? 'Why this player stands out' : 'Primary model signals'}</span><small>{eliLevel === 'eli5' ? 'Plain English' : `${current.signals?.length || 0} active`}</small></header><div className="nfl-research-signals">{current.signals?.slice(0, 6).map((signal) => <article key={signal.key} className={`tone-${signal.tone}`}><Icon name={signalIcon(signal)} size={15} /><div><b>{nflSignalText(signal, eliLevel)}</b><small>{nflSignalCaption(eliLevel)}</small></div></article>)}{!current.signals?.length && <div className="nfl-research-empty"><Icon name="Info" size={15} />{eliLevel === 'eli5' ? 'The model has no strong, easy-to-explain trend for this player yet.' : 'No active streak or role signal for this market.'}</div>}</div></section>
+          <section className="nfl-research-panel"><header><span><Icon name="ShieldAlert" size={14} /> Betting signal assessment</span><small>Risk first</small></header><SignalAssessmentPanel signals={current.signals} eliLevel={eliLevel} /></section>
           <section className="nfl-research-panel"><header><span><Icon name="LayoutGrid" size={14} /> Eligible markets</span><small>{scoredMarkets.length} available</small></header><div className="nfl-eligible-grid">{scoredMarkets.map(({ market, model }) => <span key={market.id} className={market.id === marketId ? 'active' : ''} title={eligibilityReason(player, market.id)}><b>{market.shortLabel}</b><em className="mono">{pct(model.probability)}</em><small className="mono">{marketValue(player, model, market.id)}</small></span>)}</div></section>
           <section className="nfl-research-disclosure"><Icon name="Info" size={14} /><p>Model features reflect the history, role, injury, weather and live-game coverage available for this slate. Missing feeds are shown as limited rather than replaced with invented values.</p></section>
         </div>}

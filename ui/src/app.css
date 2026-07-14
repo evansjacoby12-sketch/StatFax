@@ -15269,6 +15269,15 @@ button.th:focus-visible {
 .nfl-research-identity h2 { margin: 0; font-size: 30px; letter-spacing: -.025em; }
 .nfl-research-identity p { margin-top: 6px; color: var(--text-faint); font-size: 11px; }
 .nfl-research-identity p b { color: var(--text-dim); }
+.nfl-assessment-badge { width: fit-content; max-width: 100%; padding: 6px 8px; display: inline-flex; align-items: center; gap: 6px; border: 1px solid currentColor; border-radius: 7px; background: color-mix(in srgb, currentColor 8%, transparent); line-height: 1; }
+.nfl-assessment-badge b { overflow: hidden; font-size: 9px; letter-spacing: .045em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
+.nfl-assessment-badge small { overflow: hidden; color: var(--text-dim); font-size: 8px; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
+.nfl-assessment-badge.is-good { color: var(--strong); }
+.nfl-assessment-badge.is-caution { color: var(--warn); }
+.nfl-assessment-badge.is-avoid { color: var(--bad); }
+.nfl-assessment-badge.is-compact { padding: 3px 5px; gap: 4px; border-radius: 5px; }
+.nfl-assessment-badge.is-compact b { font-size: 7px; }
+.nfl-research-identity-copy > .nfl-assessment-badge { margin-top: 10px; }
 .nfl-research-decision { margin-top: 18px; display: grid; grid-template-columns: minmax(135px, .75fr) minmax(300px, 1.8fr) minmax(140px, .8fr); align-items: stretch; gap: 10px; }
 .nfl-research-market,
 .nfl-research-score { border: 1px solid var(--border-soft); border-radius: 11px; background: rgba(255,255,255,.022); }
@@ -15296,6 +15305,22 @@ button.th:focus-visible {
 .nfl-research-panel > header > span { display: inline-flex; align-items: center; gap: 7px; font-family: var(--display); font-size: 11px; font-weight: 800; }
 .nfl-research-panel > header svg { color: var(--accent); }
 .nfl-research-panel > header small { color: var(--text-faint); font-size: 8px; font-weight: 800; text-transform: uppercase; }
+.nfl-assessment-panel { padding: 12px; display: grid; gap: 12px; }
+.nfl-assessment-summary { padding: 10px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border: 1px solid var(--border-soft); border-radius: 10px; background: rgba(255,255,255,.015); }
+.nfl-assessment-summary > span { color: var(--text-faint); font-size: 8px; text-align: right; }
+.nfl-assessment-panel.is-avoid .nfl-assessment-summary { border-color: color-mix(in srgb, var(--bad) 36%, transparent); background: color-mix(in srgb, var(--bad) 7%, transparent); }
+.nfl-assessment-panel.is-caution .nfl-assessment-summary { border-color: color-mix(in srgb, var(--warn) 30%, transparent); background: color-mix(in srgb, var(--warn) 6%, transparent); }
+.nfl-assessment-panel.is-good .nfl-assessment-summary { border-color: color-mix(in srgb, var(--strong) 30%, transparent); background: color-mix(in srgb, var(--strong) 6%, transparent); }
+.nfl-assessment-group { overflow: hidden; border: 1px solid var(--border-soft); border-left-width: 3px; border-radius: 10px; }
+.nfl-assessment-group.is-avoid { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 30%, transparent); background: color-mix(in srgb, var(--bad) 4%, transparent); }
+.nfl-assessment-group.is-caution { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 26%, transparent); background: color-mix(in srgb, var(--warn) 3%, transparent); }
+.nfl-assessment-group.is-good { color: var(--strong); border-color: color-mix(in srgb, var(--strong) 26%, transparent); background: color-mix(in srgb, var(--strong) 3%, transparent); }
+.nfl-assessment-group > header { min-height: 45px; padding: 8px 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid color-mix(in srgb, currentColor 16%, transparent); }
+.nfl-assessment-group > header > span { display: inline-flex; align-items: center; gap: 7px; }
+.nfl-assessment-group > header b { font-size: 10px; text-transform: uppercase; }
+.nfl-assessment-group > header em { min-width: 20px; padding: 3px 5px; color: currentColor; border: 1px solid color-mix(in srgb, currentColor 35%, transparent); border-radius: 999px; font-size: 8px; font-style: normal; text-align: center; }
+.nfl-assessment-group > header small { color: var(--text-faint); font-size: 8px; }
+.nfl-assessment-group .nfl-research-signals { padding: 9px; }
 .nfl-research-signals { padding: 12px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .nfl-research-signals article { min-width: 0; min-height: 76px; padding: 12px; display: flex; align-items: flex-start; gap: 9px; border: 1px solid var(--border-soft); border-radius: 10px; background: rgba(255,255,255,.02); }
 .nfl-research-signals article > svg { flex: none; margin-top: 1px; color: currentColor; }
@@ -15562,6 +15587,11 @@ button.th:focus-visible {
   .nfl-research-body { padding: 16px 14px calc(28px + env(safe-area-inset-bottom)); }
   .nfl-research-signals { grid-template-columns: 1fr; }
   .nfl-research-signals article { min-height: 64px; }
+  .nfl-assessment-summary { align-items: flex-start; flex-direction: column; }
+  .nfl-assessment-summary > span { text-align: left; }
+  .nfl-assessment-group > header { align-items: flex-start; flex-direction: column; gap: 4px; }
+  .nfl-assessment-badge:not(.is-compact) { align-items: flex-start; flex-wrap: wrap; }
+  .nfl-assessment-badge:not(.is-compact) small { width: 100%; white-space: normal; }
   .nfl-research-panel > .nfl-eligible-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .nfl-research-panel > .nfl-research-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .nfl-research-panel .nfl-research-grid span { min-height: 76px; }

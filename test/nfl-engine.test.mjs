@@ -5,7 +5,7 @@ import NFL_DEMO_SNAPSHOT from '../src/sports/nfl/data/demoSlate.js'
 import { loadNFLSnapshot, mergeNFLLiveUpdate, validateNFLSnapshot } from '../src/sports/nfl/api/NFLService.js'
 import { isPropEligible, eligiblePropMarkets } from '../src/sports/nfl/logic/propEligibility.js'
 import { scoreNFLProp, scoreNFLSnapshot } from '../src/sports/nfl/logic/ScoringEngine.js'
-import { buildNFLSignals, nflStreakSignals } from '../src/sports/nfl/logic/signals.js'
+import { assessNFLSignals, buildNFLSignals, nflStreakSignals } from '../src/sports/nfl/logic/signals.js'
 import { nflWeatherImpact } from '../src/sports/nfl/logic/weather.js'
 
 const player = (name) => NFL_DEMO_SNAPSHOT.players.find((item) => item.name === name)
@@ -96,6 +96,26 @@ test('declining opportunity creates a negative scoring-role signal', () => {
 test('QB keeper threat requires repeated red-zone rushing work', () => {
   const signals = buildNFLSignals({ position: 'QB', usage: { goalLineTouchesL3: 3 } })
   assert.ok(signals.some((signal) => signal.key === 'qb-keeper-threat'))
+})
+
+test('signal assessment labels risk clearly and sorts every red flag first', () => {
+  const signals = buildNFLSignals({
+    position: 'WR',
+    usage: { targetShare: .31, redZoneTargetsL3: 6 },
+    lineup: { restrictions: { snapLimit: .55 } },
+  })
+  const firstNonAvoid = signals.findIndex((signal) => signal.assessment !== 'avoid')
+  assert.ok(firstNonAvoid > 0)
+  assert.ok(signals.slice(0, firstNonAvoid).every((signal) => signal.assessment === 'avoid'))
+  assert.equal(signals[0].key, 'snap-limit')
+  assert.equal(signals[0].tone, 'bad')
+  assert.equal(assessNFLSignals(signals).label, 'Be wary')
+})
+
+test('assessment uses explicit positive, caution, and avoid-read-first language', () => {
+  assert.equal(assessNFLSignals([{ key: 'target-share', tone: 'strong' }]).label, 'Positive')
+  assert.equal(assessNFLSignals([{ key: 'split', tone: 'warn' }]).label, 'Caution')
+  assert.equal(assessNFLSignals([{ key: 'committee-risk', tone: 'bad' }, { key: 'scoring-role-lost', tone: 'bad' }]).label, 'Avoid · read first')
 })
 
 test('snapshot scoring returns only eligible players in score order', () => {

@@ -17,6 +17,26 @@ const SIGNAL_PRIORITY = {
   'route-participation': 72, 'target-share': 71, 'snap-share': 70, 'lineup-confirmed': 69,
 }
 
+const ASSESSMENT_ORDER = { avoid: 3, caution: 2, good: 1 }
+const CRITICAL_RISK_SIGNALS = new Set(['snap-limit', 'scoring-role-lost', 'quick-pressure-risk', 'protection-mismatch'])
+
+export function nflSignalAssessment(signal) {
+  if (signal?.tone === 'bad') return 'avoid'
+  if (signal?.tone === 'warn') return 'caution'
+  return 'good'
+}
+
+export function assessNFLSignals(signals = []) {
+  const groups = { avoid: [], caution: [], good: [] }
+  for (const signal of signals) groups[nflSignalAssessment(signal)].push(signal)
+  const critical = groups.avoid.some((signal) => CRITICAL_RISK_SIGNALS.has(signal.key))
+  if (groups.avoid.length >= 2 || critical) return { level: 'avoid', label: groups.avoid.length >= 2 ? 'Avoid · read first' : 'Be wary', headline: 'Material risk signals need review before betting', groups }
+  if (groups.avoid.length) return { level: 'avoid', label: 'Be wary', headline: 'A negative signal needs review before betting', groups }
+  if (groups.caution.length) return { level: 'caution', label: 'Caution', headline: 'Mixed evidence or conditions to monitor', groups }
+  if (groups.good.length) return { level: 'good', label: 'Positive', headline: 'Supporting evidence is present', groups }
+  return { level: 'caution', label: 'Limited signals', headline: 'There is not enough signal evidence yet', groups }
+}
+
 function orderedGames(player) {
   return [...(player?.recentGames || [])].sort((a, b) => Number(b.season || 0) - Number(a.season || 0) || Number(b.week || 0) - Number(a.week || 0))
 }
@@ -93,7 +113,7 @@ export function nflRoleSignals(player) {
   if (lineup.replacement?.inherited) signals.push({ key: 'role-inheritance', text: `Role up: ${lineup.replacement.replaces?.join(', ') || 'vacated work'}`, tone: 'prime' })
   if (Number(lineup.routesPerDropback) >= .75) signals.push({ key: 'route-participation', text: `${Math.round(lineup.routesPerDropback * 100)}% routes/dropback`, tone: 'strong' })
   if (lineup.redZone?.goalLinePackage) signals.push({ key: 'goal-line-package', text: 'Goal-line package', tone: 'prime' })
-  if (lineup.restrictions?.snapLimit != null) signals.push({ key: 'snap-limit', text: `Snap limit ${Math.round(lineup.restrictions.snapLimit * 100)}%`, tone: 'warn' })
+  if (lineup.restrictions?.snapLimit != null) signals.push({ key: 'snap-limit', text: `Snap limit ${Math.round(lineup.restrictions.snapLimit * 100)}%`, tone: Number(lineup.restrictions.snapLimit) <= .65 ? 'bad' : 'warn' })
   return signals
 }
 
@@ -102,6 +122,6 @@ export function buildNFLSignals(player) {
   const splitLabel = player?.isHome ? 'Home' : 'Away'
   const splitSignal = Math.abs(split) >= 0.04 ? [{ key: 'split', text: `${splitLabel} edge ${split >= 0 ? '+' : ''}${Math.round(split * 100)}%`, tone: split > 0 ? 'strong' : 'warn' }] : []
   return [...nflRoleSignals(player), ...nflStreakSignals(player), ...splitSignal]
-    .map((signal) => ({ ...signal, priority: SIGNAL_PRIORITY[signal.key] ?? (signal.tone === 'bad' || signal.tone === 'warn' ? 75 : 50) }))
-    .sort((a, b) => b.priority - a.priority || a.key.localeCompare(b.key))
+    .map((signal) => ({ ...signal, assessment: nflSignalAssessment(signal), priority: SIGNAL_PRIORITY[signal.key] ?? (signal.tone === 'bad' || signal.tone === 'warn' ? 75 : 50) }))
+    .sort((a, b) => ASSESSMENT_ORDER[b.assessment] - ASSESSMENT_ORDER[a.assessment] || b.priority - a.priority || a.key.localeCompare(b.key))
 }
