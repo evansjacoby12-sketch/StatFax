@@ -2,12 +2,11 @@ import { useMemo, useEffect, useState } from 'react'
 import Icon from './Icon.jsx'
 import { loadBacktestLog } from '../lib/backtestLog.js'
 import CommandTabs from './CommandTabs.jsx'
-import { GradeChip, ScoreRing, ProbBar, Stat } from './atoms.jsx'
+import { GradeChip, ScoreRing, Stat } from './atoms.jsx'
 import {
   groupPitchers,
   pitchUsage,
   effSide,
-  K_LINES,
   K_MODEL_VERSION,
   kOverProb,
   projectedK,
@@ -222,7 +221,6 @@ function KBrainView({ pitchers, liveKsByPitcher = {} }) {
         const myLine = lines[e.key]
         const myLineNum = myLine !== undefined && myLine !== '' ? parseFloat(myLine) : null
         const myProb = myLineNum != null && Number.isFinite(myLineNum) ? kOverProb(ek.lambda, myLineNum) : null
-        const showLines = K_LINES.filter((l) => (ek.probs[l] ?? 0) >= 0.03)
         const liveK = liveKsByPitcher[e.key]
         const projection = projectedK(ek)
 
@@ -283,30 +281,6 @@ function KBrainView({ pitchers, liveKsByPitcher = {} }) {
               )}
             </div>
 
-            {/* K-over probability bars */}
-            <div className="kbrain-lines" style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginBottom: '10px' }}>
-              {showLines.map((line) => {
-                const p = ek.probs[line]
-                if (p == null) return null
-                const pct100 = p * 100
-                const barColor = pct100 >= 60 ? 'var(--strong)' : pct100 >= 40 ? '#c69a57' : 'var(--bad)'
-                return (
-                  <div className="kbrain-line" key={line} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px' }}>
-                    <span className="mono" style={{ width: '32px', color: 'var(--text-dim)', flexShrink: 0 }}>{line}+</span>
-                    <div style={{ flex: 1, height: '6px', background: 'rgba(255,255,255,0.06)', borderRadius: '99px', overflow: 'hidden' }}>
-                      <div style={{ height: '100%', width: `${pct100}%`, background: barColor, borderRadius: '99px', transition: 'width 0.3s' }} />
-                    </div>
-                    <span className="mono" style={{ width: '34px', textAlign: 'right', fontWeight: '700', color: barColor }}>{pct100.toFixed(0)}%</span>
-                    {p >= 0.60 ? (
-                      <span style={{ fontSize: '9px', fontWeight: '700', color: 'var(--strong)', textTransform: 'uppercase', letterSpacing: '0.04em', flexShrink: 0 }}>value</span>
-                    ) : p <= 0.35 ? (
-                      <span style={{ fontSize: '9px', fontWeight: '700', color: 'var(--bad)', textTransform: 'uppercase', letterSpacing: '0.04em', flexShrink: 0 }}>fade</span>
-                    ) : null}
-                  </div>
-                )
-              })}
-            </div>
-
             {/* Sportsbook line input */}
             <div className="kbrain-book" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{ fontSize: '11px', color: 'var(--text-faint)', flexShrink: 0 }}>Book line:</span>
@@ -338,7 +312,7 @@ function KBrainView({ pitchers, liveKsByPitcher = {} }) {
               onClick={() => setDetailsOpen((prev) => ({ ...prev, [e.key]: !prev[e.key] }))}
               aria-expanded={!!detailsOpen[e.key]}
             >
-              {detailsOpen[e.key] ? 'Show less' : 'More lines & matchup'}
+              {detailsOpen[e.key] ? 'Show less' : 'More context'}
               <Icon name={detailsOpen[e.key] ? 'ChevronUp' : 'ChevronDown'} size={14} />
             </button>
           </div>
