@@ -23,9 +23,11 @@ mkdirSync(DATA, { recursive: true });
 console.log('Pulling backtest-log.json …');
 const log = await getJson(`${BASE}/backtest-log.json`);
 writeFileSync(resolve(DATA, 'backtest-log.json'), JSON.stringify(log));
-const days = log.dates?.length ?? 0;
-const total = (log.dates || []).reduce((s, d) => s + (log.records?.[d]?.length || 0), 0);
-console.log(`  ✓ ${days} days, ${total} reconciled predictions (${log.dates?.[0]} … ${log.dates?.[days - 1]})`);
+const evidenceDates = log.modelHistory?.dates?.length ? log.modelHistory.dates : (log.dates || []);
+const evidenceRecords = log.modelHistory?.dates?.length ? log.modelHistory.records : (log.records || {});
+const days = evidenceDates.length;
+const total = evidenceDates.reduce((s, d) => s + (evidenceRecords?.[d]?.length || 0), 0);
+console.log(`  ✓ ${days} evidence days, ${total} reconciled predictions (${evidenceDates[0]} … ${evidenceDates[days - 1]})`);
 
 console.log('Pulling daily.json (today’s snapshot) …');
 try {

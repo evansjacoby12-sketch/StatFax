@@ -18,10 +18,10 @@
  *   node model-lab/wf-eval.mjs --weights   # print rich stacker weights from last window
  */
 
-import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { brier, logLoss, auc, baseRate, fitScoreToProb } from './lib/metrics.mjs';
+import { loadFreshestBacktest } from './lib/loadBacktest.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -33,7 +33,7 @@ function arg(name, def) {
 const TRAIN_DAYS   = parseInt(arg('train',   '14'), 10);
 const HOLDOUT_DAYS = parseInt(arg('holdout',  '7'), 10);
 const STRIDE_DAYS  = parseInt(arg('stride',   '7'), 10);
-const LOG_PATH     = arg('log', resolve(__dirname, 'data/backtest-log.json'));
+const LOG_ARG      = arg('log', null);
 const SHOW_WEIGHTS = process.argv.includes('--weights');
 
 // ── Logistic regression (L2 ridge, full-batch GD) ────────────────────────────
@@ -166,7 +166,11 @@ function evalRows(rows) {
 }
 
 // ── Load data ─────────────────────────────────────────────────────────────────
-const log = JSON.parse(readFileSync(LOG_PATH, 'utf8'));
+const sources = LOG_ARG
+  ? [resolve(LOG_ARG)]
+  : [resolve(__dirname, 'data/backtest-log.json'), resolve(__dirname, '../dist/backtest-log.json')];
+const { log, path: LOG_PATH, coverage } = loadFreshestBacktest(sources);
+console.log(`[data] ${LOG_PATH} · latest ${coverage.latestDate} · ${coverage.days} day(s) via ${coverage.source}`);
 const allDates = log.dates || [];
 const played = d => (log.records[d] || []).filter(r => r.actuallyPlayed !== false);
 
@@ -204,7 +208,8 @@ console.log(`Windows: ${windows.length}\n`);
 const accumulated = { baseline: [], rule: [], shallow: [], rich: [] };
 // Rule↔Rich blend sweep — held-out Brier at each featModel weight, to size the
 // production blend cap (EXPERIMENTAL_ML_RANK_CAP) empirically instead of guessing.
-const BLEND_WEIGHTS = [0, 0.25, 0.4, 0.5, 0.65, 0.8, 1.0];
+const CURRENT_BLEND_CAP = 0.60;
+const BLEND_WEIGHTS = [0, 0.25, 0.4, 0.5, CURRENT_BLEND_CAP, 0.65, 0.8, 1.0];
 const blendAcc = Object.fromEntries(BLEND_WEIGHTS.map(w => [w, []]));
 let lastWindowWeights = null;
 
@@ -314,11 +319,11 @@ if (blendAcc[1.0].length) {
   for (const w of BLEND_WEIGHTS) {
     const b = brier(blendAcc[w]);
     if (b < best.brier) best = { w, brier: b };
-    const cur = w === 0.25 ? '  ← current cap' : '';
+    const cur = w === CURRENT_BLEND_CAP ? '  ← current cap' : '';
     console.log(`    w=${w.toFixed(2)}  Brier ${b.toFixed(4)}  AUC ${auc(blendAcc[w]).toFixed(4)}${cur}`);
   }
   console.log(`  → best held-out Brier at featModel weight ${best.w.toFixed(2)} (${best.brier.toFixed(4)}). ` +
-    `Current cap 0.25 ${best.w > 0.25 ? 'is too LOW — raise toward ' + best.w.toFixed(2) : 'looks right'}.`);
+    `Current cap ${CURRENT_BLEND_CAP.toFixed(2)} ${best.w > CURRENT_BLEND_CAP ? 'remains conservative vs ' + best.w.toFixed(2) : 'looks right'}.`);
 }
 
 // Brier skill score vs baseline: positive = improvement, 1.0 = perfect.

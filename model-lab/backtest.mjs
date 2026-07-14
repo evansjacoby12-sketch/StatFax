@@ -7,13 +7,17 @@
  *   node model-lab/backtest.mjs            # all logged days
  *   node model-lab/backtest.mjs --days=7   # most recent 7 reconciled days
  */
-import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { brier, logLoss, auc, baseRate, calibration, fitScoreToProb } from './lib/metrics.mjs';
+import { loadFreshestBacktest } from './lib/loadBacktest.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const log = JSON.parse(readFileSync(resolve(__dirname, 'data/backtest-log.json'), 'utf8'));
+const { log, path, coverage } = loadFreshestBacktest([
+  resolve(__dirname, 'data/backtest-log.json'),
+  resolve(__dirname, '../dist/backtest-log.json'),
+]);
+console.log(`[data] ${path} · latest ${coverage.latestDate} · ${coverage.days} day(s) via ${coverage.source}`);
 
 const daysArg = process.argv.find((a) => a.startsWith('--days='));
 const nDays = daysArg ? parseInt(daysArg.split('=')[1], 10) : log.dates.length;

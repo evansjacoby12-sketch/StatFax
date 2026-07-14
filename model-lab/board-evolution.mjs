@@ -13,6 +13,7 @@
 import { readFileSync, existsSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { loadFreshestBacktest } from './lib/loadBacktest.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const histPath = [resolve(__dirname, 'data/board-history.json'), resolve(__dirname, '../dist/board-history.json')].find(existsSync)
@@ -53,9 +54,15 @@ for (const s of snaps) {
 }
 
 // 3) If a settled day's HRs are available, grade early vs final board hit rate.
-const logPath = [resolve(__dirname, 'data/backtest-log.json'), resolve(__dirname, '../dist/backtest-log.json')].find(existsSync)
-if (logPath) {
-  const log = JSON.parse(readFileSync(logPath, 'utf8'))
+let loadedLog = null
+try {
+  loadedLog = loadFreshestBacktest([
+    resolve(__dirname, 'data/backtest-log.json'),
+    resolve(__dirname, '../dist/backtest-log.json'),
+  ], { preferModelHistory: false })
+} catch {}
+if (loadedLog) {
+  const { log } = loadedLog
   const recs = log.records?.[hist.date]
   if (recs?.length) {
     const hr = new Set(recs.filter((r) => r.homered).map((r) => Number(r.playerId)))

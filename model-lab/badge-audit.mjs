@@ -12,18 +12,14 @@
  * (local). Each reconciled record carries { grade, badges:[...], homered,
  * actuallyPlayed }, logged by server/reconcile.mjs.
  */
-import { readFileSync, existsSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { loadFreshestBacktest } from './lib/loadBacktest.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const SOURCES = [resolve(__dirname, 'data/backtest-log.json'), resolve(__dirname, '../dist/backtest-log.json')]
-const path = SOURCES.find(existsSync)
-if (!path) {
-  console.error('No backtest-log.json found — run `npm run lab:pull` or `npm run slate` first.')
-  process.exit(1)
-}
-const log = JSON.parse(readFileSync(path, 'utf8'))
+const { log, path, coverage } = loadFreshestBacktest(SOURCES)
+console.log(`[data] ${path} · latest ${coverage.latestDate} · ${coverage.days} day(s) via ${coverage.source}`)
 
 // Flatten every reconciled prediction; drop scratches (no PA → can't homer).
 const rows = []

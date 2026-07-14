@@ -5,21 +5,26 @@
  * features, swap the learner, change the split, re-run.
  *
  * Dependency-free (hand-rolled GD + L2), same spirit as server/models/
- * trainEnsembleWeights.mjs but on the FULL 20-feature vector instead of just
- * score/grade/badges.
+ * trainEnsembleWeights.mjs but on the production featModel feature vector
+ * instead of just score/grade/badges.
  *
  *   node model-lab/train-logreg.mjs
  */
-import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { brier, logLoss, auc, baseRate, fitScoreToProb } from './lib/metrics.mjs';
+import { loadFreshestBacktest } from './lib/loadBacktest.mjs';
+import { FEAT_KEYS } from '../server/models/featModel.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const log = JSON.parse(readFileSync(resolve(__dirname, 'data/backtest-log.json'), 'utf8'));
+const { log, path, coverage } = loadFreshestBacktest([
+  resolve(__dirname, 'data/backtest-log.json'),
+  resolve(__dirname, '../dist/backtest-log.json'),
+]);
+console.log(`[data] ${path} · latest ${coverage.latestDate} · ${coverage.days} day(s) via ${coverage.source}`);
 
-// The 20 logged features (server/reconcile.mjs → extractPredictionRecord.feat).
-const FEATURES = ['bs', 'ms', 'es', 'iso', 'xiso', 'brl', 'rbrl', 'ev', 'hh', 'la', 'phr9', 'pera', 'pk9', 'vdel', 'csw', 'park', 'vig', 'ord', 'hot', 'due'];
+// Use the exact production feature schema so the lab cannot silently drift.
+const FEATURES = FEAT_KEYS;
 
 const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : null; };
 

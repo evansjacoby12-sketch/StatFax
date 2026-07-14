@@ -182,6 +182,9 @@ jobs:
           npm run build-model
           npm run slate
 
+      - name: Validate MLB data contracts
+        run: npm run validate:mlb-data
+
       - name: Generate NFL slate
         env:
           SPORTSGAMEODDS_API_KEY: ${{ secrets.SPORTSGAMEODDS_API_KEY }}

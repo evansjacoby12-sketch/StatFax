@@ -10,14 +10,17 @@
  *
  *   node model-lab/matchup-model.mjs
  */
-import { readFileSync, existsSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { brier, logLoss, auc, baseRate } from './lib/metrics.mjs'
+import { loadFreshestBacktest } from './lib/loadBacktest.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const SRC = [resolve(__dirname, 'data/backtest-log.json'), resolve(__dirname, '../dist/backtest-log.json')].find(existsSync)
-const log = JSON.parse(readFileSync(SRC, 'utf8'))
+const { log, path: SRC, coverage } = loadFreshestBacktest([
+  resolve(__dirname, 'data/backtest-log.json'),
+  resolve(__dirname, '../dist/backtest-log.json'),
+])
+console.log(`[data] ${SRC} · latest ${coverage.latestDate} · ${coverage.days} day(s) via ${coverage.source}`)
 
 const rows = []
 for (const d of log.dates || []) {

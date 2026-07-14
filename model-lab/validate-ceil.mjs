@@ -12,21 +12,24 @@
  * it renders the shortlist table + a GRADUATE / HOLD read. Advisory metrics never
  * touch the HR score — this decides whether POWER READY can lose its beta label.
  */
-import { readFileSync, existsSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { loadFreshestBacktest } from './lib/loadBacktest.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const CANDIDATES = [
   resolve(__dirname, 'data/backtest-log.json'),   // pulled history (lab:pull)
   resolve(__dirname, '../dist/backtest-log.json'), // freshest local slate
 ];
-const path = CANDIDATES.find(existsSync);
-if (!path) {
-  console.log('No backtest-log.json found (looked in model-lab/data/ and dist/). Run `npm run lab:pull` or `npm run slate`.');
+let loaded;
+try {
+  loaded = loadFreshestBacktest(CANDIDATES);
+} catch (error) {
+  console.log(`${error.message} Run \`npm run lab:pull\` or \`npm run slate\`.`);
   process.exit(0);
 }
-const log = JSON.parse(readFileSync(path, 'utf8'));
+const { log, path, coverage } = loaded;
+console.log(`[data] ${path} · latest ${coverage.latestDate} · ${coverage.days} day(s) via ${coverage.source}`);
 
 // Flatten reconciled opportunities (played bats with a settled HR outcome).
 const bats = [];

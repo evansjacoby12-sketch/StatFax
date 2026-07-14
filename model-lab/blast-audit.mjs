@@ -12,15 +12,14 @@
  *
  *   node model-lab/blast-audit.mjs
  */
-import { readFileSync, existsSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { loadFreshestBacktest } from './lib/loadBacktest.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const SOURCES = [resolve(__dirname, 'data/backtest-log.json'), resolve(__dirname, '../dist/backtest-log.json')]
-const logPath = SOURCES.find(existsSync)
-if (!logPath) { console.error('No backtest-log.json — run `npm run slate` first.'); process.exit(1) }
-const log = JSON.parse(readFileSync(logPath, 'utf8'))
+const { log, path: logPath, coverage } = loadFreshestBacktest(SOURCES)
+console.log(`[data] ${logPath} · latest ${coverage.latestDate} · ${coverage.days} day(s) via ${coverage.source}`)
 const YEAR = new Date().getFullYear()
 
 const SAVANT_HEADERS = {

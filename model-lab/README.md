@@ -19,7 +19,7 @@ The model is *already* a pure, Node-runnable module:
   `server/.build/model.mjs` (RN deps stubbed, `stadiums.json` inlined). That
   bundle is your offline fork.
 - **There's a recorded dataset** — R2 `backtest-log.json` carries, per reconciled
-  prediction, the model's **20-feature vector** (`feat`) + `score` + `grade` +
+  prediction, the production feature vector (`feat`) + `score` + `grade` +
   `badges` + `homered` + `actuallyPlayed`.
 - **Production runs the same engine on server + client**, so a winning change
   ships to both by editing one file.
@@ -36,6 +36,12 @@ node model-lab/backtest.mjs        # offline backtest of the RULE model (Brier /
 node model-lab/train-logreg.mjs    # train a logistic model on the feature vectors; compare vs rule model
 node model-lab/score-offline.mjs   # bundle the engine + re-score a recorded input corpus (rule-engine fork)
 ```
+
+Lab commands automatically compare `model-lab/data/backtest-log.json` with
+`dist/backtest-log.json` and select the source with the newest reconciled game
+date (then the widest coverage). When the compact `modelHistory` archive is
+present, model and signal audits use its longer evidence window; operational
+combo reads continue to use the 30-day records.
 
 (or `cd model-lab && npm run pull|backtest|train|score`)
 
@@ -88,7 +94,7 @@ Until then, `score-offline.mjs` still proves the offline engine bundles + runs.
 |---|---|
 | `pull-data.mjs` | download R2 `backtest-log.json` + `daily.json` → `data/` |
 | `backtest.mjs` | offline metrics on the rule model (per-grade, calibration, Brier/LogLoss/AUC) |
-| `train-logreg.mjs` | logistic regression on `feat` → P(HR), vs rule model on a time split |
+| `train-logreg.mjs` | logistic regression on the production `FEAT_KEYS` → P(HR), vs rule model on a time split |
 | `score-offline.mjs` | bundle the engine + re-score a recorded input corpus |
 | `lib/metrics.mjs` | Brier · LogLoss · AUC · calibration · isotonic (PAV) |
 | `data/` | downloaded artifacts (git-ignored) |

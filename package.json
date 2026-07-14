@@ -8,6 +8,7 @@
     "serve": "node server/serve.mjs",
     "build-model": "node server/build-model.mjs",
     "slate": "node server/fetch-slate.mjs",
+    "validate:mlb-data": "node server/tools/validate-mlb-data.mjs",
     "context": "node server/context-pass.mjs",
     "brief": "node server/slate-brief.mjs",
     "reconcile": "node server/reconcile.mjs",
