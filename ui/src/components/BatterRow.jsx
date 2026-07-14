@@ -6,6 +6,7 @@ import { useLiveMode } from '../lib/liveMode.js'
 import { risingForm } from '../lib/groups.js'
 import { useSwipeActions } from '../lib/useSwipeActions.js'
 import { hrSetup, pitchMixScore } from '../lib/scout.js'
+import { playerHeadshot } from '../lib/teams.js'
 
 export default function BatterRow({
   batter: b,
@@ -142,21 +143,30 @@ export default function BatterRow({
         style={{ '--dl-color': color }}
       >
         <div className="mobile-dl-main">
-          <div className="mobile-dl-name">
-            <span className="mobile-dl-rank mono">{String(rank).padStart(2, '0')}</span>
-            <strong>{b.name}</strong>
-            <small className="mono">{b.batSide}</small>
-            {b.battingOrder && <small className="mono">#{b.battingOrder}</small>}
-            <span className={`mobile-dl-lineup ${b.lineupConfirmed ? 'confirmed' : ''}`} title={b.lineupConfirmed ? 'Confirmed lineup' : 'Projected lineup'} />
-            {momentum && (
-              <span className={`mobile-dl-momentum ${momentum.cls}`}>
-                <Icon name={momentum.icon} size={9} /> {momentum.label}
-              </span>
+          <span className="mobile-dl-headshot" aria-hidden="true">
+            {b.playerId ? (
+              <img src={playerHeadshot(b.playerId, 96)} alt="" loading="lazy" />
+            ) : (
+              <Icon name="Users" size={17} />
             )}
-            {live && <span className="live-tag"><span className="live-dot" /> LIVE</span>}
-            {isFinal && <span className="final-tag">FINAL</span>}
+          </span>
+          <div className="mobile-dl-identity-copy">
+            <div className="mobile-dl-name">
+              <span className="mobile-dl-rank mono">{String(rank).padStart(2, '0')}</span>
+              <strong>{b.name}</strong>
+              <small className="mono">{b.batSide}</small>
+              {b.battingOrder && <small className="mono">#{b.battingOrder}</small>}
+              <span className={`mobile-dl-lineup ${b.lineupConfirmed ? 'confirmed' : ''}`} title={b.lineupConfirmed ? 'Confirmed lineup' : 'Projected lineup'} />
+              {momentum && (
+                <span className={`mobile-dl-momentum ${momentum.cls}`}>
+                  <Icon name={momentum.icon} size={9} /> {momentum.label}
+                </span>
+              )}
+              {live && <span className="live-tag"><span className="live-dot" /> LIVE</span>}
+              {isFinal && <span className="final-tag">FINAL</span>}
+            </div>
+            <div className="mobile-dl-matchup">{matchup}</div>
           </div>
-          <div className="mobile-dl-matchup">{matchup}</div>
         </div>
 
         <div className="mobile-dl-verdict">
