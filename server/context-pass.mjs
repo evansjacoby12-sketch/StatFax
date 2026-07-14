@@ -4,8 +4,9 @@
  * Once a day, after the slate is built, this asks Claude (with web search) to
  * research the unstructured stuff the stats model is blind to — injuries,
  * scratches/rest-day risk, call-up pitchers with no track record, bullpen
- * usage, and game-time weather — and emits dist/context.json: a flat list of
- * flags keyed by player/pitcher name that the builder + UI can surface.
+ * usage, and game-time weather — and emits dist/context.json using the strict
+ * AI HR context contract. Every accepted signal is tied to a slate-owned
+ * entity key, source URL, confidence, observation time, and expiration time.
  *
  * IMPORTANT: this NEVER touches the HR predictions. The model stays statistical;
  * this only adds a human-readable context overlay (and catches data gaps like a
@@ -20,6 +21,13 @@
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  assertValidAiHrContext,
+  emptyAiHrContext,
+  normalizeAiHrContext,
+  summarizeAiHrTargets,
+  validateAiHrContext,
+} from './lib/aiHrContext.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SLATE_PATH = resolve(__dirname, '../dist/daily.json');
@@ -37,7 +45,7 @@ function priorIsFresh(slateDate) {
   try {
     if (!existsSync(OUT_PATH)) return false;
     const prev = JSON.parse(readFileSync(OUT_PATH, 'utf8'));
-    if (prev.skipped || prev.error || prev.date !== slateDate) return false;
+    if (prev.skipped || prev.error || prev.date !== slateDate || !validateAiHrContext(prev).ok) return false;
     return (Date.now() - new Date(prev.generatedAt).getTime()) / 3600e3 < STALE_HOURS;
   } catch {
     return false;
@@ -45,8 +53,9 @@ function priorIsFresh(slateDate) {
 }
 
 function write(obj) {
+  assertValidAiHrContext(obj);
   writeFileSync(OUT_PATH, JSON.stringify(obj));
-  console.log(`[context] wrote ${OUT_PATH} — ${obj.flags?.length ?? 0} flag(s)${obj.skipped ? ' (skipped)' : ''}`);
+  console.log(`[context] wrote ${OUT_PATH} — ${obj.signals.length} sourced signal(s), ${obj.stats.rejected} rejected${obj.skipped ? ' (skipped)' : ''}`);
 }
 
 async function loadSlate() {
@@ -56,65 +65,42 @@ async function loadSlate() {
   return res.json();
 }
 
-// Compact the slate to just what the model needs to research (keeps tokens low).
-function summarize(slate) {
-  const bats = Object.values(slate.scoredBatters || {});
-  const seen = new Set();
-  const uniq = bats.filter((b) => (seen.has(b.playerId) ? false : (seen.add(b.playerId), true)));
-  const games = (slate.games || []).map((g) => {
-    const et = g.gameDate ? new Date(new Date(g.gameDate).getTime() - 4 * 3600e3).toISOString().slice(11, 16) + ' ET' : '';
-    return {
-      matchup: `${g.awayTeam?.abbr}@${g.homeTeam?.abbr}`,
-      venue: g.venueName,
-      time: et,
-      pitchers: [g.awayPitcher?.fullName || g.awayPitcher?.name, g.homePitcher?.fullName || g.homePitcher?.name].filter(Boolean),
-    };
-  });
-  // Top ~28 bats by score — the ones the combos actually use.
-  const watch = uniq
-    .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
-    .slice(0, 28)
-    .map((b) => `${b.name} (${b.team}, ${b.grade?.label || b.grade}, vs ${b.pitcher?.name || '?'})`);
-  return { date: slate.date, games, watch };
-}
-
 function buildPrompt(sum) {
-  return `You are a sharp MLB betting research assistant. For tonight's home-run prop slate (${sum.date}), research CURRENT news and return ONLY soft-factor context the stats model can't see. Use web search for today's lineups, injuries, weather, and pitcher news.
+  return `You are a careful MLB home-run research extractor. For tonight's slate (${sum.date}), research CURRENT news and return ONLY sourced facts the statistical HR model cannot reliably obtain from its numeric feeds. Use web search for official lineups, injuries, pitcher roles, roof/weather changes, and bullpen availability.
 
-GAMES:
-${sum.games.map((g) => `- ${g.matchup} ${g.time} @ ${g.venue} | probables: ${g.pitchers.join(' vs ')}`).join('\n')}
+ALLOWED GAME, PITCHER, AND BULLPEN TARGETS:
+${sum.games.map((g) => `- ${g.entityKey} | ${g.matchup} | ${g.gameDate || '?'} @ ${g.venue || '?'}\n  pitchers: ${g.pitchers.map((p) => `${p.entityKey}=${p.name}`).join('; ') || 'none'}\n  bullpens: ${g.bullpens.map((b) => `${b.entityKey}=${b.team}`).join('; ')}`).join('\n')}
 
-KEY BATS TO WATCH:
-${sum.watch.join('\n')}
+ALLOWED BATTER TARGETS:
+${sum.batters.map((b) => `- ${b.entityKey} | ${b.name} (${b.team}, ${b.grade}, vs ${b.opposingPitcher || '?'})`).join('\n')}
 
-For each meaningful finding, emit a flag. Focus on things that change a bet:
-- injury / scratch risk / load-management rest-day risk for a listed bat
-- a probable pitcher who is a recent call-up or season debut (no track record)
-- notable game-time weather (wind blowing out/in, heat, rain risk)
-- bullpen overuse/unavailability that opens late-game HR windows
-- a bat that is notably hot or cold beyond what season stats show
+Emit only meaningful candidate HR features:
+- starter change, opener risk, or a documented pitch limit
+- confirmed lineup status, injury, or scratch risk for a listed batter
+- game-time weather or roof status that changed or is not yet stable
+- bullpen overuse or key reliever unavailability
+- a call-up or season debut with insufficient MLB history
 
 Return STRICT JSON only (no prose, no markdown fences):
-{"flags":[{"entity":"<player or pitcher name>","team":"<abbr>","kind":"injury|scratch-risk|rest-risk|callup|weather|bullpen|form|other","severity":"alert|warn|info","note":"<one concise sentence, cite the source if possible>"}]}
-If you find nothing noteworthy, return {"flags":[]}.`;
+{"signals":[{"entityKey":"<EXACT allowed key above>","kind":"starter-change|opener-risk|pitch-limit|lineup-status|injury|scratch-risk|weather|roof|bullpen|callup|other","direction":"boost|suppress|uncertain","severity":"alert|warn|info","confidence":0.0,"note":"<one concise factual sentence>","observedAt":"<ISO timestamp>","expiresAt":"<ISO timestamp no more than 24h later>","evidence":[{"url":"https://<direct source URL>","title":"<source title>","publishedAt":"<ISO timestamp or null>"}]}]}
+
+Rules:
+- entityKey MUST exactly match one of the allowed keys. Never invent an ID.
+- Every signal MUST have at least one direct http/https evidence URL. No source means omit it.
+- direction is a hypothesis for later backtesting, NOT a probability adjustment.
+- Do not output probabilities, score changes, multipliers, weights, locks, or betting recommendations.
+- Prefer official MLB/team/venue/weather sources and current reporting. Avoid rumor-only social posts.
+- If nothing trustworthy is found, return {"signals":[]}.`;
 }
 
-function parseFlags(text) {
+function parseSignals(text) {
   const m = text.match(/\{[\s\S]*\}/); // first JSON object, tolerant of stray prose
-  if (!m) return [];
+  if (!m) return { signals: [] };
   try {
     const obj = JSON.parse(m[0]);
-    return Array.isArray(obj.flags)
-      ? obj.flags.filter((f) => f && f.entity && f.note).map((f) => ({
-          entity: String(f.entity).slice(0, 60),
-          team: f.team ? String(f.team).slice(0, 4) : null,
-          kind: ['injury', 'scratch-risk', 'rest-risk', 'callup', 'weather', 'bullpen', 'form', 'other'].includes(f.kind) ? f.kind : 'other',
-          severity: ['alert', 'warn', 'info'].includes(f.severity) ? f.severity : 'info',
-          note: String(f.note).slice(0, 240),
-        }))
-      : [];
+    return { signals: Array.isArray(obj.signals) ? obj.signals : [] };
   } catch {
-    return [];
+    return { signals: [] };
   }
 }
 
@@ -140,25 +126,31 @@ async function callClaude(prompt) {
 }
 
 async function main() {
-  const base = { date: null, generatedAt: new Date().toISOString(), model: MODEL, source: 'claude-web-search', flags: [] };
+  const generatedAt = new Date().toISOString();
+  const empty = (extra = {}) => emptyAiHrContext({
+    date: slate?.date || null,
+    generatedAt,
+    model: MODEL,
+    source: 'claude-web-search',
+    ...extra,
+  });
   let slate;
   try {
     slate = await loadSlate();
   } catch (e) {
     console.warn(`[context] no slate: ${e.message}`);
-    return write({ ...base, skipped: true });
+    return write(empty({ skipped: true, error: e.message }));
   }
-  base.date = slate.date;
-  const sum = summarize(slate);
+  const sum = summarizeAiHrTargets(slate);
   const prompt = buildPrompt(sum);
 
   if (DRY_RUN) {
     console.log('[context] --dry-run: prompt built (' + prompt.length + ' chars), no API call');
-    return write({ ...base, skipped: true, dryRun: true });
+    return write(empty({ skipped: true, dryRun: true }));
   }
   if (!process.env.ANTHROPIC_API_KEY) {
     console.warn('[context] ANTHROPIC_API_KEY not set — skipping (model predictions unaffected)');
-    return write({ ...base, skipped: true });
+    return write(empty({ skipped: true }));
   }
   // The pipeline ticks every ~10 min; reuse a recent good run instead of paying
   // for ~144 web-search calls/day. Refreshes every STALE_HOURS as news firms up.
@@ -170,10 +162,16 @@ async function main() {
   }
   try {
     const text = await callClaude(prompt);
-    write({ ...base, flags: parseFlags(text) });
+    write(normalizeAiHrContext({
+      raw: parseSignals(text),
+      slate,
+      generatedAt,
+      model: MODEL,
+      source: 'claude-web-search',
+    }));
   } catch (e) {
     console.warn(`[context] pass failed (non-fatal): ${e.message}`);
-    write({ ...base, skipped: true, error: e.message });
+    write(empty({ skipped: true, error: e.message }));
   }
 }
 

@@ -64,7 +64,9 @@ function loadAlerts() {
   try {
     if (!existsSync(CONTEXT_PATH)) return [];
     const ctx = JSON.parse(readFileSync(CONTEXT_PATH, 'utf8'));
-    return (ctx.flags || [])
+    // v1 AI HR context uses sourced `signals`; keep `flags` as a read-only
+    // fallback while previously generated artifacts age out.
+    return (ctx.signals || ctx.flags || [])
       .filter((f) => f && (f.severity === 'alert' || f.severity === 'warn') && f.entity && f.note)
       .slice(0, 8)
       .map((f) => `${f.entity}${f.team ? ` (${f.team})` : ''}: ${f.note}`);

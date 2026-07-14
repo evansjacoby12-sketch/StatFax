@@ -69,6 +69,19 @@ cd ui && npm install && npm run dev   # React board at localhost:5173
 
 **Day Rating (1–5★):** Pitching 45% + Environment 30% + Supply 25%, computed from pre-cap PRIME count to correctly reflect raw slate quality.
 
+### AI HR context — Phase 1
+
+`npm run context` researches unstructured, current-day information that the numeric feeds can miss: starter changes, opener or pitch-limit risk, lineup/injury status, roof/weather changes, bullpen availability, and call-ups.
+
+The output at `dist/context.json` is intentionally non-scoring (`mode: "advisory"`, `scoreImpact: false`). Every accepted signal must:
+
+- target an exact slate-owned batter, pitcher, game, or bullpen key;
+- include a direct source URL, confidence, observation time, and expiration time;
+- use an allowed HR-context category and entity type;
+- contain no probability, score, multiplier, or weight fields.
+
+Run `npm run validate:ai-context` to enforce the contract. Phase 2 will log hypothetical HR-probability effects in shadow mode; no AI context affects the production HR probability in Phase 1.
+
 ## K Brain
 
 Poisson-based strikeout projection per starter. Lives in `server/fetch-slate.mjs` (server-side pre-computation) and `ui/src/lib/pitchers.js` (client mirror).

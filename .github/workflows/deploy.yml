@@ -239,14 +239,18 @@ jobs:
               && echo "R2: published nfl/tracking.json"
           fi
 
-      # LLM soft-factor layer (injuries/lineups/weather/bullpen → dist/context.json).
-      # Advisory only — never touches predictions. Skips itself if the key is unset,
-      # and `|| true` ensures a flaky API call can never block the deploy.
+      # Source-backed AI HR context (injuries/lineups/weather/bullpen →
+      # dist/context.json). Phase 1 is advisory and cannot touch predictions.
+      # Skips itself if the key is unset; a flaky API call emits a valid empty
+      # artifact so the board can still deploy.
       - name: Context pass (Claude)
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           CONTEXT_MODEL: ${{ vars.CONTEXT_MODEL || 'claude-haiku-4-5-20251001' }}
         run: npm run context || true
+
+      - name: Validate AI HR context contract
+        run: npm run validate:ai-context
 
       # Daily one-paragraph board summary → dist/brief.json. Reads the scored
       # board (+ the context flags above) and narrates it; advisory only, never
