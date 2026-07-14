@@ -18833,3 +18833,15 @@ button.th:focus-visible {
   .pcard-targets .grade-chip { padding-inline: 4px; font-size: 8px; }
   .ptarget-probability { min-width: 34px; }
 }
+
+/* Mobile filter tray breathing room. */
+@media (max-width: 560px) {
+  .filters { padding: 8px 14px 12px !important; }
+  .filters-row {
+    gap: 8px;
+    padding: 6px;
+  }
+  .grade-pills {
+    padding: 5px 0 0 !important;
+  }
+}
