@@ -18333,7 +18333,7 @@ button.th:focus-visible {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 88px;
     grid-template-rows: auto auto 44px;
-    gap: 10px 12px;
+    gap: 9px 12px;
     padding: 13px 13px 0 16px;
     overflow: hidden;
     color: var(--text);
@@ -18370,7 +18370,7 @@ button.th:focus-visible {
     display: flex;
     flex-direction: column;
     justify-content: center;
-    gap: 5px;
+    gap: 4px;
   }
 
   .mobile-dl-name {
@@ -18403,12 +18403,13 @@ button.th:focus-visible {
   .mobile-dl-matchup .dl-pitcher::after { content: ''; position: absolute; inset: -8px -5px; }
 
   .mobile-dl-signal {
-    width: fit-content;
-    max-width: 100%;
+    min-width: 0;
+    max-width: 104px;
+    flex: 0 1 auto;
     display: inline-flex;
     align-items: center;
     gap: 5px;
-    padding: 3px 7px;
+    padding: 5px 7px;
     overflow: hidden;
     color: var(--accent);
     border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
@@ -18439,13 +18440,56 @@ button.th:focus-visible {
     grid-row: 2;
     display: flex;
     align-items: center;
-    gap: 14px;
-    padding: 0 2px;
+    min-width: 0;
+    gap: 4px;
+    padding: 4px;
     color: var(--text-faint);
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.025);
     font-size: 9px;
     font-weight: 700;
   }
-  .mobile-dl-evidence > svg { margin-left: auto; }
+  .mobile-dl-proof-metrics {
+    min-width: 0;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+  }
+  .mobile-dl-proof-metrics > span {
+    min-width: 30px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    line-height: 1.05;
+  }
+  .mobile-dl-proof-metrics b { color: var(--text); font-size: 9px; }
+  .mobile-dl-proof-metrics small {
+    margin-top: 3px;
+    color: var(--text-faint);
+    font-size: 7px;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+  }
+  .mobile-dl-proof-metrics .good b,
+  .mobile-dl-proof-metrics .good small { color: var(--strong); }
+  .mobile-dl-proof-metrics .warn b,
+  .mobile-dl-proof-metrics .warn small { color: var(--prime); }
+  .mobile-dl-proof-metrics .bad b,
+  .mobile-dl-proof-metrics .bad small { color: var(--bad); }
+  .mobile-dl-proof-metrics > i {
+    width: 1px;
+    height: 20px;
+    flex: none;
+    background: var(--border-soft);
+  }
+  .mobile-dl-evidence > .mobile-dl-disclose {
+    flex: none;
+    margin: 0 2px 0 0;
+    opacity: 0.45;
+  }
 
   .mobile-dl-actions {
     grid-column: 1 / 3;
@@ -18483,5 +18527,7 @@ button.th:focus-visible {
   }
   .mobile-dl-name > strong { width: 100%; font-size: 14px; }
   .mobile-dl-verdict > b { font-size: 18px; }
+  .mobile-dl-signal { max-width: 82px; padding-inline: 5px; font-size: 7px; }
+  .mobile-dl-proof-metrics > span { min-width: 26px; }
   .mobile-dl-actions { margin-left: -13px; }
 }

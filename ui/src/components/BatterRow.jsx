@@ -55,6 +55,14 @@ export default function BatterRow({
               ? { label: momentum.label, tone: momentum.cls, icon: momentum.icon }
               : null
 
+  const mobileContext = dueSetup.n > 0 && !strongestSignal?.label.startsWith('Due')
+    ? { label: 'DUE', value: `${dueSetup.n}/${dueSetup.checks.length}`, tone: 'warn' }
+    : air != null && !strongestSignal?.label.startsWith('Air')
+      ? { label: 'AIR', value: signedPct(air - 1, 0), tone: airTone }
+      : pmScore != null && !strongestSignal?.label.startsWith('Pitch')
+        ? { label: 'PITCH', value: pmScore.toFixed(1), tone: pmScore >= 7 ? 'good' : '' }
+        : null
+
   const mobileSwipe = useSwipeActions({
     onRight: () => onToggleWatch?.(b),
     onLeft: () => onToggleSlip?.(b),
@@ -149,12 +157,6 @@ export default function BatterRow({
             {isFinal && <span className="final-tag">FINAL</span>}
           </div>
           <div className="mobile-dl-matchup">{matchup}</div>
-          {strongestSignal && (
-            <span className={`mobile-dl-signal ${strongestSignal.tone}`}>
-              <Icon name={strongestSignal.icon} size={10} />
-              {strongestSignal.label}{strongestSignal.beta ? ' · BETA' : ''}
-            </span>
-          )}
         </div>
 
         <div className="mobile-dl-verdict">
@@ -163,9 +165,24 @@ export default function BatterRow({
         </div>
 
         <div className="mobile-dl-evidence">
-          <span className="mono">xHR {num(b.expectedHRs, 3)}</span>
-          <span className="mono">HEAT {b.heatIndex ?? '—'}</span>
-          <Icon name="ChevronDown" size={14} />
+          {strongestSignal && (
+            <span className={`mobile-dl-signal ${strongestSignal.tone}`}>
+              <Icon name={strongestSignal.icon} size={10} />
+              {strongestSignal.label}{strongestSignal.beta ? ' · BETA' : ''}
+            </span>
+          )}
+          <span className="mobile-dl-proof-metrics">
+            <span><b className="mono">{num(b.expectedHRs, 3)}</b><small>xHR</small></span>
+            <i />
+            <span><b className="mono">{b.heatIndex ?? '—'}</b><small>HEAT</small></span>
+            {mobileContext && (
+              <>
+                <i />
+                <span className={mobileContext.tone}><b className="mono">{mobileContext.value}</b><small>{mobileContext.label}</small></span>
+              </>
+            )}
+          </span>
+          <Icon className="mobile-dl-disclose" name="ChevronDown" size={14} />
         </div>
 
         <div className="mobile-dl-actions">
