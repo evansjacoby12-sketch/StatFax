@@ -81,23 +81,27 @@ test('sport refresh, reconnect, shortcuts, and heavy workspaces stay sport scope
   assert.match(serviceWorker, /const SCOPE_URL = self\.registration\.scope/)
 })
 
-test('NFL Bet Lab follows the MLB four-mode workspace format', async () => {
+test('NFL Bet Lab shares the core MLB workspace modes without a Saved destination', async () => {
   const [mlbLab, nflLab, shell, board] = await Promise.all([
     readFile(new URL('../ui/src/components/BetLab.jsx', import.meta.url), 'utf8'),
     readFile(new URL('../ui/src/components/NFLBetLab.jsx', import.meta.url), 'utf8'),
     readFile(new URL('../ui/src/components/WorkspaceShell.jsx', import.meta.url), 'utf8'),
     readFile(new URL('../ui/src/components/NFLBoard.jsx', import.meta.url), 'utf8'),
   ])
-  for (const label of ['Explore combos', 'Custom builder', 'Same game', 'Saved']) {
+  for (const label of ['Explore combos', 'Custom builder', 'Same game']) {
     assert.match(mlbLab, new RegExp(`label: '${label}'`))
     assert.match(nflLab, new RegExp(`label: '${label}'`))
   }
+  assert.match(mlbLab, /label: 'Top 10 straights'/)
+  assert.doesNotMatch(mlbLab, /label: 'Saved'/)
+  assert.doesNotMatch(nflLab, /label: 'Saved'/)
   assert.match(nflLab, /<WorkspaceShell[\s\S]*?embedded[\s\S]*?title="Bet Lab"/)
   assert.match(nflLab, /className="workspace-brief"/)
   assert.match(nflLab, /tab === 'same-game'[\s\S]*?scope="same-game"/)
-  assert.match(nflLab, /tab === 'saved' && savedContent/)
+  assert.doesNotMatch(nflLab, /savedContent|tab === 'saved'/)
   assert.match(shell, /embedded = false/)
-  assert.match(board, /setBetLabView\('saved'\)/)
+  assert.match(board, /setBetLabView\('builder'\)/)
+  assert.doesNotMatch(board, /setBetLabView\('saved'\)/)
   assert.doesNotMatch(board, /BET_LAB_TABS/)
 })
 
