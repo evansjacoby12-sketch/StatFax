@@ -8,6 +8,7 @@ import {
   pitchUsage,
   effSide,
   K_LINES,
+  K_MODEL_VERSION,
   kOverProb,
   projectedK,
   summarizeKProjectionResults,
@@ -358,21 +359,34 @@ function KBrainView({ pitchers, liveKsByPitcher = {} }) {
         const dates = Object.keys(resultsByDate).sort().slice(-7).reverse()
         if (!dates.length) return null
         const recentResults = dates.flatMap((d) => resultsByDate[d] || [])
-        const projectionSummary = summarizeKProjectionResults(recentResults)
+        const currentResults = recentResults.filter((row) => row.modelVersion === K_MODEL_VERSION)
+        const showingCurrentModel = currentResults.length > 0
+        const scoredResults = showingCurrentModel ? currentResults : recentResults
+        const projectionSummary = summarizeKProjectionResults(scoredResults)
+        const displayDates = dates.filter((d) => (resultsByDate[d] || []).some((row) => (
+          showingCurrentModel ? row.modelVersion === K_MODEL_VERSION : true
+        )))
         return (
           <details className="kbrain-record" style={{ marginTop: '20px', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '16px' }}>
             <summary className="kbrain-record-summary" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
               <span style={{ fontSize: '12px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-faint)' }}>K projection accuracy</span>
               {projectionSummary.n > 0 && (
                 <span style={{ fontSize: '11px', color: projectionSummary.mae <= 1 ? 'var(--strong)' : projectionSummary.mae <= 1.75 ? '#c69a57' : 'var(--bad)' }}>
-                  MAE {projectionSummary.mae.toFixed(1)} K · {projectionSummary.withinCount}/{projectionSummary.n} within 1 K
+                  {showingCurrentModel ? `v${K_MODEL_VERSION}` : 'legacy'} · MAE {projectionSummary.mae.toFixed(1)} K · exact {projectionSummary.exactCount}/{projectionSummary.n} · ±1 K {projectionSummary.withinCount}/{projectionSummary.n}
                 </span>
               )}
               <Icon className="kbrain-record-chevron" name="ChevronDown" size={14} />
             </summary>
+            {!showingCurrentModel && projectionSummary.n > 0 && (
+              <div style={{ fontSize: '10px', color: 'var(--text-faint)', margin: '-4px 0 10px' }}>
+                Legacy baseline only. v{K_MODEL_VERSION} tracking begins with its first graded slate. Exact and ±1 use the rounded projected total; MAE uses the decimal projection.
+              </div>
+            )}
             <div className="kbrain-record-body">
-            {dates.map((d) => {
-              const rows = (resultsByDate[d] || []).filter(e => e.actualK != null)
+              {displayDates.map((d) => {
+                const rows = (resultsByDate[d] || []).filter((e) => (
+                  e.actualK != null && (showingCurrentModel ? e.modelVersion === K_MODEL_VERSION : true)
+                ))
               if (!rows.length) return null
               return (
                 <div key={d} style={{ marginBottom: '12px' }}>
@@ -380,14 +394,15 @@ function KBrainView({ pitchers, liveKsByPitcher = {} }) {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
                     {rows.map((e, i) => {
                       const projection = projectedK(e)
-                      const error = Number.isFinite(projection) ? e.actualK - projection : null
-                      const hit = Number.isFinite(error) && Math.abs(error) <= 1
+                      const pointProjection = Number.isFinite(projection) ? Math.round(projection) : null
+                      const pointError = Number.isFinite(pointProjection) ? e.actualK - pointProjection : null
+                      const hit = Number.isFinite(pointError) && Math.abs(pointError) <= 1
                       return (
                         <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', padding: '4px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: '6px' }}>
                           <span style={{ flex: 1, fontWeight: '600', color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{e.name}</span>
-                          <span className="mono" style={{ color: 'var(--text-faint)', flexShrink: 0 }}>proj {Number.isFinite(projection) ? projection.toFixed(1) : '—'} K</span>
+                          <span className="mono" style={{ color: 'var(--text-faint)', flexShrink: 0 }}>proj {Number.isFinite(projection) ? `${projection.toFixed(1)} → ${pointProjection}` : '—'} K</span>
                           <span className="mono" style={{ color: '#fff', fontWeight: '700', flexShrink: 0 }}>actual {e.actualK}</span>
-                          {Number.isFinite(error) && <span className="mono" style={{ color: hit ? 'var(--strong)' : 'var(--bad)', flexShrink: 0 }}>{error >= 0 ? '+' : ''}{error.toFixed(1)}</span>}
+                          {Number.isFinite(pointError) && <span className="mono" style={{ color: hit ? 'var(--strong)' : 'var(--bad)', flexShrink: 0 }}>{pointError >= 0 ? '+' : ''}{pointError}</span>}
                           <Icon name={hit ? 'Check' : 'X'} size={13} style={{ flexShrink: 0, color: hit ? 'var(--strong)' : 'var(--bad)' }} aria-label={hit ? 'within one strikeout' : 'more than one strikeout off'} />
                         </div>
                       )

@@ -139,10 +139,12 @@ test('K projection helpers use the expected total, not the uncertainty range', (
   assert.equal(projectedK({ lo: 4, hi: 8 }), 6, 'legacy range-only rows fall back to midpoint')
 
   const summary = summarizeKProjectionResults([
-    { estK: 6.4, actualK: 7, lo: 3, hi: 10 },
+    { estK: 6.6, actualK: 8, lo: 3, hi: 10 },
     { estK: 8.2, actualK: 6, lo: 5, hi: 12 },
+    { estK: 7.4, actualK: 7, lo: 4, hi: 11 },
   ])
-  assert.equal(summary.n, 2)
-  assert.equal(summary.withinCount, 1)
-  assert.ok(Math.abs(summary.mae - 1.4) < 1e-9)
+  assert.equal(summary.n, 3)
+  assert.equal(summary.exactCount, 1)
+  assert.equal(summary.withinCount, 2, 'within-one accuracy uses the rounded whole-K projection')
+  assert.ok(Math.abs(summary.mae - (4 / 3)) < 1e-9, 'MAE keeps the decimal projection')
 })

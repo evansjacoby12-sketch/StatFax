@@ -6,13 +6,14 @@
 import { pitcherVulnerability } from './vulnerability.js'
 import {
   K_LINES,
+  K_MODEL_VERSION,
   effSide,
   estimatedKs,
   kBrain,
   kOverProb,
 } from '../../../src/sports/mlb/logic/kBrain.js'
 
-export { K_LINES, effSide, estimatedKs, kBrain, kOverProb }
+export { K_LINES, K_MODEL_VERSION, effSide, estimatedKs, kBrain, kOverProb }
 
 // The actionable K Brain output is the expected strikeout total. The model's
 // lo/hi values are uncertainty bounds, not the projection itself. Accept both
@@ -27,22 +28,28 @@ export function projectedK(value) {
   return null
 }
 
+// Actual strikeouts are whole numbers, so exact/±1 accuracy grades the rounded
+// point forecast. MAE intentionally retains the more precise decimal expectation.
 export function summarizeKProjectionResults(rows, within = 1) {
   let n = 0
   let absoluteError = 0
+  let exactCount = 0
   let withinCount = 0
   for (const row of rows || []) {
     const projection = projectedK(row)
     if (!Number.isFinite(projection) || !Number.isFinite(row?.actualK)) continue
     const error = Math.abs(row.actualK - projection)
+    const pointError = Math.abs(row.actualK - Math.round(projection))
     n++
     absoluteError += error
-    if (error <= within) withinCount++
+    if (pointError === 0) exactCount++
+    if (pointError <= within) withinCount++
   }
   return {
     n,
     mae: n ? absoluteError / n : null,
     within,
+    exactCount,
     withinCount,
   }
 }
