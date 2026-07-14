@@ -132,7 +132,7 @@ function HelpMenu({ sport, onOpenWeather, onOpenGroups, onOpenSplits, onOpenBack
     {
       title: 'Build',
       items: [
-        { label: 'Bet Lab', desc: 'Explore combos, build slips, same-game plays and saved tickets', icon: 'Beaker', fn: onOpenGroups },
+        { label: 'Bet Lab', desc: 'Explore combos, rank straights, build slips and isolate same-game plays', icon: 'Beaker', fn: onOpenGroups },
       ],
     },
     {
@@ -176,7 +176,7 @@ function HelpMenu({ sport, onOpenWeather, onOpenGroups, onOpenSplits, onOpenBack
     desc: 'Analyze model edge and parlay combos',
     icon: 'Beaker',
     fn: onOpenGroups,
-    keywords: 'build slips same game saved tickets',
+    keywords: 'build slips same game top straights combos',
   }
   const quickTools = isNFL ? [
     { label: 'Cheat Sheet', meta: 'NFL leaders', icon: 'LayoutGrid', fn: onOpenSplits, keywords: 'nfl football ranked props touchdown receiving rushing passing' },

@@ -171,11 +171,10 @@ function LegRow({ b, perLeg, weak, onSelect, onRemove }) {
   )
 }
 
-export default function ParlayBuilder({ batters, legs, slipSet, onToggle, onRemove, onClear, onReplace, onSelect, onClose, favorConsistency = false, scorecard = null, initialTab = 'legs' }) {
+export default function ParlayBuilder({ batters, legs, slipSet, onToggle, onRemove, onClear, onReplace, onSelect, onClose, favorConsistency = false, scorecard = null }) {
   const [wager, setWager] = useState('10')
-  const [tab, setTab] = useState(initialTab) // legs | build | saved
+  const [tab, setTab] = useState('legs') // legs | build
   const [autoSize, setAutoSize] = useState(3)
-  const [saved, setSaved] = useState(() => store.load('savedSlips', []))
 
   // Quick Build state
   const [qbStrat, setQbStrat] = useState('balanced')
@@ -211,9 +210,8 @@ export default function ParlayBuilder({ batters, legs, slipSet, onToggle, onRemo
 
   const p = useMemo(() => buildParlay(legs, { correlate: false }), [legs])
   const perLegById = useMemo(() => new Map(p.perLeg.map((l) => [l.id, l])), [p])
-  // Live tracking — grade the slip + resolve saved slips against in-progress HRs.
+  // Live tracking for the active slip.
   const live = useMemo(() => comboStatus(legs), [legs])
-  const byId = useMemo(() => new Map((batters || []).map((b) => [b.id, b])), [batters])
 
   // Same-game groups with ≥2 legs for the independent-estimate note.
   const sgGroups = useMemo(() => p.byGame.filter((g) => g.legs.length >= 2), [p])
@@ -260,30 +258,21 @@ export default function ParlayBuilder({ batters, legs, slipSet, onToggle, onRemo
     return { mode: 'complete', need, items }
   }, [batters, autoSize, favorConsistency, legs, slipSet])
 
-  const saveSlip = () => {
+  const trackSlip = () => {
     if (!legs.length) return
     const name = legs.map((b) => surname(b.name)).join(' · ')
-    const entry = { id: `s${Date.now()}`, name, ids: legs.map((b) => b.id), savedAt: Date.now() }
-    const next = [entry, ...saved.filter((s) => s.ids.join() !== entry.ids.join())].slice(0, 20)
-    setSaved(next)
-    store.save('savedSlips', next)
     const wagerNumber = Number(wager)
     trackTicket(makeTicket({
       legs,
       date: new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' }),
-      strategy: 'saved-parlay',
+      strategy: 'custom-parlay',
       label: name,
       size: legs.length,
       allHit: p.modelAllHit,
       american: p.american,
       wager: Number.isFinite(wagerNumber) && wagerNumber > 0 ? wagerNumber : null,
     }))
-    toast.success('Slip saved')
-  }
-  const deleteSaved = (id) => {
-    const next = saved.filter((s) => s.id !== id)
-    setSaved(next)
-    store.save('savedSlips', next)
+    toast.success('Ticket tracked in Results')
   }
   const shareSlip = async () => {
     if (!legs.length) return
@@ -320,7 +309,6 @@ export default function ParlayBuilder({ batters, legs, slipSet, onToggle, onRemo
         tabs={[
           { id: 'legs', label: 'Legs', icon: 'Layers' },
           { id: 'build', label: 'Auto-build', icon: 'Sparkles' },
-          { id: 'saved', label: `Saved${saved.length ? ` (${saved.length})` : ''}`, icon: 'Bookmark' },
         ]}
       />
 
@@ -333,7 +321,7 @@ export default function ParlayBuilder({ batters, legs, slipSet, onToggle, onRemo
                   <span style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-faint)' }}>Your legs</span>
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <button onClick={shareSlip} style={{ fontSize: '11px', color: 'var(--accent)', fontWeight: '700', display: 'inline-flex', alignItems: 'center', gap: '4px' }}><Icon name="Share2" size={12} /> Share</button>
-                    <button onClick={saveSlip} style={{ fontSize: '11px', color: 'var(--accent)', fontWeight: '700', display: 'inline-flex', alignItems: 'center', gap: '4px' }}><Icon name="Bookmark" size={12} /> Save</button>
+                    <button onClick={trackSlip} style={{ fontSize: '11px', color: 'var(--accent)', fontWeight: '700', display: 'inline-flex', alignItems: 'center', gap: '4px' }}><Icon name="Bookmark" size={12} /> Track</button>
                     <button onClick={onClear} style={{ fontSize: '11px', color: 'var(--text-faint)', fontWeight: '600' }}>Clear</button>
                   </div>
                 </div>
@@ -550,25 +538,6 @@ export default function ParlayBuilder({ batters, legs, slipSet, onToggle, onRemo
           </>
         )}
 
-        {tab === 'saved' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            {saved.length ? saved.map((s) => {
-              const resolved = s.ids.map((id) => byId.get(id)).filter(Boolean)
-              const v = comboStatus(resolved)
-              return (
-                <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '9px 11px', background: v.code === 'cashed' ? hexA('#69b99e', 0.07) : 'rgba(255,255,255,0.015)', border: `1px solid ${v.code === 'cashed' ? 'rgba(105,185,158,0.25)' : 'rgba(255,255,255,0.05)'}`, borderRadius: '9px' }}>
-                  <button onClick={() => { onReplace(s.ids); setTab('legs') }} style={{ flex: 1, textAlign: 'left', minWidth: 0 }}>
-                    <span style={{ display: 'block', fontSize: '12.5px', fontWeight: '600', color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.name}</span>
-                    <span className="dim" style={{ fontSize: '10px' }}>{s.ids.length} legs · saved {new Date(s.savedAt).toLocaleDateString()}</span>
-                  </button>
-                  {v.started && resolved.length > 0 && <LiveTag code={v.code} text={`${VERDICT_META[v.code].label} ${v.hits}/${v.n}`} meta={VERDICT_META} />}
-                  <button onClick={() => { onReplace(s.ids); setTab('legs') }} style={{ fontSize: '11px', fontWeight: '700', color: 'var(--accent)', border: '1px solid var(--accent)', borderRadius: '6px', padding: '2px 9px' }}>Load</button>
-                  <button onClick={() => deleteSaved(s.id)} aria-label="Delete saved slip" style={{ color: 'var(--text-faint)', display: 'grid', placeItems: 'center' }}><Icon name="Trash2" size={14} /></button>
-                </div>
-              )
-            }) : <div className="pb-empty" style={{ textAlign: 'center', color: 'var(--text-faint)', padding: '28px 16px', fontSize: '13px' }}><Icon name="Bookmark" size={24} /><p style={{ marginTop: '8px' }}>No saved slips yet. Build one and tap <b>Save</b>.</p></div>}
-          </div>
-        )}
       </div>
     </div>
   )

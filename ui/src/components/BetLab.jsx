@@ -10,7 +10,6 @@ const TABS = [
   { id: 'straights', label: 'Top 10 straights', icon: 'ListOrdered' },
   { id: 'builder', label: 'Custom builder', icon: 'Sparkles' },
   { id: 'same-game', label: 'Same game', icon: 'Zap' },
-  { id: 'saved', label: 'Saved', icon: 'Bookmark' },
 ]
 
 export default function BetLab({ initialTab = 'explore', onClose, batters, selectedId, onSelect, scorecard, generatedAt, windowMode, comboConf, favorConsistency, lockedBoard, slipSet, onToggleSlip, comboLock, legs, onRemove, onClear, onReplace, sgpScorecard }) {
@@ -33,7 +32,7 @@ export default function BetLab({ initialTab = 'explore', onClose, batters, selec
       </div>}
       {tab === 'explore' && <GroupsView batters={batters} onSelect={onSelect} selectedId={selectedId} scorecard={scorecard} generatedAt={generatedAt} windowMode={windowMode} comboConf={comboConf} favorConsistency={favorConsistency} lockedBoard={lockedBoard} slipSet={slipSet} onToggleSlip={onToggleSlip} comboLock={comboLock} />}
       {tab === 'straights' && <TopStraightsView batters={batters} onSelect={onSelect} slipSet={slipSet} onToggleSlip={onToggleSlip} />}
-      {(tab === 'builder' || tab === 'saved') && <ParlayBuilder batters={batters} legs={legs} slipSet={slipSet} onToggle={onToggleSlip} onRemove={onRemove} onClear={onClear} onReplace={onReplace} onSelect={onSelect} onClose={onClose} favorConsistency={favorConsistency} scorecard={scorecard} initialTab={tab === 'saved' ? 'saved' : 'legs'} />}
+      {tab === 'builder' && <ParlayBuilder batters={batters} legs={legs} slipSet={slipSet} onToggle={onToggleSlip} onRemove={onRemove} onClear={onClear} onReplace={onReplace} onSelect={onSelect} onClose={onClose} favorConsistency={favorConsistency} scorecard={scorecard} />}
       {tab === 'same-game' && <SameGameView batters={batters} onSelect={onSelect} favorConsistency={favorConsistency} comboConf={comboConf} sgpScorecard={sgpScorecard} />}
     </WorkspaceShell>
   )

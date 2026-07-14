@@ -10,7 +10,6 @@ const TABS = [
   { id: 'explore', label: 'Explore combos', icon: 'Layers' },
   { id: 'builder', label: 'Custom builder', icon: 'Sparkles' },
   { id: 'same-game', label: 'Same game', icon: 'Zap' },
-  { id: 'saved', label: 'Saved', icon: 'Bookmark' },
 ]
 
 function ComboGrid({ combos, slip, onAddCombo }) {
@@ -50,11 +49,11 @@ function CustomBuilder({ slipLegs, onToggleLeg, onClearSlip, onSaveTicket }) {
     <header><div><span className="nfl-eyebrow"><Icon name="Sparkles" size={13} /> Active decision</span><h3 id="nfl-custom-builder-title">Custom slip</h3><p>Add props from Signals or a model combo, then review the complete ticket here.</p></div><span className="nfl-ticket-count">{slipLegs.length} leg{slipLegs.length === 1 ? '' : 's'}</span></header>
     <div className="nfl-builder-metrics"><span><small>All-hit model</small><b className="mono">{pct(allHit)}</b></span><span><small>Average leg</small><b className="mono">{pct(average)}</b></span><span><small>Pricing</small><b>{slipLegs.length && slipLegs.every((leg) => leg.odds != null) ? 'Complete' : 'Missing prices'}</b></span></div>
     {slipLegs.length ? <ol className="nfl-builder-legs">{slipLegs.map((leg, index) => <li key={leg.key}><span className="nfl-combo-ord mono">{index + 1}</span><div><b>{leg.name}</b><small>{leg.marketLabel}{leg.line != null && !leg.marketId.includes('td') ? ` · over ${leg.line}` : ''}</small></div><aside><strong className="mono">{pct(leg.probability)}</strong><small className="mono">{price(leg.odds)}</small></aside><button type="button" onClick={() => onToggleLeg(leg.key)} aria-label={`Remove ${leg.name} from slip`}><Icon name="X" size={14} /></button></li>)}</ol> : <div className="nfl-ticket-empty"><Icon name="Plus" size={18} /><b>Your slip is empty</b><span>Add a full combo here or choose individual props from Signals.</span></div>}
-    <footer><button type="button" onClick={onClearSlip} disabled={!slipLegs.length}>Clear</button><button type="button" className="primary" onClick={onSaveTicket} disabled={!slipLegs.length}><Icon name="Save" size={14} />Save ticket</button></footer>
+    <footer><button type="button" onClick={onClearSlip} disabled={!slipLegs.length}>Clear</button><button type="button" className="primary" onClick={onSaveTicket} disabled={!slipLegs.length}><Icon name="Bookmark" size={14} />Track ticket</button></footer>
   </section>
 }
 
-export default function NFLBetLab({ snapshot, slip, slipLegs, tab, onTabChange, onAddCombo, onToggleLeg, onClearSlip, onSaveTicket, savedContent }) {
+export default function NFLBetLab({ snapshot, slip, slipLegs, tab, onTabChange, onAddCombo, onToggleLeg, onClearSlip, onSaveTicket }) {
   const [legCount, setLegCount] = useState(2)
   const [strategy, setStrategy] = useState('balanced')
   const [minGrade, setMinGrade] = useState('LEAN')
@@ -76,6 +75,5 @@ export default function NFLBetLab({ snapshot, slip, slipLegs, tab, onTabChange, 
     {tab === 'explore' && <ComboExplorer snapshot={snapshot} slip={slip} onAddCombo={onAddCombo} scope="all" legCount={legCount} setLegCount={setLegCount} strategy={strategy} setStrategy={setStrategy} minGrade={minGrade} setMinGrade={setMinGrade} />}
     {tab === 'builder' && <CustomBuilder slipLegs={slipLegs} onToggleLeg={onToggleLeg} onClearSlip={onClearSlip} onSaveTicket={onSaveTicket} />}
     {tab === 'same-game' && <ComboExplorer snapshot={snapshot} slip={slip} onAddCombo={onAddCombo} scope="same-game" legCount={legCount} setLegCount={setLegCount} strategy={strategy} setStrategy={setStrategy} minGrade={minGrade} setMinGrade={setMinGrade} />}
-    {tab === 'saved' && savedContent}
   </WorkspaceShell>
 }
