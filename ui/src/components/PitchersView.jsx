@@ -563,10 +563,10 @@ function KParlaySection({ pitchers, open, onToggle }) {
 }
 
 const PVP_TIERS = [
-  { key: 'vuln', label: 'Tier 1 — High Vulnerability', sub: 'best targets', color: '#c96f7e', test: (s) => s >= 80 },
-  { key: 'shaky', label: 'Tier 2 — Shaky', sub: 'decent targets', color: '#ffb02e', test: (s) => s >= 60 && s < 80 },
-  { key: 'mild', label: 'Tier 3 — Mild', sub: 'situational', color: '#d6b56f', test: (s) => s >= 40 && s < 60 },
-  { key: 'tough', label: 'Tier 4 — Tough', sub: 'avoid targeting', color: '#69b99e', test: (s) => s < 40 },
+  { key: 'vuln', label: 'High Exposure', sub: 'extreme HR risk', verdict: 'Attack', color: '#c96f7e', test: (s) => s >= 80 },
+  { key: 'shaky', label: 'Shaky Rotation', sub: 'selective exposure', verdict: 'Watch', color: '#ffb02e', test: (s) => s >= 60 && s < 80 },
+  { key: 'mild', label: 'Situational', sub: 'target with support', verdict: 'Lean', color: '#d6b56f', test: (s) => s >= 40 && s < 60 },
+  { key: 'tough', label: 'Protected', sub: 'avoid forcing action', verdict: 'Pass', color: '#69b99e', test: (s) => s < 40 },
 ]
 
 function lastName(name) {
@@ -575,50 +575,60 @@ function lastName(name) {
 }
 
 function PitcherPreview({ pitchers, onSelect }) {
+  const [openTiers, setOpenTiers] = useState(() => Object.fromEntries(PVP_TIERS.map((tier) => [tier.key, true])))
   const tbd = pitchers.filter((e) => !Number.isFinite(e.pitcher?.season?.hrPer9))
-  const scored = pitchers.filter((e) => Number.isFinite(e.pitcher?.season?.hrPer9))
+  const scored = pitchers
+    .filter((e) => Number.isFinite(e.pitcher?.season?.hrPer9))
+    .sort((a, b) => (b.vuln?.score ?? 0) - (a.vuln?.score ?? 0))
+  const attackable = scored.filter((e) => (e.vuln?.score ?? 0) >= 60)
+  const topEntry = scored[0]
+  const topTarget = topEntry?.targets?.find((b) => b.playerId != null)
   return (
-    <div className="pvp">
-      <div className="pvp-cap dim" style={{ fontSize: '11px', marginBottom: '20px' }}>
-        Starters ranked by HR-vulnerability. Matching bats = best HR targets.
+    <div className="pvp pvp-attack-board">
+      <div className="pvp-command-strip">
+        <div className="pvp-command-title">
+          <span className="pvp-command-icon"><Icon name="Crosshair" size={15} /></span>
+          <span><b>Vulnerability Attack Board</b><small>Pitcher risk → supporting evidence → target bats</small></span>
+        </div>
+        <div className="pvp-command-facts">
+          <span><small>Slate posture</small><b className={attackable.length ? 'is-live' : ''}>{attackable.length ? 'Attack spots live' : 'Selective'}</b></span>
+          <span><small>Attackable</small><b className="mono">{attackable.length}</b></span>
+          <span><small>Top target</small><b>{topTarget ? lastName(topTarget.name) : 'No target'}</b></span>
+        </div>
       </div>
       {PVP_TIERS.map((t) => {
         const rows = scored.filter((e) => t.test(e.vuln?.score ?? 50))
         if (!rows.length) return null
+        const expanded = openTiers[t.key]
         return (
-          <div className="pvp-tier" key={t.key} style={{
-            background: 'rgba(17, 18, 20, 0.3)',
-            border: '1px solid rgba(255,255,255,0.04)',
-            borderRadius: '12px',
-            padding: '16px',
-            marginBottom: '16px'
-          }}>
-            <div className="pvp-tier-head" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', marginBottom: '12px' }}>
-              <span className="pvp-dot" style={{ background: t.color, width: '8px', height: '8px', borderRadius: '50%', boxShadow: `0 0 8px ${t.color}` }} />
-              <b style={{ color: '#fff' }}>{t.label}</b> 
-              <span className="dim" style={{ fontSize: '12px' }}>· {t.sub}</span>
-              <span className="pvp-tier-n dim" style={{ marginLeft: 'auto', background: 'rgba(255,255,255,0.05)', padding: '1px 6px', borderRadius: '4px', fontSize: '11px' }}>{rows.length}</span>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+          <section className={`pvp-tier ${expanded ? 'is-open' : ''}`} key={t.key} style={{ '--tier-color': t.color }}>
+            <button
+              type="button"
+              className="pvp-tier-head"
+              onClick={() => setOpenTiers((current) => ({ ...current, [t.key]: !current[t.key] }))}
+              aria-expanded={expanded}
+            >
+              <span className="pvp-dot" />
+              <span className="pvp-tier-copy"><b>{t.label}</b><small>{t.sub}</small></span>
+              <span className="pvp-tier-verdict">{t.verdict}</span>
+              <span className="pvp-tier-n mono">{rows.length}</span>
+              <Icon name={expanded ? 'ChevronUp' : 'ChevronDown'} size={15} />
+            </button>
+            <div className="pvp-tier-rows" hidden={!expanded}>
               {rows.map((e) => <PvpRow key={e.key} e={e} tier={t} onSelect={onSelect} />)}
             </div>
-          </div>
+          </section>
         )
       })}
       {tbd.length > 0 && (
-        <div className="pvp-tier" style={{
-          background: 'rgba(17, 18, 20, 0.3)',
-          border: '1px solid rgba(255,255,255,0.04)',
-          borderRadius: '12px',
-          padding: '16px'
-        }}>
-          <div className="pvp-tier-head" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', marginBottom: '8px' }}>
-            <span className="pvp-dot" style={{ background: '#676673', width: '8px', height: '8px', borderRadius: '50%' }} />
-            <b style={{ color: '#fff' }}>TBD / low sample</b> 
-            <span className="dim" style={{ fontSize: '12px' }}>· treat league-avg</span>
+        <section className="pvp-tier pvp-tier-tbd" style={{ '--tier-color': '#676673' }}>
+          <div className="pvp-tier-head pvp-tier-head-static">
+            <span className="pvp-dot" />
+            <span className="pvp-tier-copy"><b>TBD / low sample</b><small>treat league average</small></span>
+            <span className="pvp-tier-n mono">{tbd.length}</span>
           </div>
-          <div className="pvp-tbd dim" style={{ fontSize: '12px', paddingLeft: '16px' }}>{tbd.map((e) => `${e.pitcher.name} (${e.targets[0]?.team || '?'})`).join(' · ')}</div>
-        </div>
+          <div className="pvp-tbd">{tbd.map((e) => `${e.pitcher.name} (${e.targets[0]?.team || '?'})`).join(' · ')}</div>
+        </section>
       )}
     </div>
   )
@@ -638,23 +648,35 @@ function sgpLegs(targets, n) {
 
 function SgpCombo({ legs, prob, onSelect }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+    <div className="pvp-combo">
       {legs.map((b, i) => (
-        <span key={b.playerId} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+        <span className="pvp-combo-leg" key={b.playerId}>
           <button
             className={`pvp-bat ${(b.grade?.label || b.grade) === 'PRIME' ? 'prime' : ''}`}
             onClick={() => onSelect?.(b)}
             title={`${b.name} · ${pct(b.hrProbability, 1)} HR`}
-            style={{ fontSize: '11px' }}
           >
             {lastName(b.name)}
           </button>
-          {i < legs.length - 1 && <span style={{ color: 'var(--text-faint)', fontSize: '10px' }}>+</span>}
+          {i < legs.length - 1 && <span className="pvp-combo-plus">+</span>}
         </span>
       ))}
-      <span className="mono" style={{ marginLeft: '4px', fontSize: '10px', color: 'var(--text-faint)' }}>~{pct(prob, 1)} fair</span>
+      <span className="pvp-combo-fair mono">~{pct(prob, 1)} fair</span>
     </div>
   )
+}
+
+function pvpReasons(e) {
+  const s = e.pitcher?.season || {}
+  const sav = e.pitcher?.savant || {}
+  const reasons = []
+  if (s.hrPer9 >= 1.5) reasons.push('Elevated home-run rate')
+  else if (s.hrPer9 >= 1.1) reasons.push('Playable HR profile')
+  if (sav.exitVeloAgainst >= 90) reasons.push('Hard contact running hot')
+  else if (sav.exitVeloAgainst >= 88) reasons.push('Firm contact allowed')
+  if (e.estK?.k <= 5) reasons.push('Low strikeout resistance')
+  if ((e.targets || []).some((b) => (b.grade?.label || b.grade) === 'PRIME')) reasons.push('Prime bat in matchup')
+  return reasons.slice(0, 2).length ? reasons.slice(0, 2) : ['No single attack flag', 'Require batter-side support']
 }
 
 function PvpRow({ e, tier, onSelect }) {
@@ -667,66 +689,82 @@ function PvpRow({ e, tier, onSelect }) {
   const oppTeam = tg[0]?.team || '?'
   const sgp2 = sgpLegs(e.targets, 2)
   const sgp3 = sgpLegs(e.targets, 3)
+  const reasons = pvpReasons(e)
   return (
-    <div className="pvp-row" style={{ flexWrap: 'wrap' }}>
-      <div className="pvp-card-head">
-        <img className="pvp-mobile-photo" src={playerHeadshot(p.id, 72)} alt={p.name} loading="lazy" />
-        <div className="pvp-p" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          <span className="pvp-name" style={{ color: '#fff', fontWeight: '600' }}>{p.name}</span>
-          <span className="pvp-hand dim"> ({p.hand})</span>
-          <span className="pvp-vs dim"> vs {oppTeam}</span>
+    <article className={`pvp-row ${open ? 'is-open' : ''}`}>
+      <div className="pvp-identity">
+        <span className="pvp-pitcher-silo"><img src={playerHeadshot(p.id, 96)} alt={p.name} loading="lazy" /></span>
+        <div className="pvp-p">
+          <span className="pvp-name">{p.name}</span>
+          <span className="pvp-matchup"><b>{p.hand}HP</b><span>vs {oppTeam}</span></span>
         </div>
-        <span className="pvp-vuln-score" style={{ '--tier-color': tier?.color }}>
+      </div>
+
+      <div className="pvp-decision">
+        <span className="pvp-vuln-score">
           <b className="mono">{Math.round(e.vuln?.score ?? 0)}</b>
-          <small>{tier?.key || 'tier'}</small>
+          <small>score</small>
+        </span>
+        <span className="pvp-verdict-copy">
+          <b className={`pvp-verdict pvp-verdict-${tier?.verdict?.toLowerCase()}`}>{tier?.verdict}</b>
+          <span className="pvp-reasons">{reasons.map((reason) => <small key={reason}><Icon name="Check" size={10} />{reason}</small>)}</span>
         </span>
       </div>
+
       <div className="pvp-stats mono">
-        <span><b style={{ color: '#fff' }}>{num(s.hrPer9, 2)}</b> HR/9</span>
-        <span title={e.estK ? `Projected strikeouts: ${e.estK.lo}–${e.estK.hi} (≈${e.estK.expIP.toFixed(1)} IP vs a ${pct(e.estK.oppK, 0)}-K lineup)` : undefined}><b style={{ color: 'var(--accent)' }}>{e.estK ? Math.round(e.estK.k) : '—'}</b> est K</span>
-        <span><b style={{ color: '#fff' }}>{sav.exitVeloAgainst != null ? num(sav.exitVeloAgainst, 0) : '—'}</b> EV</span>
+        <span><b>{num(s.hrPer9, 2)}</b><small>HR/9</small></span>
+        <span title={e.estK ? `Projected strikeouts: ${e.estK.lo}–${e.estK.hi} (≈${e.estK.expIP.toFixed(1)} IP vs a ${pct(e.estK.oppK, 0)}-K lineup)` : undefined}><b className="is-accent">{e.estK ? Math.round(e.estK.k) : '—'}</b><small>Est K</small></span>
+        <span><b>{sav.exitVeloAgainst != null ? num(sav.exitVeloAgainst, 0) : '—'}</b><small>EV</small></span>
       </div>
-      <div className="pvp-bats" style={{ justifyContent: 'flex-end' }}>
+
+      <div className="pvp-target-rail">
+        <span className="pvp-target-label">Target bats</span>
+        <div className="pvp-bats">
         {tg.map((b) => (
           <button
             key={b.playerId}
-            className={`pvp-bat ${(b.grade?.label || b.grade) === 'PRIME' ? 'prime' : ''}`}
+            className={`pvp-target ${(b.grade?.label || b.grade) === 'PRIME' ? 'prime' : ''}`}
             onClick={() => onSelect?.(b)}
             title={`${b.name} · ${pct(b.hrProbability, 1)} HR`}
           >
-            {lastName(b.name)}
+            <span className="pvp-target-photo"><img src={playerHeadshot(b.playerId, 72)} alt="" loading="lazy" /></span>
+            <span className="pvp-target-copy"><b>{lastName(b.name)}</b><small className="mono">{pct(b.hrProbability, 1)}</small></span>
+            {(b.grade?.label || b.grade) === 'PRIME' && <em>Prime</em>}
           </button>
         ))}
+        </div>
         {(sgp2 || sgp3) && (
           <button
-            className="pvp-chevron"
+            className="pvp-sgp-toggle"
             onClick={(ev) => { ev.stopPropagation(); setOpen((v) => !v) }}
             aria-expanded={open}
             title={open ? 'Hide SGP combos' : 'Show SGP combos'}
-            style={{ background: 'none', border: 'none', padding: '2px 4px', cursor: 'pointer', color: open ? 'var(--accent)' : 'var(--text-faint)', display: 'flex', alignItems: 'center' }}
           >
-            <Icon name={open ? 'ChevronUp' : 'ChevronDown'} size={13} />
+            <Icon name={open ? 'ChevronUp' : 'Plus'} size={14} />
+            <span>{open ? 'Hide combos' : 'Build SGP'}</span>
+            {sgp2 && <small className="mono">~{pct(sgp2.prob, 1)}</small>}
           </button>
         )}
       </div>
+
       {open && (sgp2 || sgp3) && (
-        <div className="pvp-sgp" style={{ width: '100%', padding: '8px 8px 4px', display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid rgba(255,255,255,0.04)', marginTop: '4px' }}>
-          <span style={{ fontSize: '10px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-faint)' }}>SGP combos</span>
+        <div className="pvp-sgp">
+          <span className="pvp-sgp-title"><Icon name="GitMerge" size={12} />Same-game combinations <small>Fair probability floor; correlation not applied</small></span>
           {sgp2 && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '10px', color: 'var(--text-faint)', width: '28px' }}>2-leg</span>
+            <div className="pvp-sgp-row">
+              <span>2-leg</span>
               <SgpCombo legs={sgp2.legs} prob={sgp2.prob} onSelect={onSelect} />
             </div>
           )}
           {sgp3 && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '10px', color: 'var(--text-faint)', width: '28px' }}>3-leg</span>
+            <div className="pvp-sgp-row">
+              <span>3-leg</span>
               <SgpCombo legs={sgp3.legs} prob={sgp3.prob} onSelect={onSelect} />
             </div>
           )}
         </div>
       )}
-    </div>
+    </article>
   )
 }
 

@@ -6998,6 +6998,119 @@ button.th:focus-visible {
   .nfl-cheat-row .splits-val { min-width: 40px; font-size: 12px; }
 }
 
+/* MLB combo cards — ticket-first sportsbook hierarchy. */
+.grp-ticket-card {
+  overflow: hidden;
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--gc) 7%, transparent), transparent 84px),
+    rgba(12, 13, 15, .96);
+  box-shadow: 0 14px 34px -26px color-mix(in srgb, var(--gc) 45%, transparent);
+}
+.grp-ticket-card .grp-head {
+  min-height: 48px;
+  padding: 11px 14px 5px;
+  border-bottom: 0;
+}
+.grp-ticket-card .grp-legbadge {
+  color: var(--gc);
+  border-color: color-mix(in srgb, var(--gc) 34%, transparent);
+  background: color-mix(in srgb, var(--gc) 12%, transparent);
+}
+.grp-ticket-card .grp-strategy { color: var(--text-faint); font-size: 11px; }
+.grp-ticket-summary {
+  min-height: 58px;
+  padding: 0 14px 10px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+.grp-ticket-price,
+.grp-ticket-return { display: flex; flex-direction: column; }
+.grp-ticket-kicker,
+.grp-ticket-return > span {
+  color: var(--text-faint);
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.grp-ticket-price > strong {
+  margin-top: 2px;
+  color: #fff;
+  font-family: var(--display);
+  font-size: 25px;
+  font-weight: 850;
+  letter-spacing: -.045em;
+  line-height: 1;
+}
+.grp-ticket-return { align-items: flex-end; }
+.grp-ticket-return > b { margin-top: 2px; color: var(--gc); font-size: 15px; }
+.grp-ticket-card .grp-sub {
+  margin: 0;
+  padding: 8px 14px;
+  border-top: 1px solid var(--border-soft);
+  font-size: 10px;
+}
+.grp-ticket-card .grp-hitrail { padding: 8px 14px 10px; }
+.grp-ticket-card .grp-legs {
+  margin: 0;
+  border-top: 1px solid var(--border);
+}
+.grp-ticket-card .grp-leg {
+  min-height: 70px;
+  padding: 9px 14px;
+  border-radius: 0;
+  border-width: 0 0 1px;
+}
+.grp-ticket-card[data-size='2'] .grp-leg { min-height: 76px; }
+.grp-ticket-card[data-size='4'] .grp-leg { min-height: 62px; padding-block: 7px; }
+.grp-ticket-card .grp-ord {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--gc) 28%, transparent);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--gc) 9%, transparent);
+  color: var(--gc);
+}
+.grp-ticket-card .grp-track-row {
+  min-height: 60px;
+  margin-top: 0 !important;
+  padding: 8px 12px !important;
+  border-top: 1px solid var(--border);
+  background: var(--card-2);
+}
+.grp-ticket-card .grp-track-row > .grp-tail:last-child {
+  min-height: 42px;
+  padding-inline: 16px;
+  color: #08090a;
+  border-color: var(--gc);
+  background: var(--gc);
+  font-weight: 850;
+  box-shadow: 0 0 14px color-mix(in srgb, var(--gc) 20%, transparent);
+}
+.grp-ticket-card .grp-track-row > .grp-tail:last-child.on { color: #07110d; background: var(--good); }
+
+@media (max-width: 560px) {
+  .groups-modal[aria-label='Parlay Combos'] .grp-ticket-card { padding: 0 !important; }
+  .groups-modal[aria-label='Parlay Combos'] .grp-ticket-card .grp-head {
+    min-height: 47px;
+    padding: 10px 12px 4px !important;
+  }
+  .groups-modal[aria-label='Parlay Combos'] .grp-ticket-summary { min-height: 55px; padding: 0 12px 9px; }
+  .groups-modal[aria-label='Parlay Combos'] .grp-ticket-price > strong { font-size: 23px; }
+  .groups-modal[aria-label='Parlay Combos'] .grp-ticket-card .grp-sub { padding: 7px 12px; }
+  .groups-modal[aria-label='Parlay Combos'] .grp-ticket-card .grp-hitrail { padding: 7px 12px 9px; }
+  .groups-modal[aria-label='Parlay Combos'] .grp-ticket-card .grp-leg { min-height: 68px; padding: 8px 12px !important; }
+  .groups-modal[aria-label='Parlay Combos'] .grp-ticket-card[data-size='2'] .grp-leg { min-height: 74px; }
+  .groups-modal[aria-label='Parlay Combos'] .grp-ticket-card[data-size='4'] .grp-leg { min-height: 58px; padding-block: 6px !important; }
+  .groups-modal[aria-label='Parlay Combos'] .grp-ticket-card .grp-track-row { min-height: 58px; padding: 7px 10px !important; }
+  .groups-modal[aria-label='Parlay Combos'] .grp-ticket-card .grp-track-row > .grp-tail:last-child { min-height: 42px; }
+}
+
 /* Parlay weak-link flag */
 .slip-leg.weak {
   background: color-mix(in srgb, var(--warn) 7%, transparent);
@@ -18844,4 +18957,424 @@ button.th:focus-visible {
   .grade-pills {
     padding: 5px 0 0 !important;
   }
+}
+
+/* Pitcher Vulnerability — approved Attack Board. */
+.pvp-attack-board {
+  --pvp-lane: rgba(15, 14, 21, 0.54);
+  margin-top: 0;
+}
+.pvp-command-strip {
+  min-height: 66px;
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: linear-gradient(120deg, rgba(151,149,203,.07), rgba(15,14,21,.58) 42%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.025);
+}
+.pvp-command-title,
+.pvp-command-title > span,
+.pvp-command-facts,
+.pvp-command-facts > span {
+  display: flex;
+  align-items: center;
+}
+.pvp-command-title { min-width: 0; gap: 10px; }
+.pvp-command-icon {
+  width: 36px;
+  height: 36px;
+  flex: none;
+  justify-content: center;
+  color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  border-radius: 10px;
+  background: rgba(151,149,203,.08);
+  box-shadow: 0 0 12px rgba(151,149,203,.08);
+}
+.pvp-command-title > span:last-child { min-width: 0; flex-direction: column; align-items: flex-start; }
+.pvp-command-title b { color: #fff; font-family: var(--display); font-size: 13px; }
+.pvp-command-title small { margin-top: 2px; color: var(--text-faint); font-size: 9px; }
+.pvp-command-facts { flex: none; align-self: stretch; }
+.pvp-command-facts > span {
+  min-width: 98px;
+  padding: 0 13px;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  border-left: 1px solid var(--border-soft);
+}
+.pvp-command-facts small {
+  color: var(--text-faint);
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.pvp-command-facts b { margin-top: 3px; color: #fff; font-size: 11px; white-space: nowrap; }
+.pvp-command-facts b.is-live { color: var(--bad); }
+
+.pvp-attack-board .pvp-tier {
+  margin-bottom: 12px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 15px;
+  background: var(--pvp-lane);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.018);
+}
+.pvp-attack-board .pvp-tier-head {
+  width: 100%;
+  min-height: 46px;
+  margin: 0;
+  padding: 0 13px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--text-faint);
+  border: 0;
+  border-bottom: 1px solid transparent;
+  border-radius: 0;
+  background: rgba(255,255,255,.018);
+  text-align: left;
+  cursor: pointer;
+}
+.pvp-attack-board .pvp-tier.is-open .pvp-tier-head { border-bottom-color: var(--border-soft); }
+.pvp-attack-board .pvp-tier-head:hover { background: rgba(255,255,255,.03); }
+.pvp-attack-board .pvp-tier-head-static { cursor: default; }
+.pvp-attack-board .pvp-dot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  background: var(--tier-color);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--tier-color) 70%, transparent);
+}
+.pvp-tier-copy { min-width: 0; display: flex; align-items: baseline; gap: 7px; }
+.pvp-tier-copy b {
+  color: #fff;
+  font-family: var(--display);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .02em;
+}
+.pvp-tier-copy small { color: var(--text-faint); font-size: 10px; font-weight: 600; }
+.pvp-tier-verdict {
+  padding: 2px 6px;
+  color: var(--tier-color);
+  border: 1px solid color-mix(in srgb, var(--tier-color) 28%, transparent);
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--tier-color) 8%, transparent);
+  font-size: 8px;
+  font-weight: 850;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+.pvp-attack-board .pvp-tier-n {
+  min-width: 22px;
+  margin-left: auto;
+  padding: 2px 6px;
+  color: var(--text-dim);
+  border-radius: 5px;
+  background: rgba(255,255,255,.04);
+  font-size: 9px;
+  text-align: center;
+}
+.pvp-tier-rows { display: flex; flex-direction: column; }
+
+.pvp-attack-board .pvp-row {
+  min-height: 92px;
+  padding: 10px 12px;
+  display: grid;
+  grid-template-columns: minmax(170px,.8fr) minmax(220px,1.1fr) 174px minmax(340px,1.7fr);
+  align-items: center;
+  gap: 14px;
+  border: 0;
+  border-bottom: 1px solid var(--border-soft);
+  border-radius: 0;
+  background: transparent;
+}
+.pvp-attack-board .pvp-row:last-child { border-bottom: 0; }
+.pvp-attack-board .pvp-row:hover { border-color: var(--border-soft); background: rgba(255,255,255,.018); }
+.pvp-identity { min-width: 0; display: flex; align-items: center; gap: 10px; }
+.pvp-pitcher-silo {
+  width: 48px;
+  height: 56px;
+  flex: none;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--tier-color) 24%, var(--border-soft));
+  border-radius: 11px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--tier-color) 8%, transparent), rgba(255,255,255,.015));
+}
+.pvp-pitcher-silo img { width: 100%; height: 100%; display: block; object-fit: cover; object-position: top center; }
+.pvp-attack-board .pvp-p { min-width: 0; display: flex; flex-direction: column; }
+.pvp-attack-board .pvp-name {
+  overflow: hidden;
+  color: #fff;
+  font-family: var(--display);
+  font-size: 13px;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pvp-matchup { margin-top: 4px; display: flex; align-items: center; gap: 5px; color: var(--text-faint); font-size: 9px; }
+.pvp-matchup b { color: var(--text-dim); font-size: 8px; letter-spacing: .06em; }
+
+.pvp-decision { min-width: 0; display: flex; align-items: center; gap: 10px; }
+.pvp-attack-board .pvp-vuln-score {
+  width: 48px;
+  height: 48px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  color: var(--tier-color);
+  border: 1px solid color-mix(in srgb, var(--tier-color) 32%, transparent);
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--tier-color) 8%, transparent);
+}
+.pvp-attack-board .pvp-vuln-score b { font-size: 15px; line-height: 1; }
+.pvp-attack-board .pvp-vuln-score small {
+  margin-top: 3px;
+  font-size: 6px;
+  font-weight: 850;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.pvp-verdict-copy { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 5px; }
+.pvp-verdict {
+  padding: 2px 7px;
+  color: var(--tier-color);
+  border: 1px solid color-mix(in srgb, var(--tier-color) 30%, transparent);
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--tier-color) 9%, transparent);
+  font-size: 8px;
+  font-weight: 850;
+  letter-spacing: .08em;
+  line-height: 1.4;
+  text-transform: uppercase;
+}
+.pvp-reasons { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.pvp-reasons small { min-width: 0; display: flex; align-items: center; gap: 4px; color: var(--text-faint); font-size: 9px; white-space: nowrap; }
+.pvp-reasons svg { flex: none; color: var(--tier-color); }
+
+.pvp-attack-board .pvp-stats {
+  display: grid;
+  grid-template-columns: repeat(3,minmax(0,1fr));
+  gap: 5px;
+}
+.pvp-attack-board .pvp-stats > span {
+  min-width: 0;
+  min-height: 48px;
+  padding: 5px 3px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  background: rgba(255,255,255,.016);
+}
+.pvp-attack-board .pvp-stats b { color: #fff; font-size: 11px; }
+.pvp-attack-board .pvp-stats b.is-accent { color: var(--accent); }
+.pvp-attack-board .pvp-stats small { color: var(--text-faint); font-family: var(--sans); font-size: 7px; font-weight: 750; letter-spacing: .05em; text-transform: uppercase; }
+
+.pvp-target-rail { min-width: 0; display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: end; gap: 8px; }
+.pvp-target-label {
+  grid-column: 1 / -1;
+  color: var(--text-faint);
+  font-size: 7px;
+  font-weight: 850;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.pvp-attack-board .pvp-bats { min-width: 0; display: flex; flex-wrap: nowrap; gap: 5px; }
+.pvp-target {
+  position: relative;
+  min-width: 0;
+  flex: 1 1 0;
+  height: 48px;
+  padding: 4px 5px;
+  display: grid;
+  grid-template-columns: 30px minmax(0,1fr);
+  align-items: center;
+  gap: 5px;
+  overflow: hidden;
+  color: var(--text-dim);
+  border: 1px solid var(--border-soft);
+  border-radius: 9px;
+  background: rgba(255,255,255,.015);
+  cursor: pointer;
+}
+.pvp-target:hover { color: #fff; border-color: var(--border); background: rgba(255,255,255,.035); }
+.pvp-target.prime { color: var(--prime); border-color: color-mix(in srgb,var(--prime) 30%,transparent); background: rgba(198,154,87,.055); }
+.pvp-target-photo { width: 30px; height: 38px; overflow: hidden; border-radius: 7px; background: rgba(255,255,255,.025); }
+.pvp-target-photo img { width: 100%; height: 100%; display: block; object-fit: cover; object-position: top center; }
+.pvp-target-copy { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }
+.pvp-target-copy b { width: 100%; overflow: hidden; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.pvp-target-copy small { color: var(--text-faint); font-size: 7px; }
+.pvp-target em {
+  position: absolute;
+  top: 2px;
+  right: 3px;
+  color: var(--prime);
+  font-size: 5px;
+  font-style: normal;
+  font-weight: 900;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.pvp-sgp-toggle {
+  min-width: 104px;
+  height: 48px;
+  padding: 0 9px;
+  display: grid;
+  grid-template-columns: 14px 1fr;
+  align-content: center;
+  align-items: center;
+  gap: 2px 6px;
+  color: var(--accent);
+  border: 1px solid color-mix(in srgb,var(--accent) 25%,var(--border-soft));
+  border-radius: 9px;
+  background: rgba(151,149,203,.055);
+  font-size: 9px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.pvp-sgp-toggle:hover { border-color: color-mix(in srgb,var(--accent) 45%,transparent); background: rgba(151,149,203,.09); }
+.pvp-sgp-toggle small { grid-column: 2; color: var(--text-faint); font-size: 7px; text-align: left; }
+.pvp-sgp {
+  grid-column: 1 / -1;
+  margin: 0 -12px -10px;
+  padding: 10px 12px 11px;
+  display: grid;
+  grid-template-columns: minmax(250px,.8fr) repeat(2,minmax(0,1fr));
+  align-items: center;
+  gap: 10px;
+  border-top: 1px solid var(--border-soft);
+  background: rgba(0,0,0,.13);
+}
+.pvp-sgp-title { display: flex; align-items: center; gap: 6px; color: var(--text-dim); font-size: 9px; font-weight: 800; text-transform: uppercase; }
+.pvp-sgp-title svg { color: var(--accent); }
+.pvp-sgp-title small { color: var(--text-faint); font-size: 7px; font-weight: 500; text-transform: none; }
+.pvp-sgp-row { min-width: 0; display: grid; grid-template-columns: 34px minmax(0,1fr); align-items: center; gap: 5px; }
+.pvp-sgp-row > span { color: var(--text-faint); font-size: 8px; font-weight: 750; text-transform: uppercase; }
+.pvp-combo { min-width: 0; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.pvp-combo-leg { display: flex; align-items: center; gap: 4px; }
+.pvp-combo .pvp-bat { min-height: 28px; padding: 2px 7px; font-size: 9px; }
+.pvp-combo-plus { color: var(--text-faint); font-size: 9px; }
+.pvp-combo-fair { margin-left: 3px; color: var(--text-faint); font-size: 8px; }
+.pvp-attack-board .pvp-tbd { padding: 10px 14px; color: var(--text-faint); font-size: 10px; }
+
+@media (max-width: 1120px) and (min-width: 561px) {
+  .pvp-attack-board .pvp-row {
+    grid-template-columns: minmax(170px,.8fr) minmax(220px,1.2fr) 174px;
+  }
+  .pvp-target-rail { grid-column: 1 / -1; padding-left: 58px; }
+  .pvp-sgp { grid-column: 1 / -1; }
+}
+
+@media (max-width: 700px) {
+  .pvp-command-facts > span:first-child { display: none; }
+}
+
+@media (max-width: 560px) {
+  .pvp-command-strip {
+    min-height: 0;
+    margin-bottom: 10px;
+    padding: 9px 10px;
+    align-items: stretch;
+    gap: 9px;
+  }
+  .pvp-command-icon { width: 32px; height: 32px; }
+  .pvp-command-title b { font-size: 11px; }
+  .pvp-command-title small { max-width: 170px; overflow: hidden; font-size: 7px; text-overflow: ellipsis; white-space: nowrap; }
+  .pvp-command-facts { margin-left: auto; }
+  .pvp-command-facts > span { min-width: 54px; padding: 0 7px; align-items: flex-end; }
+  .pvp-command-facts > span:last-child { display: none; }
+  .pvp-command-facts small { font-size: 6px; }
+  .pvp-command-facts b { font-size: 10px; }
+
+  .pvp-attack-board .pvp-tier { margin-bottom: 10px; border-radius: 14px !important; }
+  .pvp-attack-board .pvp-tier-head { min-height: 44px; padding: 0 10px; gap: 7px; }
+  .pvp-tier-copy { flex-direction: column; align-items: flex-start; gap: 1px; }
+  .pvp-tier-copy b { font-size: 11px; }
+  .pvp-tier-copy small { font-size: 7px; }
+  .pvp-tier-verdict { margin-left: auto; }
+  .pvp-attack-board .pvp-tier-n { margin-left: 0; }
+
+  .pvp-attack-board .pvp-row {
+    min-height: 0;
+    padding: 10px !important;
+    grid-template-columns: minmax(0,1fr) auto !important;
+    grid-template-areas:
+      'identity decision'
+      'stats stats'
+      'targets targets'
+      'sgp sgp';
+    align-items: center;
+    gap: 8px !important;
+  }
+  .pvp-identity { grid-area: identity; gap: 8px; }
+  .pvp-pitcher-silo { width: 42px; height: 49px; border-radius: 10px; }
+  .pvp-attack-board .pvp-name { font-size: 12px !important; }
+  .pvp-matchup { margin-top: 3px; }
+  .pvp-decision { grid-area: decision; gap: 6px; }
+  .pvp-attack-board .pvp-vuln-score { width: 44px; height: 44px; }
+  .pvp-attack-board .pvp-vuln-score b { font-size: 13px; }
+  .pvp-verdict-copy { align-items: flex-end; }
+  .pvp-verdict { font-size: 7px; }
+  .pvp-reasons { display: none; }
+
+  .pvp-attack-board .pvp-stats {
+    grid-area: stats;
+    display: grid !important;
+    grid-template-columns: repeat(3,minmax(0,1fr));
+    gap: 6px !important;
+  }
+  .pvp-attack-board .pvp-stats > span { min-height: 40px; padding: 4px; }
+  .pvp-attack-board .pvp-stats b { font-size: 11px; }
+  .pvp-attack-board .pvp-stats small { font-size: 6px; }
+
+  .pvp-target-rail {
+    grid-area: targets;
+    display: grid;
+    grid-template-columns: minmax(0,1fr);
+    gap: 6px;
+  }
+  .pvp-target-label { grid-column: 1; }
+  .pvp-attack-board .pvp-bats {
+    width: 100%;
+    display: grid !important;
+    grid-template-columns: repeat(3,minmax(0,1fr)) !important;
+    gap: 5px !important;
+  }
+  .pvp-target { width: 100%; height: 48px; padding: 4px; grid-template-columns: 28px minmax(0,1fr); }
+  .pvp-target:nth-child(n+4) { display: none; }
+  .pvp-target-photo { width: 28px; height: 36px; }
+  .pvp-target-copy b { font-size: 8px; }
+  .pvp-sgp-toggle {
+    width: 100%;
+    min-width: 0;
+    height: 42px;
+    grid-template-columns: 16px auto auto;
+    justify-content: center;
+    gap: 7px;
+  }
+  .pvp-sgp-toggle small { grid-column: auto; text-align: center; }
+  .pvp-sgp {
+    grid-area: sgp;
+    margin: 0 -10px -10px;
+    padding: 9px 10px 10px;
+    grid-template-columns: minmax(0,1fr);
+    gap: 8px;
+  }
+  .pvp-sgp-title { flex-wrap: wrap; }
+  .pvp-sgp-title small { width: 100%; padding-left: 18px; }
+  .pvp-sgp-row { grid-template-columns: 32px minmax(0,1fr); }
+  .pvp-combo .pvp-bat { width: auto; min-height: 34px; }
 }

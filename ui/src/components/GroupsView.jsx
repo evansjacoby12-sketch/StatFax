@@ -676,8 +676,9 @@ function GroupCard({ g, idx = 0, onSelect, selectedId, comboConf = 'off', slipSe
   const allConfirmed = g.legs.length > 0 && g.legs.every((b) => b.lineupConfirmed === true)
   return (
     <section
-      className={`grp-card tone-${tone}${cashed ? ' cashed' : ''}${oneAway ? ' one-away' : ''}`}
+      className={`grp-card grp-ticket-card tone-${tone}${cashed ? ' cashed' : ''}${oneAway ? ' one-away' : ''}`}
       data-strat={g.strategy}
+      data-size={g.size}
       style={{ '--gc': gc, '--i': Math.min(idx, 8) }}
       title={cashed ? '💰 CASHED — every leg homered' : oneAway ? '🔥 ONE AWAY — one more HR cashes this ticket' : title}
     >
@@ -730,6 +731,16 @@ function GroupCard({ g, idx = 0, onSelect, selectedId, comboConf = 'off', slipSe
           </button>
         )}
       </header>
+      <div className="grp-ticket-summary">
+        <div className="grp-ticket-price">
+          <span className="grp-ticket-kicker">All-hit chance</span>
+          <strong className="mono">{pct(g.allHit, g.allHit < 0.01 ? 2 : 1)}</strong>
+        </div>
+        <div className="grp-ticket-return">
+          <span>{oneBook ? `${bookLabel(oneBook.book)} ticket` : 'Best payout'}</span>
+          <b className="mono">{oneBook ? american(oneBook.american) : g.american ? american(g.american) : '—'}</b>
+        </div>
+      </div>
       <div className="grp-sub dim">
         — {g.desc} · 1 per game · all-hit {pct(g.allHit, g.allHit < 0.01 ? 2 : 1)}
         {g.american && (
