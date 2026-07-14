@@ -18710,6 +18710,52 @@ button.th:focus-visible {
   .mobile-dl-actions { margin-left: -13px; }
 }
 
+/* NFL uses the approved MLB decision-ladder anatomy with football evidence. */
+.nfl-decision-board { margin-top: 10px; }
+.nfl-decision-ladder-head,
+.nfl-decision-ladder-row {
+  grid-template-columns: 40px minmax(220px, 1.2fr) minmax(190px, .9fr) minmax(230px, 1fr) 96px;
+  padding-inline: 14px;
+}
+.nfl-decision-ladder-head .dl-actions { padding-left: 14px; }
+.nfl-decision-ladder-row .dl-verdict { gap: 14px; padding-inline: 10px; }
+.nfl-decision-ladder-row .dl-proof { padding-inline: 10px; }
+.nfl-decision-ladder-row .dl-evidence-strip { max-width: 100%; }
+.nfl-decision-ladder-row .dl-evidence-strip > span { min-width: 0; max-width: 118px; overflow: hidden; text-overflow: ellipsis; }
+.nfl-decision-ladder-row .dl-proof-signal.bad { color: var(--bad); }
+.nfl-decision-ladder-row .dl-proof-signal.warn { color: var(--warn); }
+.nfl-decision-ladder-row .dl-proof-signal.good { color: var(--strong); }
+.nfl-mobile-risk { padding: 2px 5px; display: inline-flex; align-items: center; gap: 3px; border: 1px solid currentColor; border-radius: 999px; font-size: 7px; font-weight: 900; text-transform: uppercase; }
+.nfl-mobile-risk.is-good { color: var(--strong); }
+.nfl-mobile-risk.is-caution { color: var(--warn); }
+.nfl-mobile-risk.is-avoid { color: var(--bad); }
+
+@media (max-width: 1280px) and (min-width: 561px) {
+  .nfl-layout { display: flex; flex-direction: column; }
+  .nfl-decision-rail { width: 100%; position: static; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (max-width: 760px) and (min-width: 561px) {
+  .nfl-decision-ladder-head,
+  .nfl-decision-ladder-row {
+    grid-template-columns: 34px minmax(190px, 1.1fr) minmax(170px, .85fr) minmax(205px, 1fr) 92px;
+    padding-inline: 10px;
+  }
+  .nfl-decision-ladder-row .dl-identity { padding-inline: 10px; }
+  .nfl-decision-ladder-row .dl-verdict { gap: 8px; padding-inline: 6px; }
+  .nfl-decision-ladder-row .dl-proof { padding-inline: 7px; }
+}
+
+@media (max-width: 560px) {
+  .nfl-decision-board { margin-top: 8px; }
+  .nfl-mobile-decision-card .nfl-headshot-silo { width: 40px; height: 48px; border-radius: 10px 10px 7px 7px; }
+  .nfl-mobile-decision-card .mobile-dl-signal.bad { color: var(--bad); }
+  .nfl-mobile-decision-card .mobile-dl-signal.warn { color: var(--warn); }
+  .nfl-mobile-decision-card .mobile-dl-signal.good { color: var(--strong); }
+  .nfl-mobile-decision-card .mobile-dl-signal { max-width: min(48%, 180px); }
+  .nfl-decision-rail { display: flex; }
+}
+
 /* ============ Pitcher Attack Blueprint ============ */
 .pitcher-drawer { width: min(600px, 100vw); }
 .pitcher-drawer-body { padding: 0; }
