@@ -83,6 +83,7 @@ export function normalizeTeamLineup(entry = {}, team = null) {
       available: defenseAvailable, starters: defense.starters || [], secondaryAvailable: n(defense.secondaryAvailable, null), linebackersAvailable: n(defense.linebackersAvailable, null),
       nickelRate: clamp(n(defense.nickelRate, .55)), dimeRate: clamp(n(defense.dimeRate, .15)), blitzRate: clamp(n(defense.blitzRate, .25)),
       boxRate: clamp(n(defense.boxRate, .30)), coverageFactor: clamp(n(defense.coverageFactor, 1), .88, 1.12), frontFactor: clamp(n(defense.frontFactor, 1), .88, 1.12),
+      pressureRate: n(defense.pressureRate), quickPressureRate: n(defense.quickPressureRate), trackingVerified: truthy(defense.trackingVerified ?? defense.verified),
     },
   }
 }
@@ -174,6 +175,13 @@ export function buildTeamLineup(rows = [], teamEntry = null, opponentEntry = nul
       situations: { twoMinuteShare: clamp(n(entry.twoMinuteShare, expectedSnapShare)), noHuddleShare: clamp(n(entry.noHuddleShare, offense.personnel.noHuddle)), leadingShare: clamp(n(entry.leadingShare, expectedSnapShare)), trailingShare: clamp(n(entry.trailingShare, expectedSnapShare)) },
       restrictions: { snapLimit: n(entry.snapLimit), returnFromAbsence: truthy(entry.returnFromAbsence), gameTimeDecision: truthy(entry.gameTimeDecision), injuryTrend: entry.injuryTrend || null },
       replacement: { inherited: boost.sources.length > 0, replaces: entry.replacementFor ? [entry.replacementFor] : boost.sources, vacatedOpportunityShare: clamp(n(entry.vacatedOpportunityShare, boost.opportunityShare)), allocation: entry.allocation || null },
+      tracking: {
+        verified: truthy(entry.tracking?.verified ?? entry.trackingVerified), source: entry.tracking?.source || entry.trackingSource || null,
+        scoringDriveParticipation: n(entry.tracking?.scoringDriveParticipation ?? entry.scoringDriveParticipation),
+        yacAboveExpectationPerReception: n(entry.tracking?.yacAboveExpectationPerReception ?? entry.yacAboveExpectationPerReception),
+        rushingYardsOverExpectedPerAttempt: n(entry.tracking?.rushingYardsOverExpectedPerAttempt ?? entry.rushingYardsOverExpectedPerAttempt),
+        averageSeparation: n(entry.tracking?.averageSeparation ?? entry.averageSeparation),
+      },
       offensiveLine: offense.offensiveLine,
       opponentDefense: opponent.defense,
     }

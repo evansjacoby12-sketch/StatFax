@@ -15151,6 +15151,7 @@ button.th:focus-visible {
 .nfl-card-signals .tone-prime { color: var(--prime); border-color: rgba(214,181,111,.18); }
 .nfl-card-signals .tone-strong { color: var(--strong); border-color: rgba(105,185,158,.18); }
 .nfl-card-signals .tone-warn { color: var(--warn); }
+.nfl-card-signals .tone-bad { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 24%, transparent); background: color-mix(in srgb, var(--bad) 6%, transparent); }
 .nfl-prop-card > footer { min-height: 52px; padding: 7px 10px 9px 14px; display: flex; gap: 6px; border-top: 1px solid var(--border-soft); }
 .nfl-prop-card > footer > button { min-height: 38px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; color: var(--text-faint); border: 1px solid var(--border-soft); border-radius: 9px; background: rgba(255,255,255,.025); font-size: 9px; font-weight: 800; text-transform: uppercase; }
 .nfl-prop-card > footer > button:first-child { width: 40px; }
@@ -15268,6 +15269,15 @@ button.th:focus-visible {
 .nfl-research-identity h2 { margin: 0; font-size: 30px; letter-spacing: -.025em; }
 .nfl-research-identity p { margin-top: 6px; color: var(--text-faint); font-size: 11px; }
 .nfl-research-identity p b { color: var(--text-dim); }
+.nfl-assessment-badge { width: fit-content; max-width: 100%; padding: 6px 8px; display: inline-flex; align-items: center; gap: 6px; border: 1px solid currentColor; border-radius: 7px; background: color-mix(in srgb, currentColor 8%, transparent); line-height: 1; }
+.nfl-assessment-badge b { overflow: hidden; font-size: 9px; letter-spacing: .045em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
+.nfl-assessment-badge small { overflow: hidden; color: var(--text-dim); font-size: 8px; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
+.nfl-assessment-badge.is-good { color: var(--strong); }
+.nfl-assessment-badge.is-caution { color: var(--warn); }
+.nfl-assessment-badge.is-avoid { color: var(--bad); }
+.nfl-assessment-badge.is-compact { padding: 3px 5px; gap: 4px; border-radius: 5px; }
+.nfl-assessment-badge.is-compact b { font-size: 7px; }
+.nfl-research-identity-copy > .nfl-assessment-badge { margin-top: 10px; }
 .nfl-research-decision { margin-top: 18px; display: grid; grid-template-columns: minmax(135px, .75fr) minmax(300px, 1.8fr) minmax(140px, .8fr); align-items: stretch; gap: 10px; }
 .nfl-research-market,
 .nfl-research-score { border: 1px solid var(--border-soft); border-radius: 11px; background: rgba(255,255,255,.022); }
@@ -15295,6 +15305,22 @@ button.th:focus-visible {
 .nfl-research-panel > header > span { display: inline-flex; align-items: center; gap: 7px; font-family: var(--display); font-size: 11px; font-weight: 800; }
 .nfl-research-panel > header svg { color: var(--accent); }
 .nfl-research-panel > header small { color: var(--text-faint); font-size: 8px; font-weight: 800; text-transform: uppercase; }
+.nfl-assessment-panel { padding: 12px; display: grid; gap: 12px; }
+.nfl-assessment-summary { padding: 10px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border: 1px solid var(--border-soft); border-radius: 10px; background: rgba(255,255,255,.015); }
+.nfl-assessment-summary > span { color: var(--text-faint); font-size: 8px; text-align: right; }
+.nfl-assessment-panel.is-avoid .nfl-assessment-summary { border-color: color-mix(in srgb, var(--bad) 36%, transparent); background: color-mix(in srgb, var(--bad) 7%, transparent); }
+.nfl-assessment-panel.is-caution .nfl-assessment-summary { border-color: color-mix(in srgb, var(--warn) 30%, transparent); background: color-mix(in srgb, var(--warn) 6%, transparent); }
+.nfl-assessment-panel.is-good .nfl-assessment-summary { border-color: color-mix(in srgb, var(--strong) 30%, transparent); background: color-mix(in srgb, var(--strong) 6%, transparent); }
+.nfl-assessment-group { overflow: hidden; border: 1px solid var(--border-soft); border-left-width: 3px; border-radius: 10px; }
+.nfl-assessment-group.is-avoid { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 30%, transparent); background: color-mix(in srgb, var(--bad) 4%, transparent); }
+.nfl-assessment-group.is-caution { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 26%, transparent); background: color-mix(in srgb, var(--warn) 3%, transparent); }
+.nfl-assessment-group.is-good { color: var(--strong); border-color: color-mix(in srgb, var(--strong) 26%, transparent); background: color-mix(in srgb, var(--strong) 3%, transparent); }
+.nfl-assessment-group > header { min-height: 45px; padding: 8px 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid color-mix(in srgb, currentColor 16%, transparent); }
+.nfl-assessment-group > header > span { display: inline-flex; align-items: center; gap: 7px; }
+.nfl-assessment-group > header b { font-size: 10px; text-transform: uppercase; }
+.nfl-assessment-group > header em { min-width: 20px; padding: 3px 5px; color: currentColor; border: 1px solid color-mix(in srgb, currentColor 35%, transparent); border-radius: 999px; font-size: 8px; font-style: normal; text-align: center; }
+.nfl-assessment-group > header small { color: var(--text-faint); font-size: 8px; }
+.nfl-assessment-group .nfl-research-signals { padding: 9px; }
 .nfl-research-signals { padding: 12px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .nfl-research-signals article { min-width: 0; min-height: 76px; padding: 12px; display: flex; align-items: flex-start; gap: 9px; border: 1px solid var(--border-soft); border-radius: 10px; background: rgba(255,255,255,.02); }
 .nfl-research-signals article > svg { flex: none; margin-top: 1px; color: currentColor; }
@@ -15358,6 +15384,7 @@ button.th:focus-visible {
 .nfl-live-analysis p { color: var(--text-dim); font-size: 10px; line-height: 1.55; }
 .tone-good { color: var(--strong) !important; }
 .tone-warn { color: var(--warn) !important; }
+.tone-bad { color: var(--bad) !important; }
 
 @media (max-width: 920px) {
   .nfl-card-grid { grid-template-columns: 1fr; }
@@ -15560,6 +15587,11 @@ button.th:focus-visible {
   .nfl-research-body { padding: 16px 14px calc(28px + env(safe-area-inset-bottom)); }
   .nfl-research-signals { grid-template-columns: 1fr; }
   .nfl-research-signals article { min-height: 64px; }
+  .nfl-assessment-summary { align-items: flex-start; flex-direction: column; }
+  .nfl-assessment-summary > span { text-align: left; }
+  .nfl-assessment-group > header { align-items: flex-start; flex-direction: column; gap: 4px; }
+  .nfl-assessment-badge:not(.is-compact) { align-items: flex-start; flex-wrap: wrap; }
+  .nfl-assessment-badge:not(.is-compact) small { width: 100%; white-space: normal; }
   .nfl-research-panel > .nfl-eligible-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .nfl-research-panel > .nfl-research-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .nfl-research-panel .nfl-research-grid span { min-height: 76px; }
@@ -18676,6 +18708,52 @@ button.th:focus-visible {
   .mobile-dl-signal { max-width: 82px; padding-inline: 5px; font-size: 7px; }
   .mobile-dl-proof-metrics > span { min-width: 26px; }
   .mobile-dl-actions { margin-left: -13px; }
+}
+
+/* NFL uses the approved MLB decision-ladder anatomy with football evidence. */
+.nfl-decision-board { margin-top: 10px; }
+.nfl-decision-ladder-head,
+.nfl-decision-ladder-row {
+  grid-template-columns: 40px minmax(220px, 1.2fr) minmax(190px, .9fr) minmax(230px, 1fr) 96px;
+  padding-inline: 14px;
+}
+.nfl-decision-ladder-head .dl-actions { padding-left: 14px; }
+.nfl-decision-ladder-row .dl-verdict { gap: 14px; padding-inline: 10px; }
+.nfl-decision-ladder-row .dl-proof { padding-inline: 10px; }
+.nfl-decision-ladder-row .dl-evidence-strip { max-width: 100%; }
+.nfl-decision-ladder-row .dl-evidence-strip > span { min-width: 0; max-width: 118px; overflow: hidden; text-overflow: ellipsis; }
+.nfl-decision-ladder-row .dl-proof-signal.bad { color: var(--bad); }
+.nfl-decision-ladder-row .dl-proof-signal.warn { color: var(--warn); }
+.nfl-decision-ladder-row .dl-proof-signal.good { color: var(--strong); }
+.nfl-mobile-risk { padding: 2px 5px; display: inline-flex; align-items: center; gap: 3px; border: 1px solid currentColor; border-radius: 999px; font-size: 7px; font-weight: 900; text-transform: uppercase; }
+.nfl-mobile-risk.is-good { color: var(--strong); }
+.nfl-mobile-risk.is-caution { color: var(--warn); }
+.nfl-mobile-risk.is-avoid { color: var(--bad); }
+
+@media (max-width: 1280px) and (min-width: 561px) {
+  .nfl-layout { display: flex; flex-direction: column; }
+  .nfl-decision-rail { width: 100%; position: static; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (max-width: 760px) and (min-width: 561px) {
+  .nfl-decision-ladder-head,
+  .nfl-decision-ladder-row {
+    grid-template-columns: 34px minmax(190px, 1.1fr) minmax(170px, .85fr) minmax(205px, 1fr) 92px;
+    padding-inline: 10px;
+  }
+  .nfl-decision-ladder-row .dl-identity { padding-inline: 10px; }
+  .nfl-decision-ladder-row .dl-verdict { gap: 8px; padding-inline: 6px; }
+  .nfl-decision-ladder-row .dl-proof { padding-inline: 7px; }
+}
+
+@media (max-width: 560px) {
+  .nfl-decision-board { margin-top: 8px; }
+  .nfl-mobile-decision-card .nfl-headshot-silo { width: 40px; height: 48px; border-radius: 10px 10px 7px 7px; }
+  .nfl-mobile-decision-card .mobile-dl-signal.bad { color: var(--bad); }
+  .nfl-mobile-decision-card .mobile-dl-signal.warn { color: var(--warn); }
+  .nfl-mobile-decision-card .mobile-dl-signal.good { color: var(--strong); }
+  .nfl-mobile-decision-card .mobile-dl-signal { max-width: min(48%, 180px); }
+  .nfl-decision-rail { display: flex; }
 }
 
 /* ============ Pitcher Attack Blueprint ============ */

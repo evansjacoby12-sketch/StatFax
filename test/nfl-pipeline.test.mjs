@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import { fetchESPNDepthChart, fetchESPNRoster, parseESPNDepthChart, parseESPNDepthChartHTML, parseESPNRoster, parseESPNScoreboard, parseESPNSummary, selectCurrentNFLSlate } from '../server/sports/nfl/providers/espn.mjs'
 import { nearestHourlyForecast } from '../server/sports/nfl/providers/weather.mjs'
 import { parseSportsGameOdds } from '../server/sports/nfl/providers/odds.mjs'
-import { indexNFLHistory, matchHistoryPlayer, projectNFLPlayer } from '../server/sports/nfl/projections.mjs'
+import { enrichNFLTeamOpportunityShares, indexNFLHistory, matchHistoryPlayer, projectNFLPlayer } from '../server/sports/nfl/projections.mjs'
 import { buildNFLSnapshot, defenseProfile, normalizeFirstTouchdownProbabilities } from '../server/sports/nfl/fetch-nfl-slate.mjs'
 import { assessPlayerAvailability, indexAvailability, externalAvailabilityFor } from '../server/sports/nfl/availability.mjs'
 import { evaluateNFLHistory } from '../server/sports/nfl/backtest.mjs'
@@ -230,6 +230,17 @@ test('availability gate excludes inactive players and discounts practice risks',
   assert.equal(out.multiplier, 0)
   assert.equal(limited.eligible, true)
   assert.ok(limited.multiplier > 0 && limited.multiplier < 1)
+})
+
+test('team opportunity enrichment produces minimum-sample end-zone and goal-to-go shares', () => {
+  const players = [
+    { gameId: 'g1', team: 'BUF', usage: { endZoneTargetsL3: 3, goalLineTouchesL3: 2 } },
+    { gameId: 'g1', team: 'BUF', usage: { endZoneTargetsL3: 1, goalLineTouchesL3: 2 } },
+  ]
+  enrichNFLTeamOpportunityShares(players)
+  assert.equal(players[0].usage.endZoneTargetShare, .75)
+  assert.equal(players[0].usage.goalToGoOpportunitiesL3, 5)
+  assert.equal(players[0].usage.goalToGoOpportunityShare, .625)
 })
 
 test('walk-forward NFL backtest emits probability and projection metrics without future leakage', () => {

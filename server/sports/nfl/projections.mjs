@@ -69,6 +69,31 @@ function redZoneUsage(history, games) {
   }
 }
 
+export function enrichNFLTeamOpportunityShares(players = []) {
+  const teams = new Map()
+  for (const player of players) {
+    const key = `${player.gameId || 'game'}:${player.team || 'team'}`
+    const endZone = n(player.usage?.endZoneTargetsL3)
+    const goalToGo = endZone + n(player.usage?.goalLineTouchesL3)
+    const bucket = teams.get(key) || { endZone: 0, goalToGo: 0 }
+    bucket.endZone += endZone
+    bucket.goalToGo += goalToGo
+    teams.set(key, bucket)
+  }
+  for (const player of players) {
+    const bucket = teams.get(`${player.gameId || 'game'}:${player.team || 'team'}`) || {}
+    const endZone = n(player.usage?.endZoneTargetsL3)
+    const goalToGo = endZone + n(player.usage?.goalLineTouchesL3)
+    player.usage = {
+      ...player.usage,
+      endZoneTargetShare: bucket.endZone >= 3 ? clamp(endZone / bucket.endZone, 0, 1) : null,
+      goalToGoOpportunitiesL3: goalToGo,
+      goalToGoOpportunityShare: bucket.goalToGo >= 4 ? clamp(goalToGo / bucket.goalToGo, 0, 1) : null,
+    }
+  }
+  return players
+}
+
 export function projectNFLPlayer(rosterPlayer, history, { isHome, odds = null, availability = null, lineup = null, calibration = {} } = {}) {
   const prior = PRIORS[rosterPlayer.position]
   const games = history?.recentGames || []
@@ -121,6 +146,7 @@ export function projectNFLPlayer(rosterPlayer, history, { isHome, odds = null, a
   for (const [marketId, quote] of Object.entries(odds?.markets || {})) markets[marketId] = { ...markets[marketId], ...quote }
   const propLines = Object.fromEntries(Object.entries(markets).filter(([, quote]) => Number.isFinite(Number(quote.line))).map(([id, quote]) => [id, Number(quote.line)]))
   const targetShare = n(rosterPlayer.depthChart?.targetShare, weighted(games, 'targetShare', rosterPlayer.position === 'WR' ? .18 : rosterPlayer.position === 'TE' ? .14 : .08))
+  const airYardsShare = weightedPresent(games, 'airYardsShare', null)
   const snapShare = n(rosterPlayer.depthChart?.snapShare, weightedPresent(games, 'snapShare', prior.snapShare))
   const redZone = redZoneUsage(history, games)
   const redZoneTotal = redZone.redZoneTargetsL3 + redZone.redZoneTouchesL3
@@ -130,7 +156,7 @@ export function projectNFLPlayer(rosterPlayer, history, { isHome, odds = null, a
     markets,
     propLines,
     recentGames: games.slice(0, 8),
-    usage: { snapShare: clamp(snapShare, .05, 1), targetShare: clamp(targetShare, 0, .45), carryShare: rosterPlayer.depthChart?.carryShare ?? null, ...redZone, redZoneOpportunityShare: clamp(redZoneTotal ? redZoneTotal / 18 : projections.anytimeTdProbability * .75, .03, .65), goalLineOpportunityShare: clamp(rosterPlayer.depthChart?.goalLineShare ?? (redZone.goalLineTouchesL3 ? redZone.goalLineTouchesL3 / 10 : projections.anytimeTdProbability * .65), .02, .6), roleRank: rosterPlayer.roleRank || null, roleLabel, depthSource: rosterPlayer.depthChart ? 'overlay' : 'historical-role' },
+    usage: { snapShare: clamp(snapShare, .05, 1), targetShare: clamp(targetShare, 0, .45), airYardsShare: airYardsShare == null ? null : clamp(airYardsShare, 0, 1), carryShare: rosterPlayer.depthChart?.carryShare ?? null, ...redZone, redZoneOpportunityShare: clamp(redZoneTotal ? redZoneTotal / 18 : projections.anytimeTdProbability * .75, .03, .65), goalLineOpportunityShare: clamp(rosterPlayer.depthChart?.goalLineShare ?? (redZone.goalLineTouchesL3 ? redZone.goalLineTouchesL3 / 10 : projections.anytimeTdProbability * .65), .02, .6), roleRank: rosterPlayer.roleRank || null, roleLabel, depthSource: rosterPlayer.depthChart ? 'overlay' : 'historical-role' },
     splits: { home: history?.splits?.home?.tdRate ?? null, away: history?.splits?.away?.tdRate ?? null, activeEdge: splitEdge(history, isHome) },
     historyMatch: history ? { id: history.id, games: games.length, seasons: [...new Set(games.map((game) => game.season))] } : null,
     availability: availability || { eligible: true, multiplier: 1, label: 'Active', tone: 'good', reason: 'active' },

@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { fetchESPNDepthChart, fetchESPNRoster, fetchESPNSeason, fetchESPNSummary, selectCurrentNFLSlate } from './providers/espn.mjs'
 import { fetchNFLWeather } from './providers/weather.mjs'
 import { fetchNFLOdds, normalizePlayerName } from './providers/odds.mjs'
-import { indexNFLHistory, matchHistoryPlayer, playerRoleScore, projectNFLPlayer } from './projections.mjs'
+import { enrichNFLTeamOpportunityShares, indexNFLHistory, matchHistoryPlayer, playerRoleScore, projectNFLPlayer } from './projections.mjs'
 import { assessPlayerAvailability, externalAvailabilityFor, indexAvailability } from './availability.mjs'
 import { calibrateNFLProbability } from '../../../src/sports/nfl/logic/calibration.js'
 import { depthFor, indexDepthChart, indexWeather, overlayFreshness, readOptionalJSON, weatherFor } from './context-overlays.mjs'
@@ -236,6 +236,7 @@ export async function buildNFLSnapshot({ now = new Date(), fetchImpl = fetch, hi
     }
   }
 
+  enrichNFLTeamOpportunityShares(players)
   normalizeFirstTouchdownProbabilities(players, calibration)
 
   const anchor = games[0]
