@@ -537,7 +537,7 @@ export default function Header({
               placeItems: 'center',
               color: '#fff'
             }}>
-              <img className="brand-mark-img" src="/icons/icon-192.png" alt="" aria-hidden="true" />
+              <img className="brand-mark-img" src={`${import.meta.env?.BASE_URL ?? '/'}icons/icon-192.png`} alt="" aria-hidden="true" />
             </span>
             <div className="brand-txt">
               <span className="brand-name">

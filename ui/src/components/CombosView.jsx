@@ -7,6 +7,7 @@ import { legStatus } from '../lib/live.js'
 import LiveCombosView from './LiveCombosView.jsx'
 import MyTickets from './MyTickets.jsx'
 import * as store from '../lib/storage.js'
+import { loadBacktestLog } from '../lib/backtestLog.js'
 
 // Dedicated Combos page: live combo tracking (today, in progress) + the settled
 // day-by-day combo scorecard graded off the backtest log. Split out of the
@@ -35,8 +36,7 @@ export default function CombosView({ batters, onSelect, favorConsistency = false
 
   useEffect(() => {
     let alive = true
-    fetch(`${import.meta.env.BASE_URL}data/backtest-log.json`, { cache: 'no-store' })
-      .then((r) => (r.ok ? r.json() : Promise.reject(`HTTP ${r.status}`)))
+    loadBacktestLog()
       .then((d) => alive && setLog(d))
       .catch((e) => alive && setErr(String(e)))
     return () => { alive = false }

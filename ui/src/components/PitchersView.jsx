@@ -1,5 +1,6 @@
 import { useMemo, useEffect, useState } from 'react'
 import Icon from './Icon.jsx'
+import { loadBacktestLog } from '../lib/backtestLog.js'
 import CommandTabs from './CommandTabs.jsx'
 import { GradeChip, ScoreRing, ProbBar, Stat } from './atoms.jsx'
 import { groupPitchers, pitchUsage, effSide, K_LINES, kOverProb } from '../lib/pitchers.js'
@@ -130,8 +131,7 @@ function KBrainView({ pitchers, liveKsByPitcher = {} }) {
   const [kLog, setKLog] = useState(null)
 
   useEffect(() => {
-    fetch(`${import.meta.env.BASE_URL}data/backtest-log.json`, { cache: 'no-store' })
-      .then(r => r.ok ? r.json() : null).then(d => d && setKLog(d)).catch(() => {})
+    loadBacktestLog().then(setKLog).catch(() => {})
   }, [])
 
   const arms = useMemo(() => {

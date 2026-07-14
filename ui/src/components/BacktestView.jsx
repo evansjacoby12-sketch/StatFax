@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import Icon from './Icon.jsx'
 import { GRADE_ORDER, BADGES, gradeColor } from '../lib/badges.js'
 import * as store from '../lib/storage.js'
+import { loadBacktestLog } from '../lib/backtestLog.js'
 
-const BASE_URL = import.meta.env?.BASE_URL ?? '/'
 // Worker endpoint that turns plain English into filters. Unset → NL box hidden.
 const PARSE_URL = import.meta.env?.VITE_PARSE_URL || ''
 // Signals the BOARD can filter on (so a saved system applies to tonight exactly).
@@ -30,8 +30,7 @@ export default function BacktestView({ batters = [], onApply }) {
 
   useEffect(() => {
     let alive = true
-    fetch(`${BASE_URL}data/backtest-log.json`, { cache: 'no-store' })
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))))
+    loadBacktestLog()
       .then((j) => alive && setLog(j))
       .catch((e) => alive && setErr(e.message))
     return () => {

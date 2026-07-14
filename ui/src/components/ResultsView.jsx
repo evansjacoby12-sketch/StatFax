@@ -10,6 +10,7 @@ import CombosView from './CombosView.jsx'
 import MyTickets from './MyTickets.jsx'
 import { useTickets } from '../lib/tickets.js'
 import { gradeTicket, summarizeTickets } from '../lib/ticketMath.js'
+import { loadBacktestLog } from '../lib/backtestLog.js'
 
 function computeAuc(rows) {
   const y = rows.map((r) => (r.homered ? 1 : 0))
@@ -70,8 +71,7 @@ function AccountabilityOverview({ meta, batters, onSelect, onOpenTickets }) {
 
   useEffect(() => {
     let alive = true
-    fetch(`${import.meta.env.BASE_URL}data/backtest-log.json`, { cache: 'no-store' })
-      .then((response) => response.ok ? response.json() : null)
+    loadBacktestLog()
       .then((data) => { if (alive) setLog(data) })
       .catch(() => { if (alive) setLog(null) })
     return () => { alive = false }
@@ -154,8 +154,7 @@ function ModelResults({ meta }) {
 
   useEffect(() => {
     let alive = true
-    fetch(`${import.meta.env.BASE_URL}data/backtest-log.json`, { cache: 'no-store' })
-      .then((r) => (r.ok ? r.json() : Promise.reject(`HTTP ${r.status}`)))
+    loadBacktestLog()
       .then((d) => alive && setLog(d))
       .catch((e) => alive && setErr(String(e)))
     return () => {

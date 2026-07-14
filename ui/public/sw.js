@@ -10,16 +10,22 @@
  *
  * Bump VERSION to force a full cache flush on the next deploy.
  */
-const VERSION = 'sf-v2'
+const VERSION = 'sf-v3'
 const SHELL = `${VERSION}-shell`
 const ASSETS = `${VERSION}-assets`
 const DATA = `${VERSION}-data`
 const FONTS = `${VERSION}-fonts`
 const ASSET_LIMIT = 60
+const SCOPE_URL = self.registration.scope
+const SCOPE_PATH = new URL(SCOPE_URL).pathname.replace(/\/$/, '')
+const scoped = (path) => new URL(path.replace(/^\//, ''), SCOPE_URL).href
+const relativePath = (url) => url.pathname.startsWith(SCOPE_PATH)
+  ? url.pathname.slice(SCOPE_PATH.length) || '/'
+  : url.pathname
 
 self.addEventListener('install', (e) => {
   e.waitUntil(
-    caches.open(SHELL).then((c) => c.addAll(['/', '/manifest.webmanifest', '/icon.png', '/icons/favicon-32.png'])).then(() => self.skipWaiting())
+    caches.open(SHELL).then((c) => c.addAll([scoped(''), scoped('manifest.webmanifest'), scoped('icon.png'), scoped('icons/favicon-32.png')])).then(() => self.skipWaiting())
   )
 })
 
@@ -43,11 +49,11 @@ async function networkFirstNav(req) {
     const res = await fetch(req)
     if (res.ok) {
       const cache = await caches.open(SHELL)
-      cache.put('/', res.clone())
+      cache.put(scoped(''), res.clone())
     }
     return res
   } catch {
-    return (await caches.match('/')) || Response.error()
+    return (await caches.match(scoped(''))) || Response.error()
   }
 }
 
@@ -86,6 +92,7 @@ self.addEventListener('fetch', (e) => {
   const req = e.request
   if (req.method !== 'GET') return
   const url = new URL(req.url)
+  const path = relativePath(url)
 
   if (url.pathname.startsWith('/api/')) return // live server endpoints — always network
 
@@ -93,11 +100,11 @@ self.addEventListener('fetch', (e) => {
     e.respondWith(networkFirstNav(req))
     return
   }
-  if (url.origin === location.origin && url.pathname.startsWith('/assets/')) {
+  if (url.origin === location.origin && path.startsWith('/assets/')) {
     e.respondWith(cacheFirst(req, ASSETS))
     return
   }
-  if (url.origin === location.origin && url.pathname.startsWith('/data/') && url.pathname.endsWith('.json')) {
+  if (url.origin === location.origin && path.startsWith('/data/') && path.endsWith('.json')) {
     e.respondWith(networkFirstData(req))
     return
   }

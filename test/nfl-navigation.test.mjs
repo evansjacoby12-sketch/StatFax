@@ -60,6 +60,27 @@ test('sport UI contracts share navigation primitives without sharing sport state
   assert.match(dock, /onChange\(item\.id\)/)
 })
 
+test('sport refresh, reconnect, shortcuts, and heavy workspaces stay sport scoped', async () => {
+  const [app, logLoader, main, serviceWorker] = await Promise.all([
+    readFile(new URL('../ui/src/App.jsx', import.meta.url), 'utf8'),
+    readFile(new URL('../ui/src/lib/backtestLog.js', import.meta.url), 'utf8'),
+    readFile(new URL('../ui/src/main.jsx', import.meta.url), 'utf8'),
+    readFile(new URL('../ui/public/sw.js', import.meta.url), 'utf8'),
+  ])
+  assert.match(app, /if \(sport === 'mlb'\) load\(\)/)
+  assert.match(app, /if \(sport !== 'mlb'\) return undefined/)
+  assert.match(app, /if \(sport === 'nfl'\) refreshNFL\(\)/)
+  assert.match(app, /nflHasLiveGames \? LIVE_REFRESH_MS : SLATE_REFRESH_MS/)
+  assert.match(app, /sport === 'nfl' \? '\.sport-filter-search input' : '\.search input'/)
+  assert.match(app, /SPORT_UI\.nfl\.primaryViews/)
+  assert.match(app, /const NFLBoard = lazy/)
+  assert.match(app, /const PlayerDrawer = lazy/)
+  assert.match(logLoader, /if \(cachedLog\)/)
+  assert.match(logLoader, /if \(pendingLog\)/)
+  assert.match(main, /BASE_URL.*sw\.js/)
+  assert.match(serviceWorker, /const SCOPE_URL = self\.registration\.scope/)
+})
+
 test('NFL Bet Lab follows the MLB four-mode workspace format', async () => {
   const [mlbLab, nflLab, shell, board] = await Promise.all([
     readFile(new URL('../ui/src/components/BetLab.jsx', import.meta.url), 'utf8'),

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback, useRef, useLayoutEffect } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState, useCallback, useRef, useLayoutEffect } from 'react'
 import { loadSlate, loadBrief, forceSlateRefresh, normName, projectedSlateHRs } from './lib/data.js'
 import { GRADE_ORDER, BADGES } from './lib/badges.js'
 import { HOT_HEAT, DESC_BY_DEFAULT, DEFAULT_FILTERS, SORTS } from './lib/constants.js'
@@ -11,16 +11,9 @@ import Header from './components/Header.jsx'
 import Filters from './components/Filters.jsx'
 import BatterTable from './components/BatterTable.jsx'
 import SlateBrief from './components/SlateBrief.jsx'
-import GamesView from './components/GamesView.jsx'
 import PitchersView, { PitcherCard } from './components/PitchersView.jsx'
 import { groupPitchers } from './lib/pitchers.js'
-import WeatherView from './components/WeatherView.jsx'
-import BacktestView from './components/BacktestView.jsx'
-import ResultsView from './components/ResultsView.jsx'
-import PlayerDrawer from './components/PlayerDrawer.jsx'
-import ZoneView from './components/ZoneView.jsx'
 import ParlaySlip from './components/ParlaySlip.jsx'
-import Settings from './components/Settings.jsx'
 import DayRating from './components/DayRating.jsx'
 import Skeleton from './components/Skeleton.jsx'
 import BackToTop from './components/BackToTop.jsx'
@@ -29,13 +22,7 @@ import PickOfDay from './components/PickOfDay.jsx'
 import ReadyRadar from './components/ReadyRadar.jsx'
 import BoardWorkspaceSummary from './components/BoardWorkspaceSummary.jsx'
 import UpdateBanner from './components/UpdateBanner.jsx'
-import BetLab from './components/BetLab.jsx'
-import FindPlays from './components/FindPlays.jsx'
-import LearnCenter from './components/LearnCenter.jsx'
 import WorkspaceShell from './components/WorkspaceShell.jsx'
-import NFLBoard from './components/NFLBoard.jsx'
-import NFLLearnCenter from './components/NFLLearnCenter.jsx'
-import NFLCheatSheet from './components/NFLCheatSheet.jsx'
 import SportMobileDock from './components/SportMobileDock.jsx'
 import { loadNFLSnapshot } from '../../src/sports/nfl/api/NFLService.js'
 import ToastStack, { toast } from './components/Toast.jsx'
@@ -44,6 +31,20 @@ import Confetti from './components/Confetti.jsx'
 import Icon from './components/Icon.jsx'
 import { SPORT_UI } from './lib/sportUi.js'
 import './app.css'
+
+const GamesView = lazy(() => import('./components/GamesView.jsx'))
+const WeatherView = lazy(() => import('./components/WeatherView.jsx'))
+const ResultsView = lazy(() => import('./components/ResultsView.jsx'))
+const PlayerDrawer = lazy(() => import('./components/PlayerDrawer.jsx'))
+const ZoneView = lazy(() => import('./components/ZoneView.jsx'))
+const Settings = lazy(() => import('./components/Settings.jsx'))
+const BetLab = lazy(() => import('./components/BetLab.jsx'))
+const FindPlays = lazy(() => import('./components/FindPlays.jsx'))
+const LearnCenter = lazy(() => import('./components/LearnCenter.jsx'))
+const BacktestView = lazy(() => import('./components/BacktestView.jsx'))
+const NFLBoard = lazy(() => import('./components/NFLBoard.jsx'))
+const NFLLearnCenter = lazy(() => import('./components/NFLLearnCenter.jsx'))
+const NFLCheatSheet = lazy(() => import('./components/NFLCheatSheet.jsx'))
 
 // Cloudflare Worker base — its /trigger endpoint fires a repository_dispatch
 // that rebuilds the slate on GitHub Actions (the press-and-hold "build" action).
@@ -198,12 +199,18 @@ export default function App() {
     try { setNflSnapshot(await loadNFLSnapshot({ demoFallback: true })) }
     finally { setNflRefreshing(false) }
   }, [])
+  const nflHasLiveGames = !!nflSnapshot?.players?.some((player) => player.live?.isLive)
   useEffect(() => {
     if (sport !== 'nfl') return undefined
     refreshNFL()
-    const timer = setInterval(refreshNFL, 30_000)
-    return () => clearInterval(timer)
   }, [refreshNFL, sport])
+  useEffect(() => {
+    if (sport !== 'nfl') return undefined
+    // Pregame snapshots only change with the published pipeline, so reserve the
+    // faster cadence for games that are actually live.
+    const timer = setInterval(refreshNFL, nflHasLiveGames ? LIVE_REFRESH_MS : SLATE_REFRESH_MS)
+    return () => clearInterval(timer)
+  }, [nflHasLiveGames, refreshNFL, sport])
 
   // Publish the sticky chrome height so the board column-header can stick right
   // below it — robust to the filter bar wrapping at any width.
@@ -270,8 +277,8 @@ export default function App() {
   }, [forceRefresh])
 
   useEffect(() => {
-    load()
-  }, [load])
+    if (sport === 'mlb') load()
+  }, [load, sport])
 
   // Track when the app was last actively open, and reset a stale return. A
   // heartbeat marks `lastSeenAt` every minute while visible; on hide we stamp it;
@@ -316,17 +323,19 @@ export default function App() {
   // still going — otherwise "Live on" would freeze on the last load, which is
   // exactly what users hit. Poll faster once a game is actually live.
   useEffect(() => {
+    if (sport !== 'mlb') return undefined
     const livePolling = liveScores && livePhase.anyPending
     if (!autoRefresh && !livePolling) return
     const ms = livePhase.anyLive ? LIVE_REFRESH_MS : AUTO_REFRESH_MS
     const t = setInterval(load, ms)
     return () => clearInterval(t)
-  }, [autoRefresh, liveScores, livePhase.anyLive, livePhase.anyPending, load])
+  }, [autoRefresh, liveScores, livePhase.anyLive, livePhase.anyPending, load, sport])
 
-  // Silent background poll — always fires every 3 min regardless of toggles.
+  // Silent MLB background poll — fires every 3 min while MLB is active.
   // Only swaps in fresh data when generatedAt actually changed, so there's no
   // flicker or loading spinner for a 19-minute session with a stale slate.
   useEffect(() => {
+    if (sport !== 'mlb') return undefined
     const poll = async () => {
       try {
         const fresh = await loadSlate()
@@ -342,33 +351,41 @@ export default function App() {
     }
     const t = setInterval(poll, SLATE_REFRESH_MS)
     return () => clearInterval(t)
-  }, [])
+  }, [sport])
 
   // Connectivity toasts — the SW keeps serving the last cached slate offline,
   // so tell the user what they're looking at.
   useEffect(() => {
     const onOffline = () => toast.warn('Offline — showing last saved slate', 4000)
-    const onOnline = () => { toast.success('Back online'); load() }
+    const onOnline = () => {
+      toast.success('Back online')
+      if (sport === 'nfl') refreshNFL()
+      else load()
+    }
     window.addEventListener('offline', onOffline)
     window.addEventListener('online', onOnline)
     return () => {
       window.removeEventListener('offline', onOffline)
       window.removeEventListener('online', onOnline)
     }
-  }, [load])
+  }, [load, refreshNFL, sport])
 
-  // Esc closes the topmost overlay; '/' focuses search; 1-4 switch views.
+  // Esc closes the topmost overlay; '/' focuses sport search; number keys switch
+  // the visible sport's primary views.
   useEffect(() => {
     const onKey = (e) => {
       const typing = ['INPUT', 'TEXTAREA'].includes(e.target.tagName)
       if (e.key === '/' && !typing) {
         e.preventDefault()
-        const input = document.querySelector('.search input')
+        const input = document.querySelector(sport === 'nfl' ? '.sport-filter-search input' : '.search input')
         if (input) { input.focus(); input.select() }
         return
       }
       if (!typing && !e.metaKey && !e.ctrlKey && !e.altKey && ['1', '2', '3', '4', '5'].includes(e.key)) {
-        setView(['board', 'games', 'pitchers', 'weather', 'results'][+e.key - 1]) // matches the view-toggle tab order
+        const nextView = sport === 'nfl'
+          ? SPORT_UI.nfl.primaryViews[+e.key - 1]?.id
+          : ['board', 'games', 'pitchers', 'weather', 'results'][+e.key - 1]
+        if (nextView) (sport === 'nfl' ? setNflView : setView)(nextView)
         return
       }
       if (e.key === 'Escape') {
@@ -386,7 +403,7 @@ export default function App() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [selectedId, zoneId, findPlaysTab, betLabTab, nflLearnTab, showNFLCheatSheet, learnTab, showBacktest, showSettings, pitcherKey])
+  }, [selectedId, zoneId, findPlaysTab, betLabTab, nflLearnTab, showNFLCheatSheet, learnTab, showBacktest, showSettings, pitcherKey, sport])
 
   const patch = useCallback((p) => setFilters((f) => ({ ...f, ...p })), [])
 
@@ -629,13 +646,15 @@ export default function App() {
               onOpenSplits={() => setShowNFLCheatSheet(true)}
             />
           </div>
-          <main className="main nfl-main"><NFLBoard snapshot={nflData} view={nflView} onViewChange={setNflView} /></main>
+          <main className="main nfl-main"><Suspense fallback={<div className="results-loading">Loading NFL workspace…</div>}><NFLBoard snapshot={nflData} view={nflView} onViewChange={setNflView} /></Suspense></main>
           <footer className="foot"><span className="dim">StatFax NFL · TD, yardage and reception props</span></footer>
           <UpdateBanner />
           <ToastStack />
         </div>
-        {nflLearnTab && <NFLLearnCenter key={nflLearnTab} initialTab={nflLearnTab} onClose={() => setNflLearnTab(null)} />}
-        {showNFLCheatSheet && <NFLCheatSheet snapshot={nflData} onClose={() => setShowNFLCheatSheet(false)} />}
+        <Suspense fallback={null}>
+          {nflLearnTab && <NFLLearnCenter key={nflLearnTab} initialTab={nflLearnTab} onClose={() => setNflLearnTab(null)} />}
+          {showNFLCheatSheet && <NFLCheatSheet snapshot={nflData} onClose={() => setShowNFLCheatSheet(false)} />}
+        </Suspense>
         <SportMobileDock sport="nfl" value={nflView} onChange={setNflView} />
         </>
       </EliLevelContext.Provider>
@@ -721,6 +740,7 @@ export default function App() {
       </div>
 
       <main className="main">
+        <Suspense fallback={<div className="results-loading">Loading workspace…</div>}>
         {view === 'results' || view === 'combos' ? (
           <ResultsView
             meta={data.meta}
@@ -818,6 +838,7 @@ export default function App() {
             </aside>
           </div>
         )}
+        </Suspense>
       </main>
 
       <footer className="foot">
@@ -834,6 +855,7 @@ export default function App() {
         onOpenBuilder={() => setBetLabTab('builder')}
       />
 
+      <Suspense fallback={null}>
       {betLabTab && (
         <BetLab
           key={betLabTab}
@@ -946,6 +968,7 @@ export default function App() {
           />
         </WorkspaceShell>
       )}
+      </Suspense>
       <BackToTop />
       <PullToRefresh onRefresh={load} />
       <UpdateBanner />
