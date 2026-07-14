@@ -98,27 +98,18 @@ export default function BatterTable({
 
   return (
     <div className="board">
-      <div className="board-head">
-        <div className="th col-rank" title="Rank by current sort" style={{ fontWeight: '800' }}>#</div>
-        <HeadCol k="name" className="col-batter" title="Batter, team vs opponent, and starting pitcher">
-          Batter
+      <div className="board-head decision-ladder-head">
+        <div className="th dl-rank" title="Rank by current sort">Rank</div>
+        <HeadCol k="name" className="dl-identity" title="Batter, team vs opponent, and starting pitcher">
+          Player identity
         </HeadCol>
-        <HeadCol k="score" className="col-grade" title="Model grade: PRIME / STRONG / LEAN / SKIP">
-          Grade
+        <HeadCol k="score" className="dl-verdict" title="Model grade and calibrated chance of at least one home run">
+          Model verdict
         </HeadCol>
-        <HeadCol k="hrProbability" className="col-prob" title="Calibrated chance of >=1 HR today">
-          Prob
+        <HeadCol k="expectedHRs" className="dl-proof" title="Expected home runs, heat, and strongest active signal">
+          Supporting proof
         </HeadCol>
-        <HeadCol k="expectedHRs" className="col-xhr" title="Expected HRs this game">
-          xHR
-        </HeadCol>
-        <HeadCol k="heat" className="col-rating" title="Heat index — current form (0-100)">
-          Heat
-        </HeadCol>
-        <div className="th col-signals" title="Active model signals (hot, due, edges...)">
-          Signals
-        </div>
-        <div className="th col-actions" title="Watchlist & parlay" />
+        <div className="th dl-actions" title="Watchlist & parlay">Actions</div>
       </div>
 
       <div className="board-body" ref={bodyRef}>
