@@ -69,13 +69,16 @@ export const DEFAULT_LOOKUP_TABLE = [
  * @param {Object} [opts]
  * @param {number} [opts.bucketSize=10]      - Width of each score bucket (0-10, 10-20, …)
  * @param {number} [opts.minNPerBucket=10]   - Minimum samples before a bucket is used as-is; sparser buckets are merged into their neighbor
- * @param {number} [opts.lookbackDays=30]    - How many calendar days of records to include
- * @returns {{ table: Array<{scoreLo, scoreHi, observedProb, n}>, totalN: number, fittedAt: string }}
+ * @param {number} [opts.lookbackDays=30]    - How many recent logged dates to include
+ * @param {number} [opts.priorStrength=20]    - Empirical-prior pseudo-sample size
+ * @param {number} [opts.priorMean]           - Optional fixed prior; defaults to the board's hit rate
+ * @returns {{ table: Array<{scoreLo, scoreHi, observedProb, n}>, totalN: number, priorMean:number, priorStrength:number, fittedAt: string }}
  */
 export function fitIsotonicFromBacktest(backtestLog, opts = {}) {
   const bucketSize    = opts.bucketSize    ?? 10;
   const minNPerBucket = opts.minNPerBucket ?? 10;
   const lookbackDays  = opts.lookbackDays  ?? 30;
+  const priorStrength = opts.priorStrength ?? 20;
 
   // Guard: empty or malformed input → return the fallback table.
   if (
@@ -91,22 +94,27 @@ export function fitIsotonicFromBacktest(backtestLog, opts = {}) {
   const numBuckets = Math.ceil(100 / bucketSize); // 10 for default
   const counts = new Array(numBuckets).fill(null).map(() => ({ n: 0, hits: 0 }));
 
-  const cutoffDate = _dateMinus(lookbackDays);
   let totalN = 0;
+  let totalHits = 0;
 
-  const dates = Array.isArray(backtestLog.dates) ? backtestLog.dates : Object.keys(backtestLog.records);
+  const dates = (Array.isArray(backtestLog.dates) ? backtestLog.dates : Object.keys(backtestLog.records))
+    .slice()
+    .sort()
+    .slice(-lookbackDays);
   for (const dateStr of dates) {
-    if (dateStr < cutoffDate) continue;
     const dayRecords = backtestLog.records[dateStr];
     if (!Array.isArray(dayRecords)) continue;
 
     for (const rec of dayRecords) {
+      if (rec?.actuallyPlayed === false) continue;
+      if (rec?.homered !== true && rec?.homered !== false) continue;
       const score = typeof rec.score === 'number' ? rec.score : null;
       if (score === null || score < 0 || score > 100) continue;
       const bucketIdx = Math.min(Math.floor(score / bucketSize), numBuckets - 1);
       counts[bucketIdx].n    += 1;
       counts[bucketIdx].hits += rec.homered ? 1 : 0;
       totalN += 1;
+      totalHits += rec.homered ? 1 : 0;
     }
   }
 
@@ -152,23 +160,30 @@ export function fitIsotonicFromBacktest(backtestLog, opts = {}) {
     }
   }
 
-  // ── Step c: Pool Adjacent Violators (PAV) — enforce monotonicity ─────────
-  // Raw hit rate per group.
+  // ── Step c: Empirical prior + Pool Adjacent Violators (PAV) ─────────────
+  // Use the displayed board's empirical hit rate as the prior mean. The old
+  // formula accidentally encoded a ~0.1% prior and crushed every bucket down.
+  const empiricalPrior = totalN > 0 ? totalHits / totalN : LEAGUE_PRIOR;
+  const priorMean = Number.isFinite(opts.priorMean) ? opts.priorMean : empiricalPrior;
   for (const g of merged) {
-    g.rawRate = g.n > 0 ? g.hits / g.n : 0;
+    g.fitN = g.n + priorStrength;
+    g.fitHits = g.hits + priorMean * priorStrength;
+    g.fitRate = g.fitN > 0 ? g.fitHits / g.fitN : priorMean;
   }
 
-  // PAV: scan left-to-right; if group[k].rawRate > group[k+1].rawRate, merge.
+  // PAV on the posterior rates keeps the final smoothed table monotonic.
   let changed = true;
   while (changed) {
     changed = false;
     for (let k = 0; k < merged.length - 1; k++) {
-      if (merged[k].rawRate > merged[k + 1].rawRate) {
+      if (merged[k].fitRate > merged[k + 1].fitRate) {
         // Merge k and k+1 into k.
         merged[k].n        += merged[k + 1].n;
         merged[k].hits     += merged[k + 1].hits;
+        merged[k].fitN     += merged[k + 1].fitN;
+        merged[k].fitHits  += merged[k + 1].fitHits;
         merged[k].origIdxs  = merged[k].origIdxs.concat(merged[k + 1].origIdxs);
-        merged[k].rawRate   = merged[k].n > 0 ? merged[k].hits / merged[k].n : 0;
+        merged[k].fitRate   = merged[k].fitHits / merged[k].fitN;
         merged.splice(k + 1, 1);
         changed = true;
         break; // Restart scan — earlier groups may now violate.
@@ -176,15 +191,11 @@ export function fitIsotonicFromBacktest(backtestLog, opts = {}) {
     }
   }
 
-  // ── Step d: Bayesian smoothing ────────────────────────────────────────────
-  // observedProb = (hits + 2 * leaguePrior) / (n + 2 * (1 / leaguePrior))
-  // This prevents a 0-hit bucket from producing 0% (a true zero is very
-  // unlikely over ≥10 observations; small-sample buckets should regress to
-  // the league prior rather than claiming near-zero probability).
-  const alpha = 2 * LEAGUE_PRIOR;
-  const beta  = 2 * (1 / LEAGUE_PRIOR);
+  // ── Step d: Publish posterior rates ──────────────────────────────────────
+  // The pseudo-count prior was applied before PAV, so the posterior table is
+  // already both smoothed and monotonic here.
   for (const g of merged) {
-    g.smoothedProb = (g.hits + alpha) / (g.n + beta);
+    g.smoothedProb = g.fitRate;
   }
 
   // ── Expand back to original bucket boundaries ─────────────────────────────
@@ -214,6 +225,8 @@ export function fitIsotonicFromBacktest(backtestLog, opts = {}) {
   return {
     table:    origBuckets,
     totalN,
+    priorMean,
+    priorStrength,
     fittedAt: new Date().toISOString(),
   };
 }
@@ -239,9 +252,18 @@ const _defaultIsoFallback = (s) => Math.max(0.005, Math.min(0.30, (Math.max(0, M
 
 /** One-fold Brier: fit the isotonic table on `train` at `bucketSize`, score
  *  `test` with it (out-of-sample). */
-function _isoFoldBrier(train, test, bucketSize, fallbackFn) {
-  const sub = { dates: ['_'], records: { _: train } };
-  const { table } = fitIsotonicFromBacktest(sub, { lookbackDays: 9999, bucketSize });
+function _rowsToBacktest(rows) {
+  const records = {};
+  for (const row of rows) (records[row.date] ||= []).push(row);
+  return { dates: Object.keys(records).sort(), records };
+}
+
+function _isoFoldBrier(train, test, bucketSize, fallbackFn, fitOpts) {
+  const { table } = fitIsotonicFromBacktest(_rowsToBacktest(train), {
+    ...fitOpts,
+    lookbackDays: 9999,
+    bucketSize,
+  });
   let s = 0;
   for (const r of test) {
     const p = lookupProb(r.score, table, fallbackFn);
@@ -251,30 +273,39 @@ function _isoFoldBrier(train, test, bucketSize, fallbackFn) {
   return test.length ? s / test.length : null;
 }
 
-/** Deterministic k-fold (index % k, no RNG) mean out-of-sample Brier at a grid. */
-function _isoCvBrier(rows, bucketSize, fallbackFn, k = 5) {
-  const folds = Array.from({ length: k }, () => []);
-  rows.forEach((r, i) => folds[i % k].push(r));
-  let sum = 0;
-  let used = 0;
-  for (let f = 0; f < k; f++) {
-    const test = folds[f];
-    const train = folds.filter((_, i) => i !== f).flat();
-    if (!test.length || !train.length) continue;
-    const b = _isoFoldBrier(train, test, bucketSize, fallbackFn);
-    if (b == null) continue;
-    sum += b;
-    used += 1;
+/** Expanding-window temporal validation: every test row occurs after training. */
+function _isoTemporalBrier(rows, bucketSize, fallbackFn, fitOpts, foldCount = 5) {
+  const dates = [...new Set(rows.map((row) => row.date))].sort();
+  if (dates.length < 3) return null;
+
+  const firstTest = Math.max(2, Math.floor(dates.length / 2));
+  const testDates = dates.slice(firstTest);
+  const blockSize = Math.max(1, Math.ceil(testDates.length / foldCount));
+  let squaredError = 0;
+  let holdoutN = 0;
+  let folds = 0;
+
+  for (let start = 0; start < testDates.length; start += blockSize) {
+    const block = new Set(testDates.slice(start, start + blockSize));
+    const firstBlockDate = testDates[start];
+    const train = rows.filter((row) => row.date < firstBlockDate);
+    const test = rows.filter((row) => block.has(row.date));
+    if (!train.length || !test.length) continue;
+    const brier = _isoFoldBrier(train, test, bucketSize, fallbackFn, fitOpts);
+    if (!Number.isFinite(brier)) continue;
+    squaredError += brier * test.length;
+    holdoutN += test.length;
+    folds++;
   }
-  return used ? sum / used : null;
+  return holdoutN ? { brier: squaredError / holdoutN, holdoutN, folds } : null;
 }
 
 /**
  * Fit the score→prob table at the bucket width that GENERALIZES best, chosen by
- * 5-fold CV on the current log rather than a hardcoded constant.
+ * expanding-window validation rather than a hardcoded constant.
  *
  * Background: the deployed call hardcoded `bucketSize: 15` because an offline
- * 5-fold CV found 15 beat 10 (Brier 0.1000 vs 0.1008). But that CV ran on a log
+ * an older interleaved CV found 15 beat 10. That evaluation ran on a log
  * whose pre-game scores had drifted (the live-decay/Final freeze bug — since
  * fixed), so coarse buckets were "winning" partly by smearing over corrupted
  * scores. Coarse buckets also pin the ceiling low: the top 75-90 band genuinely
@@ -293,28 +324,31 @@ export function fitIsotonicAdaptive(backtestLog, opts = {}) {
   const fallbackFn    = opts.fallbackFn    ?? _defaultIsoFallback;
   const candidates    = opts.bucketSizes   ?? ADAPTIVE_BUCKET_SIZES;
   const defaultBucket = opts.bucketSize    ?? 15;
+  const priorStrength = opts.priorStrength ?? 20;
 
   // Gather the resolved rows (score + outcome) within the lookback window.
   const rows = [];
   if (backtestLog && typeof backtestLog === 'object' && backtestLog.records && typeof backtestLog.records === 'object') {
-    const cutoff = _dateMinus(lookbackDays);
-    const dates = Array.isArray(backtestLog.dates) ? backtestLog.dates : Object.keys(backtestLog.records);
+    const dates = (Array.isArray(backtestLog.dates) ? backtestLog.dates : Object.keys(backtestLog.records))
+      .slice()
+      .sort()
+      .slice(-lookbackDays);
     for (const d of dates) {
-      if (d < cutoff) continue;
       const day = backtestLog.records[d];
       if (!Array.isArray(day)) continue;
       for (const r of day) {
+        if (r?.actuallyPlayed === false) continue;
         const score = typeof r.score === 'number' ? r.score : null;
         if (score === null || score < 0 || score > 100) continue;
         if (r.homered !== true && r.homered !== false) continue;
-        rows.push({ score, homered: r.homered === true });
+        rows.push({ date: d, score, homered: r.homered === true });
       }
     }
   }
 
   // Thin log → behave exactly like the old hardcoded path.
   if (rows.length < ADAPTIVE_MIN_ROWS) {
-    const res = fitIsotonicFromBacktest(backtestLog, { lookbackDays, minNPerBucket, bucketSize: defaultBucket });
+    const res = fitIsotonicFromBacktest(backtestLog, { lookbackDays, minNPerBucket, bucketSize: defaultBucket, priorStrength });
     return { ...res, bucketSize: defaultBucket, cv: null, adaptive: false };
   }
 
@@ -322,7 +356,10 @@ export function fitIsotonicAdaptive(backtestLog, opts = {}) {
   const cv = candidates
     .slice()
     .sort((a, b) => b - a)
-    .map((bs) => ({ bucketSize: bs, brier: _isoCvBrier(rows, bs, fallbackFn) }))
+    .map((bs) => {
+      const temporal = _isoTemporalBrier(rows, bs, fallbackFn, { minNPerBucket, priorStrength });
+      return { bucketSize: bs, brier: temporal?.brier ?? null, holdoutN: temporal?.holdoutN ?? 0, folds: temporal?.folds ?? 0 };
+    })
     .filter((c) => Number.isFinite(c.brier));
 
   // Pick the coarsest as incumbent, then walk finer; adopt a finer grid only
@@ -333,8 +370,142 @@ export function fitIsotonicAdaptive(backtestLog, opts = {}) {
     if (chosen.brier == null || cv[i].brier < chosen.brier - ADAPTIVE_BRIER_EPS) chosen = cv[i];
   }
 
-  const res = fitIsotonicFromBacktest(backtestLog, { lookbackDays, minNPerBucket, bucketSize: chosen.bucketSize });
-  return { ...res, bucketSize: chosen.bucketSize, cv, adaptive: true };
+  const res = fitIsotonicFromBacktest(backtestLog, { lookbackDays, minNPerBucket, bucketSize: chosen.bucketSize, priorStrength });
+  return { ...res, bucketSize: chosen.bucketSize, cv, adaptive: true, evaluation: 'expanding-window' };
+}
+
+function _resolvedCalibrationRows(backtestLog, lookbackDays) {
+  if (!backtestLog?.records || typeof backtestLog.records !== 'object') return [];
+  const dates = (Array.isArray(backtestLog.dates) ? backtestLog.dates : Object.keys(backtestLog.records))
+    .slice()
+    .sort()
+    .slice(-lookbackDays);
+  const rows = [];
+  for (const date of dates) {
+    for (const row of backtestLog.records[date] || []) {
+      if (row?.actuallyPlayed === false) continue;
+      if (row?.homered !== true && row?.homered !== false) continue;
+      if (!Number.isFinite(row.score) || row.score < 0 || row.score > 100) continue;
+      rows.push({ date, score: row.score, homered: row.homered === true });
+    }
+  }
+  return rows;
+}
+
+/** Fit a monotone Platt sigmoid over the rule score. */
+export function fitPlattFromBacktest(backtestLog, opts = {}) {
+  const lookbackDays = opts.lookbackDays ?? 30;
+  const bucketSize = opts.bucketSize ?? 10;
+  const iterations = opts.iterations ?? 2500;
+  const learningRate = opts.learningRate ?? 0.1;
+  const regularization = opts.regularization ?? 0.01;
+  const rows = _resolvedCalibrationRows(backtestLog, lookbackDays);
+  if (rows.length < 100) return { ..._fallbackResult(), method: 'fallback' };
+
+  const mean = rows.reduce((sum, row) => sum + row.score, 0) / rows.length;
+  const sd = Math.sqrt(rows.reduce((sum, row) => sum + (row.score - mean) ** 2, 0) / rows.length) || 1;
+  const baseRate = rows.filter((row) => row.homered).length / rows.length;
+  const safeRate = Math.max(0.001, Math.min(0.999, baseRate));
+  let intercept = Math.log(safeRate / (1 - safeRate));
+  let slope = 0;
+
+  for (let iteration = 0; iteration < iterations; iteration++) {
+    let interceptGradient = 0;
+    let slopeGradient = 0;
+    for (const row of rows) {
+      const x = (row.score - mean) / sd;
+      const z = intercept + slope * x;
+      const probability = z >= 0 ? 1 / (1 + Math.exp(-z)) : Math.exp(z) / (1 + Math.exp(z));
+      const error = probability - (row.homered ? 1 : 0);
+      interceptGradient += error;
+      slopeGradient += error * x;
+    }
+    intercept -= learningRate * interceptGradient / rows.length;
+    slope = Math.max(0, slope - learningRate * (slopeGradient / rows.length + regularization * slope));
+  }
+
+  const counts = new Array(Math.ceil(100 / bucketSize)).fill(0);
+  for (const row of rows) counts[Math.min(Math.floor(row.score / bucketSize), counts.length - 1)]++;
+  const probabilityAt = (score) => {
+    const z = intercept + slope * ((score - mean) / sd);
+    return z >= 0 ? 1 / (1 + Math.exp(-z)) : Math.exp(z) / (1 + Math.exp(z));
+  };
+  const table = counts.map((n, index) => ({
+    scoreLo: index * bucketSize,
+    scoreHi: (index + 1) * bucketSize,
+    observedProb: +probabilityAt(index * bucketSize + bucketSize / 2).toFixed(4),
+    n,
+  }));
+  return {
+    table,
+    totalN: rows.length,
+    method: 'platt',
+    params: { intercept, slope, mean, sd },
+    fittedAt: new Date().toISOString(),
+  };
+}
+
+function _plattTemporalMetrics(rows, opts = {}, foldCount = 5) {
+  const dates = [...new Set(rows.map((row) => row.date))].sort();
+  if (dates.length < 3) return null;
+  const firstTest = Math.max(2, Math.floor(dates.length / 2));
+  const testDates = dates.slice(firstTest);
+  const blockSize = Math.max(1, Math.ceil(testDates.length / foldCount));
+  let brier = 0;
+  let logLoss = 0;
+  let n = 0;
+  let folds = 0;
+  for (let start = 0; start < testDates.length; start += blockSize) {
+    const block = new Set(testDates.slice(start, start + blockSize));
+    const firstBlockDate = testDates[start];
+    const train = rows.filter((row) => row.date < firstBlockDate);
+    const test = rows.filter((row) => block.has(row.date));
+    if (!train.length || !test.length) continue;
+    const fit = fitPlattFromBacktest(_rowsToBacktest(train), { ...opts, lookbackDays: 9999 });
+    for (const row of test) {
+      const probability = Math.max(1e-9, Math.min(1 - 1e-9, lookupProb(row.score, fit.table)));
+      const outcome = row.homered ? 1 : 0;
+      brier += (probability - outcome) ** 2;
+      logLoss += -(outcome * Math.log(probability) + (1 - outcome) * Math.log(1 - probability));
+      n++;
+    }
+    folds++;
+  }
+  return n ? { brier: brier / n, logLoss: logLoss / n, holdoutN: n, folds } : null;
+}
+
+/**
+ * Select the production score calibrator with future-only validation. Platt
+ * must beat the best isotonic grid by a material Brier margin before replacing
+ * it, which keeps the deployed method stable when their scores are equivalent.
+ */
+export function fitScoreCalibrationAdaptive(backtestLog, opts = {}) {
+  const lookbackDays = opts.lookbackDays ?? 30;
+  const isotonic = fitIsotonicAdaptive(backtestLog, opts);
+  const rows = _resolvedCalibrationRows(backtestLog, lookbackDays);
+  const chosenIsoCv = Array.isArray(isotonic.cv)
+    ? isotonic.cv.find((candidate) => candidate.bucketSize === isotonic.bucketSize)
+    : null;
+  const plattCv = rows.length >= ADAPTIVE_MIN_ROWS ? _plattTemporalMetrics(rows, opts) : null;
+  const isotonicBrier = chosenIsoCv?.brier ?? null;
+  const plattWins = Number.isFinite(plattCv?.brier)
+    && (!Number.isFinite(isotonicBrier) || plattCv.brier < isotonicBrier - ADAPTIVE_BRIER_EPS);
+  const selected = plattWins
+    ? fitPlattFromBacktest(backtestLog, { ...opts, lookbackDays })
+    : isotonic;
+  return {
+    ...selected,
+    method: plattWins ? 'platt' : 'isotonic',
+    evaluation: 'expanding-window',
+    validationBrier: plattWins ? plattCv.brier : isotonicBrier,
+    validationLogLoss: plattWins ? plattCv.logLoss : null,
+    validationN: plattWins ? plattCv.holdoutN : (chosenIsoCv?.holdoutN ?? 0),
+    candidates: {
+      isotonic: { brier: isotonicBrier, bucketSize: isotonic.bucketSize },
+      platt: plattCv,
+    },
+    cv: isotonic.cv,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -432,21 +603,6 @@ function _linearFallback(score) {
 }
 
 /**
- * Return the ISO date string for `daysAgo` days before today (Chicago time).
- * @param {number} daysAgo
- * @returns {string} 'YYYY-MM-DD'
- */
-function _dateMinus(daysAgo) {
-  const fmt = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/Chicago',
-    year: 'numeric', month: '2-digit', day: '2-digit',
-  });
-  const d = new Date();
-  d.setDate(d.getDate() - daysAgo);
-  return fmt.format(d);
-}
-
-/**
  * Build the fallback result shape using DEFAULT_LOOKUP_TABLE.
  * @returns {{ table: Array, totalN: number, fittedAt: string }}
  */
@@ -454,6 +610,8 @@ function _fallbackResult() {
   return {
     table:    DEFAULT_LOOKUP_TABLE,
     totalN:   0,
+    priorMean: LEAGUE_PRIOR,
+    priorStrength: 0,
     fittedAt: new Date().toISOString(),
   };
 }

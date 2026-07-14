@@ -5,8 +5,8 @@
  *   - Discrimination: AUC + top-decile lift (how well the ranking separates
  *     HR from no-HR). This is THE model-quality number; it can only improve by
  *     changing the score, not the calibration.
- *   - Calibration: Brier + log-loss vs the base-rate baseline, and a 5-fold CV
- *     comparison of calibration methods (deployed isotonic vs logistic/Platt)
+ *   - Calibration: Brier + log-loss vs the base-rate baseline, and temporal CV
+ *     comparison of calibration methods (isotonic vs logistic/Platt)
  *     so we can graduate whichever generalizes best.
  *   - Reliability by score decile.
  *
@@ -15,7 +15,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { fitIsotonicFromBacktest, lookupProb } from '../.build/model.mjs'
+import { fitIsotonicAdaptive, lookupProb } from '../../src/sports/mlb/logic/isotonicCalibration.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const LOG = path.resolve(__dirname, '..', '..', 'dist', 'backtest-log.json')
@@ -25,7 +25,7 @@ const records = log.records || {}
 const rows = []
 for (const date of Object.keys(records)) {
   for (const r of records[date]) {
-    if (Number.isFinite(r.score) && (r.homered === true || r.homered === false)) {
+    if (r.actuallyPlayed !== false && Number.isFinite(r.score) && (r.homered === true || r.homered === false)) {
       rows.push({ date, score: r.score, y: r.homered ? 1 : 0, sim: r.simHRProb ?? null, feat: r.feat ?? null })
     }
   }
@@ -54,24 +54,37 @@ function auc(rs, sf) {
   return (rankSum - (pos.length * (pos.length + 1)) / 2) / (pos.length * neg.length)
 }
 
-// Deterministic k-fold by hashing the row index (stable, no RNG).
-function kfold(rs, k = 5) {
-  const folds = Array.from({ length: k }, () => [])
-  rs.forEach((r, i) => folds[i % k].push(r))
+// Expanding-window folds: every validation date is later than its training set.
+function temporalFolds(rs, foldCount = 5) {
+  const dates = [...new Set(rs.map((row) => row.date))].sort()
+  const firstTest = Math.max(2, Math.floor(dates.length / 2))
+  const testDates = dates.slice(firstTest)
+  const blockSize = Math.max(1, Math.ceil(testDates.length / foldCount))
+  const folds = []
+  for (let start = 0; start < testDates.length; start += blockSize) {
+    const block = new Set(testDates.slice(start, start + blockSize))
+    const firstBlockDate = testDates[start]
+    const train = rs.filter((row) => row.date < firstBlockDate)
+    const test = rs.filter((row) => block.has(row.date))
+    if (train.length && test.length) folds.push({ train, test })
+  }
   return folds
 }
 
 // --- Calibration methods (fit on train → predict prob) ---
 function isotonicCal(train) {
-  const sub = { records: { d: train.map((r) => ({ score: r.score, homered: !!r.y })) } }
-  const { table } = fitIsotonicFromBacktest(sub, { lookbackDays: 9999, bucketSize: 10 })
+  const records = {}
+  for (const row of train) (records[row.date] ||= []).push({ score: row.score, homered: !!row.y })
+  const sub = { dates: Object.keys(records).sort(), records }
+  const { table } = fitIsotonicAdaptive(sub, { lookbackDays: 9999 })
   return (r) => lookupProb(r.score, table, (s) => Math.max(0.005, Math.min(0.3, 0.025 + s * 0.0015)))
 }
 function logisticCal(train) {
   // Standardize score, fit sigmoid(a + b*z) by gradient descent.
   const mean = train.reduce((s, r) => s + r.score, 0) / train.length
   const sd = Math.sqrt(train.reduce((s, r) => s + (r.score - mean) ** 2, 0) / train.length) || 1
-  let a = Math.log(base / (1 - base)), b = 0
+  const trainBase = train.reduce((sum, row) => sum + row.y, 0) / train.length
+  let a = Math.log(trainBase / (1 - trainBase)), b = 0
   const lr = 0.1
   for (let it = 0; it < 4000; it++) {
     let ga = 0, gb = 0
@@ -87,17 +100,16 @@ function logisticCal(train) {
   return (r) => 1 / (1 + Math.exp(-(a + b * ((r.score - mean) / sd))))
 }
 
-function cv(method, k = 5) {
-  const folds = kfold(rows, k)
-  let bSum = 0, llSum = 0
-  for (let f = 0; f < k; f++) {
-    const test = folds[f]
-    const train = folds.filter((_, i) => i !== f).flat()
+function cv(method) {
+  const folds = temporalFolds(rows)
+  let bSum = 0, llSum = 0, n = 0
+  for (const { train, test } of folds) {
     const pf = method(train)
-    bSum += brier(test, pf)
-    llSum += logloss(test, pf)
+    bSum += brier(test, pf) * test.length
+    llSum += logloss(test, pf) * test.length
+    n += test.length
   }
-  return { brier: bSum / k, logloss: llSum / k }
+  return { brier: bSum / n, logloss: llSum / n, n, folds: folds.length }
 }
 
 // --- Report ---
@@ -114,15 +126,15 @@ console.log(`  Top-decile HR rate:          ${(topRate * 100).toFixed(1)}%  (lif
 const top5 = sorted.slice(0, Math.round(N * 0.05))
 console.log(`  Top-5% HR rate:              ${((top5.reduce((s, r) => s + r.y, 0) / top5.length) * 100).toFixed(1)}%`)
 
-console.log('\nCALIBRATION (5-fold CV — lower is better):')
+console.log('\nCALIBRATION (expanding-window validation — lower is better):')
 const baseB = brier(rows, () => base), baseLL = logloss(rows, () => base)
 console.log(`  Baseline (base rate):        Brier ${baseB.toFixed(4)}  LogLoss ${baseLL.toFixed(4)}`)
 const iso = cv(isotonicCal)
-console.log(`  Isotonic (deployed):         Brier ${iso.brier.toFixed(4)}  LogLoss ${iso.logloss.toFixed(4)}`)
+console.log(`  Isotonic candidate:          Brier ${iso.brier.toFixed(4)}  LogLoss ${iso.logloss.toFixed(4)}  n=${iso.n}`)
 const lr = cv(logisticCal)
-console.log(`  Logistic / Platt:            Brier ${lr.brier.toFixed(4)}  LogLoss ${lr.logloss.toFixed(4)}`)
-const better = lr.logloss < iso.logloss ? 'LOGISTIC' : 'ISOTONIC'
-console.log(`  → better generalizer: ${better} (by CV log-loss)\n`)
+console.log(`  Logistic / Platt:            Brier ${lr.brier.toFixed(4)}  LogLoss ${lr.logloss.toFixed(4)}  n=${lr.n}`)
+const better = lr.brier < iso.brier - 0.0003 ? 'PLATT' : 'ISOTONIC'
+console.log(`  → deployed selector: ${better} (0.0003 Brier promotion margin)\n`)
 
 console.log('RELIABILITY by score decile (predicted band → observed):')
 const byScore = rows.slice().sort((a, b) => a.score - b.score)

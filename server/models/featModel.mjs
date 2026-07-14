@@ -6,8 +6,8 @@
  * score — it's essentially a re-calibration of it. This model instead fits an
  * L2-regularized logistic regression directly on the FEATURE vector that
  * reconcile.mjs logs (`feat`), which empirically separates HR/no-HR better
- * (5-fold CV AUC ~0.77 vs the rule score's ~0.73 on the first ~430 reconciled
- * rows with features).
+ * (temporal holdout AUC ~0.77 vs the rule score's ~0.65 on the current
+ * reconciled feature history).
  *
  * Train/inference feature parity is guaranteed because both sides use the SAME
  * extractor: training reads `record.feat`, inference calls
@@ -27,9 +27,9 @@ export const FEAT_KEYS = [
   'phr9', 'pera', 'pk9', 'vdel', 'csw', 'park', 'vig', 'ord', 'hot', 'due',
   // Ceiling/form raw ingredients — ADDED 2026-07-10. 100% null until slates
   // accrue, so they're constant-0 columns → L2 drives their weight to 0 →
-  // predictions are BYTE-IDENTICAL today. As data lands, each retrain (5-fold
-  // CV-AUC gated, L2-reg, blend sized by the measured AUC edge) learns their
-  // weight ONLY to the extent they lift cross-validated AUC — auto-earning,
+  // predictions are BYTE-IDENTICAL today. As data lands, each retrain
+  // (temporal-AUC gated, L2-reg, blend sized by the measured AUC edge) learns
+  // their weight only when it lifts future-date AUC — auto-earning,
   // self-limiting, no hand-tuned multiplier. Raw ingredients, not the ceil/form
   // composites, so the model learns the weighting itself (no double-count).
   'ss', 'evhi', 'rev',
@@ -79,62 +79,128 @@ function fitLogistic(rowsX, y, base) {
   return { intercept: b, weights: w }
 }
 
+// Shared train/evaluation helpers.
+function standardizationFor(samples) {
+  const mean = {}
+  const sd = {}
+  for (const key of FEAT_KEYS) {
+    const values = samples.map((sample) => sample.feat[key]).filter(Number.isFinite)
+    const avg = values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0
+    const spread = values.length
+      ? Math.sqrt(values.reduce((sum, value) => sum + (value - avg) ** 2, 0) / values.length)
+      : 1
+    mean[key] = avg
+    sd[key] = spread || 1
+  }
+  return { mean, sd }
+}
+
+function standardize(feat, mean, sd) {
+  return FEAT_KEYS.map((key) => {
+    const value = Number.isFinite(feat[key]) ? feat[key] : mean[key]
+    return (value - mean[key]) / sd[key]
+  })
+}
+
+function predictLogistic(row, model) {
+  let z = model.intercept
+  for (let i = 0; i < row.length; i++) z += model.weights[i] * row[i]
+  return sigmoid(z)
+}
+
 /**
- * Fit the feature model from the backtest log. Returns a handle with the fitted
- * params + the measured CV-AUC edge over the rule score (so the caller can size
- * the blend weight), or { ready:false } when there isn't enough feature data.
+ * Fit the feature model and evaluate it on the newest dates only. Training
+ * rows, standardization statistics, and the base-rate intercept all come from
+ * older dates, preventing future information from leaking into the promotion
+ * gate. The final inference model is then refit on the full resolved window.
  */
-export function trainFeatModel(backtestLog, { minN = MIN_N } = {}) {
-  const recs = backtestLog?.records || {}
+export function trainFeatModel(backtestLog, {
+  minN = MIN_N,
+  holdoutDays = 5,
+  minHoldoutN = 50,
+} = {}) {
+  const records = backtestLog?.records || {}
+  const dates = Object.keys(records).sort()
   const samples = []
-  for (const date of Object.keys(recs)) {
-    for (const r of recs[date]) {
-      if (r?.feat && (r.homered === true || r.homered === false) && Number.isFinite(r.score)) {
-        samples.push({ feat: r.feat, y: r.homered ? 1 : 0, score: r.score })
+  for (const date of dates) {
+    for (const row of records[date] || []) {
+      if (
+        row?.actuallyPlayed !== false
+        && row?.feat
+        && (row.homered === true || row.homered === false)
+        && Number.isFinite(row.score)
+      ) {
+        samples.push({ date, feat: row.feat, y: row.homered ? 1 : 0, score: row.score })
       }
     }
   }
+
   const n = samples.length
-  if (n < minN) return { ready: false, n }
+  if (n < minN) return { ready: false, n, reason: 'sample-too-small' }
 
-  const base = samples.reduce((s, r) => s + r.y, 0) / n
-  // Standardization stats (finite values only).
-  const mean = {}
-  const sd = {}
-  for (const k of FEAT_KEYS) {
-    const v = samples.map((r) => r.feat[k]).filter((x) => Number.isFinite(x))
-    const m = v.length ? v.reduce((a, b) => a + b, 0) / v.length : 0
-    const s = v.length ? Math.sqrt(v.reduce((a, b) => a + (b - m) ** 2, 0) / v.length) : 1
-    mean[k] = m
-    sd[k] = s || 1
-  }
-  const std = (feat) => FEAT_KEYS.map((k) => ((Number.isFinite(feat[k]) ? feat[k] : mean[k]) - mean[k]) / sd[k])
-  const X = samples.map((r) => std(r.feat))
-  const y = samples.map((r) => r.y)
-
-  // 5-fold CV → OOS predictions for an honest AUC estimate.
-  const folds = Array.from({ length: 5 }, () => [])
-  samples.forEach((_, i) => folds[i % 5].push(i))
-  const oos = new Array(n).fill(0)
-  for (let f = 0; f < 5; f++) {
-    const test = folds[f]
-    const train = folds.filter((_, i) => i !== f).flat()
-    const m = fitLogistic(train.map((i) => X[i]), train.map((i) => y[i]), base)
-    for (const i of test) {
-      let z = m.intercept
-      for (let j = 0; j < X[i].length; j++) z += m.weights[j] * X[i][j]
-      oos[i] = sigmoid(z)
+  const populatedDates = [...new Set(samples.map((sample) => sample.date))]
+  if (populatedDates.length < 2) return { ready: false, n, reason: 'need-multiple-dates' }
+  const testDayCount = Math.min(
+    holdoutDays,
+    Math.max(1, Math.ceil(populatedDates.length * 0.20)),
+  )
+  const holdoutDates = populatedDates.slice(-testDayCount)
+  const holdoutSet = new Set(holdoutDates)
+  const trainSamples = samples.filter((sample) => !holdoutSet.has(sample.date))
+  const testSamples = samples.filter((sample) => holdoutSet.has(sample.date))
+  const requiredTrainN = Math.min(minN, Math.floor(n * 0.60))
+  if (trainSamples.length < requiredTrainN || testSamples.length < minHoldoutN) {
+    return {
+      ready: false,
+      n,
+      trainN: trainSamples.length,
+      holdoutN: testSamples.length,
+      holdoutDates,
+      reason: 'temporal-split-too-small',
     }
   }
-  const cvAuc = aucOf(oos, y)
-  const ruleAuc = aucOf(samples.map((r) => r.score), y)
 
-  // Final model on all rows.
-  const final = fitLogistic(X, y, base)
-  return { ready: true, n, mean, sd, weights: final.weights, intercept: final.intercept, cvAuc, ruleAuc }
+  const trainStats = standardizationFor(trainSamples)
+  const trainX = trainSamples.map((sample) => standardize(sample.feat, trainStats.mean, trainStats.sd))
+  const trainY = trainSamples.map((sample) => sample.y)
+  const trainBase = trainY.reduce((sum, value) => sum + value, 0) / trainY.length
+  const evaluationModel = fitLogistic(trainX, trainY, trainBase)
+  const testX = testSamples.map((sample) => standardize(sample.feat, trainStats.mean, trainStats.sd))
+  const testY = testSamples.map((sample) => sample.y)
+  const holdoutPredictions = testX.map((row) => predictLogistic(row, evaluationModel))
+  const cvAuc = aucOf(holdoutPredictions, testY)
+  const ruleAuc = aucOf(testSamples.map((sample) => sample.score), testY)
+  let cvBrier = 0
+  let cvLogLoss = 0
+  for (let i = 0; i < testY.length; i++) {
+    const probability = Math.max(1e-9, Math.min(1 - 1e-9, holdoutPredictions[i]))
+    cvBrier += (probability - testY[i]) ** 2
+    cvLogLoss += -(testY[i] * Math.log(probability) + (1 - testY[i]) * Math.log(1 - probability))
+  }
+
+  const finalStats = standardizationFor(samples)
+  const finalX = samples.map((sample) => standardize(sample.feat, finalStats.mean, finalStats.sd))
+  const finalY = samples.map((sample) => sample.y)
+  const finalBase = finalY.reduce((sum, value) => sum + value, 0) / finalY.length
+  const final = fitLogistic(finalX, finalY, finalBase)
+  return {
+    ready: true,
+    n,
+    mean: finalStats.mean,
+    sd: finalStats.sd,
+    weights: final.weights,
+    intercept: final.intercept,
+    cvAuc,
+    ruleAuc,
+    cvBrier: cvBrier / testY.length,
+    cvLogLoss: cvLogLoss / testY.length,
+    trainN: trainSamples.length,
+    holdoutN: testSamples.length,
+    holdoutDates,
+    evaluation: 'temporal-holdout',
+  }
 }
 
-/** Inference: feature vector → HR probability. */
 export function scoreFeatProb(feat, model) {
   if (!model?.ready || !feat) return null
   let z = model.intercept

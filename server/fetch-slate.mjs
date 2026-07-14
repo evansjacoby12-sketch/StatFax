@@ -226,8 +226,7 @@ const {
   americanToImpliedProb,
   dejuicedImpliedProb,
   blendScoreWithVegas,
-  fitIsotonicFromBacktest,
-  fitIsotonicAdaptive,
+  fitScoreCalibrationAdaptive,
   lookupProb,
   computeMetricsFromBacktest,
   baselineBrierForRate,
@@ -2210,34 +2209,40 @@ async function main() {
   let scoreToProbTable = null;
   let modelMetrics     = null;
   try {
-    // Bucket width is CV-SELECTED each run (fitIsotonicAdaptive) instead of a
-    // hardcoded 15. The old 15 came from an offline CV that ran on a log whose
+    // Calibration method and isotonic bucket width are selected each run with
+    // expanding-window validation. The old fixed 15-bin path came from an
+    // offline interleaved CV that ran on a log whose
     // pre-game scores had drifted (live-decay/Final freeze bug — since fixed),
     // which biased the choice coarse and pinned the top-bucket ceiling low. The
-    // selector starts at 15 and only goes finer when it measurably improves
-    // 5-fold Brier on the now-clean log, lifting the ceiling for the genuinely
-    // hot top band. See server/tools/model-metrics.mjs.
-    scoreToProbTable = fitIsotonicAdaptive(backtestLog, { lookbackDays: 30 });
-    console.log(`[calib] isotonic — totalN:${scoreToProbTable.totalN} buckets:${scoreToProbTable.table?.length} bucketSize:${scoreToProbTable.bucketSize} adaptive:${scoreToProbTable.adaptive === true}` +
+    // selector starts coarse and only goes finer when it measurably improves
+    // expanding-window Brier on the now-clean log, lifting the ceiling for the
+    // genuinely hot top band. See server/tools/model-metrics.mjs.
+    scoreToProbTable = fitScoreCalibrationAdaptive(backtestLog, { lookbackDays: 30 });
+    console.log(`[calib] ${scoreToProbTable.method} — totalN:${scoreToProbTable.totalN} buckets:${scoreToProbTable.table?.length} bucketSize:${scoreToProbTable.bucketSize ?? 'n/a'} adaptive:${scoreToProbTable.adaptive === true}` +
       (Array.isArray(scoreToProbTable.cv) ? ` cv:[${scoreToProbTable.cv.map(c => `${c.bucketSize}:${c.brier.toFixed(4)}`).join(' ')}]` : ''));
   } catch (e) {
-    console.warn(`[calib] isotonic fit failed: ${e?.message}`);
+    console.warn(`[calib] score calibration fit failed: ${e?.message}`);
   }
   try {
-    // Use the just-fit isotonic table for the metric prob conversion. Falls
+    // Use the selected score-calibration table for the metric prob conversion. Falls
     // back to the rough linear scoreToProb when the table is sparse/missing.
     const probFn = (s) => lookupProb(s, scoreToProbTable?.table, (sc) => Math.max(0.005, Math.min(0.30, sc / 100 * 0.28)));
     modelMetrics = computeMetricsFromBacktest(backtestLog, { lookbackDays: 30, scoreToProbFn: probFn });
     if (modelMetrics) {
       // The Brier/logLoss just computed are IN-SAMPLE — scored on the very rows
-      // the isotonic table was fit on, so they read optimistically. Attach the
-      // honest out-of-sample 5-fold CV Brier (at the chosen bucket) so skill is
+      // the calibration table was fit on, so they read optimistically. Attach the
+      // honest out-of-sample expanding-window Brier (at the chosen bucket) so skill is
       // judged week-over-week on an OOS number, not the flattering in-sample one.
       const chosenCv = Array.isArray(scoreToProbTable?.cv)
         ? scoreToProbTable.cv.find(c => c.bucketSize === scoreToProbTable.bucketSize)
         : null;
       modelMetrics.inSample = true;
-      modelMetrics.cvBrier  = Number.isFinite(chosenCv?.brier) ? +chosenCv.brier.toFixed(4) : null;
+      const validationBrier = Number.isFinite(scoreToProbTable?.validationBrier)
+        ? scoreToProbTable.validationBrier
+        : chosenCv?.brier;
+      modelMetrics.cvBrier = Number.isFinite(validationBrier) ? +validationBrier.toFixed(4) : null;
+      modelMetrics.calibrationMethod = scoreToProbTable?.method || 'isotonic';
+      modelMetrics.validationN = scoreToProbTable?.validationN || chosenCv?.holdoutN || 0;
       // Empirical base HR rate over the reconciled window (played records only).
       // The logged set is the displayed top-N batters, whose base rate (~12%) is
       // far above the league per-PA rate, so the old hardcoded 0.035 made the
@@ -2292,8 +2297,12 @@ async function main() {
       const trainDates = sortedDates.slice(0, sortedDates.length - testDates.length);
       if (trainDates.length >= MIN_TRAIN_DAYS) {
         const holdoutModel = trainEnsembleWeights({ dates: trainDates, records: backtestLog.records }, { lookbackDays: trainDates.length });
+        const holdoutCalibration = fitScoreCalibrationAdaptive(
+          { dates: trainDates, records: backtestLog.records },
+          { lookbackDays: trainDates.length },
+        );
         const sig = (z) => (z >= 0 ? 1 / (1 + Math.exp(-z)) : Math.exp(z) / (1 + Math.exp(z)));
-        const ruleProbOf = (s) => lookupProb(s, scoreToProbTable?.table, (sc) => Math.max(0.005, Math.min(0.30, sc / 100 * 0.28)));
+        const ruleProbOf = (s) => lookupProb(s, holdoutCalibration?.table, (sc) => Math.max(0.005, Math.min(0.30, sc / 100 * 0.28)));
         let ruleBrierSum = 0, mlBrierSum = 0, n = 0;
         for (const d of testDates) {
           for (const rec of (backtestLog.records[d] || [])) {
@@ -2357,8 +2366,12 @@ async function main() {
     enabled: featRankWeight > 0,
     weight: +featRankWeight.toFixed(3),
     n: featModel.n || 0,
+    trainN: featModel.trainN || 0,
+    holdoutN: featModel.holdoutN || 0,
+    evaluation: featModel.evaluation || null,
     cvAuc: Number.isFinite(featModel.cvAuc) ? +featModel.cvAuc.toFixed(4) : null,
     ruleAuc: Number.isFinite(featModel.ruleAuc) ? +featModel.ruleAuc.toFixed(4) : null,
+    cvBrier: Number.isFinite(featModel.cvBrier) ? +featModel.cvBrier.toFixed(4) : null,
   };
 
   // 1) Schedule

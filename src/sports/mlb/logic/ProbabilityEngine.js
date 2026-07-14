@@ -2271,6 +2271,8 @@ export {
 export {
   fitIsotonicFromBacktest,
   fitIsotonicAdaptive,
+  fitPlattFromBacktest,
+  fitScoreCalibrationAdaptive,
   lookupProb,
   serializeTable as serializeIsotonicTable,
   deserializeTable as deserializeIsotonicTable,

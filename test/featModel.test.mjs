@@ -39,16 +39,33 @@ test('trainFeatModel: not ready below the minimum sample', () => {
 
 test('trainFeatModel: trains + ranks better than noise on a separable synthetic set', () => {
   // Build 400 rows where HR correlates with feature "bs"; model should learn it.
-  const records = { d: [] }
+  const records = Object.fromEntries(
+    Array.from({ length: 10 }, (_, day) => [`2026-06-${String(day + 1).padStart(2, '0')}`, []]),
+  )
+  const dates = Object.keys(records)
   for (let i = 0; i < 400; i++) {
     const high = i % 2 === 0
     const feat = Object.fromEntries(FEAT_KEYS.map((k) => [k, 0]))
     feat.bs = high ? 80 : 20
-    records.d.push({ feat, homered: high ? i % 3 === 0 : i % 9 === 0, score: feat.bs })
+    records[dates[Math.floor(i / 40)]].push({
+      feat,
+      homered: high ? i % 3 === 0 : i % 9 === 0,
+      score: feat.bs,
+    })
   }
+  records[dates[0]].push({
+    feat: Object.fromEntries(FEAT_KEYS.map((key) => [key, 999])),
+    homered: false,
+    score: 100,
+    actuallyPlayed: false,
+  })
   const m = trainFeatModel({ records })
   assert.equal(m.ready, true)
   assert.equal(m.n, 400)
+  assert.equal(m.evaluation, 'temporal-holdout')
+  assert.deepEqual(m.holdoutDates, dates.slice(-2))
+  assert.equal(m.trainN, 320)
+  assert.equal(m.holdoutN, 80)
   assert.ok(Number.isFinite(m.cvAuc) && m.cvAuc > 0.5, `learned signal (cvAuc ${m.cvAuc})`)
   const pHigh = scoreFeatProb({ ...Object.fromEntries(FEAT_KEYS.map((k) => [k, 0])), bs: 80 }, m)
   const pLow = scoreFeatProb({ ...Object.fromEntries(FEAT_KEYS.map((k) => [k, 0])), bs: 20 }, m)
