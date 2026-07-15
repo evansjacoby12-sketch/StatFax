@@ -1,4 +1,8 @@
 import { LIST_BUILDER_PRESETS } from '../../ui/src/lib/list-builder-presets.js'
+import {
+  evaluateListBuilderHistoryRecord,
+  mergeListBuilderHistory,
+} from '../../ui/src/lib/list-builder-history.js'
 
 export const LIST_BUILDER_EVIDENCE_VERSION = 1
 export const LIST_BUILDER_EVIDENCE_WINDOWS = Object.freeze([
@@ -7,106 +11,12 @@ export const LIST_BUILDER_EVIDENCE_WINDOWS = Object.freeze([
   Object.freeze({ id: 'season', label: 'Season', days: null }),
 ])
 
-const NUMERIC_GATES = Object.freeze({
-  minOppHr9: ['phr9', 'min'],
-  minPitchMix: ['pm', 'min'],
-  minParkFactor: ['park', 'min'],
-  minRecentPitcherHr9: ['prhr9', 'min'],
-  maxPitcherK9: ['pk9', 'max'],
-  minContactCollision: ['mcf', 'min'],
-  maxBattingOrder: ['ord', 'max'],
-  minISO: ['iso', 'min'],
-  minExitVelo: ['ev', 'min'],
-  minBarrel: ['brl', 'min'],
-  minHardHit: ['hh', 'min'],
-  minBlast: ['blast', 'min'],
-  minLaunchAngle: ['la', 'min'],
-  maxLaunchAngle: ['la', 'max'],
-  minPullPct: ['pull', 'min'],
-  minScore: ['$score', 'min'],
-  minHeat: ['heat', 'min'],
-  minHrProb: ['$simHrPct', 'min'],
-  minRecBarrel: ['rbrl', 'min'],
-  minHrDue: ['setup', 'min'],
-  minPositives: ['pos', 'min'],
-  maxNegatives: ['neg', 'max'],
-})
-
 const round = (value, digits = 6) => Number.isFinite(value) ? Number(value.toFixed(digits)) : null
 const isDate = (value) => /^\d{4}-\d{2}-\d{2}$/.test(String(value || ''))
 const dateMs = (value) => Date.parse(`${value}T12:00:00Z`)
 const dateMinus = (value, days) => new Date(dateMs(value) - days * 86400000).toISOString().slice(0, 10)
 
-function feature(record, key) {
-  if (key === '$score') return Number.isFinite(record?.score) ? record.score : null
-  if (key === '$simHrPct') return Number.isFinite(record?.simHRProb) ? record.simHRProb * 100 : null
-  const value = record?.feat?.[key]
-  return Number.isFinite(value) ? value : null
-}
-
-function signalValue(record, key) {
-  if (key === 'hot') return Number.isFinite(record?.feat?.hot) ? record.feat.hot === 1 : null
-  if (key === 'barrelKing') return Array.isArray(record?.badges) ? record.badges.includes('barrelKing') : null
-  return null
-}
-
-function stateValue(record, key) {
-  if (key === 'pregameOnly') return true // Every log row is a frozen pregame prediction.
-  if (key === 'confirmedOnly') return typeof record?.lineupConfirmed === 'boolean' ? record.lineupConfirmed : null
-  if (key === 'trustedOnly') return typeof record?.dataTrusted === 'boolean' ? record.dataTrusted : null
-  return null
-}
-
-function evaluateRecord(record, criteria = {}) {
-  const missing = []
-  let matches = true
-
-  for (const [key, [featureKey, mode]] of Object.entries(NUMERIC_GATES)) {
-    if (!Number.isFinite(Number(criteria[key])) || criteria[key] === '') continue
-    const value = feature(record, featureKey)
-    if (!Number.isFinite(value)) {
-      missing.push(key)
-      continue
-    }
-    const threshold = Number(criteria[key])
-    if (mode === 'max' ? value > threshold : value < threshold) matches = false
-  }
-
-  for (const key of ['pregameOnly', 'confirmedOnly', 'trustedOnly']) {
-    if (criteria[key] !== true) continue
-    const value = stateValue(record, key)
-    if (value == null) missing.push(key)
-    else if (!value) matches = false
-  }
-
-  const signals = Array.isArray(criteria.signals) ? criteria.signals : []
-  if (signals.length) {
-    const values = signals.map((key) => ({ key, value: signalValue(record, key) }))
-    for (const item of values) if (item.value == null) missing.push(`signal:${item.key}`)
-    if (!values.some((item) => item.value == null)) {
-      const signalsMatch = criteria.signalMode === 'any'
-        ? values.some((item) => item.value)
-        : values.every((item) => item.value)
-      if (!signalsMatch) matches = false
-    }
-  }
-
-  return { evaluable: missing.length === 0, matches: missing.length === 0 && matches, missing }
-}
-
-export function mergeListBuilderHistory(backtestLog = {}) {
-  const records = {}
-  const archive = backtestLog?.modelHistory
-  for (const date of [...(archive?.dates || []), ...Object.keys(archive?.records || {})]) {
-    if (isDate(date) && Array.isArray(archive?.records?.[date])) records[date] = archive.records[date]
-  }
-  // Operational rows are richer (lineup/data-health fields) and must win for
-  // overlapping dates. The archive remains the long-horizon fallback.
-  for (const date of [...(backtestLog?.dates || []), ...Object.keys(backtestLog?.records || {})]) {
-    if (isDate(date) && Array.isArray(backtestLog?.records?.[date])) records[date] = backtestLog.records[date]
-  }
-  return { dates: Object.keys(records).sort(), records }
-}
+export { mergeListBuilderHistory }
 
 export function wilsonInterval(hits, sample, z = 1.96) {
   if (!Number.isInteger(hits) || !Number.isInteger(sample) || sample <= 0 || hits < 0 || hits > sample) return null
@@ -129,7 +39,7 @@ function scoreRows(rows, criteria) {
   let hits = 0
   const missingByGate = {}
   for (const { record } of rows) {
-    const evaluation = evaluateRecord(record, criteria)
+    const evaluation = evaluateListBuilderHistoryRecord(record, criteria)
     if (!evaluation.evaluable) {
       for (const key of evaluation.missing) missingByGate[key] = (missingByGate[key] || 0) + 1
       continue

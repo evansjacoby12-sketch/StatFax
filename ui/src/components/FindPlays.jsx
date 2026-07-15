@@ -11,7 +11,7 @@ const TABS = [
 ]
 
 export default function FindPlays({
-  initialTab = 'weather', onClose, batters, selectedId, onSelect, onOpenPitcher,
+  initialTab = 'weather', onClose, batters, slateDate, selectedId, onSelect, onOpenPitcher,
   watchlist, slip, onToggleWatch, onToggleSlip,
 }) {
   const [tab, setTab] = useState(initialTab)
@@ -35,6 +35,7 @@ export default function FindPlays({
       {tab === 'list-builder' && (
         <ListBuilderView
           batters={batters}
+          slateDate={slateDate}
           onSelect={onSelect}
           watchlist={watchlist}
           slip={slip}

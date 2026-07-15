@@ -4,6 +4,7 @@ import { GradeChip } from './atoms.jsx'
 import { toast } from './Toast.jsx'
 import { pct, num } from '../lib/format.js'
 import * as store from '../lib/storage.js'
+import { loadBacktestLog } from '../lib/backtestLog.js'
 import { translateListBuilderQuery } from '../lib/list-builder-ai.js'
 import {
   LIST_BUILDER_EVIDENCE_WINDOW_OPTIONS,
@@ -24,6 +25,12 @@ import {
   relaxListBuilderGate,
   sanitizeListBuilderCriteria,
 } from '../lib/list-builder.js'
+import {
+  buildListBuilderRecipeTracking,
+  captureListBuilderRecipePicks,
+  normalizeListBuilderTrackingLedger,
+  settleListBuilderRecipePicks,
+} from '../lib/list-builder-tracking.js'
 
 const FIELD_GROUPS = Object.freeze([
   {
@@ -104,7 +111,20 @@ function savedRecipesFromStorage() {
   return saved
     .filter((recipe) => recipe && typeof recipe.name === 'string' && recipe.criteria)
     .slice(0, 20)
-    .map((recipe) => ({ ...recipe, criteria: sanitizeListBuilderCriteria(recipe.criteria) }))
+    .map((recipe) => ({
+      ...recipe,
+      criteria: sanitizeListBuilderCriteria(recipe.criteria),
+      version: Math.max(1, Math.floor(Number(recipe.version) || 1)),
+      createdAt: Number.isFinite(Date.parse(recipe.createdAt)) ? recipe.createdAt : recipe.updatedAt,
+    }))
+}
+
+function trackingLedgerFromStorage() {
+  return normalizeListBuilderTrackingLedger(store.load('listBuilderTrackingLedger', {}))
+}
+
+function sameTrackingLedger(left, right) {
+  return JSON.stringify(left) === JSON.stringify(right)
 }
 
 function lineupLabel(batter) {
@@ -121,6 +141,103 @@ function formatEvidenceRange(startDate, endDate) {
   }).format(new Date(`${value}T12:00:00Z`))
   const sameYear = startDate.slice(0, 4) === endDate.slice(0, 4)
   return `${format(startDate)}–${format(endDate, !sameYear)}`
+}
+
+function formatTrackingDate(value, includeYear = false) {
+  if (!validTrackingDate(value)) return 'Waiting for settled games'
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short', day: 'numeric', ...(includeYear ? { year: 'numeric' } : {}), timeZone: 'UTC',
+  }).format(new Date(`${value}T12:00:00Z`))
+}
+
+function validTrackingDate(value) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(String(value || ''))
+}
+
+function trackingPercent(value, digits = 1) {
+  return Number.isFinite(value) ? `${value.toFixed(digits)}%` : '—'
+}
+
+function trackerStatus(tracking) {
+  if (!tracking) return { key: 'loading', label: 'Loading history' }
+  if (tracking.forward.total > 0) return { key: 'tracking', label: 'Tracking' }
+  if (tracking.historical.status === 'tracked') return { key: 'ready', label: 'Replay ready' }
+  if (tracking.historical.status === 'limited-coverage') return { key: 'limited', label: 'Limited history' }
+  return { key: 'collecting', label: 'Collecting' }
+}
+
+function RecipeTrackerCard({ recipe, tracking, onLoad, onDelete }) {
+  const status = trackerStatus(tracking)
+  const historical = tracking?.historical
+  const forward = tracking?.forward
+  const calibration = forward?.calibration?.sample ? forward.calibration : historical?.calibration
+  const overlap = forward?.overlap?.shared ? forward.overlap : historical?.overlap
+  const cold = forward?.sample ? forward.coldStreak : historical?.coldStreak
+  const coldSource = forward?.sample ? 'forward' : 'replay'
+
+  return (
+    <article className="lbv-tracker-card">
+      <div className="lbv-tracker-head">
+        <div className="lbv-tracker-identity">
+          <span className={`lbv-tracker-status ${status.key}`}>{status.label}</span>
+          <div>
+            <strong>{recipe.name}</strong>
+            <small>v{recipe.version} · {activeListBuilderCriteria(recipe.criteria).length} gates</small>
+          </div>
+        </div>
+        <div className="lbv-tracker-actions">
+          <button type="button" onClick={() => onLoad(recipe)}><Icon name="Filter" size={12} /> Load</button>
+          <button type="button" className="danger" onClick={() => onDelete(recipe)} aria-label={`Delete ${recipe.name}`} title={`Delete ${recipe.name}`}><Icon name="Trash2" size={13} /></button>
+        </div>
+      </div>
+
+      <div className="lbv-tracker-metrics" aria-label={`${recipe.name} tracking summary`}>
+        <span><small>Forward record</small><b className="mono">{forward ? `${forward.hits}/${forward.sample}` : '—'}</b><em>{forward?.pending ? `${forward.pending} pending` : trackingPercent(forward?.hitRate)}</em></span>
+        <span><small>Historical replay</small><b className="mono">{historical ? `${historical.hits}/${historical.sample}` : '—'}</b><em>{trackingPercent(historical?.hitRate)}</em></span>
+        <span><small>Lift vs slate</small><b className="mono">{Number.isFinite(historical?.lift) ? `${historical.lift.toFixed(2)}×` : '—'}</b><em>{historical?.positiveLiftDates ?? 0} positive dates</em></span>
+        <span><small>Calibration</small><b className="mono">{calibration?.sample ? `${trackingPercent(calibration.observedRate)} / ${trackingPercent(calibration.meanProjection)}` : '—'}</b><em>observed / projected</em></span>
+        <span><small>Cold streak</small><b className="mono">{Number.isFinite(cold) ? cold : '—'}</b><em>{coldSource} picks</em></span>
+        <span><small>Top overlap</small><b className="mono">{overlap?.shared ? overlap.shared : 0}</b><em>{overlap?.shared ? `${overlap.recipeName} · ${trackingPercent(overlap.rate, 0)}` : 'No shared picks'}</em></span>
+      </div>
+
+      <details className="lbv-tracker-detail">
+        <summary><span><Icon name="Activity" size={13} /> Tracking detail</span><Icon name="ChevronDown" size={14} /></summary>
+        <div className="lbv-tracker-detail-body">
+          <section>
+            <h4>Forward picks</h4>
+            <p>Frozen at the pregame projection for this criteria version. Updates do not rewrite older versions.</p>
+            <div className="lbv-tracker-picks">
+              {forward?.recentPicks?.length ? forward.recentPicks.map((pick) => (
+                <span key={pick.id}>
+                  <b>{pick.name || `Player ${pick.playerId}`}</b>
+                  <small>{formatTrackingDate(pick.date)} · {Number.isFinite(pick.projection) ? pct(pick.projection, 1) : 'No projection'}</small>
+                  <em className={pick.status}>{pick.status}</em>
+                </span>
+              )) : <span className="empty">No frozen picks yet. The next pregame match will appear here.</span>}
+            </div>
+          </section>
+          <section>
+            <h4>Historical replay</h4>
+            <p>Current gates replayed on frozen rows; missing features and scratches are excluded.</p>
+            <div className="lbv-tracker-days">
+              {historical?.dates?.length ? historical.dates.map((day) => (
+                <span key={day.date}>
+                  <b>{formatTrackingDate(day.date)}</b>
+                  <small>{day.hits}/{day.sample} HR · {trackingPercent(day.hitRate)}</small>
+                  <em className={day.positiveLift ? 'positive' : ''}>{day.positiveLift ? 'Above slate' : 'At/below slate'}</em>
+                </span>
+              )) : <span className="empty">No exact historical rows for the current gates.</span>}
+            </div>
+          </section>
+          <div className="lbv-tracker-truth">
+            <span><Icon name="Gauge" size={13} /><b>Calibration</b> {calibration?.sample ? `${trackingPercent(calibration.observedRate)} observed vs ${trackingPercent(calibration.meanProjection)} projected (${calibration.delta >= 0 ? '+' : ''}${trackingPercent(calibration.delta)}).` : 'Waiting for projected, settled picks.'}</span>
+            <span><Icon name="Share2" size={13} /><b>Overlap</b> {overlap?.shared ? `${overlap.shared} picks shared with ${overlap.recipeName}.` : 'No shared picks with another saved recipe.'}</span>
+            <span><Icon name="DollarSign" size={13} /><b>Profit unavailable</b> A saved recipe has no selected sportsbook, stake, or explicit wager ledger; positive-lift dates are descriptive, not profit.</span>
+          </div>
+        </div>
+      </details>
+    </article>
+  )
 }
 
 function evidenceStatusLabel(evidence) {
@@ -281,7 +398,7 @@ function ResultCard({ item, index, nearMiss = false, onRelax, onSelect, watched,
 }
 
 export default function ListBuilderView({
-  batters = [], onSelect, watchlist = new Set(), slip = new Set(), onToggleWatch, onToggleSlip,
+  batters = [], slateDate = null, onSelect, watchlist = new Set(), slip = new Set(), onToggleWatch, onToggleSlip,
 }) {
   const [form, setForm] = useState(() => createListBuilderCriteria())
   const [activePreset, setActivePreset] = useState(null)
@@ -295,6 +412,9 @@ export default function ListBuilderView({
   const [evidenceWindow, setEvidenceWindow] = useState('d14')
   const [evidenceFeedStatus, setEvidenceFeedStatus] = useState('loading')
   const [resultMode, setResultMode] = useState('exact')
+  const [trackingLedger, setTrackingLedger] = useState(trackingLedgerFromStorage)
+  const [trackingHistory, setTrackingHistory] = useState(null)
+  const [trackingFeedStatus, setTrackingFeedStatus] = useState('loading')
 
   useEffect(() => {
     let active = true
@@ -310,6 +430,42 @@ export default function ListBuilderView({
     return () => { active = false }
   }, [])
 
+  useEffect(() => {
+    let active = true
+    loadBacktestLog()
+      .then((log) => {
+        if (!active) return
+        setTrackingHistory(log)
+        setTrackingFeedStatus('ready')
+      })
+      .catch(() => {
+        if (active) setTrackingFeedStatus('error')
+      })
+    return () => { active = false }
+  }, [])
+
+  useEffect(() => {
+    setTrackingLedger((current) => {
+      const next = captureListBuilderRecipePicks({
+        ledger: current,
+        recipes: savedRecipes,
+        batters,
+        slateDate,
+      })
+      if (sameTrackingLedger(current, next)) return current
+      store.save('listBuilderTrackingLedger', next)
+      return next
+    })
+  }, [batters, savedRecipes, slateDate])
+
+  useEffect(() => {
+    if (!trackingHistory) return
+    const next = settleListBuilderRecipePicks(trackingLedger, trackingHistory)
+    if (sameTrackingLedger(trackingLedger, next)) return
+    store.save('listBuilderTrackingLedger', next)
+    setTrackingLedger(next)
+  }, [trackingHistory, trackingLedger])
+
   const built = useMemo(() => buildListBuilderResults(batters, form), [batters, form])
   const visibleResults = resultMode === 'near' ? built.nearMisses : built.results
   const aiCriteria = useMemo(() => aiProposal ? activeListBuilderCriteria(aiProposal.criteria) : [], [aiProposal])
@@ -317,6 +473,10 @@ export default function ListBuilderView({
   const covered = metricCoverage.length ? Math.min(...metricCoverage.map((item) => item.available)) : batters.length
   const rollingWindow = rollingEvidence?.windows?.[evidenceWindow] || null
   const evidenceContext = rollingWindow || LIST_BUILDER_EVIDENCE
+  const trackingReport = useMemo(() => trackingHistory
+    ? buildListBuilderRecipeTracking({ backtestLog: trackingHistory, recipes: savedRecipes, ledger: trackingLedger })
+    : null, [trackingHistory, savedRecipes, trackingLedger])
+  const trackingByRecipe = useMemo(() => new Map((trackingReport?.recipes || []).map((item) => [item.id, item])), [trackingReport])
   const evidenceFor = (preset) => rollingEvidence
     ? rollingEvidence.recipes?.[preset.id]?.windows?.[evidenceWindow]
     : { ...preset.evidence, fallback: true }
@@ -348,6 +508,12 @@ export default function ListBuilderView({
     store.save('listBuilderRecipes', limited)
   }
 
+  const persistTrackingLedger = (ledger) => {
+    const clean = normalizeListBuilderTrackingLedger(ledger)
+    setTrackingLedger(clean)
+    store.save('listBuilderTrackingLedger', clean)
+  }
+
   const saveRecipe = () => {
     const name = recipeName.trim().slice(0, 40)
     if (!name) {
@@ -355,15 +521,18 @@ export default function ListBuilderView({
       return
     }
     const existing = savedRecipes.find((recipe) => recipe.name.toLowerCase() === name.toLowerCase())
+    const now = new Date().toISOString()
     const recipe = {
       id: existing?.id || `recipe-${Date.now()}`,
       name,
       criteria: sanitizeListBuilderCriteria(form),
-      updatedAt: new Date().toISOString(),
+      version: existing ? Math.max(1, Math.floor(Number(existing.version) || 1)) + 1 : 1,
+      createdAt: existing?.createdAt || now,
+      updatedAt: now,
     }
     persistRecipes([recipe, ...savedRecipes.filter((item) => item.id !== recipe.id)])
     setRecipeName('')
-    toast.success(existing ? 'Recipe updated' : 'Recipe saved')
+    toast.success(existing ? 'Recipe updated · tracking new version' : 'Recipe saved · tracking started')
   }
 
   const restoreRecipe = (recipe) => {
@@ -374,6 +543,10 @@ export default function ListBuilderView({
 
   const deleteRecipe = (recipe) => {
     persistRecipes(savedRecipes.filter((item) => item.id !== recipe.id))
+    persistTrackingLedger({
+      ...trackingLedger,
+      picks: trackingLedger.picks.filter((pick) => pick.recipeId !== recipe.id),
+    })
     toast.info(`Deleted ${recipe.name}`)
   }
 
@@ -546,10 +719,15 @@ export default function ListBuilderView({
           )}
         </div>
 
-        <div className="lbv-saved-card">
+        <div className="lbv-saved-card lbv-tracker-workspace">
           <div className="lbv-workflow-head">
             <span className="lbv-workflow-icon"><Icon name="Bookmark" size={17} /></span>
-            <div><h3>Saved recipes</h3><p>Keep a reusable setup on this device.</p></div>
+            <div><h3>Recipe tracker</h3><p>Save a setup once. Historical replay and frozen forward picks stay separate.</p></div>
+            <span className={`lbv-tracker-feed ${trackingFeedStatus}`}>
+              {trackingFeedStatus === 'ready'
+                ? `Settled through ${formatTrackingDate(trackingReport?.source?.latestSettledDate)}`
+                : trackingFeedStatus === 'error' ? 'History unavailable' : 'Loading history'}
+            </span>
           </div>
           <div className="lbv-save-input">
             <input
@@ -560,21 +738,26 @@ export default function ListBuilderView({
               onChange={(event) => setRecipeName(event.target.value)}
               onKeyDown={(event) => event.key === 'Enter' && saveRecipe()}
             />
-            <button type="button" onClick={saveRecipe}><Icon name="Bookmark" size={14} /> Save current</button>
+            <button type="button" onClick={saveRecipe}><Icon name="Bookmark" size={14} /> Save & track</button>
           </div>
-          <div className="lbv-saved-list">
+          <div className="lbv-tracker-note">
+            <Icon name="Info" size={12} />
+            <span><b>Replay</b> applies today&apos;s gates to frozen history. <b>Forward</b> starts from saved pregame matches for the current version; scratches are excluded.</span>
+          </div>
+          <div className="lbv-saved-list lbv-tracker-list">
             {savedRecipes.length ? savedRecipes.map((recipe) => (
-              <div className="lbv-saved-row" key={recipe.id}>
-                <button type="button" className="lbv-saved-load" onClick={() => restoreRecipe(recipe)}>
-                  <Icon name="Filter" size={12} /><span>{recipe.name}</span>
-                  <small>{activeListBuilderCriteria(recipe.criteria).length} gates</small>
-                </button>
-                <button type="button" className="lbv-saved-delete" onClick={() => deleteRecipe(recipe)} aria-label={`Delete ${recipe.name}`} title={`Delete ${recipe.name}`}>
-                  <Icon name="Trash2" size={13} />
-                </button>
-              </div>
-            )) : <p className="lbv-saved-empty">No saved recipes yet.</p>}
+              <RecipeTrackerCard
+                key={recipe.id}
+                recipe={recipe}
+                tracking={trackingByRecipe.get(recipe.id)}
+                onLoad={restoreRecipe}
+                onDelete={deleteRecipe}
+              />
+            )) : <p className="lbv-saved-empty">No saved recipes yet. Save the current gates to start historical replay and forward tracking.</p>}
           </div>
+          {trackingReport?.source?.droppedForwardPicks > 0 && (
+            <p className="lbv-tracker-cap"><Icon name="Info" size={12} /> Local history reached its device cap; {trackingReport.source.droppedForwardPicks.toLocaleString()} oldest forward picks were removed.</p>
+          )}
         </div>
       </section>
 

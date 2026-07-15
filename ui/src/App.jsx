@@ -925,6 +925,7 @@ export default function App() {
           initialTab={findPlaysTab}
           onClose={() => setFindPlaysTab(null)}
           batters={all}
+          slateDate={data.meta?.date}
           selectedId={selectedId}
           onSelect={(b) => setSelectedId(b.id)}
           onOpenPitcher={openPitcher}
