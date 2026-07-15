@@ -120,27 +120,25 @@ export default function Filters({ value, onChange, gradeCounts, games, badgeCoun
               )}
             </label>
 
-            <div className="grade-pills" role="group" aria-label="Filter by grade">
+            <div className="grade-spectrum-rail" role="group" aria-label="Filter by grade">
+              <span className="grade-spectrum-label" aria-hidden="true">Grades</span>
               {GRADE_ORDER.map((g) => {
                 const on = v.grades.has(g)
                 const c = gradeColor(g)
                 return (
                   <button
                     key={g}
-                    className={`grade-pill ${on ? 'on' : ''}`}
+                    type="button"
+                    className={`grade-segment ${on ? 'on' : ''}`}
                     onClick={() => toggleGrade(g)}
                     aria-pressed={on}
-                    style={{
-                      color: on ? c : 'var(--text-faint)',
-                      borderColor: on ? hexA(c, 0.45) : 'var(--border)',
-                      background: on ? `linear-gradient(135deg, ${hexA(c, 0.12)} 0%, ${hexA(c, 0.04)} 100%)` : 'var(--card)',
-                      boxShadow: on ? `0 0 10px ${hexA(c, 0.1)}` : 'none'
-                    }}
+                    style={{ '--grade-color': c }}
                     title={`${g} — ${gradeCounts[g] || 0} batters`}
                   >
-                    <span className="grade-pill-dot" style={{ background: c, boxShadow: on ? `0 0 8px ${c}` : 'none' }} />
-                    {g}
-                    <span className="grade-pill-n mono">{gradeCounts[g] || 0}</span>
+                    <span className="grade-segment-indicator" aria-hidden="true" />
+                    <Icon className="grade-segment-state" name={on ? 'CircleCheck' : 'Circle'} size={14} aria-hidden="true" />
+                    <span className="grade-segment-name">{g}</span>
+                    <span className="grade-segment-count mono">{gradeCounts[g] || 0}</span>
                   </button>
                 )
               })}

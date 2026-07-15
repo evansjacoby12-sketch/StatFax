@@ -9,6 +9,7 @@ dist/*
 *.out.json
 .env
 .omc/
+.superdesign/tmp/
 
 # Background-agent isolated worktrees (harness state)
 .claude/worktrees/
