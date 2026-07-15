@@ -6,6 +6,11 @@ import { pct, num } from '../lib/format.js'
 import * as store from '../lib/storage.js'
 import { translateListBuilderQuery } from '../lib/list-builder-ai.js'
 import {
+  LIST_BUILDER_EVIDENCE,
+  MORE_LIST_BUILDER_PRESETS,
+  PRIMARY_LIST_BUILDER_PRESETS,
+} from '../lib/list-builder-presets.js'
+import {
   LIST_BUILDER_SIGNALS,
   LIST_BUILDER_SORTS,
   activeListBuilderCriteria,
@@ -13,34 +18,6 @@ import {
   createListBuilderCriteria,
   sanitizeListBuilderCriteria,
 } from '../lib/list-builder.js'
-
-const PRESETS = Object.freeze([
-  {
-    id: 'best', icon: 'Crown', title: 'Best available',
-    description: 'Strong model cases with lineup and data checks.',
-    criteria: { minScore: 70, minHrProb: 12, confirmedOnly: true, trustedOnly: true },
-  },
-  {
-    id: 'power', icon: 'Flame', title: 'Power surge',
-    description: 'Barrels, recent contact and an HR launch window.',
-    criteria: { minBarrel: 12, minRecBarrel: 12, minLaunchAngle: 8, maxLaunchAngle: 32 },
-  },
-  {
-    id: 'matchup', icon: 'Target', title: 'Soft matchup',
-    description: 'HR exposure plus a favorable pitch-mix score.',
-    criteria: { minOppHr9: 1.3, minPitchMix: 6.5 },
-  },
-  {
-    id: 'park', icon: 'Wind', title: 'Park boost',
-    description: 'Hitters in an above-neutral HR environment.',
-    criteria: { minParkFactor: 1.08 },
-  },
-  {
-    id: 'confirmed', icon: 'UserCheck', title: 'Confirmed only',
-    description: 'Actionable lineups with no data-health warning.',
-    criteria: { confirmedOnly: true, trustedOnly: true },
-  },
-])
 
 const FIELD_GROUPS = Object.freeze([
   {
@@ -118,6 +95,31 @@ function lineupLabel(batter) {
   if (batter.lineupConfirmed) return 'Confirmed lineup'
   if (Number.isFinite(batter.battingOrder)) return `Projected · batting ${batter.battingOrder}`
   return 'Lineup unconfirmed'
+}
+
+function PresetCard({ preset, active, compact = false, onApply }) {
+  const { evidence } = preset
+  return (
+    <button
+      type="button"
+      className={`lbv-preset${compact ? ' compact' : ''}${active ? ' active' : ''}`}
+      onClick={() => onApply(preset)}
+      aria-pressed={active}
+    >
+      <span className="lbv-preset-top">
+        <span className="lbv-preset-icon"><Icon name={preset.icon} size={compact ? 15 : 17} /></span>
+        <span className="lbv-preset-lift">{evidence.lift.toFixed(2)}× slate</span>
+      </span>
+      <span className="lbv-preset-copy">
+        <b>{preset.title}</b>
+        <small>{preset.description}</small>
+      </span>
+      <span className="lbv-preset-evidence">
+        <span><b>{evidence.hitRate.toFixed(1)}%</b> HR</span>
+        <span>n={evidence.sample}</span>
+      </span>
+    </button>
+  )
 }
 
 function ResultCard({ item, index, onSelect, watched, inSlip, onToggleWatch, onToggleSlip }) {
@@ -293,19 +295,37 @@ export default function ListBuilderView({
         </div>
       </header>
 
-      <section className="lbv-presets" aria-label="List recipes">
-        {PRESETS.map((preset) => (
-          <button
-            key={preset.id}
-            type="button"
-            className={`lbv-preset${activePreset === preset.id ? ' active' : ''}`}
-            onClick={() => applyPreset(preset)}
-            aria-pressed={activePreset === preset.id}
-          >
-            <span className="lbv-preset-icon"><Icon name={preset.icon} size={17} /></span>
-            <span className="lbv-preset-copy"><b>{preset.title}</b><small>{preset.description}</small></span>
-          </button>
-        ))}
+      <section className="lbv-recipe-section" aria-labelledby="lbv-recipe-title">
+        <div className="lbv-recipe-head">
+          <div>
+            <span className="lbv-eyebrow">Validation snapshot</span>
+            <h3 id="lbv-recipe-title">Evidence-backed recipes</h3>
+            <p>
+              Jul 1–12 · {LIST_BUILDER_EVIDENCE.settledSlates} settled slates · {LIST_BUILDER_EVIDENCE.hitterGames.toLocaleString()} hitter-games
+            </p>
+          </div>
+          <span className="lbv-slate-baseline"><b>{LIST_BUILDER_EVIDENCE.baselineRate.toFixed(1)}%</b> slate HR baseline</span>
+        </div>
+
+        <div className="lbv-presets" aria-label="Primary list recipes">
+          {PRIMARY_LIST_BUILDER_PRESETS.map((preset) => (
+            <PresetCard key={preset.id} preset={preset} active={activePreset === preset.id} onApply={applyPreset} />
+          ))}
+        </div>
+
+        <details className="lbv-more-recipes">
+          <summary>
+            <span><Icon name="ChevronDown" size={14} /> More recipes</span>
+            <small>{MORE_LIST_BUILDER_PRESETS.length} secondary profiles</small>
+          </summary>
+          <div className="lbv-presets lbv-presets-more" aria-label="Secondary list recipes">
+            {MORE_LIST_BUILDER_PRESETS.map((preset) => (
+              <PresetCard key={preset.id} preset={preset} active={activePreset === preset.id} compact onApply={applyPreset} />
+            ))}
+          </div>
+        </details>
+
+        <p className="lbv-evidence-note"><Icon name="Info" size={12} /> Historical hit rates describe this sample; they do not guarantee future results.</p>
       </section>
 
       <section className="lbv-workflows">
