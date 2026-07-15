@@ -63,11 +63,14 @@ test('extractPredictionRecord carries gamePk and logs hot/homeEdge in feat', () 
   const rec = extractPredictionRecord({
     playerId: 1, gamePk: 99, name: 'X', score: 70, preGameScore: 72,
     grade: { label: 'STRONG' }, hot: true, homeEdge: true, due: false,
+    lineupConfirmed: true, dataTrust: { status: 'review' },
   })
   assert.equal(rec.gamePk, 99)
   assert.equal(rec.feat.hot, 1)
   assert.equal(rec.feat.he, 1)
   assert.equal(rec.score, 72, 'logs the frozen preGameScore, not the live score')
+  assert.equal(rec.lineupConfirmed, true)
+  assert.equal(rec.dataTrusted, false, 'mirrors the List Builder clean-data gate')
 })
 
 test('appendToLog keeps 30 operational days and a compact 180-day model archive', () => {
@@ -91,8 +94,8 @@ test('appendToLog keeps 30 operational days and a compact 180-day model archive'
   assert.equal(log.modelHistory.dates.length, 35)
   const archived = log.modelHistory.records['2026-05-01'][0]
   assert.deepEqual(Object.keys(archived).sort(), [
-    'actuallyPlayed', 'badges', 'feat', 'gamePk', 'grade', 'homered',
-    'playerId', 'score', 'simHRProb',
+    'actuallyPlayed', 'badges', 'dataTrusted', 'feat', 'gamePk', 'grade', 'homered',
+    'lineupConfirmed', 'playerId', 'score', 'simHRProb',
   ])
   assert.equal(archived.name, undefined)
   assert.equal(archived.feat.bs, 1)

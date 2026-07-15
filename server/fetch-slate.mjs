@@ -170,6 +170,7 @@ const OUT_PATH  = resolve(__dirname, '../dist/daily.json');
 // The next cron run reads these back as priorCalibration + priorBacktestLog.
 const CALIBRATION_OUT_PATH = resolve(__dirname, '../dist/calibration.json');
 const BACKTEST_OUT_PATH    = resolve(__dirname, '../dist/backtest-log.json');
+const LIST_BUILDER_EVIDENCE_OUT_PATH = resolve(__dirname, '../dist/list-builder-evidence.json');
 // Per-day "pregame freeze": once a batter's game starts we keep serving his
 // pre-first-pitch model/form values. Persisted across cron runs via the same
 // Actions cache mechanism as the backtest log.
@@ -246,6 +247,7 @@ import {
   fetchHomerersForDate,
   fetchPitcherKsForDate,
 } from './reconcile.mjs';
+import { buildListBuilderEvidence, validateListBuilderEvidence } from './lib/listBuilderEvidence.mjs';
 import {
   comboRowFromSnapshot,
   buildComboRecords,
@@ -4579,6 +4581,24 @@ async function main() {
   } else {
     writeFileSync(BACKTEST_OUT_PATH, JSON.stringify(backtestLog));
     console.log(`[calib] wrote calibration.json (${(JSON.stringify(calibration).length / 1024).toFixed(1)} KB) + backtest-log.json (${(JSON.stringify(backtestLog).length / 1024).toFixed(1)} KB)`);
+  }
+
+  // Rebuild the List Builder's descriptive recipe evidence from the exact
+  // backtest state that survived the anti-regression guard. This artifact is
+  // presentation-only: it never feeds scoring, grades, or probabilities.
+  try {
+    const persistedLog = existsSync(BACKTEST_OUT_PATH)
+      ? JSON.parse(readFileSync(BACKTEST_OUT_PATH, 'utf8'))
+      : backtestLog;
+    const evidence = buildListBuilderEvidence({ backtestLog: persistedLog });
+    const validation = validateListBuilderEvidence(evidence);
+    if (!validation.ok) throw new Error(validation.errors.join('; '));
+    writeFileSync(LIST_BUILDER_EVIDENCE_OUT_PATH, JSON.stringify(evidence));
+    console.log(`[list-builder-evidence] wrote ${validation.metrics.recipes} recipe profiles across ${validation.metrics.historyDates} settled date(s)`);
+  } catch (e) {
+    // Keep the slate available if the presentation artifact fails. CI validates
+    // the file separately and will stop publication when it is expected.
+    console.warn(`[list-builder-evidence] build skipped: ${e.message}`);
   }
 
   // Persist the zone cache so the next cron run can warm-start instead

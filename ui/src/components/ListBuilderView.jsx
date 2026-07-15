@@ -1,10 +1,14 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Icon from './Icon.jsx'
 import { GradeChip } from './atoms.jsx'
 import { toast } from './Toast.jsx'
 import { pct, num } from '../lib/format.js'
 import * as store from '../lib/storage.js'
 import { translateListBuilderQuery } from '../lib/list-builder-ai.js'
+import {
+  LIST_BUILDER_EVIDENCE_WINDOW_OPTIONS,
+  loadListBuilderEvidence,
+} from '../lib/list-builder-evidence.js'
 import {
   LIST_BUILDER_EVIDENCE,
   MORE_LIST_BUILDER_PRESETS,
@@ -97,8 +101,28 @@ function lineupLabel(batter) {
   return 'Lineup unconfirmed'
 }
 
-function PresetCard({ preset, active, compact = false, onApply }) {
-  const { evidence } = preset
+function formatEvidenceRange(startDate, endDate) {
+  if (!startDate || !endDate) return 'Waiting for settled games'
+  const format = (value, includeYear = false) => new Intl.DateTimeFormat('en-US', {
+    month: 'short', day: 'numeric', ...(includeYear ? { year: 'numeric' } : {}), timeZone: 'UTC',
+  }).format(new Date(`${value}T12:00:00Z`))
+  const sameYear = startDate.slice(0, 4) === endDate.slice(0, 4)
+  return `${format(startDate)}–${format(endDate, !sameYear)}`
+}
+
+function evidenceStatusLabel(evidence) {
+  if (evidence?.fallback) return 'Last verified snapshot'
+  if (!evidence || !Number.isFinite(evidence.hitRate)) return 'Collecting exact coverage'
+  if (evidence.status === 'limited-coverage') return `${Math.round((evidence.coverage || 0) * 100)}% data coverage`
+  if (evidence.stability?.status === 'stable-positive') return 'Stable across halves'
+  if (evidence.stability?.status === 'mixed') return 'Mixed across halves'
+  if (evidence.status === 'collecting') return 'Sample still collecting'
+  return 'Rolling settled sample'
+}
+
+function PresetCard({ preset, evidence, active, compact = false, onApply }) {
+  const hasMetrics = Number.isFinite(evidence?.hitRate) && Number.isFinite(evidence?.lift)
+  const confidence = evidence?.confidence95
   return (
     <button
       type="button"
@@ -108,15 +132,19 @@ function PresetCard({ preset, active, compact = false, onApply }) {
     >
       <span className="lbv-preset-top">
         <span className="lbv-preset-icon"><Icon name={preset.icon} size={compact ? 15 : 17} /></span>
-        <span className="lbv-preset-lift">{evidence.lift.toFixed(2)}× slate</span>
+        <span className={`lbv-preset-lift${hasMetrics ? '' : ' collecting'}`}>
+          {hasMetrics ? `${evidence.lift.toFixed(2)}× slate` : 'Collecting'}
+        </span>
       </span>
       <span className="lbv-preset-copy">
         <b>{preset.title}</b>
         <small>{preset.description}</small>
       </span>
       <span className="lbv-preset-evidence">
-        <span><b>{evidence.hitRate.toFixed(1)}%</b> HR</span>
-        <span>n={evidence.sample}</span>
+        {hasMetrics ? <><span><b>{evidence.hitRate.toFixed(1)}%</b> HR</span><span>n={evidence.matches ?? evidence.sample}</span></> : <span>Exact recipe history is not deep enough yet.</span>}
+      </span>
+      <span className="lbv-preset-confidence">
+        {confidence ? `95% ${confidence.low.toFixed(1)}–${confidence.high.toFixed(1)}% · ` : ''}{evidenceStatusLabel(evidence)}
       </span>
     </button>
   )
@@ -185,11 +213,33 @@ export default function ListBuilderView({
   const [aiProposal, setAiProposal] = useState(null)
   const [aiLoading, setAiLoading] = useState(false)
   const [aiError, setAiError] = useState('')
+  const [rollingEvidence, setRollingEvidence] = useState(null)
+  const [evidenceWindow, setEvidenceWindow] = useState('d14')
+  const [evidenceFeedStatus, setEvidenceFeedStatus] = useState('loading')
+
+  useEffect(() => {
+    let active = true
+    loadListBuilderEvidence()
+      .then((artifact) => {
+        if (!active) return
+        setRollingEvidence(artifact)
+        setEvidenceFeedStatus('rolling')
+      })
+      .catch(() => {
+        if (active) setEvidenceFeedStatus('fallback')
+      })
+    return () => { active = false }
+  }, [])
 
   const built = useMemo(() => buildListBuilderResults(batters, form), [batters, form])
   const aiCriteria = useMemo(() => aiProposal ? activeListBuilderCriteria(aiProposal.criteria) : [], [aiProposal])
   const metricCoverage = Object.values(built.coverage)
   const covered = metricCoverage.length ? Math.min(...metricCoverage.map((item) => item.available)) : batters.length
+  const rollingWindow = rollingEvidence?.windows?.[evidenceWindow] || null
+  const evidenceContext = rollingWindow || LIST_BUILDER_EVIDENCE
+  const evidenceFor = (preset) => rollingEvidence
+    ? rollingEvidence.recipes?.[preset.id]?.windows?.[evidenceWindow]
+    : { ...preset.evidence, fallback: true }
 
   const update = (patch) => {
     setActivePreset(null)
@@ -298,18 +348,32 @@ export default function ListBuilderView({
       <section className="lbv-recipe-section" aria-labelledby="lbv-recipe-title">
         <div className="lbv-recipe-head">
           <div>
-            <span className="lbv-eyebrow">Validation snapshot</span>
+            <span className="lbv-eyebrow">{rollingWindow ? 'Rolling validation' : 'Validation snapshot'}</span>
             <h3 id="lbv-recipe-title">Evidence-backed recipes</h3>
             <p>
-              Jul 1–12 · {LIST_BUILDER_EVIDENCE.settledSlates} settled slates · {LIST_BUILDER_EVIDENCE.hitterGames.toLocaleString()} hitter-games
+              {formatEvidenceRange(evidenceContext.startDate, evidenceContext.endDate)} · {evidenceContext.settledSlates} settled slates · {(evidenceContext.population ?? evidenceContext.hitterGames).toLocaleString()} hitter-games
             </p>
           </div>
-          <span className="lbv-slate-baseline"><b>{LIST_BUILDER_EVIDENCE.baselineRate.toFixed(1)}%</b> slate HR baseline</span>
+          <div className="lbv-evidence-tools">
+            <div className="lbv-evidence-windows" role="group" aria-label="Evidence window">
+              {LIST_BUILDER_EVIDENCE_WINDOW_OPTIONS.map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  className={evidenceWindow === option.id ? 'on' : ''}
+                  disabled={!rollingEvidence && option.id !== 'd14'}
+                  onClick={() => setEvidenceWindow(option.id)}
+                  aria-pressed={evidenceWindow === option.id}
+                >{option.label}</button>
+              ))}
+            </div>
+            <span className="lbv-slate-baseline"><b>{Number.isFinite(evidenceContext.baselineRate) ? `${evidenceContext.baselineRate.toFixed(1)}%` : '—'}</b> slate HR baseline</span>
+          </div>
         </div>
 
         <div className="lbv-presets" aria-label="Primary list recipes">
           {PRIMARY_LIST_BUILDER_PRESETS.map((preset) => (
-            <PresetCard key={preset.id} preset={preset} active={activePreset === preset.id} onApply={applyPreset} />
+            <PresetCard key={preset.id} preset={preset} evidence={evidenceFor(preset)} active={activePreset === preset.id} onApply={applyPreset} />
           ))}
         </div>
 
@@ -320,12 +384,12 @@ export default function ListBuilderView({
           </summary>
           <div className="lbv-presets lbv-presets-more" aria-label="Secondary list recipes">
             {MORE_LIST_BUILDER_PRESETS.map((preset) => (
-              <PresetCard key={preset.id} preset={preset} active={activePreset === preset.id} compact onApply={applyPreset} />
+              <PresetCard key={preset.id} preset={preset} evidence={evidenceFor(preset)} active={activePreset === preset.id} compact onApply={applyPreset} />
             ))}
           </div>
         </details>
 
-        <p className="lbv-evidence-note"><Icon name="Info" size={12} /> Historical hit rates describe this sample; they do not guarantee future results.</p>
+        <p className="lbv-evidence-note"><Icon name="Info" size={12} /> {evidenceFeedStatus === 'rolling' ? 'Rolling settled records; scratches excluded.' : evidenceFeedStatus === 'fallback' ? 'Rolling feed unavailable; showing the last verified snapshot.' : 'Loading rolling evidence.'} Historical results do not guarantee future outcomes.</p>
       </section>
 
       <section className="lbv-workflows">

@@ -13,6 +13,8 @@
     "validate:mlb-data-health": "node server/tools/validate-mlb-data-health.mjs",
     "mlb:data-health-history": "node server/mlb-data-health-history.mjs",
     "validate:mlb-data-health-history": "node server/tools/validate-mlb-data-health-history.mjs",
+    "mlb:list-builder-evidence": "node server/list-builder-evidence.mjs",
+    "validate:list-builder-evidence": "node server/tools/validate-list-builder-evidence.mjs",
     "validate:ai-context": "node server/tools/validate-ai-context.mjs",
     "validate:ai-shadow": "node server/tools/validate-ai-shadow.mjs",
     "validate:ai-production": "node server/tools/validate-ai-production.mjs",

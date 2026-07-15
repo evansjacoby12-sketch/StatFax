@@ -197,6 +197,10 @@ export function extractPredictionRecord(row) {
     grade:          row.preGameGrade?.label || row.preGameGrade || row.grade?.label || row.grade || null,
     badges:         activeBadgesForRow(row),
     lineupConfirmed: row.lineupConfirmed ?? null,
+    // Mirrors the List Builder's deterministic trust gate exactly: healthy
+    // rows omit dataTrust.status; warned rows carry one. Logged prospectively
+    // so rolling recipe evidence never has to guess whether the gate passed.
+    dataTrusted:    !row.dataTrust?.status,
     // Pre-game AB-by-AB sim probability. Logged so the sim-resolution blend
     // weight (server/lib/simResolution.mjs) becomes empirically tunable once a
     // few weeks of reconciled outcomes carry it. Snapshot stores the undecayed
@@ -285,6 +289,8 @@ export function compactModelRecord(record) {
     actuallyPlayed: record?.actuallyPlayed !== false,
     grade:          record?.grade ?? null,
     badges:         Array.isArray(record?.badges) ? record.badges : [],
+    lineupConfirmed: typeof record?.lineupConfirmed === 'boolean' ? record.lineupConfirmed : null,
+    dataTrusted:    typeof record?.dataTrusted === 'boolean' ? record.dataTrusted : null,
     simHRProb:      Number.isFinite(record?.simHRProb) ? record.simHRProb : null,
     feat:           record?.feat && typeof record.feat === 'object' ? record.feat : null,
   };

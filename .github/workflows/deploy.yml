@@ -201,7 +201,9 @@ jobs:
           npm run slate
 
       - name: Validate MLB data contracts
-        run: npm run validate:mlb-data
+        run: |
+          npm run validate:mlb-data
+          npm run validate:list-builder-evidence
 
       - name: Generate NFL slate
         env:
@@ -236,7 +238,7 @@ jobs:
             exit 0
           fi
           ENDPOINT="https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com"
-          for f in calibration.json backtest-log.json board-history.json zone-cache.json; do
+          for f in calibration.json backtest-log.json list-builder-evidence.json board-history.json zone-cache.json; do
             if [ -f "dist/$f" ]; then
               aws s3 cp "dist/$f" "s3://$R2_BUCKET/$f" --endpoint-url "$ENDPOINT" \
                 --content-type application/json --cache-control no-cache \
