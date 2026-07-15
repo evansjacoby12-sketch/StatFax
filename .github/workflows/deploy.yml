@@ -123,6 +123,15 @@ jobs:
           key: ai-hr-shadow-${{ github.run_id }}
           restore-keys: ai-hr-shadow-
 
+      # Rolling source-backed watchdog record. Alerts are preserved after they
+      # expire and are settled later against objective MLB box-score facts.
+      - name: Restore MLB data health history
+        uses: actions/cache@v4
+        with:
+          path: dist/mlb-data-health-history.json
+          key: mlb-data-health-history-${{ github.run_id }}
+          restore-keys: mlb-data-health-history-
+
       # Carry the prior Slate Brief across runs so its same-day staleness guard
       # can reuse a recent result instead of re-paying the API on every tick.
       - name: Restore slate brief
@@ -275,6 +284,12 @@ jobs:
       - name: Validate MLB data health watchdog
         run: npm run validate:mlb-data-health
 
+      - name: Capture and settle MLB data health history
+        run: npm run mlb:data-health-history
+
+      - name: Validate MLB data health history
+        run: npm run validate:mlb-data-health-history
+
       - name: Build AI HR shadow projections
         run: npm run ai:hr-shadow
 
@@ -316,7 +331,7 @@ jobs:
             exit 0
           fi
           ENDPOINT="https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com"
-          for f in daily.json context.json mlb-data-health.json ai-hr-shadow.json ai-hr-evaluation.json ai-hr-production.json; do
+          for f in daily.json context.json mlb-data-health.json mlb-data-health-history.json ai-hr-shadow.json ai-hr-evaluation.json ai-hr-production.json; do
             if [ -f "dist/$f" ]; then
               aws s3 cp "dist/$f" "s3://$R2_BUCKET/$f" --endpoint-url "$ENDPOINT" \
                 --content-type application/json --cache-control no-cache \
