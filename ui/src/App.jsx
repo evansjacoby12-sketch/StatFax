@@ -21,6 +21,7 @@ import PullToRefresh from './components/PullToRefresh.jsx'
 import PickOfDay from './components/PickOfDay.jsx'
 import ReadyRadar from './components/ReadyRadar.jsx'
 import BoardWorkspaceSummary from './components/BoardWorkspaceSummary.jsx'
+import MlbDataHealthBanner from './components/MlbDataHealthBanner.jsx'
 import UpdateBanner from './components/UpdateBanner.jsx'
 import WorkspaceShell from './components/WorkspaceShell.jsx'
 import SportMobileDock from './components/SportMobileDock.jsx'
@@ -740,6 +741,7 @@ export default function App() {
       </div>
 
       <main className="main">
+        <MlbDataHealthBanner health={data.meta.dataHealth} />
         <Suspense fallback={<div className="results-loading">Loading workspace…</div>}>
         {view === 'results' || view === 'combos' ? (
           <ResultsView

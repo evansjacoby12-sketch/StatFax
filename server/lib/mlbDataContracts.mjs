@@ -56,7 +56,21 @@ export function validateDailySnapshot(snapshot) {
   if (!isObject(snapshot.scoredBatters)) errors.push('scoredBatters: expected an object')
 
   const games = Array.isArray(snapshot.games) ? snapshot.games : []
-  const gameIds = new Set(games.map((game) => game?.gamePk).filter(Number.isFinite))
+  const gamesByPk = new Map()
+  for (const [index, game] of games.entries()) {
+    const prefix = `games[${index}]`
+    if (!isObject(game)) {
+      errors.push(`${prefix}: game must be an object`)
+      continue
+    }
+    if (!Number.isFinite(game.gamePk)) errors.push(`${prefix}.gamePk: must be finite`)
+    else if (gamesByPk.has(game.gamePk)) errors.push(`${prefix}.gamePk: duplicate ${game.gamePk}`)
+    else gamesByPk.set(game.gamePk, game)
+    if (Number.isFinite(game.awayTeam?.id) && game.awayTeam.id === game.homeTeam?.id) {
+      errors.push(`${prefix}: awayTeam and homeTeam cannot have the same id`)
+    }
+  }
+  const gameIds = new Set(gamesByPk.keys())
   const entries = isObject(snapshot.scoredBatters) ? Object.entries(snapshot.scoredBatters) : []
   const seen = new Set()
   for (const [key, row] of entries) {
@@ -71,6 +85,23 @@ export function validateDailySnapshot(snapshot) {
     seen.add(expectedKey)
     if (!Number.isFinite(row.playerId) || !Number.isFinite(row.gamePk)) errors.push(`${prefix}: playerId and gamePk must be finite`)
     if (gameIds.size && !gameIds.has(row.gamePk)) errors.push(`${prefix}.gamePk: game is missing from games[]`)
+    const game = gamesByPk.get(row.gamePk)
+    if (game) {
+      const awayId = game.awayTeam?.id
+      const homeId = game.homeTeam?.id
+      const matchesAway = Number.isFinite(row.teamId) && Number.isFinite(awayId) && row.teamId === awayId
+      const matchesHome = Number.isFinite(row.teamId) && Number.isFinite(homeId) && row.teamId === homeId
+      if (Number.isFinite(row.teamId) && Number.isFinite(awayId) && Number.isFinite(homeId) && !matchesAway && !matchesHome) {
+        errors.push(`${prefix}.teamId: does not belong to game ${row.gamePk}`)
+      }
+      if ((matchesAway && row.isHome === true) || (matchesHome && row.isHome === false)) {
+        errors.push(`${prefix}.isHome: contradicts teamId`)
+      }
+      const expectedPitcherId = matchesAway ? game.homePitcher?.id : matchesHome ? game.awayPitcher?.id : null
+      if (Number.isFinite(expectedPitcherId) && Number.isFinite(row.pitcher?.id) && row.pitcher.id !== expectedPitcherId) {
+        errors.push(`${prefix}.pitcher.id: expected opposing starter ${expectedPitcherId}`)
+      }
+    }
     if (!Number.isFinite(row.score) || row.score < 0 || row.score > 100) errors.push(`${prefix}.score: expected finite value in [0,100]`)
     if (row.hrProbability != null && (!Number.isFinite(row.hrProbability) || row.hrProbability < 0 || row.hrProbability > 1)) {
       errors.push(`${prefix}.hrProbability: expected null or probability in [0,1]`)

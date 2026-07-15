@@ -46,6 +46,36 @@ test('daily contract rejects the retired bare alias and invalid probability', ()
   assert.ok(check.errors.some((error) => error.includes('hrProbability')))
 })
 
+test('daily contract rejects team, side, and opposing-starter identity contradictions', () => {
+  const snapshot = {
+    version: 5,
+    date: '2026-07-14',
+    generatedAt: '2026-07-14T12:00:00.000Z',
+    finishedAt: '2026-07-14T12:00:01.000Z',
+    games: [{
+      gamePk: 10,
+      awayTeam: { id: 1 },
+      homeTeam: { id: 2 },
+      awayPitcher: { id: 50 },
+      homePitcher: { id: 60 },
+    }],
+    scoredBatters: {
+      '1-10': {
+        ...batter(), teamId: 1, isHome: true, pitcher: { id: 50 },
+      },
+      '2-10': {
+        ...batter(2), teamId: 999, isHome: false, pitcher: { id: 60 },
+      },
+    },
+    stats: { scoredBatters: 2 },
+  }
+  const check = validateDailySnapshot(snapshot)
+  assert.equal(check.ok, false)
+  assert.ok(check.errors.some((error) => error.includes('isHome: contradicts teamId')))
+  assert.ok(check.errors.some((error) => error.includes('pitcher.id: expected opposing starter 60')))
+  assert.ok(check.errors.some((error) => error.includes('teamId: does not belong to game')))
+})
+
 test('backtest contract enforces operational/archive caps and synchronization', () => {
   const row = {
     playerId: 1, gamePk: 10, score: 70, homered: false, actuallyPlayed: true,

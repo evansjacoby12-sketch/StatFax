@@ -265,6 +265,16 @@ jobs:
       - name: Validate AI HR context contract
         run: npm run validate:ai-context
 
+      # Deterministic feed/identity checks are the enforcement authority. The
+      # sourced AI context can add review warnings, but it cannot block a slate
+      # or mutate a score. Any team/side/opposing-pitcher contradiction stops
+      # this run before production probabilities or public artifacts are built.
+      - name: Build MLB data health watchdog report
+        run: npm run mlb:data-health
+
+      - name: Validate MLB data health watchdog
+        run: npm run validate:mlb-data-health
+
       - name: Build AI HR shadow projections
         run: npm run ai:hr-shadow
 
@@ -287,6 +297,7 @@ jobs:
         run: |
           npm run validate:ai-production
           npm run validate:mlb-data
+          npm run validate:mlb-data-health
 
       # Publish the adjusted slate and its complete AI audit trail together.
       # The UI build below reads this same adjusted dist/daily.json.
@@ -305,7 +316,7 @@ jobs:
             exit 0
           fi
           ENDPOINT="https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com"
-          for f in daily.json context.json ai-hr-shadow.json ai-hr-evaluation.json ai-hr-production.json; do
+          for f in daily.json context.json mlb-data-health.json ai-hr-shadow.json ai-hr-evaluation.json ai-hr-production.json; do
             if [ -f "dist/$f" ]; then
               aws s3 cp "dist/$f" "s3://$R2_BUCKET/$f" --endpoint-url "$ENDPOINT" \
                 --content-type application/json --cache-control no-cache \

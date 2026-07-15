@@ -31,6 +31,7 @@ import PullToRefresh from '../src/components/PullToRefresh.jsx'
 import BacktestView from '../src/components/BacktestView.jsx'
 import PickOfDay from '../src/components/PickOfDay.jsx'
 import NFLBoard from '../src/components/NFLBoard.jsx'
+import MlbDataHealthBanner from '../src/components/MlbDataHealthBanner.jsx'
 
 const SYNTH = {
   version: 5,
@@ -197,6 +198,15 @@ add('UpdateBanner', <UpdateBanner />)
 add('PullToRefresh', <PullToRefresh onRefresh={noop} />)
 add('BacktestView', <BacktestView />)
 add('PickOfDay', <PickOfDay batter={normal} onSelect={noop} watched={false} inSlip={false} onToggleWatch={noop} onToggleSlip={noop} />)
+add('MlbDataHealthBanner.ready', <MlbDataHealthBanner health={{ status: 'ready' }} />)
+add('MlbDataHealthBanner.limited', <MlbDataHealthBanner health={{
+  status: 'limited', warnings: 1, aiAlerts: 1, hardFailures: 0,
+  issues: [{
+    id: 'ai-context:1', severity: 'warning',
+    message: 'Listed starter may change before first pitch.',
+    evidence: [{ url: 'https://www.mlb.com/gameday/1', title: 'Official game update' }],
+  }],
+}} />)
 add('NFLBoard', <NFLBoard />)
 
 let failed = 0

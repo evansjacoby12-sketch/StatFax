@@ -278,6 +278,7 @@ export async function loadSlate() {
     morningLockAt: d.morningLockAt || null,
     ensembleMeta: d.ensembleMeta || null,
     aiHrProduction: d.aiHrProduction || null,
+    dataHealth: d.dataHealth || null,
     scoreToProb: d.scoreToProb || null,
     oddsBooks: collectBooks(d.odds),
   }
