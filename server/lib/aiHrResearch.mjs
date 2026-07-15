@@ -2,7 +2,22 @@ import { buildAiHrEntityIndex, summarizeAiHrTargets } from './aiHrContext.mjs'
 import { callOpenAiStructured, OPENAI_DEFAULT_MODEL, searchTavily } from './aiProviders.mjs'
 
 export const AI_HR_RESEARCH_PROVIDER = 'tavily+openai'
-export const AI_HR_RESEARCH_VERSION = 1
+export const AI_HR_RESEARCH_VERSION = 2
+export const AI_HR_RESEARCH_KINDS = Object.freeze([
+  'starter-change',
+  'opener-risk',
+  'pitch-limit',
+  'lineup-status',
+  'injury',
+  'scratch-risk',
+  'weather',
+  'roof',
+  'bullpen',
+  'callup',
+])
+
+const RESEARCH_KIND_SET = new Set(AI_HR_RESEARCH_KINDS)
+const BATTER_PERFORMANCE_PATTERN = /\b(?:home[ -]?runs?|homers?|homered|rbi|ops|slugging|batting|player of the game|hit(?:ting)? streak|last \d+ games?)\b/i
 
 const validIso = (value) => typeof value === 'string' && !Number.isNaN(Date.parse(value))
 
@@ -26,11 +41,11 @@ function uniqueSources(results) {
 
 export function buildAiHrResearchQueries(slate) {
   const summary = summarizeAiHrTargets(slate)
-  const names = summary.batters.slice(0, 20).map((batter) => batter.name).join(', ')
   const matchups = summary.games.map((game) => game.matchup).join(', ')
   const teams = [...new Set(summary.games.flatMap((game) => game.bullpens.map((bullpen) => bullpen.team)).filter(Boolean))].join(', ')
   return [
-    `MLB ${summary.date} confirmed lineups injuries scratches ${names}`,
+    `MLB ${summary.date} confirmed lineups injuries scratches ${matchups}`,
+    `MLB ${summary.date} probable pitchers starter changes openers pitch limits ${matchups}`,
     `MLB ${summary.date} game weather wind roof status ${matchups}`,
     `MLB ${summary.date} bullpen unavailable overworked relievers ${teams}`,
   ]
@@ -57,7 +72,7 @@ function signalSchema(entityKeys, sourceUrls) {
           type: 'object',
           properties: {
             entityKey: { type: 'string', enum: entityKeys },
-            kind: { type: 'string', enum: ['lineup-status', 'injury', 'scratch-risk', 'weather', 'roof', 'bullpen', 'callup', 'other'] },
+            kind: { type: 'string', enum: AI_HR_RESEARCH_KINDS },
             direction: { type: 'string', enum: ['boost', 'suppress', 'uncertain'] },
             severity: { type: 'string', enum: ['alert', 'warn', 'info'] },
             confidence: { type: 'number', minimum: 0, maximum: 1 },
@@ -90,6 +105,7 @@ function targetsText(slate) {
   const summary = summarizeAiHrTargets(slate)
   return `ALLOWED GAMES AND BULLPENS:\n${summary.games.map((game) => (
     `- ${game.entityKey} | ${game.matchup} | ${game.gameDate || '?'} | ${game.venue || '?'}\n` +
+    `  pitchers: ${game.pitchers.map((pitcher) => `${pitcher.entityKey}=${pitcher.name}`).join('; ')}\n` +
     `  bullpens: ${game.bullpens.map((bullpen) => `${bullpen.entityKey}=${bullpen.team}`).join('; ')}`
   )).join('\n')}\n\nALLOWED BATTERS:\n${summary.batters.map((batter) => `- ${batter.entityKey} | ${batter.name} (${batter.team}, ${batter.grade})`).join('\n')}`
 }
@@ -108,6 +124,52 @@ export function bindAiHrEvidenceToSources(raw, sources) {
         .filter(Boolean)
         .map((source) => ({ url: source.url, title: source.title, publishedAt: source.publishedAt })),
     })),
+  }
+}
+
+function normalizedWords(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+}
+
+function noteNamesEntity(note, name) {
+  const noteWords = new Set(normalizedWords(note))
+  const nameWords = normalizedWords(name).filter((word) => !['jr', 'sr', 'ii', 'iii', 'iv'].includes(word))
+  const surname = nameWords.at(-1)
+  return Boolean(surname && surname.length >= 3 && noteWords.has(surname))
+}
+
+function directionIsMaterial(signal, entity) {
+  if (signal.kind === 'lineup-status' || signal.kind === 'scratch-risk') {
+    return entity.entityType === 'batter' && ['suppress', 'uncertain'].includes(signal.direction)
+  }
+  if (signal.kind === 'callup') return signal.direction === 'uncertain'
+  if (signal.kind === 'injury' && entity.entityType === 'batter') {
+    return ['suppress', 'uncertain'].includes(signal.direction)
+  }
+  return ['boost', 'suppress', 'uncertain'].includes(signal.direction)
+}
+
+/**
+ * Deterministic guard after extraction. The statistical engine already owns
+ * recent form, season power, and prior-game outcomes; allowing those through
+ * would double-count them as "AI" evidence.
+ */
+export function filterAiHrResearchSignals(raw, entityIndex) {
+  return {
+    signals: (Array.isArray(raw?.signals) ? raw.signals : []).filter((signal) => {
+      const entity = entityIndex.get(signal?.entityKey)
+      if (!entity || !RESEARCH_KIND_SET.has(signal?.kind) || !directionIsMaterial(signal, entity)) return false
+      if (['batter', 'pitcher'].includes(entity.entityType) && !noteNamesEntity(signal?.note, entity.name)) return false
+      if (entity.entityType === 'batter' && BATTER_PERFORMANCE_PATTERN.test(String(signal?.note || ''))) return false
+      return true
+    }),
   }
 }
 
@@ -148,15 +210,17 @@ export async function researchAiHrSignals({
   const extracted = await callOpenAiStructured({
     apiKey: openAiApiKey,
     model,
-    instructions: `You extract sourced MLB home-run context from retrieval results. Use only the supplied sources and exact allowed entity keys. Never infer a result, probability, score adjustment, multiplier, lock, or betting recommendation. Direction is from the affected batter's HR perspective. Do not create pitcher targets. In historical mode, ignore any fact whose source timestamp is missing or after the cutoff. Return an empty signals array when no material pregame fact is supported.`,
+    instructions: `You extract only EXTERNAL pregame MLB context that is absent from a statistical HR model. Use only supplied sources and exact allowed entity keys. Material facts are starter changes, opener plans, documented pitch limits, injuries/scratch risk, unusual weather or roof changes, unavailable/overworked bullpen arms, and callups with missing MLB history. Never emit recent performance, prior-game results, home runs, hot/cold streaks, season totals, rankings, odds, projections, routine lineup confirmation, probability math, or betting advice. Do not use kind "other". A player-targeted note must explicitly name that player. Direction is from the affected batter's HR perspective; use uncertain when the effect is not defensible. In historical mode, ignore facts with a missing source timestamp or a timestamp after the cutoff. Return an empty signals array when no material external fact is supported.`,
     input: buildAiHrExtractionInput({ slate, sources, generatedAt, historical }),
-    schema: signalSchema([...entities.keys()].filter((key) => !key.startsWith('pitcher:')), sources.map((source) => source.url)),
+    schema: signalSchema([...entities.keys()], sources.map((source) => source.url)),
     schemaName: 'ai_hr_context',
     maxOutputTokens: 3000,
     fetchImpl,
   })
+  const bound = bindAiHrEvidenceToSources(extracted.value, sources)
+  const filtered = filterAiHrResearchSignals(bound, entities)
   return {
-    raw: bindAiHrEvidenceToSources(extracted.value, sources),
+    raw: filtered,
     model: extracted.model,
     provider: AI_HR_RESEARCH_PROVIDER,
     audit: {
@@ -166,6 +230,8 @@ export async function researchAiHrSignals({
       sources: sources.map(({ content, score, ...source }) => source),
       tavilyCredits: searches.reduce((sum, search) => sum + (search.usageCredits || 0), 0) || null,
       responseId: extracted.responseId,
+      extractedSignalCount: bound.signals.length,
+      filteredSignalCount: filtered.signals.length,
     },
   }
 }

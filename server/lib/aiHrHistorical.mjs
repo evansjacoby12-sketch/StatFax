@@ -19,7 +19,7 @@ import {
   lookupProb,
 } from '../../src/sports/mlb/logic/isotonicCalibration.js'
 
-export const AI_HR_HISTORICAL_VERSION = 2
+export const AI_HR_HISTORICAL_VERSION = 3
 export const AI_HR_HISTORICAL_MODE = 'historical-replay'
 export const AI_HR_HISTORICAL_BASELINE = 'walk-forward-score-calibration+sim-resolution'
 

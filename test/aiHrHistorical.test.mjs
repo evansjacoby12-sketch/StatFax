@@ -77,11 +77,11 @@ function fixtureSlate() {
 function signal(overrides = {}) {
   return {
     entityKey: 'batter:7:101',
-    kind: 'lineup-status',
-    direction: 'boost',
-    severity: 'info',
+    kind: 'scratch-risk',
+    direction: 'suppress',
+    severity: 'warn',
     confidence: 0.8,
-    note: 'The batter was confirmed in the pregame lineup.',
+    note: 'Time Locked Bat was questionable before first pitch.',
     evidence: [{
       url: 'https://example.com/pregame-lineup',
       title: 'Pregame lineup',

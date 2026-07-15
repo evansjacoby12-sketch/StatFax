@@ -5,16 +5,27 @@ import {
   isPregameMlbGame,
 } from './aiHrContext.mjs'
 
-export const AI_HR_SHADOW_VERSION = 1
+export const AI_HR_SHADOW_VERSION = 2
 export const AI_HR_SHADOW_MODE = 'shadow'
-export const AI_HR_SHADOW_LOGIT_STEP = 0.1
-export const AI_HR_SHADOW_MAX_ABS_LOGIT_DELTA = 0.25
+export const AI_HR_SHADOW_LOGIT_STEP = 0.05
+export const AI_HR_SHADOW_MAX_ABS_LOGIT_DELTA = 0.15
 export const AI_HR_SHADOW_RETENTION_DAYS = 180
+export const AI_HR_SHADOW_SCORING_KINDS = Object.freeze([
+  'starter-change',
+  'opener-risk',
+  'pitch-limit',
+  'injury',
+  'scratch-risk',
+  'weather',
+  'roof',
+  'bullpen',
+])
 
 const DIRECTIONS = new Set(['boost', 'suppress', 'uncertain'])
 const ENTITY_TYPES = new Set(['batter', 'pitcher', 'game', 'bullpen'])
 const KINDS = new Set(AI_HR_CONTEXT_KINDS)
 const SEVERITIES = new Set(['alert', 'warn', 'info'])
+const SCORING_KINDS = new Set(AI_HR_SHADOW_SCORING_KINDS)
 const finite = (value) => value !== null && value !== '' && Number.isFinite(Number(value))
 const isObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value)
 const validIso = (value) => typeof value === 'string' && !Number.isNaN(Date.parse(value))
@@ -32,7 +43,9 @@ function validHttpUrl(value) {
 }
 
 export function aiHrSignalLogitDelta(signal) {
-  if (!DIRECTIONS.has(signal?.direction) || !finite(signal?.confidence)) return 0
+  if (!SCORING_KINDS.has(signal?.kind) || !DIRECTIONS.has(signal?.direction) || !finite(signal?.confidence)) return 0
+  if (signal.kind === 'scratch-risk' && (signal.entityType !== 'batter' || signal.direction !== 'suppress')) return 0
+  if (signal.kind === 'injury' && signal.entityType === 'batter' && signal.direction !== 'suppress') return 0
   const sign = signal.direction === 'boost' ? 1 : signal.direction === 'suppress' ? -1 : 0
   return round(sign * AI_HR_SHADOW_LOGIT_STEP * clamp(Number(signal.confidence), 0, 1), 6)
 }
@@ -118,6 +131,7 @@ export function buildAiHrShadowRecords({ slate, context, generatedAt = new Date(
     const appliedSignals = signals
       .filter((signal) => aiHrSignalAppliesToBatter(signal, row, game))
       .map(signalProvenance)
+      .filter((signal) => signal.logitDelta !== 0)
       .sort((a, b) => a.signalId.localeCompare(b.signalId))
     if (!appliedSignals.length) continue
 
@@ -156,9 +170,10 @@ function emptyLedger(updatedAt) {
     scoreImpact: false,
     updatedAt,
     hypothesis: {
-      method: 'uniform-confidence-logit',
+      method: 'external-context-confidence-logit',
       perSignalLogit: AI_HR_SHADOW_LOGIT_STEP,
       maxAbsLogitDelta: AI_HR_SHADOW_MAX_ABS_LOGIT_DELTA,
+      scoringKinds: [...AI_HR_SHADOW_SCORING_KINDS],
     },
     recordsByDate: {},
   }
@@ -210,9 +225,10 @@ export function validateAiHrShadowLedger(ledger) {
   if (ledger.scoreImpact !== false) errors.push('scoreImpact: shadow ledger must never affect production scoring')
   if (!validIso(ledger.updatedAt)) errors.push('updatedAt: expected an ISO timestamp')
   if (
-    ledger.hypothesis?.method !== 'uniform-confidence-logit' ||
+    ledger.hypothesis?.method !== 'external-context-confidence-logit' ||
     ledger.hypothesis?.perSignalLogit !== AI_HR_SHADOW_LOGIT_STEP ||
-    ledger.hypothesis?.maxAbsLogitDelta !== AI_HR_SHADOW_MAX_ABS_LOGIT_DELTA
+    ledger.hypothesis?.maxAbsLogitDelta !== AI_HR_SHADOW_MAX_ABS_LOGIT_DELTA ||
+    JSON.stringify(ledger.hypothesis?.scoringKinds) !== JSON.stringify(AI_HR_SHADOW_SCORING_KINDS)
   ) errors.push('hypothesis: constants do not match the versioned shadow experiment')
   if (!isObject(ledger.recordsByDate)) errors.push('recordsByDate: expected an object')
 

@@ -10,8 +10,10 @@ import {
 import {
   bindAiHrEvidenceToSources,
   buildAiHrExtractionInput,
+  filterAiHrResearchSignals,
   researchAiHrSignals,
 } from '../server/lib/aiHrResearch.mjs'
+import { buildAiHrEntityIndex } from '../server/lib/aiHrContext.mjs'
 
 const slate = {
   date: '2026-07-15',
@@ -22,6 +24,8 @@ const slate = {
     status: 'Scheduled',
     awayTeam: { id: 1, abbr: 'NYY' },
     homeTeam: { id: 2, abbr: 'BOS' },
+    awayPitcher: { id: 50, name: 'Away Arm' },
+    homePitcher: { id: 60, name: 'Home Arm' },
   }],
   scoredBatters: {
     '7-101': {
@@ -33,6 +37,7 @@ const slate = {
       score: 82,
       grade: 'PRIME',
       hrProbability: 0.18,
+      pitcher: { id: 60, name: 'Home Arm' },
     },
   },
 }
@@ -186,6 +191,21 @@ test('evidence binding drops invented URLs and overwrites model metadata', () =>
   }])
 })
 
+test('research guard rejects statistical form, generic other, and misbound player signals', () => {
+  const entities = buildAiHrEntityIndex(slate)
+  const filtered = filterAiHrResearchSignals({ signals: [
+    { entityKey: 'batter:7:101', kind: 'injury', direction: 'suppress', note: 'Test Slugger has back tightness.' },
+    { entityKey: 'batter:7:101', kind: 'other', direction: 'boost', note: 'Test Slugger is hot.' },
+    { entityKey: 'batter:7:101', kind: 'injury', direction: 'suppress', note: 'Another player has back tightness.' },
+    { entityKey: 'batter:7:101', kind: 'injury', direction: 'boost', note: 'Test Slugger returned and homered.' },
+    { entityKey: 'pitcher:60:101', kind: 'pitch-limit', direction: 'boost', note: 'Home Arm has a documented 70-pitch limit.' },
+  ] }, entities)
+  assert.deepEqual(filtered.signals.map((signal) => signal.entityKey), [
+    'batter:7:101',
+    'pitcher:60:101',
+  ])
+})
+
 test('Tavily plus OpenAI research is source-locked and never receives outcome fields', async () => {
   let tavilyCalls = 0
   let openAiBody
@@ -210,11 +230,11 @@ test('Tavily plus OpenAI research is source-locked and never receives outcome fi
       model: 'gpt-test',
       output: [{ content: [{ type: 'output_text', text: JSON.stringify({ signals: [{
         entityKey: 'batter:7:101',
-        kind: 'lineup-status',
-        direction: 'boost',
-        severity: 'info',
+        kind: 'injury',
+        direction: 'suppress',
+        severity: 'warn',
         confidence: 0.8,
-        note: 'Test Slugger is confirmed in the lineup.',
+        note: 'Test Slugger has back tightness.',
         observedAt: '2026-07-15T18:00:00Z',
         expiresAt: '2026-07-16T00:00:00Z',
         evidence: [{ url: 'https://example.com/lineup', title: 'Wrong title', publishedAt: null }],
@@ -230,12 +250,14 @@ test('Tavily plus OpenAI research is source-locked and never receives outcome fi
     model: 'gpt-test',
     fetchImpl,
   })
-  assert.equal(tavilyCalls, 3)
+  assert.equal(tavilyCalls, 4)
   assert.equal(result.provider, 'tavily+openai')
   assert.equal(result.audit.sourceCount, 1)
   assert.equal(result.raw.signals[0].evidence[0].title, 'Official pregame lineup')
   assert.ok(openAiBody.text.format.schema.properties.signals.items.properties.entityKey.enum.includes('batter:7:101'))
+  assert.ok(openAiBody.text.format.schema.properties.signals.items.properties.entityKey.enum.includes('pitcher:60:101'))
   assert.ok(openAiBody.text.format.schema.properties.signals.items.properties.evidence.items.properties.url.enum.includes('https://example.com/lineup'))
+  assert.equal(openAiBody.text.format.schema.properties.signals.items.properties.kind.enum.includes('other'), false)
   assert.equal(openAiBody.input.includes('homered'), false)
   assert.equal(openAiBody.input.includes('actuallyPlayed'), false)
 })
@@ -248,6 +270,7 @@ test('extraction input contains only sanitized slate targets and retrieved sourc
     sources: [{ url: 'https://example.com/source', title: 'Source', content: 'Pregame fact', publishedAt: '2026-07-15T18:00:00.000Z' }],
   })
   assert.ok(input.includes('batter:7:101'))
+  assert.ok(input.includes('pitcher:60:101'))
   assert.ok(input.includes('https://example.com/source'))
   assert.equal(input.includes('hrProbability'), false)
 })

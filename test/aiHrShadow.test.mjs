@@ -75,9 +75,11 @@ function contextFor(signals) {
 }
 
 test('shadow math is monotonic, confidence-scaled, and capped in log-odds space', () => {
-  assert.equal(aiHrSignalLogitDelta({ direction: 'boost', confidence: 0.8 }), 0.08)
-  assert.equal(aiHrSignalLogitDelta({ direction: 'suppress', confidence: 0.5 }), -0.05)
-  assert.equal(aiHrSignalLogitDelta({ direction: 'uncertain', confidence: 1 }), 0)
+  assert.equal(aiHrSignalLogitDelta({ kind: 'weather', entityType: 'game', direction: 'boost', confidence: 0.8 }), 0.04)
+  assert.equal(aiHrSignalLogitDelta({ kind: 'pitch-limit', entityType: 'pitcher', direction: 'suppress', confidence: 0.5 }), -0.025)
+  assert.equal(aiHrSignalLogitDelta({ kind: 'weather', entityType: 'game', direction: 'uncertain', confidence: 1 }), 0)
+  assert.equal(aiHrSignalLogitDelta({ kind: 'other', entityType: 'batter', direction: 'boost', confidence: 1 }), 0)
+  assert.equal(aiHrSignalLogitDelta({ kind: 'lineup-status', entityType: 'batter', direction: 'boost', confidence: 1 }), 0)
   assert.ok(applyAiHrLogitDelta(0.1, 0.1) > 0.1)
   assert.ok(applyAiHrLogitDelta(0.1, -0.1) < 0.1)
   assert.equal(applyAiHrLogitDelta(0.1, 99), applyAiHrLogitDelta(0.1, AI_HR_SHADOW_MAX_ABS_LOGIT_DELTA))
@@ -97,16 +99,16 @@ test('batter, pitcher, game, and opposing-bullpen signals map to exact batter-ga
   assert.equal(records.length, 2)
   const away = records.find((record) => record.playerId === 7)
   const home = records.find((record) => record.playerId === 8)
-  assert.equal(away.appliedSignals.length, 4)
-  assert.equal(away.shadowLogitDelta, 0.13)
+  assert.equal(away.appliedSignals.length, 3)
+  assert.equal(away.shadowLogitDelta, 0.025)
   assert.equal(home.appliedSignals.length, 1)
-  assert.equal(home.shadowLogitDelta, 0.04)
+  assert.equal(home.shadowLogitDelta, 0.02)
   assert.ok(away.shadowHrProbability > away.baselineHrProbability)
 })
 
 test('entity keys remain doubleheader-safe and expired context is ignored', () => {
   const context = contextFor([
-    candidate('batter:7:101', 'lineup-status', 'boost', 1, 'Confirmed for game one.'),
+    candidate('batter:7:101', 'scratch-risk', 'suppress', 1, 'Questionable for game one.'),
   ])
   const records = buildAiHrShadowRecords({ slate, context, generatedAt })
   assert.deepEqual(records.map((record) => record.id), ['2026-07-15:101:7'])
