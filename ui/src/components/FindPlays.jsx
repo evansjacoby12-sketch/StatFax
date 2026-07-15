@@ -10,7 +10,10 @@ const TABS = [
   { id: 'list-builder', label: 'List builder', icon: 'Filter' },
 ]
 
-export default function FindPlays({ initialTab = 'weather', onClose, batters, selectedId, onSelect, onOpenPitcher }) {
+export default function FindPlays({
+  initialTab = 'weather', onClose, batters, selectedId, onSelect, onOpenPitcher,
+  watchlist, slip, onToggleWatch, onToggleSlip,
+}) {
   const [tab, setTab] = useState(initialTab)
   return (
     <WorkspaceShell
@@ -29,7 +32,16 @@ export default function FindPlays({ initialTab = 'weather', onClose, batters, se
       </div>
       {tab === 'weather' && <WeatherView batters={batters} onSelect={onSelect} selectedId={selectedId} />}
       {tab === 'cheat-sheet' && <CheatSheet batters={batters} onSelect={onSelect} onOpenPitcher={onOpenPitcher} />}
-      {tab === 'list-builder' && <ListBuilderView batters={batters} onSelect={onSelect} />}
+      {tab === 'list-builder' && (
+        <ListBuilderView
+          batters={batters}
+          onSelect={onSelect}
+          watchlist={watchlist}
+          slip={slip}
+          onToggleWatch={onToggleWatch}
+          onToggleSlip={onToggleSlip}
+        />
+      )}
     </WorkspaceShell>
   )
 }

@@ -32,6 +32,7 @@ import BacktestView from '../src/components/BacktestView.jsx'
 import PickOfDay from '../src/components/PickOfDay.jsx'
 import NFLBoard from '../src/components/NFLBoard.jsx'
 import MlbDataHealthBanner from '../src/components/MlbDataHealthBanner.jsx'
+import ListBuilderView from '../src/components/ListBuilderView.jsx'
 
 const SYNTH = {
   version: 5,
@@ -198,6 +199,7 @@ add('UpdateBanner', <UpdateBanner />)
 add('PullToRefresh', <PullToRefresh onRefresh={noop} />)
 add('BacktestView', <BacktestView />)
 add('PickOfDay', <PickOfDay batter={normal} onSelect={noop} watched={false} inSlip={false} onToggleWatch={noop} onToggleSlip={noop} />)
+add('ListBuilderView', <ListBuilderView batters={batters} onSelect={noop} watchlist={new Set()} slip={new Set()} onToggleWatch={noop} onToggleSlip={noop} />)
 add('MlbDataHealthBanner.ready', <MlbDataHealthBanner health={{ status: 'ready' }} />)
 add('MlbDataHealthBanner.limited', <MlbDataHealthBanner health={{
   status: 'limited', warnings: 1, aiAlerts: 1, hardFailures: 0,

@@ -928,6 +928,10 @@ export default function App() {
           selectedId={selectedId}
           onSelect={(b) => setSelectedId(b.id)}
           onOpenPitcher={openPitcher}
+          watchlist={watchlist}
+          slip={slipSet}
+          onToggleWatch={toggleWatch}
+          onToggleSlip={toggleSlip}
         />
       )}
       {showBacktest && (
