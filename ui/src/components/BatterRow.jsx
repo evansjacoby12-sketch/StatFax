@@ -35,6 +35,13 @@ export default function BatterRow({
   const pmScore = pitchMixScore(b)
   const dueSetup = hrSetup(b)
   const air = Number.isFinite(b.parkWeatherHandFactor) ? b.parkWeatherHandFactor : null
+  const aiDelta = b.aiHr?.applied === true && Number.isFinite(b.baselineHrProbability) && Number.isFinite(b.hrProbability)
+    ? b.hrProbability - b.baselineHrProbability
+    : null
+  const aiPointDelta = aiDelta == null ? null : `${aiDelta >= 0 ? '+' : ''}${num(aiDelta * 100, 1)}pp`
+  const aiTitle = aiDelta == null
+    ? null
+    : `AI external-context adjustment from ${pct(b.baselineHrProbability, 1)} baseline (${aiPointDelta})`
   const airTone = air == null ? '' : air >= 1.05 ? 'good' : air <= 0.95 ? 'bad' : ''
   const momentum = b.hot
     ? { label: 'HOT', cls: 'hot', icon: 'Flame' }
@@ -172,6 +179,7 @@ export default function BatterRow({
         <div className="mobile-dl-verdict">
           <b className="mono" style={{ color }}>{pct(b.hrProbability, 1)}</b>
           <span style={{ color }}>{grade} {gradeScore}</span>
+          {aiDelta != null && <small className="mobile-ai-adjustment mono" title={aiTitle}>AI {aiPointDelta}</small>}
         </div>
 
         <div className="mobile-dl-evidence">
@@ -241,6 +249,11 @@ export default function BatterRow({
           <div className="dl-probability">
             <ProbRing value={b.hrProbability} color={color} size={64} />
             <small>HR PROB</small>
+            {aiDelta != null && (
+              <span className="dl-ai-adjustment mono" title={aiTitle} aria-label={aiTitle}>
+                <Icon name="Sparkles" size={9} aria-hidden="true" /> AI {aiPointDelta}
+              </span>
+            )}
           </div>
         </div>
 

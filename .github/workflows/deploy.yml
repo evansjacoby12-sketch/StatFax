@@ -202,8 +202,10 @@ jobs:
           npm run nfl:backtest
           npm run nfl:slate
 
-      # Publish the slate + rolling state back to R2 (S3-compatible) so the NEXT
-      # run's reconcile reads a fresh "yesterday" snapshot from a DURABLE store
+      # Publish rolling state back to R2 (S3-compatible). daily.json is held
+      # until the external-context production overlay has run below, so R2 and
+      # the UI receive exactly the same probabilities. This also lets the NEXT
+      # run's reconcile read a fresh "yesterday" snapshot from a DURABLE store
       # instead of depending on an external publisher (the gap that froze the
       # rolling log). No-op (and never blocks the deploy) unless the R2 secrets
       # are configured. To enable, add repo secrets R2_ACCESS_KEY_ID,
@@ -225,7 +227,7 @@ jobs:
             exit 0
           fi
           ENDPOINT="https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com"
-          for f in daily.json calibration.json backtest-log.json board-history.json zone-cache.json; do
+          for f in calibration.json backtest-log.json board-history.json zone-cache.json; do
             if [ -f "dist/$f" ]; then
               aws s3 cp "dist/$f" "s3://$R2_BUCKET/$f" --endpoint-url "$ENDPOINT" \
                 --content-type application/json --cache-control no-cache \
@@ -249,7 +251,8 @@ jobs:
           fi
 
       # Source-backed AI HR context (injuries/lineups/weather/bullpen →
-      # dist/context.json). Phase 1 is advisory and cannot touch predictions.
+      # dist/context.json). Extraction is advisory; only the deterministic,
+      # capped production overlay below can touch probability.
       # Skips itself if the key is unset; a flaky API call emits a valid empty
       # artifact so the board can still deploy.
       - name: Context pass (Tavily + OpenAI)
@@ -274,10 +277,20 @@ jobs:
       - name: Validate AI HR evaluation report
         run: npm run validate:ai-evaluation
 
-      # The main artifact publish happens before the paid context pass. Persist
-      # these later artifacts separately so the experiment survives cache
-      # eviction and can be graded against final outcomes in Phase 3.
-      - name: Publish AI HR artifacts to R2
+      # Manual production promotion (2026-07-15): apply the versioned
+      # external-factor hypothesis despite the sample gate. This changes only
+      # hrProbability, never score/grade/simulation/calibration.
+      - name: Apply capped AI HR production adjustment
+        run: npm run ai:hr-production
+
+      - name: Validate AI HR production adjustment
+        run: |
+          npm run validate:ai-production
+          npm run validate:mlb-data
+
+      # Publish the adjusted slate and its complete AI audit trail together.
+      # The UI build below reads this same adjusted dist/daily.json.
+      - name: Publish production slate and AI HR artifacts to R2
         continue-on-error: true
         env:
           AWS_ACCESS_KEY_ID:     ${{ secrets.R2_ACCESS_KEY_ID }}
@@ -288,11 +301,11 @@ jobs:
           AWS_RESPONSE_CHECKSUM_VALIDATION:  when_required
         run: |
           if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$R2_ACCOUNT_ID" ] || [ -z "$R2_BUCKET" ]; then
-            echo "R2 AI publish skipped — R2 credentials are not configured."
+            echo "R2 production publish skipped — R2 credentials are not configured."
             exit 0
           fi
           ENDPOINT="https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com"
-          for f in context.json ai-hr-shadow.json ai-hr-evaluation.json; do
+          for f in daily.json context.json ai-hr-shadow.json ai-hr-evaluation.json ai-hr-production.json; do
             if [ -f "dist/$f" ]; then
               aws s3 cp "dist/$f" "s3://$R2_BUCKET/$f" --endpoint-url "$ENDPOINT" \
                 --content-type application/json --cache-control no-cache \

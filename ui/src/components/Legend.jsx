@@ -11,7 +11,7 @@ const GRADES = [
 ]
 
 const TERMS = [
-  ['HR Probability', 'Calibrated chance of ≥1 HR today. Isotonic-mapped from the model score, then sim-resolved for ranking.'],
+  ['HR Probability', 'Chance of ≥1 HR today. Starts with the calibrated, sim-resolved model rate; a visible AI marker means sourced external context applied a capped production adjustment.'],
   ['Model score', '0–100 composite: 45% batter · 30% matchup · 25% environment, after calibration.'],
   ['xHR', 'Expected HRs this game (sum of per-PA HR probabilities).'],
   ['Rating', 'Quick 0–10 read of the score.'],

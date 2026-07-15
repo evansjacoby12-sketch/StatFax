@@ -77,7 +77,7 @@ try {
   const validation = assertValidAiHrShadowLedger(ledger)
   writeFileSync(OUT_PATH, JSON.stringify(ledger))
   for (const warning of validation.warnings) console.warn(`[ai-hr-shadow] warning: ${warning}`)
-  console.log(`[ai-hr-shadow] wrote ${OUT_PATH} — ${records.length} current projection(s), ${validation.metrics.records} retained · production unchanged`)
+  console.log(`[ai-hr-shadow] wrote ${OUT_PATH} — ${records.length} current projection(s), ${validation.metrics.records} retained · slate unchanged by shadow step`)
 } catch (error) {
   console.error(`[ai-hr-shadow] ${error.message}`)
   process.exitCode = 1

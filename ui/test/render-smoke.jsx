@@ -11,6 +11,7 @@ import { DEFAULT_FILTERS } from '../src/lib/constants.js'
 import Header from '../src/components/Header.jsx'
 import Filters from '../src/components/Filters.jsx'
 import BatterTable from '../src/components/BatterTable.jsx'
+import BatterRow from '../src/components/BatterRow.jsx'
 import GamesView from '../src/components/GamesView.jsx'
 import PitchersView from '../src/components/PitchersView.jsx'
 import WeatherView from '../src/components/WeatherView.jsx'
@@ -71,6 +72,10 @@ function mkBatter(id, name, homered) {
     score: 80 - id,
     grade: { label: id === 1 ? 'PRIME' : 'STRONG', color: id === 1 ? '#00d4ff' : '#32d74b' },
     hrProbability: 0.3 - id * 0.02,
+    ...(id === 1 ? {
+      baselineHrProbability: 0.27,
+      aiHr: { productionVersion: 1, applied: true, logitDelta: 0.05, signalIds: ['weather-1'] },
+    } : {}),
     expectedHRs: 0.2,
     expectedPAs: 4,
     hot: true,
@@ -158,6 +163,14 @@ const normal = batters[batters.length - 1] || batters[0]
 
 const cases = []
 const add = (name, el) => cases.push([name, el])
+const aiSmokeBatter = {
+  ...mkBatter(1, 'AI Smoke Batter', false),
+  id: '1-1',
+  game: SYNTH.games[0],
+  opponent: SYNTH.games[0].homeTeam,
+  heatIndex: 70,
+}
+add('BatterRow.ai-production', <BatterRow batter={aiSmokeBatter} rank={1} onSelect={noop} watched={false} inSlip={false} onToggleWatch={noop} onToggleSlip={noop} />)
 for (const mode of [true, false]) {
   const tag = mode ? 'live' : 'pregame'
   add(`Header[${tag}]`, <Header meta={meta} counts={{ games: (d.games || []).length, total: batters.length, shown: batters.length }} onRefresh={noop} onOpenModel={noop} onOpenLegend={noop} autoRefresh={false} onToggleAuto={noop} liveScores={mode} onToggleLive={noop} refreshing={false} gradeCounts={{}} total={batters.length} onOpenGuide={noop} onOpenHowTo={noop} />)

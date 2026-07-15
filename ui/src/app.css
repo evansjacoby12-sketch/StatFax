@@ -13197,6 +13197,7 @@ button.th:focus-visible {
   .mobile-player-prob { flex: none; text-align: right; }
   .mobile-player-prob b { display: block; color: var(--player-accent); font-size: 18px; font-weight: 900; }
   .mobile-player-prob small { display: block; margin-top: 1px; color: var(--text-faint); font-size: 6px; font-weight: 800; letter-spacing: 0.08em; }
+  .mobile-player-prob .mobile-player-ai { display: block; margin-top: 2px; color: var(--accent); font-size: 6.5px; font-weight: 850; letter-spacing: 0.03em; white-space: nowrap; }
   .mobile-player-close {
     width: 44px;
     height: 44px;
@@ -18324,6 +18325,24 @@ button.th:focus-visible {
   letter-spacing: 0.08em;
 }
 
+.dl-ai-adjustment {
+  min-height: 15px;
+  margin-top: 3px;
+  padding: 1px 5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  font-size: 7px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  line-height: 1;
+  white-space: nowrap;
+}
+
 .dl-proof {
   min-width: 0;
   display: flex;
@@ -18610,6 +18629,14 @@ button.th:focus-visible {
   }
   .mobile-dl-verdict > b { font-family: var(--display); font-size: 20px; line-height: 1.05; }
   .mobile-dl-verdict > span { margin-top: 3px; font-size: 9px; font-weight: 900; letter-spacing: 0.02em; }
+  .mobile-dl-verdict > .mobile-ai-adjustment {
+    margin-top: 2px;
+    color: var(--accent);
+    font-size: 6.5px;
+    font-weight: 850;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+  }
 
   .mobile-dl-evidence {
     grid-column: 1 / 3;

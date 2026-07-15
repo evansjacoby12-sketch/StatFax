@@ -8,9 +8,9 @@
  * AI HR context contract. Every accepted signal is tied to a slate-owned
  * entity key, source URL, confidence, observation time, and expiration time.
  *
- * IMPORTANT: this NEVER touches the HR predictions. The model stays statistical;
- * this only adds a human-readable context overlay (and catches data gaps like a
- * pitcher with no season sample). It's advisory.
+ * IMPORTANT: this extractor never edits HR predictions itself. It emits sourced,
+ * entity-bound advisory context; the separate versioned production overlay may
+ * consume qualifying external factors after deterministic validation and caps.
  *
  * Env:
  *   TAVILY_API_KEY      required for source retrieval.
@@ -87,7 +87,7 @@ async function main() {
     return write(empty({ skipped: true, dryRun: true }));
   }
   if (!process.env.TAVILY_API_KEY || !process.env.OPENAI_API_KEY) {
-    console.warn('[context] TAVILY_API_KEY / OPENAI_API_KEY not set — skipping (model predictions unaffected)');
+    console.warn('[context] TAVILY_API_KEY / OPENAI_API_KEY not set — skipping (statistical baseline remains active)');
     return write(empty({ skipped: true }));
   }
   // The pipeline ticks every ~10 min; reuse a recent good run instead of paying
