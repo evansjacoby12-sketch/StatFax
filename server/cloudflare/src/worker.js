@@ -323,7 +323,7 @@ async function handleListBuilder(request, env) {
   ]));
   const criteriaProperties = {
     ...numericProperties,
-    signals: { type: 'array', uniqueItems: true, items: { type: 'string', enum: LIST_BUILDER_SIGNALS } },
+    signals: { type: 'array', items: { type: 'string', enum: LIST_BUILDER_SIGNALS } },
     signalMode: { type: 'string', enum: ['all', 'any'] },
     pregameOnly: { type: 'boolean' },
     confirmedOnly: { type: 'boolean' },
@@ -366,6 +366,7 @@ async function handleListBuilder(request, env) {
       maxOutputTokens: 700,
     });
   } catch (e) {
+    console.error('List Builder OpenAI request failed', { status: e.status, detail: e.detail || e.message });
     return jsonResponse({ error: e.message === 'LLM error' ? 'AI criteria request failed.' : 'AI criteria is temporarily unavailable.', status: e.status }, 502, env);
   }
 

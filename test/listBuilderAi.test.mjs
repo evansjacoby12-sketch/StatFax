@@ -69,6 +69,7 @@ test('worker returns strict visible criteria without receiving slate data', asyn
 
     assert.equal(openAiRequest.text.format.type, 'json_schema')
     assert.equal(openAiRequest.text.format.strict, true)
+    assert.equal('uniqueItems' in openAiRequest.text.format.schema.properties.criteria.properties.signals, false)
     assert.equal(openAiRequest.input, 'confirmed hot power bats against HR-prone pitching')
     assert.equal(JSON.stringify(openAiRequest).includes('playerId'), false)
     assert.equal('slate' in openAiRequest, false)
