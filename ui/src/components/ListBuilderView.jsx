@@ -1,11 +1,15 @@
-import { useState, useRef } from 'react'
+import { useMemo, useState } from 'react'
 import Icon from './Icon.jsx'
 import { GradeChip } from './atoms.jsx'
 import { toast } from './Toast.jsx'
 import { pct, num } from '../lib/format.js'
-import { pitchMixScore, hrSetup } from '../lib/scout.js'
-import { positiveReasonCount, negativeReasonCount } from '../lib/combo-engine.js'
 import { lastFirst } from '../lib/groups.js'
+import {
+  LIST_BUILDER_SIGNALS,
+  buildListBuilderResults,
+  createListBuilderCriteria,
+  effectiveOppHr9,
+} from '../lib/list-builder.js'
 
 // ─── field helpers ───────────────────────────────────────────────────────────
 
@@ -18,35 +22,9 @@ const blast = (b) => {
   return r
 }
 
-const BOOL_SIGNALS = [
-  { key: 'precision',     label: 'Precision',      get: b => b.precision },
-  { key: 'sleeper',       label: 'Sleeper',        get: b => b.sleeper },
-  { key: 'hot',           label: 'Hot Bat',        get: b => b.hot },
-  { key: 'barrelKing',    label: 'Barrel King',    get: b => b.barrelKing },
-  { key: 'blast',         label: 'Blast',          get: b => b.blast },
-  { key: 'pitchEdge',     label: 'Pitch Edge',     get: b => b.pitchEdge },
-  { key: 'pitchMixEdge',  label: 'Pitch Mix Edge', get: b => b.pitchMixEdge },
-  { key: 'zoneEdge',      label: 'Zone Match',     get: b => b.zoneEdge },
-  { key: 'hrPlatoonEdge', label: 'Platoon Edge',   get: b => b.hrPlatoonEdge },
-  { key: 'wxEdge',        label: 'Weather Boost',  get: b => b.wxEdge },
-  { key: 'homeEdge',      label: 'Home Edge',      get: b => b.homeEdge },
-  { key: 'awayEdge',      label: 'Away Edge',      get: b => b.awayEdge },
-]
+const BOOL_SIGNALS = LIST_BUILDER_SIGNALS
 
 // ─── empty form ──────────────────────────────────────────────────────────────
-
-const EMPTY = {
-  // Pitcher matchup
-  minOppHr9: '', minPitchMix: '', minParkFactor: '',
-  // Statcast
-  minExitVelo: '', minBarrel: '', minHardHit: '',
-  minBlast: '', minLaunchAngle: '', maxPullPct: '',
-  // Form / model
-  minScore: '', minHeat: '', minHrProb: '',
-  minRecBarrel: '', minHrDue: '', minPositives: '', maxNegatives: '',
-  // Signals (booleans)
-  signals: new Set(),
-}
 
 // ─── sub-components ──────────────────────────────────────────────────────────
 
@@ -98,58 +76,34 @@ function ResultRow({ b, idx = 0, onSelect, cols }) {
 // ─── main view ───────────────────────────────────────────────────────────────
 
 export default function ListBuilderView({ batters = [], onSelect }) {
-  const [form, setForm] = useState(EMPTY)
-  const [results, setResults] = useState(null) // null = not built yet
+  const [form, setForm] = useState(() => createListBuilderCriteria())
+  const [builtCriteria, setBuiltCriteria] = useState(null)
 
   const setField = (name, val) => setForm(f => ({ ...f, [name]: val }))
 
   const toggleSig = (key) => setForm(f => {
-    const s = new Set(f.signals)
-    s.has(key) ? s.delete(key) : s.add(key)
-    return { ...f, signals: s }
+    const signals = f.signals.includes(key) ? f.signals.filter((item) => item !== key) : [...f.signals, key]
+    return { ...f, signals }
   })
 
   const num_ = (v) => { const n = parseFloat(v); return Number.isFinite(n) ? n : null }
 
-  const buildList = () => {
-    const f = form
-    const out = batters.filter(b => {
-      if (num_(f.minOppHr9)     != null && (b.pitcher?.season?.hrPer9 ?? 0) < num_(f.minOppHr9))     return false
-      if (num_(f.minPitchMix)   != null && (pitchMixScore(b) ?? 0)           < num_(f.minPitchMix))   return false
-      if (num_(f.minParkFactor) != null && (b.gameParkHRFactor ?? 1)         < num_(f.minParkFactor)) return false
-      if (num_(f.minExitVelo)   != null && (b.exitVelo ?? 0)                 < num_(f.minExitVelo))   return false
-      if (num_(f.minBarrel)     != null && ((b.barrelPctBBE ?? b.barrelPct ?? 0)) < num_(f.minBarrel)) return false
-      if (num_(f.minHardHit)    != null && (b.hardHitPct ?? 0)               < num_(f.minHardHit))    return false
-      if (num_(f.minBlast)      != null && (blast(b) ?? 0)                   < num_(f.minBlast))      return false
-      if (num_(f.minLaunchAngle)!= null && (b.launchAngle ?? 0)              < num_(f.minLaunchAngle))return false
-      if (num_(f.maxPullPct)    != null && (b.pullPct ?? 100)                > num_(f.maxPullPct))    return false
-      if (num_(f.minScore)      != null && (b.score ?? 0)                    < num_(f.minScore))      return false
-      if (num_(f.minHeat)       != null && (b.heatIndex ?? 0)                < num_(f.minHeat))       return false
-      if (num_(f.minHrProb)     != null && ((b.hrProbability ?? 0) * 100)    < num_(f.minHrProb))     return false
-      if (num_(f.minRecBarrel)  != null && (b.recentBarrel?.recentBarrelPct ?? 0) < num_(f.minRecBarrel)) return false
-      if (num_(f.minHrDue)      != null && hrSetup(b).n                      < num_(f.minHrDue))      return false
-      if (num_(f.minPositives)  != null && positiveReasonCount(b)            < num_(f.minPositives))  return false
-      if (num_(f.maxNegatives)  != null && negativeReasonCount(b)            > num_(f.maxNegatives))  return false
-      for (const key of f.signals) {
-        const s = BOOL_SIGNALS.find(s => s.key === key)
-        if (!s?.get(b)) return false
-      }
-      return true
-    }).sort((a, b) => (b.hrProbability ?? 0) - (a.hrProbability ?? 0))
-    setResults(out)
-  }
+  const buildList = () => setBuiltCriteria(createListBuilderCriteria(form))
+  const built = useMemo(() => builtCriteria ? buildListBuilderResults(batters, builtCriteria) : null, [batters, builtCriteria])
+  const results = built?.results.map((item) => item.batter) ?? null
 
-  const reset = () => { setForm(EMPTY); setResults(null) }
+  const reset = () => { setForm(createListBuilderCriteria()); setBuiltCriteria(null) }
 
   // Build display columns from active numeric fields
+  const displayCriteria = builtCriteria || form
   const cols = [
-    num_(form.minScore)    != null && { key: 'score',   label: 'Score',   fmt: b => Math.round(b.score ?? 0) },
-    num_(form.minHeat)     != null && { key: 'heat',    label: 'Heat',    fmt: b => Math.round(b.heatIndex ?? 0) },
-    num_(form.minBarrel)   != null && { key: 'barrel',  label: 'Brl%',    fmt: b => `${num(b.barrelPctBBE ?? b.barrelPct, 1)}%` },
-    num_(form.minHardHit)  != null && { key: 'hardhit', label: 'HH%',     fmt: b => `${num(b.hardHitPct, 1)}%` },
-    num_(form.minExitVelo) != null && { key: 'ev',      label: 'EV',      fmt: b => `${num(b.exitVelo, 1)}` },
-    num_(form.minBlast)    != null && { key: 'blast',   label: 'Blast%',  fmt: b => `${num(blast(b), 1)}%` },
-    num_(form.minOppHr9)   != null && { key: 'hr9',     label: 'HR/9',    fmt: b => num(b.pitcher?.season?.hrPer9, 2) },
+    num_(displayCriteria.minScore)    != null && { key: 'score',   label: 'Score',   fmt: b => Math.round(b.score ?? 0) },
+    num_(displayCriteria.minHeat)     != null && { key: 'heat',    label: 'Heat',    fmt: b => Math.round(b.heatIndex ?? 0) },
+    num_(displayCriteria.minBarrel)   != null && { key: 'barrel',  label: 'Brl%',    fmt: b => `${num(b.barrelPctBBE ?? b.barrelPct, 1)}%` },
+    num_(displayCriteria.minHardHit)  != null && { key: 'hardhit', label: 'HH%',     fmt: b => `${num(b.hardHitPct, 1)}%` },
+    num_(displayCriteria.minExitVelo) != null && { key: 'ev',      label: 'EV',      fmt: b => `${num(b.exitVelo, 1)}` },
+    num_(displayCriteria.minBlast)    != null && { key: 'blast',   label: 'Blast%',  fmt: b => `${num(blast(b), 1)}%` },
+    num_(displayCriteria.minOppHr9)   != null && { key: 'hr9',     label: 'HR/9',    fmt: b => num(effectiveOppHr9(b), 2) },
   ].filter(Boolean).slice(0, 3)
 
   return (
@@ -179,8 +133,9 @@ export default function ListBuilderView({ batters = [], onSelect }) {
           <Field label="Min Barrel%"      name="minBarrel"      value={form.minBarrel}      onChange={setField} hint="BBE%; MLB avg ~7%" step="1" min="0" max="30" />
           <Field label="Min Hard Hit%"    name="minHardHit"     value={form.minHardHit}     onChange={setField} hint="EV ≥95mph; e.g. 45" step="1" min="0" max="75" />
           <Field label="Min Blast%"       name="minBlast"       value={form.minBlast}       onChange={setField} hint="Bat tracking; e.g. 20" step="1" min="0" max="60" />
-          <Field label="Min Launch Angle" name="minLaunchAngle" value={form.minLaunchAngle} onChange={setField} hint="°; HR window 8–32°" step="1" min="0" max="35" />
-          <Field label="Max Pull%"        name="maxPullPct"     value={form.maxPullPct}     onChange={setField} hint="e.g. 50 = not pull-heavy" step="1" min="0" max="100" />
+          <Field label="Min Launch Angle" name="minLaunchAngle" value={form.minLaunchAngle} onChange={setField} hint="HR window starts near 8°" step="1" min="0" max="45" />
+          <Field label="Max Launch Angle" name="maxLaunchAngle" value={form.maxLaunchAngle} onChange={setField} hint="HR window ends near 32°" step="1" min="0" max="50" />
+          <Field label="Min Pull%"        name="minPullPct"     value={form.minPullPct}     onChange={setField} hint="42%+ targets the short side" step="1" min="0" max="100" />
         </div>
       </section>
 
@@ -205,7 +160,7 @@ export default function ListBuilderView({ batters = [], onSelect }) {
         <p className="lbv-sec-desc dim">Require any combination of matchup &amp; form signals.</p>
         <div className="lbv-siglist">
           {BOOL_SIGNALS.map(s => (
-            <SigCheck key={s.key} sig={s} active={form.signals.has(s.key)} onToggle={toggleSig} />
+            <SigCheck key={s.key} sig={s} active={form.signals.includes(s.key)} onToggle={toggleSig} />
           ))}
         </div>
       </section>
