@@ -20985,8 +20985,11 @@ button.th:focus-visible {
 
 /* Grade Spectrum Rail — approved unified grade filter. */
 .grade-spectrum-rail {
+  container: grade-rail / inline-size;
+  width: 443px;
   min-width: 0;
   max-width: 100%;
+  flex: 0 1 443px;
   display: flex;
   align-items: center;
   gap: 2px;
@@ -21067,6 +21070,7 @@ button.th:focus-visible {
   font-weight: 700;
   letter-spacing: 0.02em;
   text-align: left;
+  white-space: nowrap;
 }
 .grade-segment-count {
   flex: none;
@@ -21083,6 +21087,12 @@ button.th:focus-visible {
 .grade-segment.on .grade-segment-count {
   color: #fff;
   background: rgba(255, 255, 255, 0.1);
+}
+
+/* The filter row can constrain this control even on a wide desktop. Respond
+   to the rail itself so the grade cells never compete with the family label. */
+@container grade-rail (max-width: 430px) {
+  .grade-spectrum-label { display: none; }
 }
 
 @media (max-width: 1180px) and (min-width: 561px) {
