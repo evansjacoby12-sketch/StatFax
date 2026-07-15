@@ -56,6 +56,19 @@ export function createListBuilderCriteria(overrides = {}) {
 const finite = (value) => value !== null && value !== '' && Number.isFinite(Number(value))
 const number = (value) => finite(value) ? Number(value) : null
 const fmt = (value, digits = 1) => Number(value).toFixed(digits).replace(/\.0$/, '')
+const clamp01 = (value) => Math.max(0, Math.min(1, value))
+const relaxationPrecision = Object.freeze({
+  minOppHr9: 2, minPitchMix: 1, minParkFactor: 2,
+  minExitVelo: 1, minBarrel: 1, minHardHit: 1, minBlast: 1,
+  minLaunchAngle: 1, maxLaunchAngle: 1, minPullPct: 1,
+  minScore: 0, minHeat: 0, minHrProb: 1, minRecBarrel: 1,
+  minHrDue: 0, minPositives: 0, maxNegatives: 0,
+})
+
+function safeRelaxationValue(definition, value) {
+  const scale = 10 ** (relaxationPrecision[definition.field] ?? 2)
+  return (definition.mode === 'max' ? Math.ceil((value * scale) - 1e-9) : Math.floor((value * scale) + 1e-9)) / scale
+}
 
 // Trust boundary for saved/browser/AI criteria. Internal form state may contain
 // strings while a person is typing; external criteria are reduced to the known
@@ -127,10 +140,47 @@ export function evaluateListBuilderBatter(batter, rawCriteria = {}) {
   const passed = []
   const failed = []
   const missing = []
+  const gateScores = []
 
-  if (criteria.pregameOnly && !isPregameListCandidate(batter)) failed.push({ key: 'pregameOnly', label: 'Game is not actionable pregame' })
-  if (criteria.confirmedOnly && (batter?.lineupConfirmed !== true || isBenched(batter))) failed.push({ key: 'confirmedOnly', label: 'Not in a confirmed lineup' })
-  if (criteria.trustedOnly && batter?.dataTrust?.status) failed.push({ key: 'trustedOnly', label: 'Data health review required' })
+  const stateChecks = [
+    {
+      active: criteria.pregameOnly,
+      key: 'pregameOnly',
+      label: 'Pregame only',
+      passes: isPregameListCandidate(batter),
+      detail: 'Game is not actionable pregame',
+      actual: batter?.game?.status || (batter?.game?.isLive ? 'In progress' : batter?.game?.isFinal ? 'Final' : 'Unavailable'),
+      relaxable: false,
+    },
+    {
+      active: criteria.confirmedOnly,
+      key: 'confirmedOnly',
+      label: 'Confirmed lineup',
+      passes: batter?.lineupConfirmed === true && !isBenched(batter),
+      detail: 'Not in a confirmed lineup',
+      actual: isBenched(batter) ? 'Benched' : 'Unconfirmed',
+    },
+    {
+      active: criteria.trustedOnly,
+      key: 'trustedOnly',
+      label: 'No data warnings',
+      passes: !batter?.dataTrust?.status,
+      detail: 'Data health review required',
+      actual: batter?.dataTrust?.status || 'Review required',
+    },
+  ]
+  for (const check of stateChecks.filter((item) => item.active)) {
+    gateScores.push(check.passes ? 1 : 0)
+    if (!check.passes) {
+      failed.push({
+        type: 'state', key: check.key, label: check.label, detail: check.detail,
+        actual: String(check.actual), thresholdText: 'Required',
+        ...(check.relaxable === false ? {} : {
+          relaxation: { type: 'state', key: check.key, label: `Turn off ${check.label.toLowerCase()}`, description: `${check.label}: required → off` },
+        }),
+      })
+    }
+  }
 
   for (const definition of metricDefinitions) {
     const threshold = number(criteria[definition.field])
@@ -138,22 +188,77 @@ export function evaluateListBuilderBatter(batter, rawCriteria = {}) {
     const value = definition.get(batter)
     if (!Number.isFinite(value)) {
       missing.push({ key: definition.field, label: definition.label })
-      failed.push({ key: definition.field, label: `${definition.label} unavailable`, missing: true })
+      failed.push({ type: 'metric', key: definition.field, label: definition.label, detail: `${definition.label} unavailable`, missing: true })
+      gateScores.push(0)
       continue
     }
     const qualifies = definition.mode === 'max' ? value <= threshold : value >= threshold
+    const delta = qualifies ? 0 : definition.mode === 'max' ? value - threshold : threshold - value
+    const relaxedValue = safeRelaxationValue(definition, value)
+    const [, allowedMax] = LIST_BUILDER_LIMITS[definition.field]
+    const canRelax = definition.mode === 'max' ? relaxedValue <= allowedMax : relaxedValue >= LIST_BUILDER_LIMITS[definition.field][0]
+    const denominator = Math.max(Math.abs(threshold), 1)
+    gateScores.push(qualifies ? 1 : clamp01(1 - (delta / denominator)))
     const detail = `${definition.label} ${definition.fmt(value)} ${qualifies ? 'clears' : 'misses'} ${definition.mode === 'max' ? '≤' : '≥'} ${definition.fmt(threshold)}`
-    ;(qualifies ? passed : failed).push({ key: definition.field, label: definition.label, detail, value, threshold })
+    const gate = {
+      type: 'metric', key: definition.field, label: definition.label, detail,
+      mode: definition.mode, value, threshold, delta,
+      valueText: definition.fmt(value), thresholdText: definition.fmt(threshold), deltaText: definition.fmt(delta),
+    }
+    if (!qualifies && canRelax) {
+      const symbol = definition.mode === 'max' ? '≤' : '≥'
+      gate.relaxation = {
+        type: 'metric', key: definition.field, value: relaxedValue,
+        label: `Relax to ${symbol} ${definition.fmt(relaxedValue)}`,
+        description: `${definition.label} ${symbol} ${definition.fmt(threshold)} → ${symbol} ${definition.fmt(relaxedValue)}`,
+      }
+    }
+    ;(qualifies ? passed : failed).push(gate)
   }
 
   const signalChecks = criteria.signals.map((key) => ({ key, label: LIST_BUILDER_SIGNALS.find((item) => item.key === key)?.label || key, value: batter?.[key] === true }))
   if (signalChecks.length) {
-    const signalsPass = criteria.signalMode === 'any' ? signalChecks.some((item) => item.value) : signalChecks.every((item) => item.value)
-    if (!signalsPass) failed.push({ key: 'signals', label: criteria.signalMode === 'any' ? 'No selected signal matched' : 'Not every selected signal matched' })
-    for (const signal of signalChecks.filter((item) => item.value)) passed.push({ key: `signal:${signal.key}`, label: signal.label })
+    const matchedSignals = signalChecks.filter((item) => item.value)
+    if (criteria.signalMode === 'all') {
+      for (const signal of signalChecks) {
+        gateScores.push(signal.value ? 1 : 0)
+        if (!signal.value) {
+          const retainedSignals = criteria.signals.filter((key) => key !== signal.key)
+          failed.push({
+            type: 'signal', key: `signal:${signal.key}`, label: signal.label,
+            detail: `${signal.label} signal not present`, actual: 'Not present', thresholdText: 'Required',
+            relaxation: {
+              type: 'signals', signals: retainedSignals,
+              label: `Remove ${signal.label}`,
+              description: `${signal.label}: required → off`,
+            },
+          })
+        }
+      }
+    } else {
+      const signalsPass = matchedSignals.length > 0
+      gateScores.push(signalsPass ? 1 : 0)
+      if (!signalsPass) {
+        failed.push({
+          type: 'signals', key: 'signals', label: 'Selected signals',
+          detail: 'No selected signal matched', actual: `0/${signalChecks.length} matched`, thresholdText: 'At least 1 selected',
+          relaxation: {
+            type: 'signals', signals: [], label: 'Remove signal gate',
+            description: `Signals: ${signalChecks.length} selected → off`,
+          },
+        })
+      }
+    }
+    for (const signal of matchedSignals) passed.push({ key: `signal:${signal.key}`, label: signal.label })
   }
 
-  return { matches: failed.length === 0, passed, failed, missing }
+  const matches = failed.length === 0
+  const fitScore = matches ? 100 : Math.round((gateScores.reduce((sum, value) => sum + value, 0) / Math.max(gateScores.length, 1)) * 100)
+  return {
+    matches, fitScore, passed, failed, missing,
+    gateCount: gateScores.length,
+    passedGateCount: gateScores.filter((value) => value === 1).length,
+  }
 }
 
 function sortValue(batter, sort) {
@@ -163,20 +268,50 @@ function sortValue(batter, sort) {
   return batter?.[sort]
 }
 
+function compareListBuilderItems(left, right, sort) {
+  const a = sortValue(left.batter, sort)
+  const b = sortValue(right.batter, sort)
+  if (Number.isFinite(a) !== Number.isFinite(b)) return Number.isFinite(a) ? -1 : 1
+  return (Number(b) || 0) - (Number(a) || 0)
+    || (right.batter.score ?? 0) - (left.batter.score ?? 0)
+    || String(left.batter.name || '').localeCompare(String(right.batter.name || ''))
+}
+
+export function relaxListBuilderGate(rawCriteria = {}, failure) {
+  const criteria = createListBuilderCriteria(rawCriteria)
+  const relaxation = failure?.relaxation
+  if (!relaxation) return criteria
+  if (relaxation.type === 'metric') {
+    const definition = metricDefinitions.find((item) => item.field === relaxation.key)
+    const limits = LIST_BUILDER_LIMITS[relaxation.key]
+    if (!definition || !limits || !Number.isFinite(relaxation.value)) return criteria
+    const value = Math.min(limits[1], Math.max(limits[0], relaxation.value))
+    return createListBuilderCriteria({ ...criteria, [relaxation.key]: value })
+  }
+  if (relaxation.type === 'state' && ['pregameOnly', 'confirmedOnly', 'trustedOnly'].includes(relaxation.key)) {
+    return createListBuilderCriteria({ ...criteria, [relaxation.key]: false })
+  }
+  if (relaxation.type === 'signals') {
+    const signals = (relaxation.signals || []).filter((key) => LIST_BUILDER_SIGNALS.some((signal) => signal.key === key))
+    return createListBuilderCriteria({ ...criteria, signals })
+  }
+  return criteria
+}
+
 export function buildListBuilderResults(batters = [], rawCriteria = {}) {
   const criteria = createListBuilderCriteria(rawCriteria)
   const evaluated = (batters || []).map((batter) => ({ batter, evaluation: evaluateListBuilderBatter(batter, criteria) }))
-  const results = evaluated.filter((item) => item.evaluation.matches).sort((left, right) => {
-    const a = sortValue(left.batter, criteria.sort)
-    const b = sortValue(right.batter, criteria.sort)
-    if (Number.isFinite(a) !== Number.isFinite(b)) return Number.isFinite(a) ? -1 : 1
-    return (Number(b) || 0) - (Number(a) || 0) || (right.batter.score ?? 0) - (left.batter.score ?? 0) || String(left.batter.name || '').localeCompare(String(right.batter.name || ''))
-  })
+  const results = evaluated
+    .filter((item) => item.evaluation.matches)
+    .sort((left, right) => compareListBuilderItems(left, right, criteria.sort))
+  const nearMisses = evaluated
+    .filter((item) => item.evaluation.failed.length === 1 && item.evaluation.missing.length === 0 && item.evaluation.failed[0].relaxation)
+    .sort((left, right) => right.evaluation.fitScore - left.evaluation.fitScore || compareListBuilderItems(left, right, criteria.sort))
   const active = activeListBuilderCriteria(criteria)
   const coverage = Object.fromEntries(active.filter((item) => item.type === 'metric').map((item) => {
     const definition = metricDefinitions.find((candidate) => candidate.field === item.key)
     const available = definition ? (batters || []).filter((batter) => Number.isFinite(definition.get(batter))).length : 0
     return [item.key, { available, total: batters.length }]
   }))
-  return { criteria, active, results, evaluated, coverage }
+  return { criteria, active, results, nearMisses, evaluated, coverage }
 }

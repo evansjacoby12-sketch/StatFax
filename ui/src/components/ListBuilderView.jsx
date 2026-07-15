@@ -20,6 +20,7 @@ import {
   activeListBuilderCriteria,
   buildListBuilderResults,
   createListBuilderCriteria,
+  relaxListBuilderGate,
   sanitizeListBuilderCriteria,
 } from '../lib/list-builder.js'
 
@@ -150,12 +151,14 @@ function PresetCard({ preset, evidence, active, compact = false, onApply }) {
   )
 }
 
-function ResultCard({ item, index, onSelect, watched, inSlip, onToggleWatch, onToggleSlip }) {
+function ResultCard({ item, index, nearMiss = false, onRelax, onSelect, watched, inSlip, onToggleWatch, onToggleSlip }) {
   const { batter, evaluation } = item
+  const failure = nearMiss ? evaluation.failed[0] : null
   const reasons = evaluation.passed.slice(0, 3)
+  const failureSymbol = failure?.mode === 'max' ? '≤' : '≥'
   return (
     <article
-      className="lbv-result-card"
+      className={`lbv-result-card${nearMiss ? ' near-miss' : ''}`}
       style={{ '--i': Math.min(index, 12) }}
       tabIndex={0}
       role="button"
@@ -165,8 +168,12 @@ function ResultCard({ item, index, onSelect, watched, inSlip, onToggleWatch, onT
       <div className="lbv-result-identity">
         <GradeChip grade={batter.grade} size="sm" score={batter.score} />
         <div>
-          <strong>{batter.name}</strong>
+          <span className="lbv-result-name-row">
+            <strong>{batter.name}</strong>
+            <b className={`lbv-fit-score${nearMiss ? ' near' : ''}`}>{evaluation.fitScore} FIT</b>
+          </span>
           <span>{batter.team} vs {batter.opponent?.abbr || batter.opponent?.name || '—'}</span>
+          <small>{evaluation.passedGateCount}/{evaluation.gateCount} gates passed</small>
         </div>
       </div>
 
@@ -177,11 +184,28 @@ function ResultCard({ item, index, onSelect, watched, inSlip, onToggleWatch, onT
         {batter.dataTrust?.status && (
           <span className="lbv-data-warning"><Icon name="TriangleAlert" size={13} /> Data review</span>
         )}
-        <div className="lbv-reasons">
-          {reasons.length
-            ? reasons.map((reason) => <span key={reason.key}>{reason.detail || reason.label}</span>)
-            : <span>Actionable pregame candidate · no metric gate applied</span>}
-        </div>
+        {failure ? (
+          <div className="lbv-failed-gate">
+            <div>
+              <b><Icon name="TriangleAlert" size={12} /> Failed: {failure.label}</b>
+              {failure.type === 'metric' ? (
+                <span>Actual {failure.valueText} · Gate {failureSymbol} {failure.thresholdText} · {failure.mode === 'max' ? 'Over' : 'Short'} by {failure.deltaText}</span>
+              ) : (
+                <span>Actual {failure.actual} · Gate {failure.thresholdText}</span>
+              )}
+              <small>{failure.relaxation.description}</small>
+            </div>
+            <button type="button" onClick={(event) => { event.stopPropagation(); onRelax?.(failure) }}>
+              <Icon name="SlidersHorizontal" size={13} /> {failure.relaxation.label}
+            </button>
+          </div>
+        ) : (
+          <div className="lbv-reasons">
+            {reasons.length
+              ? reasons.map((reason) => <span key={reason.key}>{reason.detail || reason.label}</span>)
+              : <span>Actionable pregame candidate · no metric gate applied</span>}
+          </div>
+        )}
       </div>
 
       <div className="lbv-result-numbers">
@@ -216,6 +240,7 @@ export default function ListBuilderView({
   const [rollingEvidence, setRollingEvidence] = useState(null)
   const [evidenceWindow, setEvidenceWindow] = useState('d14')
   const [evidenceFeedStatus, setEvidenceFeedStatus] = useState('loading')
+  const [resultMode, setResultMode] = useState('exact')
 
   useEffect(() => {
     let active = true
@@ -232,6 +257,7 @@ export default function ListBuilderView({
   }, [])
 
   const built = useMemo(() => buildListBuilderResults(batters, form), [batters, form])
+  const visibleResults = resultMode === 'near' ? built.nearMisses : built.results
   const aiCriteria = useMemo(() => aiProposal ? activeListBuilderCriteria(aiProposal.criteria) : [], [aiProposal])
   const metricCoverage = Object.values(built.coverage)
   const covered = metricCoverage.length ? Math.min(...metricCoverage.map((item) => item.available)) : batters.length
@@ -318,10 +344,21 @@ export default function ListBuilderView({
     toast.success('AI criteria applied')
   }
 
+  const relaxGate = (failure) => {
+    setActivePreset(null)
+    setForm(relaxListBuilderGate(form, failure))
+    setResultMode('exact')
+    toast.info(`Applied: ${failure.relaxation.description}`)
+  }
+
   const copyList = async () => {
     const criteria = built.active.map(criterionText).join(' · ') || 'No filters'
-    const players = built.results.map(({ batter }, index) => `${index + 1}. ${batter.name} (${batter.team}) — HR ${pct(batter.hrProbability, 1)}`)
-    const text = [`StatFax List Builder · ${built.results.length} matches`, `Criteria: ${criteria}`, '', ...players].join('\n')
+    const players = visibleResults.map(({ batter, evaluation }, index) => {
+      const miss = resultMode === 'near' ? ` · ${evaluation.fitScore} Fit · misses ${evaluation.failed[0].label}` : ''
+      return `${index + 1}. ${batter.name} (${batter.team}) — HR ${pct(batter.hrProbability, 1)}${miss}`
+    })
+    const listLabel = resultMode === 'near' ? 'near misses' : 'exact matches'
+    const text = [`StatFax List Builder · ${visibleResults.length} ${listLabel}`, `Criteria: ${criteria}`, '', ...players].join('\n')
     try {
       await navigator.clipboard.writeText(text)
       toast.success('Criteria and list copied')
@@ -340,7 +377,7 @@ export default function ListBuilderView({
         </div>
         <div className="lbv-live-count" aria-live="polite">
           <strong key={built.results.length}>{built.results.length}</strong>
-          <span>of {batters.length} match</span>
+          <span>exact · {built.nearMisses.length} near</span>
           <small>Updates live</small>
         </div>
       </header>
@@ -533,7 +570,7 @@ export default function ListBuilderView({
         <div className="lbv-results-head">
           <div>
             <span className="lbv-eyebrow">Ranked matches</span>
-            <h3>{built.results.length} candidates</h3>
+            <h3>{built.results.length} exact · {built.nearMisses.length} near</h3>
             <p>{metricCoverage.length ? `${covered}/${batters.length} hitters have data for every active metric gate.` : 'No metric gates active; actionability rules still apply.'}</p>
           </div>
           <div className="lbv-results-tools">
@@ -542,17 +579,29 @@ export default function ListBuilderView({
                 {LIST_BUILDER_SORTS.map((sort) => <option key={sort.key} value={sort.key}>{sort.label}</option>)}
               </select>
             </label>
-            <button type="button" className="lbv-copy" onClick={copyList} disabled={!built.results.length}><Icon name="Copy" size={13} /> Copy list</button>
+            <button type="button" className="lbv-copy" onClick={copyList} disabled={!visibleResults.length}><Icon name="Copy" size={13} /> Copy list</button>
           </div>
         </div>
 
-        {built.results.length ? (
+        <div className="lbv-result-tabs" role="tablist" aria-label="Result type">
+          <button type="button" role="tab" aria-selected={resultMode === 'exact'} className={resultMode === 'exact' ? 'on' : ''} onClick={() => setResultMode('exact')}>
+            <Icon name="CircleCheck" size={13} /> Exact matches <b>{built.results.length}</b>
+          </button>
+          <button type="button" role="tab" aria-selected={resultMode === 'near'} className={resultMode === 'near' ? 'on' : ''} onClick={() => setResultMode('near')}>
+            <Icon name="Target" size={13} /> Near misses <b>{built.nearMisses.length}</b>
+          </button>
+          <span>Fit measures criteria closeness, not HR probability. Missing data and multi-gate failures stay excluded.</span>
+        </div>
+
+        {visibleResults.length ? (
           <div className="lbv-result-list">
-            {built.results.map((item, index) => (
+            {visibleResults.map((item, index) => (
               <ResultCard
                 key={item.batter.id}
                 item={item}
                 index={index}
+                nearMiss={resultMode === 'near'}
+                onRelax={relaxGate}
                 onSelect={onSelect}
                 watched={watchlist.has(item.batter.id)}
                 inSlip={slip.has(item.batter.id)}
@@ -564,8 +613,11 @@ export default function ListBuilderView({
         ) : (
           <div className="lbv-empty">
             <Icon name="ListFilter" size={28} />
-            <strong>No hitters clear every active gate</strong>
-            <p>Remove a criterion above, switch signals to ANY, or try another recipe.</p>
+            <strong>{resultMode === 'near' ? 'No one-gate-away hitters' : 'No hitters clear every active gate'}</strong>
+            <p>{resultMode === 'near' ? 'Missing-data rows and hitters failing two or more gates are intentionally excluded.' : 'Remove a criterion above, switch signals to ANY, or inspect the closest qualified near misses.'}</p>
+            {resultMode === 'exact' && built.nearMisses.length > 0 && (
+              <button type="button" className="lbv-empty-action" onClick={() => setResultMode('near')}>View {built.nearMisses.length} near misses</button>
+            )}
           </div>
         )}
       </section>

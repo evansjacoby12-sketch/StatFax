@@ -6,6 +6,7 @@ import {
   createListBuilderCriteria,
   effectiveOppHr9,
   evaluateListBuilderBatter,
+  relaxListBuilderGate,
   sanitizeListBuilderCriteria,
 } from '../ui/src/lib/list-builder.js'
 
@@ -57,6 +58,9 @@ test('selected signals support explicit ALL and ANY logic', () => {
   const row = batter({ hot: true, barrelKing: false })
   assert.equal(evaluateListBuilderBatter(row, { signals: ['hot', 'barrelKing'], signalMode: 'all' }).matches, false)
   assert.equal(evaluateListBuilderBatter(row, { signals: ['hot', 'barrelKing'], signalMode: 'any' }).matches, true)
+  const twoMissing = buildListBuilderResults([batter({ hot: false, barrelKing: false })], { signals: ['hot', 'barrelKing'], signalMode: 'all' })
+  assert.equal(twoMissing.evaluated[0].evaluation.failed.length, 2)
+  assert.equal(twoMissing.nearMisses.length, 0)
 })
 
 test('builder returns evidence, missing-data coverage, and deterministic sorting', () => {
@@ -69,6 +73,58 @@ test('builder returns evidence, missing-data coverage, and deterministic sorting
   assert.deepEqual(result.results.map((item) => item.batter.id), ['3', '1'])
   assert.deepEqual(result.coverage.minBarrel, { available: 2, total: 3 })
   assert.ok(result.results[0].evaluation.passed.some((item) => item.key === 'minBarrel'))
+})
+
+test('builder separates exact matches from ranked one-gate near misses', () => {
+  const result = buildListBuilderResults([
+    batter({ id: 'exact', barrelPctBBE: 13, score: 75 }),
+    batter({ id: 'close', barrelPctBBE: 11.5, score: 70 }),
+    batter({ id: 'farther', barrelPctBBE: 9, score: 90 }),
+  ], { minBarrel: 12 })
+  assert.deepEqual(result.results.map((item) => item.batter.id), ['exact'])
+  assert.equal(result.results[0].evaluation.fitScore, 100)
+  assert.deepEqual(result.nearMisses.map((item) => item.batter.id), ['close', 'farther'])
+  assert.ok(result.nearMisses[0].evaluation.fitScore > result.nearMisses[1].evaluation.fitScore)
+  assert.equal(result.nearMisses[0].evaluation.failed[0].delta, 0.5)
+  assert.equal(result.nearMisses[0].evaluation.failed[0].deltaText, '0.5%')
+})
+
+test('near misses exclude missing data, multiple failures, and unsupported relaxations', () => {
+  const result = buildListBuilderResults([
+    batter({ id: 'missing', barrelPctBBE: null, barrelPct: null }),
+    batter({ id: 'two-away', barrelPctBBE: 8, score: 60 }),
+    batter({ id: 'outside-input-range', barrelPctBBE: -2, score: 95 }),
+    batter({ id: 'live', game: { isLive: true, status: 'In Progress' }, barrelPctBBE: 14, score: 95 }),
+  ], { minBarrel: 12, minScore: 70 })
+  assert.deepEqual(result.nearMisses, [])
+  assert.equal(result.evaluated.find((item) => item.batter.id === 'missing').evaluation.missing.length, 1)
+  assert.equal(result.evaluated.find((item) => item.batter.id === 'two-away').evaluation.failed.length, 2)
+})
+
+test('relax gate applies the disclosed threshold and makes the candidate exact', () => {
+  const criteria = createListBuilderCriteria({ minBarrel: 12 })
+  const row = batter({ barrelPctBBE: 11.46 })
+  const failure = evaluateListBuilderBatter(row, criteria).failed[0]
+  assert.equal(failure.relaxation.description, 'Barrel rate ≥ 12% → ≥ 11.4%')
+  const relaxed = relaxListBuilderGate(criteria, failure)
+  assert.equal(relaxed.minBarrel, 11.4)
+  assert.equal(evaluateListBuilderBatter(row, relaxed).matches, true)
+
+  const ceilingRow = batter({ launchAngle: 32.14 })
+  const ceilingFailure = evaluateListBuilderBatter(ceilingRow, { maxLaunchAngle: 32 }).failed[0]
+  assert.equal(ceilingFailure.relaxation.value, 32.2)
+  assert.equal(evaluateListBuilderBatter(ceilingRow, relaxListBuilderGate({ maxLaunchAngle: 32 }, ceilingFailure)).matches, true)
+})
+
+test('state-gate near misses disclose and apply an explicit relaxation', () => {
+  const criteria = createListBuilderCriteria({ confirmedOnly: true })
+  const row = batter({ lineupConfirmed: false, battingOrder: null })
+  const result = buildListBuilderResults([row], criteria)
+  assert.equal(result.nearMisses.length, 1)
+  const failure = result.nearMisses[0].evaluation.failed[0]
+  assert.equal(failure.label, 'Confirmed lineup')
+  assert.equal(failure.relaxation.description, 'Confirmed lineup: required → off')
+  assert.equal(relaxListBuilderGate(criteria, failure).confirmedOnly, false)
 })
 
 test('external criteria are allow-listed, bounded, and safe to restore', () => {
