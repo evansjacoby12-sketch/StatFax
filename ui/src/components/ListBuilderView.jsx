@@ -1,11 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
 import Icon from './Icon.jsx'
 import { GradeChip } from './atoms.jsx'
+import ListBuilderAnalystPanel from './ListBuilderAnalystPanel.jsx'
 import { toast } from './Toast.jsx'
 import { pct, num } from '../lib/format.js'
 import * as store from '../lib/storage.js'
 import { loadBacktestLog } from '../lib/backtestLog.js'
-import { translateListBuilderQuery } from '../lib/list-builder-ai.js'
+import { analyzeListBuilder, translateListBuilderQuery } from '../lib/list-builder-ai.js'
+import {
+  buildListBuilderAnalystContext,
+  findListBuilderAnalystRelaxation,
+} from '../lib/list-builder-analyst.js'
 import {
   LIST_BUILDER_EVIDENCE_WINDOW_OPTIONS,
   loadListBuilderEvidence,
@@ -31,6 +36,12 @@ import {
   normalizeListBuilderTrackingLedger,
   settleListBuilderRecipePicks,
 } from '../lib/list-builder-tracking.js'
+
+const ALL_LIST_BUILDER_PRESETS = Object.freeze([
+  ...PRIMARY_LIST_BUILDER_PRESETS,
+  ...MORE_LIST_BUILDER_PRESETS,
+  ...ADVANCED_LIST_BUILDER_PRESETS,
+])
 
 const FIELD_GROUPS = Object.freeze([
   {
@@ -415,6 +426,11 @@ export default function ListBuilderView({
   const [trackingLedger, setTrackingLedger] = useState(trackingLedgerFromStorage)
   const [trackingHistory, setTrackingHistory] = useState(null)
   const [trackingFeedStatus, setTrackingFeedStatus] = useState('loading')
+  const [analystLeftRecipeId, setAnalystLeftRecipeId] = useState('')
+  const [analystRightRecipeId, setAnalystRightRecipeId] = useState('')
+  const [analystResult, setAnalystResult] = useState(null)
+  const [analystLoading, setAnalystLoading] = useState(false)
+  const [analystError, setAnalystError] = useState('')
 
   useEffect(() => {
     let active = true
@@ -466,6 +482,16 @@ export default function ListBuilderView({
     setTrackingLedger(next)
   }, [trackingHistory, trackingLedger])
 
+  useEffect(() => {
+    const ids = savedRecipes.map((recipe) => String(recipe.id))
+    const left = ids.includes(analystLeftRecipeId) ? analystLeftRecipeId : (ids[0] || '')
+    const right = ids.includes(analystRightRecipeId) && analystRightRecipeId !== left
+      ? analystRightRecipeId
+      : (ids.find((id) => id !== left) || '')
+    if (left !== analystLeftRecipeId) setAnalystLeftRecipeId(left)
+    if (right !== analystRightRecipeId) setAnalystRightRecipeId(right)
+  }, [savedRecipes, analystLeftRecipeId, analystRightRecipeId])
+
   const built = useMemo(() => buildListBuilderResults(batters, form), [batters, form])
   const visibleResults = resultMode === 'near' ? built.nearMisses : built.results
   const aiCriteria = useMemo(() => aiProposal ? activeListBuilderCriteria(aiProposal.criteria) : [], [aiProposal])
@@ -477,6 +503,28 @@ export default function ListBuilderView({
     ? buildListBuilderRecipeTracking({ backtestLog: trackingHistory, recipes: savedRecipes, ledger: trackingLedger })
     : null, [trackingHistory, savedRecipes, trackingLedger])
   const trackingByRecipe = useMemo(() => new Map((trackingReport?.recipes || []).map((item) => [item.id, item])), [trackingReport])
+  const activePresetDefinition = useMemo(() => ALL_LIST_BUILDER_PRESETS.find((preset) => preset.id === activePreset) || null, [activePreset])
+  const activePresetEvidence = activePresetDefinition
+    ? rollingEvidence
+      ? rollingEvidence.recipes?.[activePresetDefinition.id]?.windows?.[evidenceWindow]
+      : { ...activePresetDefinition.evidence, fallback: true }
+    : null
+  const analystContext = useMemo(() => buildListBuilderAnalystContext({
+    batters,
+    built,
+    criteria: form,
+    activePreset: activePresetDefinition,
+    activeEvidence: activePresetEvidence,
+    evidenceWindow,
+    savedRecipes,
+    trackingReport,
+    compareRecipeIds: [analystLeftRecipeId, analystRightRecipeId],
+  }), [
+    batters, built, form, activePresetDefinition, activePresetEvidence, evidenceWindow,
+    savedRecipes, trackingReport, analystLeftRecipeId, analystRightRecipeId,
+  ])
+  const visibleAnalystResult = analystResult?.contextSignature === analystContext.signature ? analystResult : null
+  const analystRelaxation = findListBuilderAnalystRelaxation(analystContext, visibleAnalystResult?.relaxation?.candidateId)
   const evidenceFor = (preset) => rollingEvidence
     ? rollingEvidence.recipes?.[preset.id]?.windows?.[evidenceWindow]
     : { ...preset.evidence, fallback: true }
@@ -569,6 +617,38 @@ export default function ListBuilderView({
     setActivePreset(null)
     setForm(sanitizeListBuilderCriteria(aiProposal.criteria))
     toast.success('AI criteria applied')
+  }
+
+  const runAiAnalyst = async () => {
+    if (analystLoading) return
+    setAnalystLoading(true)
+    setAnalystError('')
+    try {
+      setAnalystResult(await analyzeListBuilder(analystContext))
+    } catch (error) {
+      setAnalystError(error.message || 'AI Analyst is temporarily unavailable.')
+    } finally {
+      setAnalystLoading(false)
+    }
+  }
+
+  const applyAnalystRelaxation = (candidate) => {
+    if (!candidate?.criteria) return
+    setActivePreset(null)
+    setForm(createListBuilderCriteria(candidate.criteria))
+    setResultMode('exact')
+    setAnalystResult(null)
+    toast.info(`Applied analyst suggestion: ${candidate.description}`)
+  }
+
+  const changeAnalystLeftRecipe = (id) => {
+    setAnalystLeftRecipeId(id)
+    if (id && id === analystRightRecipeId) setAnalystRightRecipeId('')
+  }
+
+  const changeAnalystRightRecipe = (id) => {
+    setAnalystRightRecipeId(id)
+    if (id && id === analystLeftRecipeId) setAnalystLeftRecipeId('')
   }
 
   const relaxGate = (failure) => {
@@ -760,6 +840,21 @@ export default function ListBuilderView({
           )}
         </div>
       </section>
+
+      <ListBuilderAnalystPanel
+        context={analystContext}
+        result={visibleAnalystResult}
+        relaxation={analystRelaxation}
+        loading={analystLoading}
+        error={analystError}
+        recipes={savedRecipes}
+        leftRecipeId={analystLeftRecipeId}
+        rightRecipeId={analystRightRecipeId}
+        onLeftRecipeChange={changeAnalystLeftRecipe}
+        onRightRecipeChange={changeAnalystRightRecipe}
+        onAnalyze={runAiAnalyst}
+        onApplyRelaxation={applyAnalystRelaxation}
+      />
 
       <section className="lbv-control-card">
         <div className="lbv-control-top">
