@@ -10,6 +10,7 @@ import {
   loadListBuilderEvidence,
 } from '../lib/list-builder-evidence.js'
 import {
+  ADVANCED_LIST_BUILDER_PRESETS,
   LIST_BUILDER_EVIDENCE,
   MORE_LIST_BUILDER_PRESETS,
   PRIMARY_LIST_BUILDER_PRESETS,
@@ -32,6 +33,17 @@ const FIELD_GROUPS = Object.freeze([
       { key: 'minOppHr9', label: 'Min exposure HR/9', hint: 'Effective matchup rate', min: 0, max: 4, step: 0.1 },
       { key: 'minPitchMix', label: 'Min pitch-mix score', hint: '0–10 matchup grade', min: 0, max: 10, step: 0.5 },
       { key: 'minParkFactor', label: 'Min park factor', hint: '1.00 is neutral', min: 0.5, max: 1.6, step: 0.05 },
+    ],
+  },
+  {
+    title: 'Advanced matchup',
+    description: 'Pair hitter power with a specific opposing-pitcher weakness.',
+    fields: [
+      { key: 'minISO', label: 'Min season ISO', hint: '.200 is strong power', min: 0, max: 0.6, step: 0.01 },
+      { key: 'minRecentPitcherHr9', label: 'Min recent pitcher HR/9', hint: 'Last five starts', min: 0, max: 6, step: 0.1 },
+      { key: 'maxPitcherK9', label: 'Max pitcher K/9', hint: 'Lower means more contact', min: 0, max: 20, step: 0.5 },
+      { key: 'minContactCollision', label: 'Min contact collision', hint: '-10 to +10 matchup edge', min: -10, max: 10, step: 0.5 },
+      { key: 'maxBattingOrder', label: 'Latest lineup spot', hint: '4 means spots 1–4', min: 1, max: 9, step: 1 },
     ],
   },
   {
@@ -147,6 +159,48 @@ function PresetCard({ preset, evidence, active, compact = false, onApply }) {
       <span className="lbv-preset-confidence">
         {confidence ? `95% ${confidence.low.toFixed(1)}–${confidence.high.toFixed(1)}% · ` : ''}{evidenceStatusLabel(evidence)}
       </span>
+    </button>
+  )
+}
+
+function advancedReadiness(preset, evidence) {
+  const fallbackStatus = preset.readiness?.fallbackStatus || 'collecting'
+  const status = evidence?.fallback ? fallbackStatus : evidence?.status || fallbackStatus
+  if (evidence?.evaluable === 0 || status === 'collecting') {
+    return { key: 'collecting', label: 'Collecting' }
+  }
+  if (status === 'limited-coverage') return { key: 'limited', label: 'Limited history' }
+  return { key: 'evaluated', label: 'Evaluated' }
+}
+
+function AdvancedPresetCard({ preset, evidence, active, onApply }) {
+  const readiness = advancedReadiness(preset, evidence)
+  const hasMetrics = Number.isFinite(evidence?.hitRate) && Number.isFinite(evidence?.lift)
+  const coverage = Number.isFinite(evidence?.coverage) ? `${Math.round(evidence.coverage * 100)}% coverage` : null
+  const features = preset.readiness?.features?.join(' + ') || 'required pregame features'
+  return (
+    <button
+      type="button"
+      className={`lbv-matchup-card ${readiness.key}${active ? ' active' : ''}`}
+      onClick={() => onApply(preset)}
+      aria-pressed={active}
+    >
+      <span className="lbv-matchup-card-top">
+        <span className="lbv-preset-icon"><Icon name={preset.icon} size={16} /></span>
+        <b className={`lbv-readiness ${readiness.key}`}>{readiness.label}</b>
+      </span>
+      <span className="lbv-preset-copy">
+        <b>{preset.title}</b>
+        <small>{preset.description}</small>
+      </span>
+      <span className="lbv-matchup-evidence">
+        {hasMetrics
+          ? <><span><b>{evidence.hitRate.toFixed(1)}%</b> HR · {evidence.lift.toFixed(2)}× slate</span><span>n={evidence.matches ?? evidence.sample}</span></>
+          : <span>{readiness.key === 'collecting' ? 'Live recipe available · no historical rate claimed' : 'Live recipe available · rolling rate unavailable'}</span>}
+      </span>
+      <small className="lbv-matchup-coverage">
+        {readiness.key === 'collecting' ? `Collecting ${features}` : `${coverage || readiness.label} · ${features}`}
+      </small>
     </button>
   )
 }
@@ -427,6 +481,28 @@ export default function ListBuilderView({
         </details>
 
         <p className="lbv-evidence-note"><Icon name="Info" size={12} /> {evidenceFeedStatus === 'rolling' ? 'Rolling settled records; scratches excluded.' : evidenceFeedStatus === 'fallback' ? 'Rolling feed unavailable; showing the last verified snapshot.' : 'Loading rolling evidence.'} Historical results do not guarantee future outcomes.</p>
+      </section>
+
+      <section className="lbv-matchup-section" aria-labelledby="lbv-matchup-title">
+        <div className="lbv-matchup-head">
+          <div>
+            <span className="lbv-eyebrow">Batter skill × pitcher weakness</span>
+            <h3 id="lbv-matchup-title">Advanced matchup recipes</h3>
+            <p>Every card is live-applicable. Readiness reflects the selected rolling evidence window.</p>
+          </div>
+          <span><Icon name="Info" size={12} /> Missing history is excluded, never scored as a failure.</span>
+        </div>
+        <div className="lbv-matchup-grid">
+          {ADVANCED_LIST_BUILDER_PRESETS.map((preset) => (
+            <AdvancedPresetCard
+              key={preset.id}
+              preset={preset}
+              evidence={evidenceFor(preset)}
+              active={activePreset === preset.id}
+              onApply={applyPreset}
+            />
+          ))}
+        </div>
       </section>
 
       <section className="lbv-workflows">

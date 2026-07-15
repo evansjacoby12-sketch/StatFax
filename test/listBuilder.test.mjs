@@ -14,7 +14,9 @@ function batter(overrides = {}) {
   return {
     id: '7-101', playerId: 7, gamePk: 101, name: 'Test Slugger',
     game: { isLive: false, isFinal: false, status: 'Scheduled' },
-    pitcher: { season: { hrPer9: 1.1 } }, effectiveHR9: 1.5,
+    pitcher: { season: { hrPer9: 1.1, kPer9: 7.5 }, recentForm: { hrPer9: 1.8 } }, effectiveHR9: 1.5,
+    season: { iso: 0.24 },
+    matchupSignals: { contactFactor: 3 },
     score: 80, hrProbability: 0.2, heatIndex: 70,
     exitVelo: 92, barrelPctBBE: 13, hardHitPct: 48,
     launchAngle: 20, pullPct: 45, gameParkHRFactor: 1.1,
@@ -45,6 +47,23 @@ test('recent barrel filters require a real six-BBE sample', () => {
   const evaluation = evaluateListBuilderBatter(batter({ recentBarrel: { recentBarrelPct: 30, recentBBE: 5 } }), { minRecBarrel: 12 })
   assert.equal(evaluation.matches, false)
   assert.deepEqual(evaluation.missing.map((item) => item.key), ['minRecBarrel'])
+})
+
+test('advanced matchup gates pair hitter power with pitcher weakness', () => {
+  const row = batter()
+  assert.equal(evaluateListBuilderBatter(row, { minISO: 0.2, maxPitcherK9: 8 }).matches, true)
+  assert.equal(evaluateListBuilderBatter(row, { minISO: 0.2, minRecentPitcherHr9: 1.5 }).matches, true)
+  assert.equal(evaluateListBuilderBatter(row, { minBarrel: 10, minContactCollision: 2 }).matches, true)
+  assert.equal(evaluateListBuilderBatter(row, { minISO: 0.2, maxBattingOrder: 4 }).matches, true)
+  assert.equal(evaluateListBuilderBatter(batter({ battingOrder: 5 }), { maxBattingOrder: 4 }).matches, false)
+  assert.equal(evaluateListBuilderBatter(batter({ pitcher: { season: { kPer9: 9 }, recentForm: { hrPer9: 1.8 } } }), { maxPitcherK9: 8 }).matches, false)
+})
+
+test('new advanced gates report missing live features instead of assuming a pass', () => {
+  const row = batter({ pitcher: { season: { kPer9: 7.5 }, recentForm: null }, matchupSignals: null })
+  const evaluation = evaluateListBuilderBatter(row, { minRecentPitcherHr9: 1.5, minContactCollision: 2 })
+  assert.equal(evaluation.matches, false)
+  assert.deepEqual(evaluation.missing.map((item) => item.key), ['minRecentPitcherHr9', 'minContactCollision'])
 })
 
 test('pregame, confirmed-lineup, and trust gates reject unactionable rows', () => {

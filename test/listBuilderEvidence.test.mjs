@@ -22,7 +22,7 @@ const row = ({
   simHRProb,
   badges: ['barrelKing'],
   feat: {
-    hot, brl: 14, rbrl: 14, rbbe: 12, la: 20, phr9: 1.5, pm: 7,
+    hot, iso: 0.24, brl: 14, rbrl: 14, rbbe: 12, la: 20, phr9: 1.5, pk9: 7.5, pm: 7, ord: 3,
     park: 1.05, ev: 91, hh: 45, heat: 70, setup: 4, pos: 6, neg: 1,
   },
 })
@@ -88,6 +88,35 @@ test('missing historical gates produce limited coverage instead of assumed passe
   const best = artifact.recipes.best.windows.d14
   assert.equal(best.evaluable, 3)
   assert.equal(best.missingByGate.trustedOnly, 1)
+})
+
+test('advanced evidence distinguishes evaluable legacy recipes from schema-v2 collection', () => {
+  const artifact = buildListBuilderEvidence({ backtestLog: fixture(), generatedAt: '2026-07-03T12:00:00.000Z' })
+  const lowK = artifact.recipes['low-k-power'].windows.d14
+  const topFour = artifact.recipes['top-four-power'].windows.d14
+  const recentLeak = artifact.recipes['recent-pitcher-leak'].windows.d14
+  const collision = artifact.recipes['contact-collision'].windows.d14
+  assert.equal(lowK.evaluable, 4)
+  assert.equal(topFour.evaluable, 4)
+  assert.equal(recentLeak.evaluable, 0)
+  assert.equal(recentLeak.hitRate, null)
+  assert.equal(recentLeak.status, 'collecting')
+  assert.equal(recentLeak.missingByGate.minRecentPitcherHr9, 4)
+  assert.equal(collision.evaluable, 0)
+  assert.equal(collision.status, 'collecting')
+  assert.equal(collision.missingByGate.minContactCollision, 4)
+})
+
+test('pitch-type punish reports limited coverage when the archived pitch book is sparse', () => {
+  const log = fixture()
+  delete log.records['2026-07-01'][1].feat.pm
+  delete log.records['2026-07-02'][0].feat.pm
+  delete log.modelHistory.records['2026-06-30'][0].feat.pm
+  const evidence = buildListBuilderEvidence({ backtestLog: log, generatedAt: '2026-07-03T12:00:00.000Z' })
+    .recipes['pitch-type-punish'].windows.d14
+  assert.equal(evidence.evaluable, 1)
+  assert.equal(evidence.coverage, 0.25)
+  assert.equal(evidence.status, 'limited-coverage')
 })
 
 test('evidence validator rejects arithmetic tampering', () => {

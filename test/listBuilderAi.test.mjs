@@ -41,6 +41,8 @@ test('worker returns strict visible criteria without receiving slate data', asyn
         criteria: {
           minOppHr9: 99,
           minBarrel: 12,
+          minISO: 0.2,
+          maxPitcherK9: 8,
           signals: ['hot', 'invented'],
           signalMode: 'any',
           pregameOnly: true,
@@ -63,6 +65,8 @@ test('worker returns strict visible criteria without receiving slate data', asyn
     const payload = await response.json()
     assert.equal(payload.criteria.minOppHr9, 4)
     assert.equal(payload.criteria.minBarrel, 12)
+    assert.equal(payload.criteria.minISO, 0.2)
+    assert.equal(payload.criteria.maxPitcherK9, 8)
     assert.deepEqual(payload.criteria.signals, ['hot'])
     assert.equal(payload.criteria.minHeat, null)
     assert.equal(payload.criteria.confirmedOnly, true)

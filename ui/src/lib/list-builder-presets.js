@@ -10,6 +10,12 @@ const preset = (definition) => Object.freeze({
   ...definition,
   criteria: Object.freeze({ ...definition.criteria }),
   evidence: Object.freeze({ ...definition.evidence }),
+  ...(definition.readiness ? {
+    readiness: Object.freeze({
+      ...definition.readiness,
+      features: Object.freeze([...(definition.readiness.features || [])]),
+    }),
+  } : {}),
 })
 
 export const LIST_BUILDER_PRESETS = Object.freeze([
@@ -103,6 +109,71 @@ export const LIST_BUILDER_PRESETS = Object.freeze([
     criteria: { minOppHr9: 1.3, minPitchMix: 6.5 },
     evidence: { hits: 92, sample: 550, hitRate: 16.73, lift: 1.27 },
   }),
+  preset({
+    id: 'pitch-type-punish',
+    tier: 'advanced',
+    icon: 'Crosshair',
+    title: 'Pitch-Type Punish',
+    description: 'A .200+ ISO bat whose weighted SLG clears the starter’s actual pitch mix.',
+    criteria: { minISO: 0.2, minPitchMix: 6.5 },
+    evidence: { hits: null, sample: null, hitRate: null, lift: null },
+    readiness: {
+      fallbackStatus: 'limited-coverage',
+      features: ['season ISO', 'weighted pitch-type matchup'],
+    },
+  }),
+  preset({
+    id: 'recent-pitcher-leak',
+    tier: 'advanced',
+    icon: 'TrendingUp',
+    title: 'Recent Pitcher Leak',
+    description: 'A .200+ ISO bat against a starter allowing at least 1.50 HR/9 recently.',
+    criteria: { minISO: 0.2, minRecentPitcherHr9: 1.5 },
+    evidence: { hits: null, sample: null, hitRate: null, lift: null },
+    readiness: {
+      fallbackStatus: 'collecting',
+      features: ['season ISO', 'last-five-start HR/9'],
+    },
+  }),
+  preset({
+    id: 'contact-collision',
+    tier: 'advanced',
+    icon: 'Activity',
+    title: 'Contact Collision',
+    description: 'A 10%+ barrel bat meeting a starter with a positive hard-contact allowance edge.',
+    criteria: { minBarrel: 10, minContactCollision: 0.5 },
+    evidence: { hits: null, sample: null, hitRate: null, lift: null },
+    readiness: {
+      fallbackStatus: 'collecting',
+      features: ['barrel rate', 'contact-collision factor'],
+    },
+  }),
+  preset({
+    id: 'low-k-power',
+    tier: 'advanced',
+    icon: 'TrendingDown',
+    title: 'Low-K Power',
+    description: 'A .200+ ISO bat facing a starter at 8.0 K/9 or lower.',
+    criteria: { minISO: 0.2, maxPitcherK9: 8 },
+    evidence: { hits: null, sample: null, hitRate: null, lift: null },
+    readiness: {
+      fallbackStatus: 'evaluated',
+      features: ['season ISO', 'starter K/9'],
+    },
+  }),
+  preset({
+    id: 'top-four-power',
+    tier: 'advanced',
+    icon: 'Crown',
+    title: 'Top-Four Power',
+    description: 'A .200+ ISO bat projected or confirmed in lineup spots 1–4.',
+    criteria: { minISO: 0.2, maxBattingOrder: 4 },
+    evidence: { hits: null, sample: null, hitRate: null, lift: null },
+    readiness: {
+      fallbackStatus: 'evaluated',
+      features: ['season ISO', 'frozen batting order'],
+    },
+  }),
 ])
 
 export const PRIMARY_LIST_BUILDER_PRESETS = Object.freeze(
@@ -111,4 +182,8 @@ export const PRIMARY_LIST_BUILDER_PRESETS = Object.freeze(
 
 export const MORE_LIST_BUILDER_PRESETS = Object.freeze(
   LIST_BUILDER_PRESETS.filter((item) => item.tier === 'more'),
+)
+
+export const ADVANCED_LIST_BUILDER_PRESETS = Object.freeze(
+  LIST_BUILDER_PRESETS.filter((item) => item.tier === 'advanced'),
 )

@@ -11,6 +11,11 @@ const NUMERIC_GATES = Object.freeze({
   minOppHr9: ['phr9', 'min'],
   minPitchMix: ['pm', 'min'],
   minParkFactor: ['park', 'min'],
+  minRecentPitcherHr9: ['prhr9', 'min'],
+  maxPitcherK9: ['pk9', 'max'],
+  minContactCollision: ['mcf', 'min'],
+  maxBattingOrder: ['ord', 'max'],
+  minISO: ['iso', 'min'],
   minExitVelo: ['ev', 'min'],
   minBarrel: ['brl', 'min'],
   minHardHit: ['hh', 'min'],
@@ -180,7 +185,7 @@ function recipeWindow(history, dates, criteria) {
   const lift = Number.isFinite(hitRate) && baselineRate > 0 ? hitRate / baselineRate : null
   const stability = stabilityFor(rows, dates, criteria)
   let status = 'collecting'
-  if (coverage != null && coverage < 0.8) status = 'limited-coverage'
+  if (scored.evaluable > 0 && coverage != null && coverage < 0.8) status = 'limited-coverage'
   else if (scored.matches >= 50 && scored.hits >= 5) {
     status = stability.status === 'stable-positive' ? 'stable-positive'
       : lift >= 1.05 ? 'positive'

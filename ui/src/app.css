@@ -8669,6 +8669,39 @@ button.th:focus-visible {
 .lbv-preset.compact .lbv-preset-copy small { font-size: 9px; }
 .lbv-evidence-note { display: flex; align-items: center; gap: 5px; margin: 7px 2px 0; color: var(--text-faint); font-size: 9px; }
 
+.lbv-matchup-section { margin-top: 10px; }
+.lbv-matchup-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 14px; margin-bottom: 9px; padding: 0 2px; }
+.lbv-matchup-head h3 { margin: 3px 0; color: #fff; font-size: 14px; }
+.lbv-matchup-head p { margin: 0; color: var(--text-faint); font-size: 10px; }
+.lbv-matchup-head > span { display: inline-flex; align-items: center; gap: 5px; max-width: 300px; color: var(--text-faint); font-size: 9px; text-align: right; }
+.lbv-matchup-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+.lbv-matchup-card {
+  display: flex;
+  min-width: 0;
+  min-height: 174px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  padding: 11px;
+  color: var(--text-dim);
+  background: var(--lbv-panel);
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color .15s, background .15s, transform .12s;
+}
+.lbv-matchup-card:hover { border-color: color-mix(in srgb, var(--accent) 52%, var(--border)); background: var(--lbv-panel-raised); transform: translateY(-1px); }
+.lbv-matchup-card.active { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 11%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 12%, transparent); }
+.lbv-matchup-card-top { display: flex; align-items: center; justify-content: space-between; gap: 7px; }
+.lbv-readiness { padding: 4px 6px; border: 1px solid; border-radius: 999px; font: 850 8px/1 var(--font-mono, monospace); white-space: nowrap; }
+.lbv-readiness.evaluated { color: var(--good); background: color-mix(in srgb, var(--good) 9%, transparent); border-color: color-mix(in srgb, var(--good) 24%, transparent); }
+.lbv-readiness.limited { color: var(--warn); background: color-mix(in srgb, var(--warn) 8%, transparent); border-color: color-mix(in srgb, var(--warn) 22%, transparent); }
+.lbv-readiness.collecting { color: var(--text-faint); background: rgba(255,255,255,.035); border-color: var(--border); }
+.lbv-matchup-evidence { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding-top: 7px; color: var(--text-faint); border-top: 1px solid var(--border-soft, var(--border)); font: 700 8px/1.35 var(--font-mono, monospace); }
+.lbv-matchup-evidence b { color: #fff; font-size: 10px; }
+.lbv-matchup-coverage { min-height: 22px; color: var(--text-faint); font-size: 8px; line-height: 1.35; }
+
 .lbv-workflows { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(270px, .85fr); gap: 10px; margin-top: 10px; }
 .lbv-ai-card,
 .lbv-saved-card { padding: 14px; background: var(--lbv-panel); border: 1px solid var(--border); border-radius: 12px; }
@@ -8974,6 +9007,7 @@ button.th:focus-visible {
 
 @media (max-width: 980px) {
   .lbv-presets-more { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .lbv-matchup-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .lbv-workflows { grid-template-columns: 1fr; }
   .lbv-grid { grid-template-columns: repeat(3, minmax(128px, 1fr)); }
   .lbv-result-card { grid-template-columns: minmax(180px, 1fr) minmax(240px, 1.3fr) auto; }
@@ -8991,6 +9025,10 @@ button.th:focus-visible {
   .lbv-preset { min-width: 228px; min-height: 148px; scroll-snap-align: start; }
   .lbv-preset.compact { min-width: 210px; }
   .lbv-more-recipes > summary { min-height: 44px; }
+  .lbv-matchup-head { align-items: flex-start; flex-direction: column; }
+  .lbv-matchup-head > span { max-width: none; text-align: left; }
+  .lbv-matchup-grid { display: flex; max-width: 100%; overflow-x: auto; padding-bottom: 3px; scroll-snap-type: x proximity; }
+  .lbv-matchup-card { min-width: 232px; min-height: 174px; scroll-snap-align: start; }
   .lbv-ai-input input,
   .lbv-ai-input button,
   .lbv-save-input input,

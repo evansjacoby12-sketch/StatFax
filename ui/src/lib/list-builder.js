@@ -32,6 +32,8 @@ export const LIST_BUILDER_SORTS = Object.freeze([
 
 export const LIST_BUILDER_LIMITS = Object.freeze({
   minOppHr9: [0, 4], minPitchMix: [0, 10], minParkFactor: [0.5, 1.6],
+  minRecentPitcherHr9: [0, 6], maxPitcherK9: [0, 20], minContactCollision: [-10, 10],
+  maxBattingOrder: [1, 9], minISO: [0, 0.6],
   minExitVelo: [70, 105], minBarrel: [0, 35], minHardHit: [0, 80], minBlast: [0, 60],
   minLaunchAngle: [-10, 45], maxLaunchAngle: [0, 55], minPullPct: [0, 100],
   minScore: [0, 100], minHeat: [0, 100], minHrProb: [0, 50], minRecBarrel: [0, 45],
@@ -41,6 +43,7 @@ export const LIST_BUILDER_LIMITS = Object.freeze({
 export function createListBuilderCriteria(overrides = {}) {
   return {
     minOppHr9: '', minPitchMix: '', minParkFactor: '',
+    minRecentPitcherHr9: '', maxPitcherK9: '', minContactCollision: '', maxBattingOrder: '', minISO: '',
     minExitVelo: '', minBarrel: '', minHardHit: '', minBlast: '',
     minLaunchAngle: '', maxLaunchAngle: '', minPullPct: '',
     minScore: '', minHeat: '', minHrProb: '', minRecBarrel: '',
@@ -59,6 +62,7 @@ const fmt = (value, digits = 1) => Number(value).toFixed(digits).replace(/\.0$/,
 const clamp01 = (value) => Math.max(0, Math.min(1, value))
 const relaxationPrecision = Object.freeze({
   minOppHr9: 2, minPitchMix: 1, minParkFactor: 2,
+  minRecentPitcherHr9: 2, maxPitcherK9: 1, minContactCollision: 1, maxBattingOrder: 0, minISO: 3,
   minExitVelo: 1, minBarrel: 1, minHardHit: 1, minBlast: 1,
   minLaunchAngle: 1, maxLaunchAngle: 1, minPullPct: 1,
   minScore: 0, minHeat: 0, minHrProb: 1, minRecBarrel: 1,
@@ -94,6 +98,16 @@ export const effectiveOppHr9 = (batter) => Number.isFinite(batter?.effectiveHR9)
   ? batter.effectiveHR9
   : Number.isFinite(batter?.pitcher?.season?.hrPer9) ? batter.pitcher.season.hrPer9 : null
 
+export const seasonIso = (batter) => Number.isFinite(batter?.season?.iso) ? batter.season.iso : null
+export const recentPitcherHr9 = (batter) => Number.isFinite(batter?.pitcher?.recentForm?.hrPer9) ? batter.pitcher.recentForm.hrPer9 : null
+export const pitcherK9 = (batter) => {
+  const season = batter?.pitcher?.season
+  return Number.isFinite(season?.kPer9) ? season.kPer9 : Number.isFinite(season?.k9) ? season.k9 : null
+}
+export const contactCollision = (batter) => Number.isFinite(batter?.matchupSignals?.contactFactor)
+  ? batter.matchupSignals.contactFactor
+  : null
+
 export function isPregameListCandidate(batter) {
   const game = batter?.game
   if (!game || game.isLive === true || game.isFinal === true) return false
@@ -104,6 +118,11 @@ const metricDefinitions = Object.freeze([
   { field: 'minOppHr9', label: 'Exposure HR/9', mode: 'min', get: effectiveOppHr9, fmt: (v) => fmt(v, 2) },
   { field: 'minPitchMix', label: 'Pitch mix', mode: 'min', get: pitchMixScore, fmt: (v) => fmt(v, 1) },
   { field: 'minParkFactor', label: 'Park factor', mode: 'min', get: (b) => b.gameParkHRFactor, fmt: (v) => fmt(v, 2) },
+  { field: 'minRecentPitcherHr9', label: 'Recent pitcher HR/9', mode: 'min', get: recentPitcherHr9, fmt: (v) => fmt(v, 2) },
+  { field: 'maxPitcherK9', label: 'Pitcher K/9', mode: 'max', get: pitcherK9, fmt: (v) => fmt(v, 1) },
+  { field: 'minContactCollision', label: 'Contact collision', mode: 'min', get: contactCollision, fmt: (v) => fmt(v, 1) },
+  { field: 'maxBattingOrder', label: 'Batting-order spot', mode: 'max', get: (b) => b.battingOrder, fmt: (v) => fmt(v, 0) },
+  { field: 'minISO', label: 'Season ISO', mode: 'min', get: seasonIso, fmt: (v) => fmt(v, 3) },
   { field: 'minExitVelo', label: 'Exit velocity', mode: 'min', get: (b) => b.exitVelo, fmt: (v) => `${fmt(v, 1)} mph` },
   { field: 'minBarrel', label: 'Barrel rate', mode: 'min', get: (b) => Number.isFinite(b.barrelPctBBE) ? b.barrelPctBBE : b.barrelPct, fmt: (v) => `${fmt(v, 1)}%` },
   { field: 'minHardHit', label: 'Hard-hit rate', mode: 'min', get: (b) => b.hardHitPct, fmt: (v) => `${fmt(v, 1)}%` },
