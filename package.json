@@ -22,6 +22,8 @@
     "ai:hr-shadow": "node server/ai-hr-shadow.mjs",
     "ai:hr-production": "node server/ai-hr-production.mjs",
     "ai:hr-evaluate": "node server/ai-hr-evaluate.mjs",
+    "ai:hr-attribution": "node server/ai-hr-attribution.mjs",
+    "validate:ai-attribution": "node server/tools/validate-ai-hr-attribution.mjs",
     "ai:hr-history": "node server/ai-hr-history.mjs",
     "brief": "node server/slate-brief.mjs",
     "reconcile": "node server/reconcile.mjs",
