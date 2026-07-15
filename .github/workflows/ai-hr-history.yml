@@ -12,9 +12,15 @@ on:
         required: false
         type: string
       max_dates:
-        description: Optional most-recent date count
+        description: Most-recent qualifying date count (cost control)
         required: false
         type: string
+        default: '3'
+      full_slates_only:
+        description: Replay only dates with at least 10 games and 180 scored batters
+        required: false
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -55,6 +61,7 @@ jobs:
           REPLAY_FROM: ${{ inputs.from }}
           REPLAY_TO: ${{ inputs.to }}
           REPLAY_MAX_DATES: ${{ inputs.max_dates }}
+          REPLAY_FULL_SLATES_ONLY: ${{ inputs.full_slates_only }}
         run: |
           if [ -z "$TAVILY_API_KEY" ] || [ -z "$OPENAI_API_KEY" ]; then
             echo "TAVILY_API_KEY and OPENAI_API_KEY repository secrets are required."
@@ -64,10 +71,14 @@ jobs:
           if [ -n "$REPLAY_FROM" ]; then args+=("--from=$REPLAY_FROM"); fi
           if [ -n "$REPLAY_TO" ]; then args+=("--to=$REPLAY_TO"); fi
           if [ -n "$REPLAY_MAX_DATES" ]; then args+=("--max-dates=$REPLAY_MAX_DATES"); fi
+          if [ "$REPLAY_FULL_SLATES_ONLY" = "true" ]; then args+=("--full-slates-only"); fi
           npm run ai:hr-history -- "${args[@]}"
 
       - name: Validate historical replay contract
         run: npm run validate:ai-history
+
+      - name: Validate full-slate production hypothesis
+        run: npm run validate:ai-full-slate
 
       - name: Add replay result to run summary
         run: |
@@ -77,12 +88,16 @@ jobs:
           const overall = replay.evaluation.overall
           console.log('## AI HR historical replay')
           console.log(`- Dates researched: ${replay.dates.length}`)
+          const fullSlate = JSON.parse(fs.readFileSync('dist/ai-hr-full-slate-validation.json'))
+          console.log(`- Fully hydrated slates: ${fullSlate.coverage.fullSlateDates}/${fullSlate.coverage.replayDates}`)
+          console.log(`- Identity coverage: ${(fullSlate.coverage.identityCoverage * 100).toFixed(1)}%`)
           console.log(`- Accepted signals: ${replay.contexts.reduce((n, c) => n + c.signals.length, 0)}`)
           console.log(`- Settled batter-games: ${replay.evaluation.coverage.settledRecords}`)
           console.log(`- HR outcomes: ${overall?.homers ?? 0}`)
           console.log(`- Brier improvement: ${overall?.comparison?.brierImprovement ?? 'n/a'}`)
           console.log(`- Log-loss improvement: ${overall?.comparison?.logLossImprovement ?? 'n/a'}`)
           console.log(`- Gate: ${replay.evaluation.gate.status}`)
+          console.log(`- Full-slate decision: ${fullSlate.decision.status}`)
           for (const reason of replay.evaluation.gate.reasons) console.log(`  - ${reason}`)
           NODE
 
@@ -94,4 +109,5 @@ jobs:
             dist/ai-hr-historical.json
             dist/ai-hr-history-shadow.json
             dist/ai-hr-history-evaluation.json
+            dist/ai-hr-full-slate-validation.json
           retention-days: 30

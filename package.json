@@ -18,6 +18,7 @@
     "validate:ai-production": "node server/tools/validate-ai-production.mjs",
     "validate:ai-evaluation": "node server/tools/validate-ai-evaluation.mjs",
     "validate:ai-history": "node server/tools/validate-ai-history.mjs",
+    "validate:ai-full-slate": "node server/tools/validate-ai-hr-full-slate.mjs",
     "context": "node server/context-pass.mjs",
     "ai:hr-shadow": "node server/ai-hr-shadow.mjs",
     "ai:hr-production": "node server/ai-hr-production.mjs",

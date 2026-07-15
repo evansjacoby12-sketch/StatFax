@@ -101,6 +101,21 @@ test('historical dates require exact player and game identity', () => {
   assert.deepEqual(dates, [date])
 })
 
+test('historical dates merge the durable archive and can require full slates', () => {
+  const archived = Array.from({ length: 4 }, (_, index) => ({ playerId: index + 1, gamePk: 100 + (index % 2), score: 50 }))
+  const operational = Array.from({ length: 6 }, (_, index) => ({ playerId: index + 10, gamePk: 200 + (index % 3), score: 60 }))
+  const log = {
+    modelHistory: { records: { '2026-06-18': archived, '2026-06-19': archived } },
+    records: { '2026-06-19': [{ playerId: 99, score: 70 }], [date]: operational },
+  }
+  assert.deepEqual(selectAiHrHistoricalDates(log), ['2026-06-18', date])
+  assert.deepEqual(selectAiHrHistoricalDates(log, {
+    fullSlatesOnly: true,
+    minGames: 3,
+    minRows: 6,
+  }), [date])
+})
+
 test('walk-forward baseline trains strictly before target and strips outcomes', () => {
   const baseline = buildAiHrWalkForwardBaseline(backtestLog, date)
   assert.deepEqual(baseline.audit.trainingDates, ['2026-06-19'])

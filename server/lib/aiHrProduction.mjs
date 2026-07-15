@@ -19,7 +19,7 @@ const finite = (value) => value !== null && value !== '' && Number.isFinite(Numb
 const validIso = (value) => typeof value === 'string' && !Number.isNaN(Date.parse(value))
 const round = (value, digits = 12) => Number(Number(value).toFixed(digits))
 
-function hypothesis() {
+export function aiHrProductionHypothesis() {
   return {
     method: AI_HR_PRODUCTION_METHOD,
     perSignalLogit: AI_HR_SHADOW_LOGIT_STEP,
@@ -112,7 +112,7 @@ export function applyAiHrProduction({ slate, context, generatedAt = new Date().t
     reason,
     affectedBatters: applied,
     signalApplications,
-    hypothesis: hypothesis(),
+    hypothesis: aiHrProductionHypothesis(),
   }
   output.aiHrProduction = summary
 

@@ -19,9 +19,11 @@ import {
   lookupProb,
 } from '../../src/sports/mlb/logic/isotonicCalibration.js'
 
-export const AI_HR_HISTORICAL_VERSION = 3
+export const AI_HR_HISTORICAL_VERSION = 4
 export const AI_HR_HISTORICAL_MODE = 'historical-replay'
 export const AI_HR_HISTORICAL_BASELINE = 'walk-forward-score-calibration+sim-resolution'
+export const AI_HR_FULL_SLATE_MIN_GAMES = 10
+export const AI_HR_FULL_SLATE_MIN_ROWS = 180
 
 const validDate = (value) => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
 const validIso = (value) => typeof value === 'string' && !Number.isNaN(Date.parse(value))
@@ -30,16 +32,30 @@ const isObject = (value) => value !== null && typeof value === 'object' && !Arra
 const round = (value, digits = 12) => Number(Number(value).toFixed(digits))
 
 function recordsByDate(backtestLog) {
-  return backtestLog?.records && typeof backtestLog.records === 'object'
-    ? backtestLog.records
-    : backtestLog?.modelHistory?.records || {}
+  // The compact archive is the durable source. Operational rows overwrite the
+  // same date so reconciled outcome repairs and identity upgrades always win.
+  return {
+    ...(backtestLog?.modelHistory?.records || {}),
+    ...(backtestLog?.records || {}),
+  }
 }
 
-export function selectAiHrHistoricalDates(backtestLog, { from = null, to = null, maxDates = null } = {}) {
+export function selectAiHrHistoricalDates(backtestLog, {
+  from = null,
+  to = null,
+  maxDates = null,
+  fullSlatesOnly = false,
+  minGames = AI_HR_FULL_SLATE_MIN_GAMES,
+  minRows = AI_HR_FULL_SLATE_MIN_ROWS,
+} = {}) {
   let dates = Object.entries(recordsByDate(backtestLog))
     .filter(([date, records]) => (
       validDate(date) && Array.isArray(records) &&
       records.some((record) => finite(record?.playerId) && finite(record?.gamePk) && finite(record?.score))
+    ))
+    .filter(([, records]) => !fullSlatesOnly || (
+      records.filter((record) => finite(record?.playerId) && finite(record?.gamePk) && finite(record?.score)).length >= minRows &&
+      new Set(records.map((record) => Number(record?.gamePk)).filter(Number.isFinite)).size >= minGames
     ))
     .map(([date]) => date)
     .sort()
@@ -263,7 +279,11 @@ export function buildAiHrHistoricalReplay({ runs, backtestLog, generatedAt = new
       date: run.date,
       asOf: run.asOf,
       games: run.slate.games.length,
+      sourceRows: run.baselineAudit.targetRows,
       baselineRows: Object.keys(run.slate.scoredBatters).length,
+      identityCoverage: run.baselineAudit.targetRows > 0
+        ? round(Object.keys(run.slate.scoredBatters).length / run.baselineAudit.targetRows)
+        : 0,
       signalsRequested: run.context.stats.requested,
       signalsAccepted: run.context.stats.accepted,
       signalsRejected: run.context.stats.rejected,
@@ -327,6 +347,8 @@ export function validateAiHrHistoricalReplay(replay) {
     if (context.date !== date?.date || context.replay?.asOf !== date?.asOf || !validIso(context.replay?.asOf)) errors.push(`contexts[${index}]: replay date/cutoff does not reconcile`)
     if (context.source !== 'tavily+openai') errors.push(`contexts[${index}].source: expected tavily+openai`)
     if (date?.latestTrainingDate != null && (!validDate(date.latestTrainingDate) || date.latestTrainingDate >= date.date)) errors.push(`dates[${index}]: walk-forward training reaches target or future date`)
+    if (!Number.isInteger(date?.sourceRows) || date.sourceRows < 1 || !Number.isInteger(date?.baselineRows) || date.baselineRows < 1 || date.baselineRows > date.sourceRows) errors.push(`dates[${index}]: invalid source/hydrated row coverage`)
+    else if (!Number.isFinite(date.identityCoverage) || Math.abs(date.identityCoverage - round(date.baselineRows / date.sourceRows)) > 1e-9) errors.push(`dates[${index}].identityCoverage: does not reconcile`)
     for (const signal of context.signals) {
       if (signal.evidence.some((item) => !validIso(item.publishedAt) || Date.parse(item.publishedAt) > Date.parse(context.replay.asOf))) errors.push(`contexts[${index}].${signal.id}: evidence violates historical cutoff`)
     }

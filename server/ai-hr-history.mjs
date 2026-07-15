@@ -18,6 +18,9 @@ import {
   normalizeAiHrHistoricalContext,
   selectAiHrHistoricalDates,
 } from './lib/aiHrHistorical.mjs'
+import {
+  buildAiHrFullSlateValidation,
+} from './lib/aiHrFullSlateValidation.mjs'
 import { researchAiHrSignals } from './lib/aiHrResearch.mjs'
 import { OPENAI_DEFAULT_MODEL } from './lib/aiProviders.mjs'
 
@@ -27,6 +30,7 @@ const BACKTEST_PATH = resolve(DIST, 'backtest-log.json')
 const OUT_PATH = resolve(DIST, 'ai-hr-historical.json')
 const SHADOW_PATH = resolve(DIST, 'ai-hr-history-shadow.json')
 const EVALUATION_PATH = resolve(DIST, 'ai-hr-history-evaluation.json')
+const FULL_SLATE_PATH = resolve(DIST, 'ai-hr-full-slate-validation.json')
 const MODEL = process.env.AI_HR_HISTORY_MODEL || process.env.AI_HR_MODEL || OPENAI_DEFAULT_MODEL
 const MLB_API = 'https://statsapi.mlb.com/api/v1'
 
@@ -40,6 +44,7 @@ const DRY_RUN = process.argv.includes('--dry-run')
 const FROM = arg('from')
 const TO = arg('to')
 const MAX_DATES = Number(arg('max-dates')) || null
+const FULL_SLATES_ONLY = process.argv.includes('--full-slates-only')
 
 const wait = (milliseconds) => new Promise((resolveWait) => setTimeout(resolveWait, milliseconds))
 
@@ -96,7 +101,12 @@ async function main() {
     throw new Error('TAVILY_API_KEY and OPENAI_API_KEY are required unless --dry-run is used')
   }
   const backtestLog = JSON.parse(readFileSync(BACKTEST_PATH, 'utf8'))
-  const dates = selectAiHrHistoricalDates(backtestLog, { from: FROM, to: TO, maxDates: MAX_DATES })
+  const dates = selectAiHrHistoricalDates(backtestLog, {
+    from: FROM,
+    to: TO,
+    maxDates: MAX_DATES,
+    fullSlatesOnly: FULL_SLATES_ONLY,
+  })
   if (!dates.length) throw new Error('no exact-game historical dates matched the requested range')
   console.log(`[ai-hr-history] ${DRY_RUN ? 'dry-running' : 'researching'} ${dates.length} date(s): ${dates[0]} through ${dates.at(-1)}`)
 
@@ -125,10 +135,13 @@ async function main() {
 
   const replay = buildAiHrHistoricalReplay({ runs, backtestLog })
   const validation = assertValidAiHrHistoricalReplay(replay)
+  const fullSlateValidation = buildAiHrFullSlateValidation({ replay, generatedAt: replay.generatedAt })
   writeFileSync(OUT_PATH, JSON.stringify(replay, null, 2))
   writeFileSync(SHADOW_PATH, JSON.stringify(replay.ledger, null, 2))
   writeFileSync(EVALUATION_PATH, JSON.stringify(replay.evaluation, null, 2))
+  writeFileSync(FULL_SLATE_PATH, JSON.stringify(fullSlateValidation, null, 2))
   console.log(`[ai-hr-history] wrote ${OUT_PATH}`)
+  console.log(`[ai-hr-history] full-slate validation ${fullSlateValidation.decision.status}: ${fullSlateValidation.coverage.fullSlateDates}/${fullSlateValidation.coverage.replayDates} dates qualified`)
   console.log(`[ai-hr-history] ${validation.metrics.signals} signal(s), ${validation.metrics.settled} settled rows, Brier improvement ${validation.metrics.brierImprovement ?? 'n/a'}, gate ${validation.metrics.gateStatus}`)
 }
 
