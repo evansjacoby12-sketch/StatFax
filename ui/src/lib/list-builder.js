@@ -30,6 +30,14 @@ export const LIST_BUILDER_SORTS = Object.freeze([
   { key: 'heat', label: 'Heat' },
 ])
 
+export const LIST_BUILDER_LIMITS = Object.freeze({
+  minOppHr9: [0, 4], minPitchMix: [0, 10], minParkFactor: [0.5, 1.6],
+  minExitVelo: [70, 105], minBarrel: [0, 35], minHardHit: [0, 80], minBlast: [0, 60],
+  minLaunchAngle: [-10, 45], maxLaunchAngle: [0, 55], minPullPct: [0, 100],
+  minScore: [0, 100], minHeat: [0, 100], minHrProb: [0, 50], minRecBarrel: [0, 45],
+  minHrDue: [0, 6], minPositives: [0, 15], maxNegatives: [0, 10],
+})
+
 export function createListBuilderCriteria(overrides = {}) {
   return {
     minOppHr9: '', minPitchMix: '', minParkFactor: '',
@@ -48,6 +56,26 @@ export function createListBuilderCriteria(overrides = {}) {
 const finite = (value) => value !== null && value !== '' && Number.isFinite(Number(value))
 const number = (value) => finite(value) ? Number(value) : null
 const fmt = (value, digits = 1) => Number(value).toFixed(digits).replace(/\.0$/, '')
+
+// Trust boundary for saved/browser/AI criteria. Internal form state may contain
+// strings while a person is typing; external criteria are reduced to the known
+// contract and bounded before the deterministic engine receives them.
+export function sanitizeListBuilderCriteria(raw = {}) {
+  const source = raw && typeof raw === 'object' ? raw : {}
+  const clean = createListBuilderCriteria()
+  for (const [key, [min, max]] of Object.entries(LIST_BUILDER_LIMITS)) {
+    if (!finite(source[key])) continue
+    clean[key] = Math.min(max, Math.max(min, Number(source[key])))
+  }
+  clean.signals = [...new Set(Array.isArray(source.signals) ? source.signals : [])]
+    .filter((key) => LIST_BUILDER_SIGNALS.some((signal) => signal.key === key))
+  clean.signalMode = source.signalMode === 'any' ? 'any' : 'all'
+  clean.pregameOnly = source.pregameOnly !== false
+  clean.confirmedOnly = source.confirmedOnly === true
+  clean.trustedOnly = source.trustedOnly === true
+  clean.sort = LIST_BUILDER_SORTS.some((sort) => sort.key === source.sort) ? source.sort : 'hrProbability'
+  return clean
+}
 
 export const effectiveOppHr9 = (batter) => Number.isFinite(batter?.effectiveHR9)
   ? batter.effectiveHR9

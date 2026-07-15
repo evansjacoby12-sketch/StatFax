@@ -90,10 +90,11 @@ app calls directly from the browser:
 | --- | --- | --- |
 | `/` or `/trigger` | GET | Manually fire a slate refresh (returns plain text). |
 | `/parse` | POST | Natural-language → backtest filter chips (Signal Backtest UI). |
+| `/list-builder` | POST | Natural-language → visible, editable List Builder criteria. |
 | `/explain` | POST | Plain-English "why this pick" narration for the player card. |
 | `/savant-bip` | GET | CORS proxy for Baseball Savant batted-ball data (spray chart). |
 
-`/parse` and `/explain` use OpenAI structured outputs, so they need an OpenAI
+`/parse`, `/list-builder`, and `/explain` use OpenAI structured outputs, so they need an OpenAI
 key set as a Worker secret:
 
 ```sh
@@ -101,7 +102,7 @@ wrangler secret put OPENAI_API_KEY
 # paste your OpenAI API key when prompted
 ```
 
-Both are **narration-only** — they translate English ↔ existing model
+All three are **narration/configuration-only** — they translate English ↔ existing model
 output and never see raw data, do math, or influence any prediction. The
 HR scores are computed deterministically on GitHub Actions before the app
 ever loads, so the Worker cannot change a grade or probability. Optional:

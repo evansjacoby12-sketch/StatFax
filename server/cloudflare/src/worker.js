@@ -46,6 +46,9 @@ export default {
     if (url.pathname === '/parse') {
       return handleParse(request, env);
     }
+    if (url.pathname === '/list-builder') {
+      return handleListBuilder(request, env);
+    }
     if (url.pathname === '/explain') {
       return handleExplain(request, env);
     }
@@ -256,6 +259,123 @@ async function handleParse(request, env) {
  * Required Worker secret:  OPENAI_API_KEY  (wrangler secret put)
  * Optional Worker var:     ALLOW_ORIGIN       (default "*"; set to your site)
  */
+/* Natural-language List Builder criteria. This is a translation layer only:
+ * no slate/player data enters the prompt and the output cannot alter scoring. */
+const LIST_BUILDER_FIELDS = Object.freeze({
+  minOppHr9: [0, 4, 'minimum effective opposing-pitcher HR/9 exposure'],
+  minPitchMix: [0, 10, 'minimum favorable pitch-mix score'],
+  minParkFactor: [0.5, 1.6, 'minimum park and weather HR factor; 1.0 is neutral'],
+  minExitVelo: [70, 105, 'minimum average exit velocity in mph'],
+  minBarrel: [0, 35, 'minimum season barrel percentage'],
+  minHardHit: [0, 80, 'minimum hard-hit percentage'],
+  minBlast: [0, 60, 'minimum blast percentage'],
+  minLaunchAngle: [-10, 45, 'minimum average launch angle'],
+  maxLaunchAngle: [0, 55, 'maximum average launch angle'],
+  minPullPct: [0, 100, 'minimum pull percentage'],
+  minScore: [0, 100, 'minimum StatFax model score'],
+  minHeat: [0, 100, 'minimum StatFax heat index'],
+  minHrProb: [0, 50, 'minimum already-computed HR probability as a percentage'],
+  minRecBarrel: [0, 45, 'minimum recent barrel percentage; engine requires at least six BBE'],
+  minHrDue: [0, 6, 'minimum HR setup evidence checks; never treat as being owed a result'],
+  minPositives: [0, 15, 'minimum positive evidence count'],
+  maxNegatives: [0, 10, 'maximum negative evidence count'],
+});
+const LIST_BUILDER_SIGNALS = Object.freeze([
+  'precision', 'sleeper', 'hot', 'barrelKing', 'blast', 'pitchEdge',
+  'pitchMixEdge', 'zoneEdge', 'hrPlatoonEdge', 'wxEdge', 'homeEdge', 'awayEdge',
+]);
+const LIST_BUILDER_SORTS = Object.freeze(['hrProbability', 'score', 'barrel', 'matchup', 'heat']);
+
+function normalizeListBuilderCriteria(raw) {
+  const source = raw && typeof raw === 'object' ? raw : {};
+  const criteria = {};
+  for (const [key, [min, max]] of Object.entries(LIST_BUILDER_FIELDS)) {
+    const value = source[key];
+    criteria[key] = Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : null;
+  }
+  criteria.signals = [...new Set(Array.isArray(source.signals) ? source.signals : [])]
+    .filter((key) => LIST_BUILDER_SIGNALS.includes(key));
+  criteria.signalMode = source.signalMode === 'any' ? 'any' : 'all';
+  criteria.pregameOnly = source.pregameOnly !== false;
+  criteria.confirmedOnly = source.confirmedOnly === true;
+  criteria.trustedOnly = source.trustedOnly === true;
+  criteria.sort = LIST_BUILDER_SORTS.includes(source.sort) ? source.sort : 'hrProbability';
+  return criteria;
+}
+
+async function handleListBuilder(request, env) {
+  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders(env) });
+  if (request.method !== 'POST') return jsonResponse({ error: 'POST only' }, 405, env);
+
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return jsonResponse({ error: 'bad json' }, 400, env);
+  }
+  const query = String(body.query || '').trim().slice(0, 500);
+  if (!query) return jsonResponse({ error: 'Describe the list you want.' }, 400, env);
+  if (!env.OPENAI_API_KEY) return jsonResponse({ error: 'AI criteria is not configured.' }, 503, env);
+
+  const numericProperties = Object.fromEntries(Object.entries(LIST_BUILDER_FIELDS).map(([key, [minimum, maximum]]) => [
+    key,
+    { type: ['number', 'null'], minimum, maximum },
+  ]));
+  const criteriaProperties = {
+    ...numericProperties,
+    signals: { type: 'array', uniqueItems: true, items: { type: 'string', enum: LIST_BUILDER_SIGNALS } },
+    signalMode: { type: 'string', enum: ['all', 'any'] },
+    pregameOnly: { type: 'boolean' },
+    confirmedOnly: { type: 'boolean' },
+    trustedOnly: { type: 'boolean' },
+    sort: { type: 'string', enum: LIST_BUILDER_SORTS },
+  };
+  const schema = {
+    type: 'object',
+    properties: {
+      criteria: {
+        type: 'object',
+        properties: criteriaProperties,
+        required: Object.keys(criteriaProperties),
+        additionalProperties: false,
+      },
+      summary: { type: 'string', maxLength: 240 },
+    },
+    required: ['criteria', 'summary'],
+    additionalProperties: false,
+  };
+  const fieldGuide = Object.entries(LIST_BUILDER_FIELDS)
+    .map(([key, [min, max, meaning]]) => `${key} (${min}–${max}): ${meaning}`)
+    .join('\n');
+  const instructions =
+    `Translate one plain-English MLB home-run candidate-list request into the closest StatFax List Builder criteria.\n` +
+    `This is configuration, not prediction. Use null for every numeric gate the request does not support. Never infer player names, results, odds, or new probabilities.\n` +
+    `Keep pregameOnly true unless the person explicitly requests otherwise. Confirmed means confirmedOnly. Reliable/clean/trusted data means trustedOnly.\n` +
+    `For a range such as launch angle 8 to 32, set both minLaunchAngle and maxLaunchAngle. For selected signals, use signalMode "all" only when every signal is required; otherwise use "any".\n` +
+    `Prefer a few faithful filters over aggressive assumptions. Explain the translation in one short summary without promises.\n\n` +
+    `Numeric fields:\n${fieldGuide}\n\n` +
+    `Signals: ${LIST_BUILDER_SIGNALS.join(', ')}. Sorts: ${LIST_BUILDER_SORTS.join(', ')}.`;
+
+  let result;
+  try {
+    result = await callOpenAiStructured(env, {
+      instructions,
+      input: query,
+      schema,
+      schemaName: 'list_builder_criteria',
+      maxOutputTokens: 700,
+    });
+  } catch (e) {
+    return jsonResponse({ error: e.message === 'LLM error' ? 'AI criteria request failed.' : 'AI criteria is temporarily unavailable.', status: e.status }, 502, env);
+  }
+
+  return jsonResponse({
+    criteria: normalizeListBuilderCriteria(result?.criteria),
+    summary: String(result?.summary || 'Translated into visible StatFax criteria.').trim().slice(0, 240),
+  }, 200, env);
+}
+
+// Rephrases already-computed engine evidence; it never changes a score.
 async function handleExplain(request, env) {
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders(env) });
   if (request.method !== 'POST') return jsonResponse({ error: 'POST only' }, 405, env);

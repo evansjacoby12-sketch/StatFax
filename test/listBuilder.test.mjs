@@ -6,6 +6,7 @@ import {
   createListBuilderCriteria,
   effectiveOppHr9,
   evaluateListBuilderBatter,
+  sanitizeListBuilderCriteria,
 } from '../ui/src/lib/list-builder.js'
 
 function batter(overrides = {}) {
@@ -68,4 +69,27 @@ test('builder returns evidence, missing-data coverage, and deterministic sorting
   assert.deepEqual(result.results.map((item) => item.batter.id), ['3', '1'])
   assert.deepEqual(result.coverage.minBarrel, { available: 2, total: 3 })
   assert.ok(result.results[0].evaluation.passed.some((item) => item.key === 'minBarrel'))
+})
+
+test('external criteria are allow-listed, bounded, and safe to restore', () => {
+  const criteria = sanitizeListBuilderCriteria({
+    minOppHr9: 99,
+    minLaunchAngle: -50,
+    minBarrel: '12',
+    signals: ['hot', 'invented', 'hot'],
+    signalMode: 'any',
+    pregameOnly: false,
+    confirmedOnly: true,
+    sort: 'invented',
+    hiddenScoringBoost: 100,
+  })
+  assert.equal(criteria.minOppHr9, 4)
+  assert.equal(criteria.minLaunchAngle, -10)
+  assert.equal(criteria.minBarrel, 12)
+  assert.deepEqual(criteria.signals, ['hot'])
+  assert.equal(criteria.signalMode, 'any')
+  assert.equal(criteria.pregameOnly, false)
+  assert.equal(criteria.confirmedOnly, true)
+  assert.equal(criteria.sort, 'hrProbability')
+  assert.equal('hiddenScoringBoost' in criteria, false)
 })

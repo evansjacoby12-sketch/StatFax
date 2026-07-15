@@ -3,11 +3,15 @@ import Icon from './Icon.jsx'
 import { GradeChip } from './atoms.jsx'
 import { toast } from './Toast.jsx'
 import { pct, num } from '../lib/format.js'
+import * as store from '../lib/storage.js'
+import { translateListBuilderQuery } from '../lib/list-builder-ai.js'
 import {
   LIST_BUILDER_SIGNALS,
   LIST_BUILDER_SORTS,
+  activeListBuilderCriteria,
   buildListBuilderResults,
   createListBuilderCriteria,
+  sanitizeListBuilderCriteria,
 } from '../lib/list-builder.js'
 
 const PRESETS = Object.freeze([
@@ -100,6 +104,15 @@ function criterionText(criterion) {
   return `${criterion.label} ${criterion.mode === 'max' ? '≤' : '≥'} ${criterion.threshold}`
 }
 
+function savedRecipesFromStorage() {
+  const saved = store.load('listBuilderRecipes', [])
+  if (!Array.isArray(saved)) return []
+  return saved
+    .filter((recipe) => recipe && typeof recipe.name === 'string' && recipe.criteria)
+    .slice(0, 20)
+    .map((recipe) => ({ ...recipe, criteria: sanitizeListBuilderCriteria(recipe.criteria) }))
+}
+
 function lineupLabel(batter) {
   if (batter.lineupConfirmed && Number.isFinite(batter.battingOrder)) return `Confirmed · batting ${batter.battingOrder}`
   if (batter.lineupConfirmed) return 'Confirmed lineup'
@@ -164,8 +177,15 @@ export default function ListBuilderView({
 }) {
   const [form, setForm] = useState(() => createListBuilderCriteria())
   const [activePreset, setActivePreset] = useState(null)
+  const [savedRecipes, setSavedRecipes] = useState(savedRecipesFromStorage)
+  const [recipeName, setRecipeName] = useState('')
+  const [aiQuery, setAiQuery] = useState('')
+  const [aiProposal, setAiProposal] = useState(null)
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiError, setAiError] = useState('')
 
   const built = useMemo(() => buildListBuilderResults(batters, form), [batters, form])
+  const aiCriteria = useMemo(() => aiProposal ? activeListBuilderCriteria(aiProposal.criteria) : [], [aiProposal])
   const metricCoverage = Object.values(built.coverage)
   const covered = metricCoverage.length ? Math.min(...metricCoverage.map((item) => item.available)) : batters.length
 
@@ -188,6 +208,62 @@ export default function ListBuilderView({
   const reset = () => {
     setActivePreset(null)
     setForm(createListBuilderCriteria())
+  }
+
+  const persistRecipes = (recipes) => {
+    const limited = recipes.slice(0, 20)
+    setSavedRecipes(limited)
+    store.save('listBuilderRecipes', limited)
+  }
+
+  const saveRecipe = () => {
+    const name = recipeName.trim().slice(0, 40)
+    if (!name) {
+      toast.warn('Name this recipe first')
+      return
+    }
+    const existing = savedRecipes.find((recipe) => recipe.name.toLowerCase() === name.toLowerCase())
+    const recipe = {
+      id: existing?.id || `recipe-${Date.now()}`,
+      name,
+      criteria: sanitizeListBuilderCriteria(form),
+      updatedAt: new Date().toISOString(),
+    }
+    persistRecipes([recipe, ...savedRecipes.filter((item) => item.id !== recipe.id)])
+    setRecipeName('')
+    toast.success(existing ? 'Recipe updated' : 'Recipe saved')
+  }
+
+  const restoreRecipe = (recipe) => {
+    setActivePreset(null)
+    setForm(sanitizeListBuilderCriteria(recipe.criteria))
+    toast.info(`Loaded ${recipe.name}`)
+  }
+
+  const deleteRecipe = (recipe) => {
+    persistRecipes(savedRecipes.filter((item) => item.id !== recipe.id))
+    toast.info(`Deleted ${recipe.name}`)
+  }
+
+  const translateCriteria = async () => {
+    if (!aiQuery.trim() || aiLoading) return
+    setAiLoading(true)
+    setAiError('')
+    setAiProposal(null)
+    try {
+      setAiProposal(await translateListBuilderQuery(aiQuery))
+    } catch (error) {
+      setAiError(error.message || 'AI criteria is temporarily unavailable.')
+    } finally {
+      setAiLoading(false)
+    }
+  }
+
+  const applyAiCriteria = () => {
+    if (!aiProposal) return
+    setActivePreset(null)
+    setForm(sanitizeListBuilderCriteria(aiProposal.criteria))
+    toast.success('AI criteria applied')
   }
 
   const copyList = async () => {
@@ -230,6 +306,79 @@ export default function ListBuilderView({
             <span className="lbv-preset-copy"><b>{preset.title}</b><small>{preset.description}</small></span>
           </button>
         ))}
+      </section>
+
+      <section className="lbv-workflows">
+        <div className="lbv-ai-card">
+          <div className="lbv-workflow-head">
+            <span className="lbv-workflow-icon"><Icon name="Sparkles" size={17} /></span>
+            <div><h3>Describe your list</h3><p>AI translates your words into visible filters. It does not score players.</p></div>
+          </div>
+          <div className="lbv-ai-input">
+            <input
+              type="text"
+              value={aiQuery}
+              maxLength={500}
+              placeholder="Example: confirmed power bats, 12% barrels, launch angle 8–32"
+              onChange={(event) => setAiQuery(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault()
+                  translateCriteria()
+                }
+              }}
+            />
+            <button type="button" onClick={translateCriteria} disabled={!aiQuery.trim() || aiLoading}>
+              <Icon name={aiLoading ? 'Loader' : 'Sparkles'} size={14} className={aiLoading ? 'spin' : ''} />
+              {aiLoading ? 'Translating' : 'Translate'}
+            </button>
+          </div>
+          {aiError && <div className="lbv-ai-error"><Icon name="TriangleAlert" size={13} /> {aiError}</div>}
+          {aiProposal && (
+            <div className="lbv-ai-proposal">
+              <div><b>Proposed criteria</b><p>{aiProposal.summary}</p></div>
+              <div className="lbv-chips">
+                {aiCriteria.length
+                  ? aiCriteria.map((criterion) => <span key={`${criterion.type}:${criterion.key}`} className="lbv-chip static">{criterionText(criterion)}</span>)
+                  : <span className="dim">No supported gates found</span>}
+              </div>
+              <button type="button" className="lbv-apply-ai" onClick={applyAiCriteria} disabled={!aiCriteria.length}>
+                <Icon name="Check" size={13} /> Apply these criteria
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className="lbv-saved-card">
+          <div className="lbv-workflow-head">
+            <span className="lbv-workflow-icon"><Icon name="Bookmark" size={17} /></span>
+            <div><h3>Saved recipes</h3><p>Keep a reusable setup on this device.</p></div>
+          </div>
+          <div className="lbv-save-input">
+            <input
+              type="text"
+              value={recipeName}
+              maxLength={40}
+              placeholder="Recipe name"
+              onChange={(event) => setRecipeName(event.target.value)}
+              onKeyDown={(event) => event.key === 'Enter' && saveRecipe()}
+            />
+            <button type="button" onClick={saveRecipe}><Icon name="Bookmark" size={14} /> Save current</button>
+          </div>
+          <div className="lbv-saved-list">
+            {savedRecipes.length ? savedRecipes.map((recipe) => (
+              <div className="lbv-saved-row" key={recipe.id}>
+                <button type="button" className="lbv-saved-load" onClick={() => restoreRecipe(recipe)}>
+                  <Icon name="Filter" size={12} /><span>{recipe.name}</span>
+                  <small>{activeListBuilderCriteria(recipe.criteria).length} gates</small>
+                </button>
+                <button type="button" className="lbv-saved-delete" onClick={() => deleteRecipe(recipe)} aria-label={`Delete ${recipe.name}`} title={`Delete ${recipe.name}`}>
+                  <Icon name="Trash2" size={13} />
+                </button>
+              </div>
+            )) : <p className="lbv-saved-empty">No saved recipes yet.</p>}
+          </div>
+        </div>
       </section>
 
       <section className="lbv-control-card">
