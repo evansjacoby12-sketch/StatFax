@@ -243,6 +243,7 @@ import {
   reconcileDate,
   repairRecentDays,
   mergeModelHistories,
+  syncModelHistory,
   computeMultipliers,
   fetchHomerersForDate,
   fetchPitcherKsForDate,
@@ -4574,6 +4575,10 @@ async function main() {
   // compact 180-day model archive.
   // Both are uploaded by the same workflow step that uploads daily.json.
   writeFileSync(CALIBRATION_OUT_PATH, JSON.stringify(calibration));
+  // Always migrate the recoverable operational rows and refresh the derived
+  // feature-coverage summary, even on off-days with nothing new to reconcile.
+  // Legacy rows stay schema v1; only newly frozen pregame rows are schema v2.
+  backtestLog = syncModelHistory(backtestLog);
   const finalLogDates = backtestLog?.dates?.length || 0;
   const finalModelHistoryDates = backtestLog?.modelHistory?.dates?.length || 0;
   if (finalLogDates < restoredLogDates || finalModelHistoryDates < restoredModelHistoryDates) {

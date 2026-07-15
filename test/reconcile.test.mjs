@@ -59,15 +59,45 @@ test('legacy record without gamePk falls back to bare-playerId join', () => {
   assert.equal(r[0].actuallyPlayed, true)
 })
 
-test('extractPredictionRecord carries gamePk and logs hot/homeEdge in feat', () => {
+test('extractPredictionRecord freezes the complete schema-v2 feature archive', () => {
   const rec = extractPredictionRecord({
     playerId: 1, gamePk: 99, name: 'X', score: 70, preGameScore: 72,
     grade: { label: 'STRONG' }, hot: true, homeEdge: true, due: false,
     lineupConfirmed: true, dataTrust: { status: 'review' },
+    pullPct: 46.2,
+    xStats: { xISO: 0.28, xSLG: 0.54 },
+    batTracking: {
+      batSpeed: 75.1234, blastPct: 14, blastPerContact: 18.2,
+      recentBlastPct: 20, recentBlastPerContact: 24.4, recentSwings: 30,
+      squaredUpPct: 22.3, hardSwingPct: 19, vsHandBlast: 21,
+      vsHandSwings: 40, vsMixBlast: 20.5, vsMixCoverage: 0.8,
+    },
+    pitcher: {
+      season: { hrPer9: 1.4, era: 4.2, kPer9: 8.1 },
+      recentForm: { games: 5, ip: 27.1, era: 5.1, hrPer9: 2.0, k9: 7.4, pitchesL3D: 12 },
+    },
+    matchupSignals: { arsenalEdge: 3, stuffEdge: -1, zoneFactor: 2, mixFactor: 1, pitchISOAdj: 0.5, recentForm: 6, contactFactor: 4 },
+    pitchTypeSplits: [
+      { key: 'ff', usage: 35, slg: 0.5, whiff: 22 },
+      { key: 'sl', usage: 45, slg: 0.42, whiff: 36 },
+    ],
   })
   assert.equal(rec.gamePk, 99)
+  assert.equal(rec.featureVersion, 2)
   assert.equal(rec.feat.hot, 1)
   assert.equal(rec.feat.he, 1)
+  assert.equal(rec.feat.bspd, 75.123)
+  assert.equal(rec.feat.blast, 24.4, 'freezes the exact recent-sample List Builder blast gate')
+  assert.equal(rec.feat.sq, 22.3)
+  assert.equal(rec.feat.xiso, 0.28)
+  assert.equal(rec.feat.xslg, 0.54)
+  assert.equal(rec.feat.pull, 46.2)
+  assert.equal(rec.feat.prera, 5.1)
+  assert.equal(rec.feat.prhr9, 2)
+  assert.equal(rec.feat.prk9, 7.4)
+  assert.equal(rec.feat.mrf, 6)
+  assert.equal(rec.feat.mcf, 4)
+  assert.deepEqual(rec.pitchTypes, [['sl', 45, 0.42, 36], ['ff', 35, 0.5, 22]])
   assert.equal(rec.score, 72, 'logs the frozen preGameScore, not the live score')
   assert.equal(rec.lineupConfirmed, true)
   assert.equal(rec.dataTrusted, false, 'mirrors the List Builder clean-data gate')
@@ -94,12 +124,17 @@ test('appendToLog keeps 30 operational days and a compact 180-day model archive'
   assert.equal(log.modelHistory.dates.length, 35)
   const archived = log.modelHistory.records['2026-05-01'][0]
   assert.deepEqual(Object.keys(archived).sort(), [
-    'actuallyPlayed', 'badges', 'dataTrusted', 'feat', 'gamePk', 'grade', 'homered',
-    'lineupConfirmed', 'playerId', 'score', 'simHRProb',
+    'actuallyPlayed', 'badges', 'dataTrusted', 'feat', 'featureVersion', 'gamePk', 'grade', 'homered',
+    'lineupConfirmed', 'pitchTypes', 'playerId', 'score', 'simHRProb',
   ])
   assert.equal(archived.name, undefined)
+  assert.equal(archived.featureVersion, 1, 'legacy vectors remain explicitly legacy')
   assert.equal(archived.feat.bs, 1)
+  assert.deepEqual(archived.pitchTypes, [])
   assert.equal(archived.simHRProb, 0.15)
+  assert.equal(log.featureArchive.schemaVersion, 2)
+  assert.equal(log.featureArchive.schemaV2Rows, 0)
+  assert.equal(log.featureArchive.legacyRows, 35)
 })
 
 test('syncModelHistory propagates repaired outcomes and merges older archives', () => {

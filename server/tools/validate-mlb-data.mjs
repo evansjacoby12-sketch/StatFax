@@ -30,6 +30,8 @@ try {
   for (const warning of [...daily.warnings, ...backtest.warnings]) console.warn(`[mlb-data] warning: ${warning}`)
   console.log(`[mlb-data] valid daily v5: ${daily.metrics.games} games · ${daily.metrics.scoredBatters} batter-games · ${daily.metrics.kDistributions} K distributions`)
   console.log(`[mlb-data] valid history: ${backtest.metrics.operationalDays} operational days/${backtest.metrics.operationalRows} rows · ${backtest.metrics.modelHistoryDays} archive days/${backtest.metrics.modelHistoryRows} rows · ${backtest.metrics.kResultDays} K result days`)
+  const featureArchive = backtest.metrics.featureArchive
+  console.log(`[mlb-data] feature archive v${featureArchive.schemaVersion}: ${featureArchive.schemaV2Rows}/${featureArchive.population} settled hitter-games · bat tracking ${featureArchive.groups.batTracking.available} · pitcher recent ${featureArchive.groups.pitcherRecent.available} · pitch types ${featureArchive.groups.pitchTypes.available}`)
 } catch (error) {
   console.error(`[mlb-data] ${error.message}`)
   process.exitCode = 1

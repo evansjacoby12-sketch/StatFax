@@ -146,6 +146,12 @@ Poisson-based strikeout projection per starter. Lives in `server/fetch-slate.mjs
 - Fits an isotonic calibration table (score → observed HR rate)
 - Trains a logistic ensemble stacker when holdout AUC > rule model
 
+### Historical feature archive
+
+Each new reconciled batter-game carries a versioned, frozen pregame feature vector in `backtest-log.json`. Schema v2 prospectively archives bat speed, the exact List Builder blast gate and its sample, squared-up rate, max EV, sweet-spot rate, xISO/xSLG, recent EV, opposing-pitcher recent form, and compact raw pitch-type matchup tuples. These fields are evidence inputs for future recipe backtests; adding them to the archive does not add them to production scoring.
+
+Older records remain schema v1 and are never filled from postgame data. Run `npm run mlb:feature-coverage` to see schema-v2 accumulation plus group and field-level readiness before enabling an advanced historical recipe.
+
 ## Pending validation
 
 Two signal up-weights shipped (2026-06-03) without full held-out outcome confirmation:

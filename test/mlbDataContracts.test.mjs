@@ -1,6 +1,10 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { validateBacktestLog, validateDailySnapshot } from '../server/lib/mlbDataContracts.mjs'
+import {
+  buildHistoricalFeatureCoverage,
+  normalizeHistoricalFeatureVector,
+} from '../server/lib/historicalFeatureArchive.mjs'
 
 const batter = (playerId = 1, gamePk = 10) => ({
   playerId,
@@ -94,6 +98,29 @@ test('backtest contract enforces operational/archive caps and synchronization', 
   const check = validateBacktestLog(broken)
   assert.equal(check.ok, false)
   assert.ok(check.errors.some((error) => error.includes('missing operational date')))
+})
+
+test('backtest contract verifies schema-v2 features and the derived coverage summary', () => {
+  const row = {
+    playerId: 1, gamePk: 10, score: 70, homered: false, actuallyPlayed: true,
+    featureVersion: 2,
+    feat: normalizeHistoricalFeatureVector({ bspd: 75, blast: 20, sq: 24 }),
+    pitchTypes: [['ff', 55, 0.48, 21]],
+  }
+  const modelHistory = { version: 1, dates: ['2026-07-15'], records: { '2026-07-15': [row] } }
+  const log = {
+    dates: ['2026-07-15'], records: { '2026-07-15': [row] }, modelHistory,
+    featureArchive: buildHistoricalFeatureCoverage(modelHistory),
+  }
+  assert.deepEqual(validateBacktestLog(log).errors, [])
+
+  const incomplete = structuredClone(log)
+  delete incomplete.modelHistory.records['2026-07-15'][0].feat.xslg
+  assert.ok(validateBacktestLog(incomplete).errors.some((error) => error.includes('feat.xslg: missing')))
+
+  const tampered = structuredClone(log)
+  tampered.featureArchive.schemaV2Rows = 99
+  assert.ok(validateBacktestLog(tampered).errors.some((error) => error.includes('featureArchive: inconsistent')))
 })
 
 test('backtest contract tolerates pre-gamePk legacy rows but still rejects composite duplicates', () => {

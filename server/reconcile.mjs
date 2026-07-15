@@ -32,7 +32,14 @@
 // the precision-gate thresholds (heat/setup/positives) forward-validatable
 // against real outcomes instead of proxy reconstructions.
 import { heatIndex, hrSetup, pitchMixScore } from '../ui/src/lib/scout.js';
-import { positiveReasonCount, negativeReasonCount } from '../ui/src/lib/combo-engine.js';
+import { blastRate, positiveReasonCount, negativeReasonCount } from '../ui/src/lib/combo-engine.js';
+import {
+  HISTORICAL_FEATURE_VERSION,
+  buildHistoricalFeatureCoverage,
+  compactHistoricalPitchTypes,
+  historicalFeatureVersionOf,
+  normalizeHistoricalFeatureVector,
+} from './lib/historicalFeatureArchive.mjs';
 
 const MLB_BASE = 'https://statsapi.mlb.com/api/v1';
 const ROLLING_DAYS = 30;
@@ -124,17 +131,21 @@ export function extractPredictionRecord(row) {
   // short keys + null-on-missing keep the rolling 30-day log small.
   const num = (x) => (Number.isFinite(x) ? +Number(x).toFixed(3) : null);
   const ps  = row.pitcher?.season || null;
-  const feat = {
+  const pr  = row.pitcher?.recentForm || null;
+  const bt  = row.batTracking || null;
+  const feat = normalizeHistoricalFeatureVector({
     bs:   num(row.batterScore),                   // batter sub-score (0-88)
     ms:   num(row.matchupScore),                  // matchup sub-score (8-100)
     es:   num(row.envScore),                      // environment sub-score (0-100)
     iso:  num(row.season?.iso),
     xiso: num(row.xStats?.xISO),
+    xslg: num(row.xStats?.xSLG),
     brl:  num(row.barrelPctBBE),
     rbrl: num(row.recentBarrel?.recentBarrelPct), // last ~14d barrel%
     ev:   num(row.exitVelo),
     hh:   num(row.hardHitPct),
     la:   num(row.launchAngle),
+    pull: num(row.pullPct),
     // Ceiling inputs + advisory scores — INSTRUMENTED 2026-07-10 so the
     // barrelScore/formScore ceiling metrics can be forward-validated by
     // shortlist hit-rate (see model-lab/validate-ceil.mjs) before anything
@@ -148,9 +159,34 @@ export function extractPredictionRecord(row) {
     rbbe: num(row.recentBarrel?.recentBBE),       // recent BBE (form sample size)
     ceil: num(row.ceilScore),                     // barrelScore ceiling 0-100
     form: num(row.formScore),                     // formScore 0-100
+    // Statcast bat tracking. Keep both the exact List Builder blast gate and
+    // its raw season/recent inputs so future definitions can be replayed
+    // without reconstructing a value from postgame data.
+    bspd: num(bt?.batSpeed),
+    blast:num(blastRate(row)),
+    blsp: num(bt?.blastPct),
+    blpc: num(bt?.blastPerContact),
+    rblsp:num(bt?.recentBlastPct),
+    rblpc:num(bt?.recentBlastPerContact),
+    rsw:  num(bt?.recentSwings),
+    sq:   num(bt?.squaredUpPct),
+    hsw:  num(bt?.hardSwingPct),
+    vhs:  num(bt?.vsHandBlast),
+    vhss: num(bt?.vsHandSwings),
+    vmx:  num(bt?.vsMixBlast),
+    vmc:  num(bt?.vsMixCoverage),
     phr9: num(ps?.hrPer9 ?? ps?.hr9),             // opposing starter HR/9
     pera: num(ps?.era),
     pk9:  num(ps?.kPer9 ?? ps?.k9),
+    // Last-five-start aggregate frozen before this game. Dates and individual
+    // starts are deliberately omitted; the numeric pregame form is sufficient
+    // for recipe replay and avoids carrying bulky game logs per batter.
+    prg:  num(pr?.games),
+    prip: num(pr?.ip),
+    prera:num(pr?.era),
+    prhr9:num(pr?.hrPer9),
+    prk9: num(pr?.k9),
+    prp3: num(pr?.pitchesL3D),
     vdel: num(row.opposingVeloTrend?.veloDelta),     // opposing starter velo trend
     csw:  num(row.opposingVeloTrend?.seasonCswPct),  // opposing starter CSW%
     // Matchup micro-signals — INSTRUMENTED 2026-07-09 so the zone/arsenal/stuff
@@ -161,6 +197,8 @@ export function extractPredictionRecord(row) {
     zone: num(row.matchupSignals?.zoneFactor),       // pitcher heart/zone/edge location (−5..+8)
     mixf: num(row.matchupSignals?.mixFactor),        // fastball reliance × damage (−5..+8)
     piso: num(row.matchupSignals?.pitchISOAdj),      // per-pitch-type ISO mismatch (−3..+4)
+    mrf:  num(row.matchupSignals?.recentForm),       // opposing starter recent-form edge
+    mcf:  num(row.matchupSignals?.contactFactor),    // contact collision edge
     park: num(row.gameParkHRFactor),
     vig:  num(row.vegasImpliedProb),              // Vegas implied prob (when odds present)
     ord:  num(row.battingOrder),
@@ -175,9 +213,11 @@ export function extractPredictionRecord(row) {
     pm:   num(Number.isFinite(row.pmScore) ? row.pmScore : pitchMixScore(row)), // pitch-mix score 0-10 (gate: >=7); prefer the frozen scalar — final rows lose pitchTypeSplits
     pos:  positiveReasonCount(row),           // good-tone trend count (gate: >=8)
     neg:  negativeReasonCount(row),           // bad-tone trend count (gate: <=3)
-  };
+  });
   return {
     feat,
+    featureVersion: HISTORICAL_FEATURE_VERSION,
+    pitchTypes: compactHistoricalPitchTypes(row.pitchTypeSplits),
     playerId:       row.playerId,
     gamePk:         row.gamePk,   // join outcomes per (player, game): a split doubleheader has two prediction rows for one playerId
     name:           row.name,
@@ -281,6 +321,9 @@ export function reconcileOutcomes(predictions, { homerers, played, homerersByKey
 
 /** Keep only fields needed for long-horizon model and signal evaluation. */
 export function compactModelRecord(record) {
+  const featureVersion = historicalFeatureVersionOf(record);
+  const validFeat = record?.feat && typeof record.feat === 'object' && !Array.isArray(record.feat);
+  const rawFeat = validFeat ? record.feat : (record?.feat ?? null);
   return {
     playerId:       record?.playerId ?? null,
     gamePk:         record?.gamePk ?? null,
@@ -292,7 +335,9 @@ export function compactModelRecord(record) {
     lineupConfirmed: typeof record?.lineupConfirmed === 'boolean' ? record.lineupConfirmed : null,
     dataTrusted:    typeof record?.dataTrusted === 'boolean' ? record.dataTrusted : null,
     simHRProb:      Number.isFinite(record?.simHRProb) ? record.simHRProb : null,
-    feat:           record?.feat && typeof record.feat === 'object' ? record.feat : null,
+    featureVersion: featureVersion || null,
+    feat:           featureVersion >= HISTORICAL_FEATURE_VERSION && validFeat ? normalizeHistoricalFeatureVector(rawFeat) : rawFeat,
+    pitchTypes:     compactHistoricalPitchTypes(record?.pitchTypes),
   };
 }
 
@@ -334,12 +379,14 @@ export function syncModelHistory(log) {
     if (!Array.isArray(log.records?.[date])) continue;
     currentRecords[date] = log.records[date].map(compactModelRecord);
   }
+  const modelHistory = mergeModelHistories(
+    log.modelHistory,
+    { dates: Object.keys(currentRecords), records: currentRecords },
+  );
   return {
     ...log,
-    modelHistory: mergeModelHistories(
-      log.modelHistory,
-      { dates: Object.keys(currentRecords), records: currentRecords },
-    ),
+    modelHistory,
+    featureArchive: buildHistoricalFeatureCoverage(modelHistory),
   };
 }
 

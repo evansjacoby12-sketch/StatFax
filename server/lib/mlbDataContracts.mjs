@@ -1,3 +1,9 @@
+import {
+  HISTORICAL_FEATURE_VERSION,
+  buildHistoricalFeatureCoverage,
+  validateHistoricalFeatureRecord,
+} from './historicalFeatureArchive.mjs'
+
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 const GRADE_LABELS = new Set(['PRIME', 'STRONG', 'LEAN', 'SKIP'])
 const K_VOLUME_SOURCES = new Set(['recent-pitches-bf', 'recent-ip', 'season-ip'])
@@ -148,6 +154,7 @@ function validateRecordRows(records, dates, prefix, errors, warnings, { compact 
       if (typeof row.homered !== 'boolean') errors.push(`${at}.homered: must be boolean`)
       if (compact && typeof row.actuallyPlayed !== 'boolean') errors.push(`${at}.actuallyPlayed: must be boolean`)
       if (row.feat != null && !isObject(row.feat)) errors.push(`${at}.feat: must be an object or null`)
+      errors.push(...validateHistoricalFeatureRecord(row, at))
       if (compact && !row.feat) missingFeatures++
       if (row.gamePk == null) {
         legacyGameRows++
@@ -181,12 +188,13 @@ export function validateBacktestLog(log) {
   const history = log.modelHistory
   let historyDates = []
   let historyRows = 0
+  let historyRecords = {}
   if (history != null) {
     if (!isObject(history)) {
       errors.push('modelHistory: expected an object')
     } else {
       historyDates = Array.isArray(history.dates) ? history.dates : []
-      const historyRecords = isObject(history.records) ? history.records : {}
+      historyRecords = isObject(history.records) ? history.records : {}
       if (history.version !== 1) errors.push(`modelHistory.version: expected 1, received ${String(history.version)}`)
       if (!Array.isArray(history.dates)) errors.push('modelHistory.dates: expected an array')
       if (!isObject(history.records)) errors.push('modelHistory.records: expected an object')
@@ -201,6 +209,15 @@ export function validateBacktestLog(log) {
     errors.push('modelHistory: required when operational records exist')
   }
 
+  const featureArchive = buildHistoricalFeatureCoverage({ dates: historyDates, records: historyRecords })
+  if (log.featureArchive == null) {
+    if (historyRows) warnings.push(`featureArchive: missing derived schema-v${HISTORICAL_FEATURE_VERSION} coverage summary`)
+  } else if (!isObject(log.featureArchive)) {
+    errors.push('featureArchive: expected an object')
+  } else if (JSON.stringify(log.featureArchive) !== JSON.stringify(featureArchive)) {
+    errors.push('featureArchive: inconsistent with modelHistory')
+  }
+
   const kResultDays = Object.keys(log.kProps?.resultsByDate || {}).length
   if (kResultDays > 180) errors.push(`kProps.resultsByDate: exceeds 180-day cap (${kResultDays})`)
   const kEstimateDays = Object.keys(log.kProps?.estByDate || {}).length
@@ -211,6 +228,7 @@ export function validateBacktestLog(log) {
     operationalRows,
     modelHistoryDays: historyDates.length,
     modelHistoryRows: historyRows,
+    featureArchive,
     kResultDays,
   })
 }
