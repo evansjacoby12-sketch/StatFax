@@ -6,7 +6,7 @@ import {
   buildPlayerExplainSignals,
   normalizePlayerExplain,
   playerExplainPayload,
-} from '../ui/src/lib/explain.js'
+} from '../ui/src/lib/playerExplain.js'
 
 const batter = {
   playerId: 665742,
