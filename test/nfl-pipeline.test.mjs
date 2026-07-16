@@ -6,7 +6,7 @@ import { fetchESPNDepthChart, fetchESPNRoster, parseESPNDepthChart, parseESPNDep
 import { nearestHourlyForecast } from '../server/sports/nfl/providers/weather.mjs'
 import { parseSportsGameOdds } from '../server/sports/nfl/providers/odds.mjs'
 import { enrichNFLTeamOpportunityShares, indexNFLHistory, matchHistoryPlayer, projectNFLPlayer } from '../server/sports/nfl/projections.mjs'
-import { buildNFLSnapshot, defenseProfile, normalizeFirstTouchdownProbabilities, parseNFLSlateArgs } from '../server/sports/nfl/fetch-nfl-slate.mjs'
+import { buildNFLRefreshStatus, buildNFLSnapshot, defenseProfile, normalizeFirstTouchdownProbabilities, parseNFLSlateArgs } from '../server/sports/nfl/fetch-nfl-slate.mjs'
 import { assessPlayerAvailability, indexAvailability, externalAvailabilityFor } from '../server/sports/nfl/availability.mjs'
 import { evaluateNFLHistory, evaluateNFLStackHistory } from '../server/sports/nfl/backtest.mjs'
 import { calibrateNFLProbability, correctedNFLProjection } from '../src/sports/nfl/logic/calibration.js'
@@ -75,11 +75,29 @@ test('season tracker freezes forecasts and settles probability and projection re
   const final = { generatedAt: '2026-09-02T04:00:00Z', players: [{ ...pregame.players[0], live: { isFinal: true, stats: { totalTds: 1, rushingYards: 60 } } }] }
   const log = updateNFLTracking({}, pregame, final, new Date('2026-09-02T04:00:00Z'))
   const summary = summarizeNFLTracking(log)
+  assert.equal(log.version, 3)
   assert.equal(summary.settled, 2)
   assert.equal(summary.markets.anytime_td.brier, .36)
   assert.equal(summary.markets.anytime_td.calibration[0].observed, 1)
   assert.equal(summary.markets.rushing_yards.mae, 5)
   assert.equal(summary.markets.anytime_td.roiSamples, 1)
+  assert.equal(log.records.find((record) => record.marketId === 'anytime_td').touchdowns, 1)
+  assert.equal(summary.validation.touchdowns.rawTouchdownsLogged, 1)
+  assert.equal(summary.validation.touchdowns.touchdownsObserved, 1)
+  assert.equal(summary.validation.touchdowns.status, 'collecting')
+})
+
+test('weekly refresh readiness tightens depth, availability, weather and lineup gates near kickoff', () => {
+  const games = [{ date: '2026-09-02T18:00:00Z', status: { state: 'pre' } }]
+  const quality = { depthChart: true, officialAvailability: true, weatherFresh: true, weatherCoverage: 1, lineups: true, lineupConfirmed: 0 }
+  const gameDay = buildNFLRefreshStatus(games, quality, new Date('2026-09-02T14:00:00Z'))
+  assert.equal(gameDay.phase, 'game-day')
+  assert.equal(gameDay.status, 'ready')
+  const finalCheck = buildNFLRefreshStatus(games, quality, new Date('2026-09-02T17:00:00Z'))
+  assert.equal(finalCheck.phase, 'final-check')
+  assert.equal(finalCheck.status, 'limited')
+  assert.deepEqual(finalCheck.missing, ['lineups'])
+  assert.equal(finalCheck.cadenceMinutes, 10)
 })
 
 test('season tracker archives opening and closing TD stack boards and settles them', () => {
@@ -92,7 +110,7 @@ test('season tracker archives opening and closing TD stack boards and settles th
   }))
   const pregame = { ...NFL_DEMO_SNAPSHOT, generatedAt: '2026-09-01T00:00:00Z', meta: { ...NFL_DEMO_SNAPSHOT.meta, season: 2026, week: 'Week 1' }, players: pregamePlayers }
   const opened = updateNFLTracking({}, pregame, null, new Date('2026-09-01T01:00:00Z'))
-  assert.equal(opened.version, 2)
+  assert.equal(opened.version, 3)
   assert.ok(opened.stackBoards.length > 0)
   const firstOpening = structuredClone(opened.stackBoards[0].opened)
   const final = { ...pregame, generatedAt: '2026-09-02T05:00:00Z', players: pregamePlayers.map((player, index) => ({ ...player, live: { isFinal: true, firstTdKnown: true, isFirstTdScorer: index === 0, stats: { totalTds: index % 2 } } })) }
@@ -100,6 +118,7 @@ test('season tracker archives opening and closing TD stack boards and settles th
   assert.deepEqual(settled.stackBoards.find((board) => board.id === opened.stackBoards[0].id).opened.at, firstOpening.at)
   assert.ok(settled.stackBoards.some((board) => board.locked))
   assert.ok(Object.values(summarizeNFLTracking(settled).stacks).some((stack) => stack.settled > 0))
+  assert.ok(summarizeNFLTracking(settled).validation.stacks.recent.samples > 0)
 })
 
 test('ESPN schedule normalization selects the nearest complete NFL week', () => {

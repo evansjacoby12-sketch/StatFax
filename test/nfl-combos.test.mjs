@@ -85,3 +85,17 @@ test('specialized role stacks reject unconfirmed projection-only evidence', () =
   assert.equal(buildNFLComboBoard(projectedOnly, { strategy: 'goal-line-hammer', minGrade: 'SKIP' }).combos.length, 0)
   assert.equal(buildNFLComboBoard(projectedOnly, { strategy: 'end-zone-alpha', minGrade: 'SKIP' }).combos.length, 0)
 })
+
+test('Double Tap same-game coverage admits only disclosed 4% longshots with observed scoring-area usage', () => {
+  const players = snapshot.players.slice(0, 2).map((player, index) => ({
+    ...player,
+    gameId: 'same-game', team: index ? 'AWY' : 'HME', opponent: index ? 'HME' : 'AWY',
+    markets: { ...player.markets, two_plus_td: { probability: .041 } },
+    historyMatch: { games: 8 }, lineup: null,
+    usage: { ...player.usage, goalLineTouchesL3: 1, endZoneTargetsL3: 0, redZoneTargetsL3: 0 },
+  }))
+  const board = buildNFLComboBoard({ ...snapshot, players, modelPerformance: null }, { strategy: 'double-tap', scope: 'same-game', legs: 2, minGrade: 'LEAN' })
+  assert.equal(board.combos.length, 1)
+  assert.ok(board.combos[0].legs.every((leg) => leg.grade === 'SKIP' && leg.probability >= .04 && leg.scoringRole.goalLineTouchesL3 >= 1))
+  assert.ok(board.coverage.limitations.some((message) => /4%\+ legs/i.test(message)))
+})

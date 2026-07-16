@@ -122,6 +122,39 @@ export function normalizeFirstTouchdownProbabilities(players, calibration = {}) 
   return players
 }
 
+function currentOverlay(payload, now, maxAgeHours) {
+  if (!payload) return null
+  return overlayFreshness(payload.generatedAt, now, maxAgeHours).fresh ? payload : null
+}
+
+export function buildNFLRefreshStatus(games = [], quality = {}, now = new Date()) {
+  const states = games.map((game) => game.status?.state)
+  const futureKickoffs = games.map((game) => +new Date(game.date)).filter((value) => Number.isFinite(value) && value > +new Date(now))
+  const minutesToKickoff = futureKickoffs.length ? Math.round((Math.min(...futureKickoffs) - +new Date(now)) / 60000) : null
+  const phase = states.some((state) => state === 'in') ? 'live'
+    : states.length && states.every((state) => state === 'post') ? 'final'
+      : minutesToKickoff == null ? 'monitoring'
+        : minutesToKickoff <= 90 ? 'final-check'
+          : minutesToKickoff <= 360 ? 'game-day'
+            : minutesToKickoff <= 4320 ? 'weekly-refresh' : 'forecast'
+  const checks = [
+    { id: 'depth', label: 'Depth charts', required: phase !== 'forecast', ready: Boolean(quality.depthChart) },
+    { id: 'availability', label: 'Injuries and inactive status', required: ['game-day', 'final-check', 'live'].includes(phase), ready: Boolean(quality.officialAvailability) },
+    { id: 'weather', label: 'Kickoff weather', required: minutesToKickoff != null && minutesToKickoff <= 1440, ready: Boolean(quality.weatherFresh) && Number(quality.weatherCoverage || 0) >= .8 },
+    { id: 'lineups', label: 'Confirmed roles', required: phase === 'final-check', ready: Boolean(quality.lineups) && Number(quality.lineupConfirmed || 0) > 0 },
+  ]
+  const missing = checks.filter((check) => check.required && !check.ready)
+  return {
+    phase,
+    status: ['live', 'final'].includes(phase) ? phase : missing.length ? 'limited' : 'ready',
+    minutesToKickoff,
+    cadenceMinutes: ['live', 'final-check'].includes(phase) ? 10 : phase === 'game-day' ? 15 : 30,
+    checks,
+    missing: missing.map((check) => check.id),
+    message: missing.length ? `${missing.map((check) => check.label).join(', ')} still need refresh` : phase === 'live' ? 'Live scoring and touchdown settlement active' : 'Required launch feeds are current',
+  }
+}
+
 export async function buildNFLSnapshot({ now = new Date(), fetchImpl = fetch, historyPath = DEFAULT_HISTORY, availabilityPath = DEFAULT_AVAILABILITY, backtestPath = DEFAULT_BACKTEST, depthChartPath = DEFAULT_DEPTH_CHART, weatherPath = DEFAULT_WEATHER, lineupPath = DEFAULT_LINEUPS, trackingPath = DEFAULT_TRACKING, oddsApiKey = process.env.SPORTSGAMEODDS_API_KEY, targetSeason = process.env.NFL_TARGET_SEASON || null, targetSeasonType = process.env.NFL_TARGET_SEASON_TYPE || null, targetWeek = process.env.NFL_TARGET_WEEK || null } = {}) {
   const year = Number(targetSeason) || new Date(now).getUTCFullYear()
   const schedule = await fetchESPNSeason(year, fetchImpl)
@@ -131,10 +164,12 @@ export async function buildNFLSnapshot({ now = new Date(), fetchImpl = fetch, hi
   const historyIndex = indexNFLHistory(history)
   const modelPerformance = await readJSON(backtestPath)
   const calibration = modelPerformance?.markets || {}
-  const externalAvailabilityPayload = await readJSON(availabilityPath)
-  const externalDepthPayload = await readOptionalJSON(depthChartPath)
-  const externalWeatherPayload = await readOptionalJSON(weatherPath)
-  const externalLineupPayload = await readOptionalJSON(lineupPath)
+  // A stale hand-authored overlay must never shadow a fresh automatic feed.
+  // Each deploy re-pulls ESPN/Open-Meteo and falls back automatically here.
+  const externalAvailabilityPayload = currentOverlay(await readJSON(availabilityPath), now, 72)
+  const externalDepthPayload = currentOverlay(await readOptionalJSON(depthChartPath), now, 168)
+  const externalWeatherPayload = currentOverlay(await readOptionalJSON(weatherPath), now, 24)
+  const externalLineupPayload = currentOverlay(await readOptionalJSON(lineupPath), now, 36)
   const lineupIndex = indexNFLLineups(externalLineupPayload)
   const trackingLog = await readJSON(trackingPath) || { records: [] }
   const oddsResult = await fetchNFLOdds(oddsApiKey, fetchImpl)
@@ -278,6 +313,7 @@ export async function buildNFLSnapshot({ now = new Date(), fetchImpl = fetch, hi
   const generatedAt = new Date(now).toISOString()
   const overlays = { depthChart: depthFreshness, availability: availabilityFreshness, lineups: lineupFreshness, weather: weatherFreshness }
   const dataHealth = buildNFLDataHealth({ generatedAt, games, players, quality: dataQuality, providers: { schedule: providers.schedule, rosters: providers.rosters, depth: providers.depth, lineups: providers.lineups, availability: providers.practice, weather: providers.weather, history: providers.history }, overlayStatus: { depth: depthFreshness, lineups: lineupFreshness, availability: availabilityFreshness, weather: weatherFreshness } })
+  const refreshStatus = buildNFLRefreshStatus(games, dataQuality, now)
   return {
     version: 3,
     sport: 'nfl',
@@ -292,6 +328,7 @@ export async function buildNFLSnapshot({ now = new Date(), fetchImpl = fetch, hi
     },
     dataQuality,
     dataHealth,
+    refreshStatus,
     lineupCoverage,
     overlays,
     modelPerformance,

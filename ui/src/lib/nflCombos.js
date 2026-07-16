@@ -69,6 +69,18 @@ function eligibleForStack(candidate, strategy) {
   return false
 }
 
+function meetsSelectionFloor(candidate, strategy, scope, minGrade) {
+  if (GRADE_RANK[candidate.grade] >= GRADE_RANK[minGrade]) return true
+  if (strategy !== 'double-tap' || scope !== 'same-game') return false
+  const observedScoringRole = candidate.scoringRole.goalLineTouchesL3 >= 1
+    || candidate.scoringRole.endZoneTargetsL3 >= 1
+    || candidate.scoringRole.redZoneTargetsL3 >= 2
+  // Same-game 2+ TD cards are naturally sparse. Permit a disclosed longshot
+  // tier without inventing confidence: every leg still needs a 4% model floor,
+  // real scoring-area usage, and enough history to establish its role.
+  return candidate.probability >= .04 && observedScoringRole && candidate.scoringRole.historyGames >= 4
+}
+
 function evidenceConfidence(candidate, strategy) {
   if (['goal-line-hammer', 'end-zone-alpha'].includes(strategy)) {
     const observed = strategy === 'goal-line-hammer'
@@ -163,7 +175,7 @@ export function buildNFLComboBoard(snapshot, { legs = 2, strategy = 'scorer-core
     .filter((candidate) => candidate.model.eligible && candidate.probability > 0 && candidate.gameKey)
     .filter((candidate) => candidate.availability?.eligible !== false)
     .filter((candidate) => eligibleForStack(candidate, strategy))
-    .filter((candidate) => GRADE_RANK[candidate.grade] >= GRADE_RANK[minGrade])
+    .filter((candidate) => meetsSelectionFloor(candidate, strategy, scope, minGrade))
     .map((candidate) => ({ ...candidate, evidenceConfidence: evidenceConfidence(candidate, strategy) }))
     .sort((a, b) => candidateScore(b, strategy) - candidateScore(a, strategy))
     .slice(0, scope === 'same-game' ? 32 : 24)
@@ -217,6 +229,7 @@ export function buildNFLComboBoard(snapshot, { legs = 2, strategy = 'scorer-core
   if (candidates.length < legCount) limitations.push('Not enough eligible stack candidates')
   if (diversified.selected.length < minimumReady) limitations.push(`Only ${diversified.selected.length} diversified builds available`)
   if (scope === 'same-game' && !calibrationReady) limitations.push('Same-game joint calibration is still collecting')
+  if (strategy === 'double-tap' && diversified.selected.some((combo) => combo.legs.some((leg) => GRADE_RANK[leg.grade] < GRADE_RANK[minGrade]))) limitations.push('Longshot tier includes 4%+ legs with observed scoring-area usage')
   if (diversified.selected.some((combo) => combo.evidenceConfidence === 'projected')) limitations.push('Some builds rely on projected role evidence')
   return {
     combos: diversified.selected,

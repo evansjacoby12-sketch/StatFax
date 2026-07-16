@@ -176,4 +176,7 @@ test('NFL performance surfaces frozen stack tracking and historical stack valida
   assert.match(board, /TD stack validation/)
   assert.match(board, /Observed all-hit/)
   assert.match(board, /Raw independent/)
+  assert.match(board, /Live TD calibration/)
+  assert.match(board, /Touchdowns observed/)
+  assert.match(board, /Weekly launch refresh/)
 })

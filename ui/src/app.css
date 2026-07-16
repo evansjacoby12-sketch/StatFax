@@ -16495,6 +16495,19 @@ button.th:focus-visible {
 .nfl-tracking-summary > div span { min-width: 0; padding: 10px; display: flex; flex-direction: column; gap: 3px; border: 1px solid var(--border-soft); border-radius: 9px; }
 .nfl-tracking-summary > div b { color: var(--prime); font-size: 16px; }
 .nfl-tracking-summary > div small { color: var(--text-faint); font-size: 8px; text-transform: uppercase; }
+.nfl-live-validation-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; margin-top: 12px; }
+.nfl-live-validation { padding: 14px; border: 1px solid var(--border-soft); border-radius: 12px; background: rgba(255,255,255,.018); }
+.nfl-live-validation.is-stable, .nfl-live-validation.is-ready, .nfl-live-validation.is-live { border-color: color-mix(in srgb, var(--good) 35%, var(--border-soft)); }
+.nfl-live-validation.is-warning, .nfl-live-validation.is-limited { border-color: color-mix(in srgb, var(--warn) 42%, var(--border-soft)); }
+.nfl-live-validation > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.nfl-live-validation > header span { display: inline-flex; align-items: center; gap: 7px; color: var(--accent); font-size: 10px; font-weight: 800; text-transform: uppercase; }
+.nfl-live-validation > header em { color: var(--text-faint); font-size: 9px; font-style: normal; letter-spacing: .08em; text-transform: uppercase; }
+.nfl-live-validation > div { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 8px; }
+.nfl-live-validation > div span { display: grid; gap: 3px; min-width: 0; }
+.nfl-live-validation > div b { color: var(--prime); font-size: 16px; }
+.nfl-live-validation > div small, .nfl-live-validation > footer { color: var(--text-faint); font-size: 8px; }
+.nfl-live-validation > div small { text-transform: uppercase; }
+.nfl-live-validation > footer { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border-soft); }
 .nfl-stack-performance { margin-top: 12px; padding: 12px; border: 1px solid var(--border-soft); border-radius: 12px; background: rgba(255,255,255,.018); }
 .nfl-stack-performance > header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .nfl-stack-performance > header span { display: inline-flex; align-items: center; gap: 6px; color: var(--accent); font-size: 10px; font-weight: 800; text-transform: uppercase; }
@@ -16670,6 +16683,7 @@ button.th:focus-visible {
 .nfl-game-log { overflow: hidden; border: 1px solid var(--border-soft); border-radius: 9px; }
 
 @media (max-width: 980px) {
+  .nfl-live-validation-grid { grid-template-columns: 1fr; }
   .nfl-coverage-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .nfl-performance-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .nfl-stack-performance > div { grid-template-columns: repeat(2, minmax(0, 1fr)); }
