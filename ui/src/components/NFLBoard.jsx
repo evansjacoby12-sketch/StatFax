@@ -93,6 +93,37 @@ function signalIcon(signal) {
   return 'TrendingUp'
 }
 
+function compactSignalValue(signal) {
+  if (!signal) return 'Limited'
+  const percent = signal.text?.match(/\d+%/)?.[0]
+  if (signal.key === 'end-zone-alpha') return percent ? `${percent} EZ` : 'EZ alpha'
+  if (signal.key === 'goal-to-go-dominator') return percent ? `${percent} G2G` : 'Goal role'
+  if (signal.key === 'opportunity-spike') return percent ? `Role +${percent}` : 'Role up'
+  if (signal.key === 'scoring-role-lost') return percent ? `Role -${percent}` : 'Role down'
+  if (signal.key === 'drive-participation') return percent ? `${percent} drives` : 'Drive role'
+  if (signal.key === 'committee-risk') return percent ? `${percent} carries` : 'Committee'
+  if (signal.key === 'defense-funnel') return 'Funnel'
+  if (signal.key === 'qb-keeper-threat') return 'QB rush'
+  if (signal.key === 'air-yards-leader') return percent ? `${percent} air` : 'Air share'
+  if (signal.key === 'yac-creator') return 'YAC +'
+  if (signal.key === 'rushing-over-expected') return 'RYOE +'
+  if (signal.key === 'separation-edge') return 'Separation'
+  if (['protection-mismatch', 'quick-pressure-risk'].includes(signal.key)) return 'Pressure'
+  if (signal.key === 'snap-limit') return percent ? `${percent} snaps` : 'Snap limit'
+  if (signal.key === 'rz-targets') return `${signal.text?.match(/^\d+/)?.[0] || ''} RZ tgt`.trim()
+  if (signal.key === 'rz-touches') return `${signal.text?.match(/^\d+/)?.[0] || ''} RZ touch`.trim()
+  if (signal.key === 'goal-line') return 'Goal line'
+  if (signal.key === 'goal-line-package') return 'GL package'
+  if (signal.key === 'target-share') return percent ? `${percent} tgt` : 'Target share'
+  if (signal.key === 'snap-share') return percent ? `${percent} snaps` : 'Snap share'
+  if (signal.key === 'route-participation') return percent ? `${percent} routes` : 'Route share'
+  if (signal.key === 'lineup-confirmed') return 'Confirmed'
+  if (signal.key === 'role-inheritance') return 'Role up'
+  if (signal.games) return `${signal.games}G ${signal.label || signal.key}`
+  if (signal.key === 'split') return signal.text?.replace(' edge', '') || 'Split'
+  return signal.text?.split(' ').slice(0, 2).join(' ') || 'Evidence'
+}
+
 const ASSESSMENT_META = {
   avoid: { icon: 'TriangleAlert', groupLabel: 'Be wary / avoid', detail: 'Read these before considering the bet' },
   caution: { icon: 'Info', groupLabel: 'Caution', detail: 'Mixed evidence or conditions to monitor' },
@@ -224,7 +255,7 @@ function BoardRow({ player, rank, marketId, watched, inSlip, onSelect, onToggleW
         <div className="dl-rank mono">{String(rank).padStart(2, '0')}</div>
         <div className="dl-identity"><div className="dl-name-line"><strong>{player.name}</strong><span className="nfl-position">{player.position}</span><AssessmentBadge signals={model.signals} compact />{player.live?.isLive && <span className="live-tag"><span className="live-dot" /> LIVE</span>}</div><div className="dl-matchup">{matchup}</div></div>
         <div className="dl-verdict"><div className="dl-grade" style={{ color }}><span>{model.grade}</span><b>{score}</b></div><div className="dl-probability"><ProbRing value={model.probability} color={color} size={64} /><small>MODEL PROB</small></div></div>
-        <div className="dl-proof"><div className="dl-evidence-strip">{proofSignals.length ? proofSignals.map((signal) => <span key={signal.key} className={evidenceTone(signal)}>{signal.text}</span>) : <span>No active signal</span>}</div><div className="dl-proof-metrics"><span><b className="mono">{marketValue(player, model, marketId)}</b><small>MARKET</small></span><i /><span><b className={`mono ${model.edge == null ? '' : model.edge >= 0 ? 'positive' : 'negative'}`}>{model.edge == null ? '—' : `${model.edge >= 0 ? '+' : ''}${pct(model.edge)}`}</b><small>EDGE</small></span>{strongestSignal && <><i /><span className={`dl-proof-signal ${evidenceTone(strongestSignal)}`}><Icon name={signalIcon(strongestSignal)} size={11} /><b>{assessment.label}</b></span></>}</div></div>
+        <div className="dl-proof"><div className="nfl-evidence-cells">{proofSignals.length ? proofSignals.map((signal) => <span key={signal.key} className={`nfl-evidence-cell ${evidenceTone(signal)}`} title={nflSignalText(signal, eliLevel)}><Icon name={signalIcon(signal)} size={11} /><b className="mono">{compactSignalValue(signal)}</b></span>) : <span className="nfl-evidence-cell"><Icon name="Info" size={11} /><b>Limited</b></span>}</div><div className="dl-proof-metrics"><span><small>MARKET</small><b className="mono">{marketValue(player, model, marketId)}</b></span><i /><span><small>EDGE</small><b className={`mono ${model.edge == null ? '' : model.edge >= 0 ? 'positive' : 'negative'}`}>{model.edge == null ? '—' : `${model.edge >= 0 ? '+' : ''}${pct(model.edge)}`}</b></span></div></div>
         <div className="dl-actions" onClick={(event) => event.stopPropagation()}><button className={watched ? 'watch' : ''} onClick={stop(onToggleWatch)} title={watched ? 'Remove from watchlist' : 'Add to watchlist'} aria-label="Toggle watchlist"><Icon name="Star" size={17} /></button><button className={inSlip ? 'slip' : ''} onClick={stop(onToggleSlip)} title={inSlip ? 'Remove from slip' : 'Add to slip'} aria-label="Toggle prop slip"><Icon name={inSlip ? 'Check' : 'Plus'} size={18} /></button></div>
       </div>
     </div>
@@ -412,7 +443,7 @@ export default function NFLBoard({ snapshot: suppliedSnapshot = null, view: cont
       <SportSignalRail sport="nfl" filters={NFL_SIGNAL_FILTERS} values={signalFilters} counts={signalCounts} total={filteredPool.length} onToggleFilter={toggleSignalFilter} onClear={() => setSignalFilters(new Set())} open={signalsOpen} onToggleOpen={() => setSignalsOpen((open) => !open)} />
       <div className="nfl-layout"><section className="nfl-board-panel" aria-label="Ranked NFL props">
       <SportMultiFilterBar sport="nfl" className="nfl-prop-filters" searchValue={query} onSearch={setQuery} searchPlaceholder="Search players, teams, matchups" filters={propFilters}><button className={`nfl-two-filter ${twoPlusOnly ? 'active' : ''}`} aria-pressed={twoPlusOnly} onClick={() => setTwoPlusOnly((value) => !value)}><Icon name="Flame" size={13} />2+ TD filter</button></SportMultiFilterBar>
-      {!!players.length && <div className="board nfl-decision-board"><div className="board-head decision-ladder-head nfl-decision-ladder-head"><div className="th dl-rank" title="Rank by model score">Rank</div><div className="th dl-identity">Player identity</div><div className="th dl-verdict">Model verdict</div><div className="th dl-proof">Supporting proof</div><div className="th dl-actions">Actions</div></div><div className="board-body">{players.map((player, index) => <BoardRow key={player.id} player={player} rank={index + 1} marketId={marketId} watched={watched.has(player.id)} inSlip={slip.has(`${player.id}:${marketId}`)} onSelect={setSelected} onToggleWatch={(item) => toggleSet(setWatched, item.id)} onToggleSlip={(item) => toggleSet(setSlip, `${item.id}:${marketId}`)} />)}</div></div>}
+      {!!players.length && <div className="board nfl-decision-board"><div className="board-head decision-ladder-head nfl-decision-ladder-head"><div className="th dl-rank" title="Rank by model score">Rank</div><div className="th dl-identity">Player identity</div><div className="th dl-verdict">Model verdict</div><div className="th dl-proof">Key evidence</div><div className="th dl-actions">Actions</div></div><div className="board-body">{players.map((player, index) => <BoardRow key={player.id} player={player} rank={index + 1} marketId={marketId} watched={watched.has(player.id)} inSlip={slip.has(`${player.id}:${marketId}`)} onSelect={setSelected} onToggleWatch={(item) => toggleSet(setWatched, item.id)} onToggleSlip={(item) => toggleSet(setSlip, `${item.id}:${marketId}`)} />)}</div></div>}
       {!players.length && <div className="nfl-empty"><Icon name="Search" size={22} /><b>No eligible players match</b><button onClick={() => { setQuery(''); setPositionFilters(new Set()); setTeamFilters(new Set()); setGameFilters(new Set()); setTwoPlusOnly(false); setSignalFilters(new Set()) }}>Clear filters</button></div>}
     </section><aside className="nfl-decision-rail" aria-label="NFL slate summary"><section className="nfl-slate-card"><div><span>Prop engine</span><strong>{snapshot.dataQuality?.playByPlay ? 'Full context ready' : 'Core model ready'}</strong></div><b className="nfl-rating mono">{players.length}</b><ul><li><Icon name="Check" size={12} /> {NFL_PROP_MARKET_LIST.length} position-aware markets</li><li><Icon name="Activity" size={12} /> {liveCount} live player{liveCount === 1 ? '' : 's'} in this view</li><li><Icon name="Shield" size={12} /> {snapshot.dataQuality?.defenseByPosition ? 'Defense splits connected' : 'Defense splits limited'}</li></ul></section>{featured && <section className="nfl-featured-card"><span>Top {NFL_PROP_MARKET_LIST.find((market) => market.id === marketId)?.shortLabel}</span><h2>{featured.name}</h2><p>{featured.team} vs {featured.opponent} · {liveLabel(featured)}</p><div><b className="mono">{pct(featured.model.probability)}</b><em>at</em><b className="mono">{marketValue(featured, featured.model, marketId)}</b></div><button onClick={() => toggleSet(setSlip, nflLegKey(featured.id, marketId))}><Icon name={slip.has(nflLegKey(featured.id, marketId)) ? 'Check' : 'Plus'} size={15} />{slip.has(nflLegKey(featured.id, marketId)) ? 'Added to slip' : 'Add selected prop'}</button></section>}<section className="nfl-builder-card"><header>Active workspace</header><div><span><small>Watchlist</small><b>{watched.size} players</b></span><button type="button" onClick={openBetLabBuilder}><small>Prop slip</small><b>{slip.size} legs · {tickets.length} tracked</b></button></div></section></aside></div>
     </>}

@@ -20411,8 +20411,20 @@ button.th:focus-visible {
 .nfl-decision-ladder-head .dl-actions { padding-left: 14px; }
 .nfl-decision-ladder-row .dl-verdict { gap: 14px; padding-inline: 10px; }
 .nfl-decision-ladder-row .dl-proof { padding-inline: 10px; }
-.nfl-decision-ladder-row .dl-evidence-strip { max-width: 100%; }
-.nfl-decision-ladder-row .dl-evidence-strip > span { min-width: 0; max-width: 118px; overflow: hidden; text-overflow: ellipsis; }
+.nfl-evidence-cells { width: 100%; min-width: 0; display: flex; align-items: center; justify-content: center; gap: 6px; }
+.nfl-evidence-cell { min-width: 0; max-width: 92px; height: 25px; padding: 0 7px; display: inline-flex; align-items: center; gap: 5px; overflow: hidden; color: var(--text-dim); border: 1px solid var(--border-soft); border-radius: 7px; background: rgba(255,255,255,.035); }
+.nfl-evidence-cell svg { flex: none; color: var(--accent); }
+.nfl-evidence-cell b { min-width: 0; overflow: hidden; color: inherit; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.nfl-evidence-cell.good svg { color: var(--strong); }
+.nfl-evidence-cell.warn { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 20%, var(--border-soft)); }
+.nfl-evidence-cell.warn svg { color: var(--warn); }
+.nfl-evidence-cell.bad { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 25%, var(--border-soft)); background: color-mix(in srgb, var(--bad) 6%, transparent); }
+.nfl-evidence-cell.bad svg { color: var(--bad); }
+.nfl-decision-ladder-row .dl-proof-metrics { gap: 18px; opacity: .68; }
+.nfl-decision-ladder-row .dl-proof-metrics > span { min-width: 0; flex-direction: row; align-items: center; gap: 5px; }
+.nfl-decision-ladder-row .dl-proof-metrics > span > b { font-size: 9px; }
+.nfl-decision-ladder-row .dl-proof-metrics > span > small { font-size: 7px; }
+.nfl-decision-ladder-row .dl-proof-metrics > i { height: 11px; }
 .nfl-decision-ladder-row .dl-proof-signal.bad { color: var(--bad); }
 .nfl-decision-ladder-row .dl-proof-signal.warn { color: var(--warn); }
 .nfl-decision-ladder-row .dl-proof-signal.good { color: var(--strong); }
@@ -20435,6 +20447,9 @@ button.th:focus-visible {
   .nfl-decision-ladder-row .dl-identity { padding-inline: 10px; }
   .nfl-decision-ladder-row .dl-verdict { gap: 8px; padding-inline: 6px; }
   .nfl-decision-ladder-row .dl-proof { padding-inline: 7px; }
+  .nfl-evidence-cells { gap: 4px; }
+  .nfl-evidence-cell { max-width: 70px; padding-inline: 5px; }
+  .nfl-evidence-cell b { font-size: 7px; }
 }
 
 @media (max-width: 560px) {
