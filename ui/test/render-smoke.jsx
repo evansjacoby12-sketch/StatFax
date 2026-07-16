@@ -33,6 +33,7 @@ import PickOfDay from '../src/components/PickOfDay.jsx'
 import NFLBoard from '../src/components/NFLBoard.jsx'
 import MlbDataHealthBanner from '../src/components/MlbDataHealthBanner.jsx'
 import ListBuilderView from '../src/components/ListBuilderView.jsx'
+import SlateBrief from '../src/components/SlateBrief.jsx'
 
 const SYNTH = {
   version: 5,
@@ -208,6 +209,22 @@ add('MlbDataHealthBanner.limited', <MlbDataHealthBanner health={{
     message: 'Listed starter may change before first pitch.',
     evidence: [{ url: 'https://www.mlb.com/gameday/1', title: 'Official game update' }],
   }],
+}} />)
+add('SlateBrief.decision', <SlateBrief brief={{
+  version: 2,
+  date: '2026-07-16',
+  headline: 'A concentrated board puts matchup quality ahead of volume.',
+  primeCount: 2,
+  strongCount: 3,
+  leaders: [
+    { id: 'player:1', name: 'Aaron Judge', team: 'NYY', grade: 'PRIME', hrProbability: 0.24, pitcher: 'Test Arm', note: 'Contact quality reinforces the model lead.' },
+    { id: 'player:2', name: 'Elly De La Cruz', team: 'CIN', grade: 'STRONG', hrProbability: 0.19, pitcher: 'Away Arm', note: 'The pitch-shape matchup creates another path.' },
+  ],
+  environment: { id: 'game:1', venue: 'Great American Ball Park', score: 83, note: 'The park context supports this matchup.' },
+  watchout: { id: 'lineups', label: 'Lineup readiness', fact: 'One hitter still needs a confirmed lineup spot.', note: 'Wait for the final batting order.' },
+}} />)
+add('SlateBrief.legacy', <SlateBrief brief={{
+  date: '2026-07-15', primeCount: 1, strongCount: 2, text: '**TODAY BRIEF** Aaron Judge leads the board.'
 }} />)
 add('NFLBoard', <NFLBoard />)
 
