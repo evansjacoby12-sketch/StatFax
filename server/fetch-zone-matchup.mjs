@@ -1,19 +1,21 @@
 /**
  * Zone matchup data fetcher.
  *
- * Pulls hot/cold zone heatmaps for a batter and pitch-location frequency
- * heatmaps for a pitcher, then computes "matched zones" — cells where the
- * batter does damage AND the pitcher throws frequently. Those cells are
- * the structural argument for a home run.
+ * Pulls 13-cell batter damage and pitcher-location heatmaps, then applies
+ * the versioned advisory evidence model in src/sports/mlb/logic/zoneMatchup.js.
+ * Strike-zone attacks and chase opportunities are kept separate, samples
+ * are shrunk/gated, and the result never changes the HR projection.
  *
  * Output shape (per batter-pitcher pair):
  *
  *   {
- *     batter:        { id, hand, grid: Cell[9], sampleBIP, season },
- *     pitcher:       { id, hand, grid: Cell[9], samplePitches, season },
- *     matchedZones:  number[]                  // indices into the 9-grid
- *     zoneRating:    number                    // 0..10 — how strong the matchup is
- *     badge:         'ZONE_MASTER' | null      // surfaces in modal when >= 2 matches
+ *     batter:        { id, hand, effectiveSide, grid: Cell[13], sampleBIP, season },
+ *     pitcher:       { id, hand, grid: Cell[13], samplePitches, season },
+ *     attackZones:   number[]                  // qualified indices 0..8
+ *     chaseZones:    number[]                  // qualified indices 9..12
+ *     zoneRating:    number|null               // location tendency vs league
+ *     reliability:   { status, label, reason }
+ *     advisoryOnly:  true
  *     asOf:          string (ISO timestamp)
  *   }
  *
@@ -23,7 +25,7 @@
  *
  * iso is present on batter grids, freq on pitcher grids.
  *
- * Grid layout (catcher's perspective, same as the screenshot reference):
+ * Strike-grid layout (catcher's perspective):
  *
  *   Index   Position
  *   ─────   ──────────────────
@@ -54,6 +56,14 @@
  * cron pipeline.
  */
 
+import {
+  buildZoneMatchup,
+  effectiveBatterSide,
+  ZONE_IDS,
+} from '../src/sports/mlb/logic/zoneMatchup.js';
+
+export { buildZoneMatchup } from '../src/sports/mlb/logic/zoneMatchup.js';
+
 const MLB_BASE = 'https://statsapi.mlb.com/api/v1';
 const SAVANT   = 'https://baseballsavant.mlb.com';
 const SEASON   = new Date().getFullYear();
@@ -62,7 +72,6 @@ const SEASON   = new Date().getFullYear();
 // outer "chase" quadrants (11-14). Grid index 0-8 = strike zone, 9-12 = the
 // chase corners (11→9, 12→10, 13→11, 14→12). The client renders 0-8 in the
 // center 3×3 and 9-12 in the four outer corners of a 5×5.
-const ZONE_IDS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14];
 const ZONE_N   = ZONE_IDS.length; // 13
 const zoneToIdx = (z) => (z >= 1 && z <= 9 ? z - 1 : z >= 11 && z <= 14 ? z - 2 : -1);
 
@@ -191,6 +200,39 @@ export function dumpCache() {
   return out;
 }
 
+/**
+ * Build a handedness-specific league location baseline from the warm pitcher
+ * cache. Counts are pooled (rather than averaging pitcher percentages) so a
+ * 20-pitch call-up does not carry the same weight as a full-season starter.
+ */
+export function zoneFrequencyBaselineFromCache(vsHand, { minPitches = 10_000, minPitchers = 10 } = {}) {
+  const hand = effectiveBatterSide(vsHand, null);
+  const counts = new Array(ZONE_N).fill(0);
+  let samplePitches = 0;
+  let pitcherEntries = 0;
+
+  for (const [key, entry] of _memCache.entries()) {
+    if (!key.startsWith('pitcher-') || !key.includes(`-vs${hand}-`)) continue;
+    const grid = entry?.value?.grid;
+    if (!Array.isArray(grid) || grid.length !== ZONE_N) continue;
+    const entryPitches = grid.reduce((sum, cell) => sum + Math.max(0, Number(cell?.count) || 0), 0);
+    if (entryPitches <= 0) continue;
+    for (let index = 0; index < ZONE_N; index++) {
+      counts[index] += Math.max(0, Number(grid[index]?.count) || 0);
+    }
+    samplePitches += entryPitches;
+    pitcherEntries++;
+  }
+
+  if (samplePitches < minPitches || pitcherEntries < minPitchers) return null;
+  return {
+    frequencies: counts.map((count) => count / samplePitches),
+    samplePitches,
+    pitcherEntries,
+    source: 'warm-cache',
+  };
+}
+
 // ─── HTTP helpers ───────────────────────────────────────────────────────
 
 async function getJson(url, opts = {}) {
@@ -218,7 +260,7 @@ async function savantGet(url) {
  * @param {object} opts
  * @param {'L'|'R'} opts.vsHand   pitcher handedness to split on
  * @param {number=} opts.season   defaults to current year
- * @returns {Promise<{grid: Cell[9], sampleBIP, season} | null>}
+ * @returns {Promise<{grid: Cell[13], sampleBIP, season} | null>}
  */
 export async function fetchBatterZones(batterId, { vsHand = 'R', season = SEASON } = {}) {
   const key = `batter-${batterId}-vs${vsHand}-${season}`;
@@ -266,7 +308,7 @@ export async function fetchBatterZones(batterId, { vsHand = 'R', season = SEASON
       return null;
     }
 
-    // Build 9-cell grid. ISO is derived (SLG - AVG); other metrics are
+    // Build the 13-cell strike + chase grid. ISO is derived (SLG - AVG); other metrics are
     // read straight from the API. count/hrCount come from the Savant
     // batted-ball log when available; fall back to 0 if Savant returned
     // nothing (rare — usually means the batter has no batted-ball events
@@ -311,7 +353,7 @@ export async function fetchBatterZones(batterId, { vsHand = 'R', season = SEASON
     // strikeouts) but better than nothing.
     const sampleBIP = countsData?.totalBip ?? raw?.stats?.[0]?.splits?.[0]?.stat?.atBats ?? 0;
 
-    const out = { grid, sampleBIP, season, hand: vsHand };
+    const out = { grid, sampleBIP, season, hand: vsHand, vsHand };
     _setCache(key, out);
     return out;
   } catch {
@@ -347,7 +389,7 @@ function parseZoneValue(zones, padded, unpadded) {
 
 /**
  * Pull this batter's batted-ball log from Baseball Savant and bucket it
- * into the same 9-cell strike zone. Used to populate per-cell BIP counts
+ * into the same 13-cell strike + chase grid. Used to populate per-cell BIP counts
  * and HR markers — neither of which the MLB hotColdZones endpoint
  * provides directly (it returns the metric per zone but rolls up sample
  * sizes at the split level).
@@ -427,16 +469,13 @@ async function fetchBatterZoneCounts(batterId, { vsHand = 'R', season = SEASON }
  *
  * Pulls aggregated pitch-by-pitch from Baseball Savant's `statcast_search`
  * CSV endpoint (filtered by pitcher_id + bat-side), then buckets each
- * pitch's `zone` field into our 9-cell grid. Statcast zones 1-9 are the
- * 3×3 strike-zone cells we want; 11-14 are the four outside-corner
- * "shadow" zones, which we drop for the MVP (they could be aggregated
- * into the matching edge cells later if the UI wants them).
+ * pitch's `zone` field into the 13-cell strike + chase grid.
  *
  * @param {number} pitcherId
  * @param {object} opts
  * @param {'L'|'R'} opts.vsHand   batter handedness split
  * @param {number=} opts.season
- * @returns {Promise<{grid: Cell[9], samplePitches, season} | null>}
+ * @returns {Promise<{grid: Cell[13], samplePitches, season} | null>}
  */
 export async function fetchPitcherZones(pitcherId, { vsHand = 'R', season = SEASON } = {}) {
   const key = `pitcher-${pitcherId}-vs${vsHand}-${season}`;
@@ -469,9 +508,8 @@ export async function fetchPitcherZones(pitcherId, { vsHand = 'R', season = SEAS
     const csv = await res.text();
     const rows = parseSavantCsv(csv);
 
-    // Bucket each row into our 9-cell strike-zone grid. Savant zones
-    // 1..9 map directly to our indices 0..8 (catcher-perspective,
-    // top-left = 1, bottom-right = 9). Drop 11..14 (shadow zones).
+    // Bucket each row into the 13-cell grid. Savant zones 1..9 map to
+    // strike indices 0..8; chase zones 11..14 map to indices 9..12.
     //
     // For each zone we track multiple stats from the same pitch log so
     // the client's metric switcher can show different lenses without
@@ -582,7 +620,7 @@ export async function fetchPitcherZones(pitcherId, { vsHand = 'R', season = SEAS
       contacts:   s.contacts,
     }));
 
-    const out = { grid, samplePitches: total, season, hand: vsHand };
+    const out = { grid, samplePitches: total, season, hand: vsHand, vsHand };
     _setCache(key, out);
     return out;
   } catch {
@@ -799,124 +837,6 @@ export async function resolveBulkPitcher(openerId, { season = SEASON, lookback =
   }
 }
 
-// ─── Matchup logic ──────────────────────────────────────────────────────
-
-/**
- * Pure function — given a batter grid and pitcher grid (both 9-cells),
- * compute matched zones + an overall zone-matchup rating.
- *
- * Matched zone = cell where the batter is in their HOT tier (top-third
- * by ISO) AND the pitcher throws ABOVE-AVERAGE frequency there. The
- * thresholds are deliberately gentle — over-tightening these makes the
- * "Zone Master" badge so rare it stops being useful. We want it to
- * trigger ~once or twice per slate, not once a week.
- *
- * Zone rating: weighted sum of (batter ISO × pitcher freq) across all
- * cells, normalized to a 0..10 scale where 5.0 is "league average
- * matchup, no edge in either direction." This is the visible "Zone
- * Rating X.X / 10" number from the reference screenshot.
- */
-export function buildZoneMatchup(batter, pitcher, { minBIPPerCell = 5 } = {}) {
-  if (!batter?.grid || !pitcher?.grid) return null;
-
-  const bGrid = batter.grid;
-  const pGrid = pitcher.grid;
-
-  // ── Batter "hot cell" criterion ─────────────────────────────────────────
-  // A cell qualifies as hot if it clears EITHER of two gates:
-  //
-  //   1. Per-player relative gate — cell ISO ≥ player's own mean ISO +
-  //      0.25σ. Adapts to the batter's profile so a slap hitter with
-  //      .080 league-wide can still surface their best zones. The 0.25σ
-  //      (loosened from 0.5σ) admits cells that are noticeably above the
-  //      batter's baseline without requiring an extreme peak.
-  //
-  //   2. League-absolute gate — cell ISO ≥ ABSOLUTE_HOT_ISO_FLOOR
-  //      (0.200, which is well above the ~0.160 league average so true
-  //      league-mean bats don't trigger it). This catches power hitters
-  //      who are hot EVERYWHERE — Schwarber, Judge, Soto — whose flat,
-  //      uniformly-elite zone profiles meant no individual cell cleared
-  //      a pure per-player σ gate. The previous bug: a batter who's
-  //      .250 in every cell has σ≈0, so 0.5σ above his own mean was
-  //      still .250 — exactly the cell value — and would just barely
-  //      qualify. Worse, players whose hot cells regressed slightly
-  //      under the σ-spread cutoff would silently drop out of matched
-  //      counts even though they're elite by absolute standards.
-  //
-  // The OR combination is intentional: each gate catches a class of
-  // hitter the other misses. The pitcher-frequency gate (below) still
-  // applies in the AND, so a cell only counts as "matched" when it
-  // clears at least one hot gate AND the pitcher actually pitches there.
-  const ABSOLUTE_HOT_ISO_FLOOR = 0.200;
-  const validISOs = bGrid.map(c => c.iso).filter(v => Number.isFinite(v));
-  const meanISO   = validISOs.reduce((a, b) => a + b, 0) / Math.max(1, validISOs.length);
-  const varISO    = validISOs.reduce((s, v) => s + (v - meanISO) ** 2, 0) / Math.max(1, validISOs.length);
-  const stdISO    = Math.sqrt(varISO);
-  const hotISORel = meanISO + stdISO * 0.25;
-  const isHotCell = (iso) => iso >= ABSOLUTE_HOT_ISO_FLOOR || iso >= hotISORel;
-
-  // Pitcher's "above-average frequency" threshold = mean across cells.
-  // Pitcher freqs sum to ~1.0 across the grid, so mean is roughly 0.111.
-  const validFreqs = pGrid.map(c => c.freq).filter(v => Number.isFinite(v));
-  const meanFreq   = validFreqs.reduce((a, b) => a + b, 0) / Math.max(1, validFreqs.length);
-  const freqGate   = meanFreq;
-
-  const matchedZones = [];
-  // Location matchup accumulators. `num`/`fsum` build the pitcher-frequency-
-  // weighted ISO (the damage the pitcher's LOCATIONS actually deliver to this
-  // batter); `isoSum`/`n` build the uniform-location ISO (if he threw evenly).
-  let num = 0, fsum = 0, isoSum = 0, n = 0;
-
-  for (let i = 0; i < Math.min(bGrid.length, pGrid.length); i++) {
-    const bCell = bGrid[i];
-    const pCell = pGrid[i];
-    const iso   = bCell?.iso;
-    const freq  = pCell?.freq;
-
-    // Skip cells that lack data or have a tiny batter sample (would be
-    // noise dressed as signal). Most batters have at least 5 BIP per
-    // strike-zone cell by late May, so this only filters the very
-    // sparse cells.
-    if (!Number.isFinite(iso) || !Number.isFinite(freq)) continue;
-    if (bCell.count > 0 && bCell.count < minBIPPerCell) continue;
-
-    num += iso * freq;
-    fsum += freq;
-    isoSum += iso;
-    n++;
-
-    if (isHotCell(iso) && freq >= freqGate) {
-      matchedZones.push(i);
-    }
-  }
-
-  // Zone (location) rating 0..10. RE-CALIBRATED 2026-07-09: the old formula
-  // normalized against an unrealistic "40% into one cell" max, so real per-cell
-  // frequency (~6%) pinned EVERY batter to ≤2.2/10 (≤1.1/5) — verified across
-  // 540 live bats. Instead, measure whether the pitcher's LOCATION tilts toward
-  // this batter's damage zones vs a neutral (uniform) baseline: 5 = neutral,
-  // higher = he feeds the batter's hot zones, lower = he pitches away from them.
-  // deliveredISO = ISO weighted by pitcher frequency; uniformISO = flat ISO.
-  // Scaled (×100) so a real location edge spans the range (neutral ≈2.6/5,
-  // strong ≈4.5/5). Display-only — not a model input.
-  const delivered = fsum > 0 ? num / fsum : 0;
-  const uniform   = n > 0 ? isoSum / n : 0;
-  const zoneRating = (fsum > 0 && n > 0)
-    ? +Math.max(0, Math.min(10, 5 + (delivered - uniform) * 100)).toFixed(1)
-    : 0;
-
-  const badge = matchedZones.length >= 2 ? 'ZONE_MASTER' : null;
-
-  return {
-    batter:       { id: batter.id ?? null, hand: batter.hand, grid: bGrid, sampleBIP: batter.sampleBIP || 0, season: batter.season },
-    pitcher:      { id: pitcher.id ?? null, hand: pitcher.hand, grid: pGrid, samplePitches: pitcher.samplePitches || 0, season: pitcher.season },
-    matchedZones,
-    zoneRating,
-    badge,
-    asOf:         new Date().toISOString(),
-  };
-}
-
 // ─── High-level wrapper ─────────────────────────────────────────────────
 
 /**
@@ -988,17 +908,26 @@ export async function buildZoneMatchupForGame({
 
   // 3. Fetch zones for the target pitcher (bulk if available, else opener
   //    or normal starter) and the batter split by pitcher hand.
+  const batterSide = effectiveBatterSide(batterHand, targetPitcherHand);
   const [batterZones, pitcherZones] = await Promise.all([
     fetchBatterZones(batterId,        { vsHand: targetPitcherHand }),
-    fetchPitcherZones(targetPitcherId, { vsHand: batterHand }),
+    fetchPitcherZones(targetPitcherId, { vsHand: batterSide }),
   ]);
 
   if (!batterZones || !pitcherZones) return null;
 
   // 4. Build the matchup with the right pitcher's zones
+  const baseline = zoneFrequencyBaselineFromCache(batterSide);
   const matchup = buildZoneMatchup(
-    { ...batterZones,  id: batterId },
-    { ...pitcherZones, id: targetPitcherId },
+    { ...batterZones, id: batterId, batSide: batterHand, effectiveSide: batterSide },
+    { ...pitcherZones, id: targetPitcherId, pitcherHand: targetPitcherHand, vsHand: batterSide },
+    {
+      effectiveBatterSide: batterSide,
+      pitcherHand: targetPitcherHand,
+      leagueFrequencies: baseline?.frequencies,
+      baselineSource: baseline?.source,
+      baselineSamplePitches: baseline?.samplePitches,
+    },
   );
 
   if (!matchup) return null;

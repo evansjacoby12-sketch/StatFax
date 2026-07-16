@@ -106,21 +106,22 @@
  * @property {string[]} reasons        Human-readable "why this score".
  * @property {string[]} [eli5Reasons]  Friendlier wording for ELI5 mode.
  * @property {Object}   [flags]        hot/due/cold/bullpenLegend/dayEdge etc.
- * @property {?ZoneMatchup} [zoneMatchup]  3×3 batter ISO + pitcher freq grids,
- *   matched zones, and Zone Rating. Only present for the top ~25 batters per
- *   game (cron capacity). Resolves opener → bulk pitcher automatically.
- * @property {?number} [zoneBonus]  Score adjustment applied from zoneMatchup,
- *   range -2..+4. Present only when the bonus is non-zero. See "8.65) Zone
- *   score bonus pass" in fetch-slate.mjs for the formula.
- * @property {?number} [baseScore]  Pre-zone-bonus composite score. Preserved
- *   so the score breakdown UI can show "X base + N zone bonus" decomposition.
+ * @property {?ZoneMatchup} [zoneMatchup]  Advisory-only 13-cell location
+ *   evidence. Only present for the top ~25 batters per game (cron capacity).
+ *   Resolves opener → bulk pitcher automatically and never changes score.
  *
  * @typedef {Object} ZoneMatchup
- * @property {Object} batter         { id, hand, grid: ZoneCell[9], sampleBIP, season }
- * @property {Object} pitcher        { id, hand, grid: ZoneCell[9], samplePitches, season }
- * @property {number[]} matchedZones Indices into the 9-grid where batter-hot meets pitcher-frequent.
- * @property {number} zoneRating     0-10 overall matchup quality.
- * @property {?string} badge         'ZONE_MASTER' when matchedZones.length >= 2.
+ * @property {number} modelVersion   Version of the advisory evidence logic.
+ * @property {boolean} advisoryOnly  Always true; location is not a scoring feature.
+ * @property {Object} batter         { id, hand, effectiveSide, grid: ZoneCell[13], sampleBIP, season }
+ * @property {Object} pitcher        { id, hand, grid: ZoneCell[13], samplePitches, season }
+ * @property {number[]} attackZones  Qualified strike-zone attack indices.
+ * @property {number[]} chaseZones   Qualified chase-zone opportunity indices.
+ * @property {number[]} matchedZones Compatibility alias for attackZones.
+ * @property {Object[]} cellEvidence Absolute evidence and sample status per cell.
+ * @property {?number} zoneRating    0-10 location tendency vs a handedness baseline.
+ * @property {?string} badge         'ZONE_MASTER' only for 2+ reliable attacks at 6.5+.
+ * @property {Object} reliability    high/medium/limited evidence status.
  * @property {?Object} opener        Present on opener games: { id, recentAvgIP }.
  * @property {?Object} bulk          Present when bulk pitcher was resolved:
  *                                   { id, name, confidence, candidates }.
@@ -3627,11 +3628,8 @@ async function main() {
   };
 
   // 25 covers a typical batting order (9) plus any bench bats who might
-  // pinch-hit or platoon in. We expanded from 5 to 25 once zone matchup
-  // started feeding the probability score — limiting to top-5 meant a
-  // mid-lineup batter who'd benefit from a Zone Master bonus would never
-  // get their zones fetched and would silently lose the boost. 25 ensures
-  // every realistic HR candidate has zone data available for ranking.
+  // pinch-hit or platoon in. Zone evidence is advisory-only, but broad
+  // coverage keeps the research view useful beyond the top five scores.
   // Higher values quickly hit MLB API rate-limit territory; the
   // persistent cache makes this cheap on warmed runs.
   const TOP_N_PER_GAME = 25;
@@ -3661,7 +3659,7 @@ async function main() {
         try {
           const matchup = await buildZoneMatchupForGame({
             batterId:            b.id,
-            batterHand:          row.batSide === 'L' ? 'L' : 'R',   // S → R as a default
+            batterHand:          ['L', 'R', 'S'].includes(row.batSide) ? row.batSide : 'R',
             probablePitcherId:   opposing.id,
             probablePitcherHand: (opposing.hand === 'L' ? 'L' : 'R'),
             resolvePitcherHand,
@@ -3682,63 +3680,14 @@ async function main() {
     .length;
   console.log(`[slate] zone matchup enriched on ${zoneCount} rows in ${((Date.now() - zoneStart) / 1000).toFixed(2)}s`);
 
-  // 8.65) Zone score bonus pass. The base scoreBatter() model doesn't see
-  // zone matchup data — that fetch happens AFTER scoring (zones are
-  // expensive and we only enrich the top candidates). So we apply the
-  // zone bump as a POST-SCORING adjustment here.
-  //
-  // Bonus formula (capped at -2..+4 to avoid swamping the base model):
-  //   bonus = (zoneRating - 5) * 0.6
-  //         + (badge === 'ZONE_MASTER' ? 1.5 : 0)
-  //
-  // Rationale: zoneRating 5 = neutral matchup, no bump. Rating 8 with
-  // Zone Master badge ≈ +3.3 — meaningful but doesn't dominate. Rating
-  // 1 with no badge ≈ -2.4, floored to -2. The badge is the structural
-  // signal (2+ matched zones) so it gets its own kicker on top of the
-  // continuous rating.
-  //
-  // Re-derives grade from the boosted score so an 80 → 84 PRIME stays
-  // PRIME but a 70 → 73 STRONG can promote to PRIME. Stashes zoneBonus
-  // on the row so the UI breakdown can show "+N zone bonus" separately
-  // from the base composite.
-  const zoneScoreStart = Date.now();
-  let zoneScoreApplied = 0;
-  // Schema-v5 map keys are all composite; keep the guard explicit so malformed
-  // or hand-authored snapshots cannot enter the score pass.
-  for (const key of Object.keys(scoredBatters)) {
-    if (!key.includes('-')) continue;
-    const row = scoredBatters[key];
-    const zm  = row?.zoneMatchup;
-    if (!zm || !Number.isFinite(zm.zoneRating)) continue;
-    if (!Number.isFinite(row.score)) continue;
-
-    // Bonus is computed with fractional precision then rounded to an
-    // INTEGER at the end so the final `score` value stays whole. Scores
-    // are always rendered as integers everywhere; carrying decimals
-    // through the pipeline just created noise like "78.7" in the UI.
-    let rawBonus = (zm.zoneRating - 5) * 0.6;
-    if (zm.badge === 'ZONE_MASTER') rawBonus += 1.5;
-    const bonus = Math.round(Math.max(-2, Math.min(4, rawBonus)));
-
-    if (bonus === 0) continue;
-
-    const newScore = Math.max(0, Math.min(100, Math.round(row.score + bonus)));
-    row.zoneBonus    = bonus;
-    row.baseScore    = row.score;       // preserved for the breakdown UI
-    row.score        = newScore;
-    row.grade        = gradeFromScore(newScore);
-    zoneScoreApplied++;
-  }
-  console.log(`[slate] zone bonus applied to ${zoneScoreApplied} rows in ${((Date.now() - zoneScoreStart) / 1000).toFixed(2)}s`);
-
   // Day rating computed here — BEFORE the PRIME cap — so supply uses the raw
   // PRIME count. The cap is a display cap (prevents board flooding); it must not
   // reduce the supply signal used to gauge slate quality.
   const preCapDayRating = computeDayRating(scoredBatters, games);
 
   // ─── PRIME relative cap ─────────────────────────────────────────────────────
-  // Runs AFTER all pregame score/grade passes (incl. the zone-bonus re-grade
-  // above) so it's the final word on the pregame grade, and BEFORE the live-decay
+  // Runs AFTER all pregame score/grade passes so it's the final word on the
+  // pregame grade, and BEFORE the live-decay
   // freeze so it flows into preGameGrade. PRIME is the ELITE tier; an absolute
   // bar (score ≥72) lets a big/soft slate flood it (66+ on a 14-gamer). Cap PRIME
   // to the top PRIME_PCT of PLAYABLE (non-SKIP) bats by score, demoting the
