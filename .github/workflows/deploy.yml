@@ -205,6 +205,12 @@ jobs:
           npm run validate:mlb-data
           npm run validate:list-builder-evidence
 
+      - name: Build prospective MLB zone evaluation
+        run: npm run mlb:zone-evaluate
+
+      - name: Validate MLB zone evaluation
+        run: npm run validate:zone-evaluation
+
       - name: Generate NFL slate
         env:
           SPORTSGAMEODDS_API_KEY: ${{ secrets.SPORTSGAMEODDS_API_KEY }}
@@ -238,7 +244,7 @@ jobs:
             exit 0
           fi
           ENDPOINT="https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com"
-          for f in calibration.json backtest-log.json list-builder-evidence.json board-history.json zone-cache.json; do
+          for f in calibration.json backtest-log.json list-builder-evidence.json board-history.json zone-cache.json zone-evaluation.json; do
             if [ -f "dist/$f" ]; then
               aws s3 cp "dist/$f" "s3://$R2_BUCKET/$f" --endpoint-url "$ENDPOINT" \
                 --content-type application/json --cache-control no-cache \
@@ -339,7 +345,7 @@ jobs:
             exit 0
           fi
           ENDPOINT="https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com"
-          for f in daily.json context.json mlb-data-health.json mlb-data-health-history.json ai-hr-shadow.json ai-hr-evaluation.json ai-hr-attribution.json ai-hr-production.json; do
+          for f in daily.json context.json mlb-data-health.json mlb-data-health-history.json ai-hr-shadow.json ai-hr-evaluation.json ai-hr-attribution.json ai-hr-production.json zone-evaluation.json; do
             if [ -f "dist/$f" ]; then
               aws s3 cp "dist/$f" "s3://$R2_BUCKET/$f" --endpoint-url "$ENDPOINT" \
                 --content-type application/json --cache-control no-cache \

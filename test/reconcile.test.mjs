@@ -64,6 +64,11 @@ test('extractPredictionRecord freezes the complete schema-v2 feature archive', (
     playerId: 1, gamePk: 99, name: 'X', score: 70, preGameScore: 72,
     grade: { label: 'STRONG' }, hot: true, homeEdge: true, due: false,
     lineupConfirmed: true, dataTrust: { status: 'review' },
+    simHRProb: 0.14,
+    zoneMatchup: {
+      modelVersion: 2, advisoryOnly: true, attackZones: [0], chaseZones: [], zoneRating: 7,
+      reliability: { status: 'high' }, locationBaseline: { source: 'warm-cache', samplePitches: 12000 },
+    },
     pullPct: 46.2,
     xStats: { xISO: 0.28, xSLG: 0.54 },
     batTracking: {
@@ -101,6 +106,9 @@ test('extractPredictionRecord freezes the complete schema-v2 feature archive', (
   assert.equal(rec.score, 72, 'logs the frozen preGameScore, not the live score')
   assert.equal(rec.lineupConfirmed, true)
   assert.equal(rec.dataTrusted, false, 'mirrors the List Builder clean-data gate')
+  assert.equal(rec.zoneEvidence.version, 1)
+  assert.equal(rec.zoneEvidence.attackCount, 1)
+  assert.ok(rec.zoneEvidence.shadowProbability > rec.simHRProb)
 })
 
 test('appendToLog keeps 30 operational days and a compact 180-day model archive', () => {
@@ -125,13 +133,14 @@ test('appendToLog keeps 30 operational days and a compact 180-day model archive'
   const archived = log.modelHistory.records['2026-05-01'][0]
   assert.deepEqual(Object.keys(archived).sort(), [
     'actuallyPlayed', 'badges', 'dataTrusted', 'feat', 'featureVersion', 'gamePk', 'grade', 'homered',
-    'lineupConfirmed', 'pitchTypes', 'playerId', 'score', 'simHRProb',
+    'lineupConfirmed', 'pitchTypes', 'playerId', 'score', 'simHRProb', 'zoneEvidence',
   ])
   assert.equal(archived.name, undefined)
   assert.equal(archived.featureVersion, 1, 'legacy vectors remain explicitly legacy')
   assert.equal(archived.feat.bs, 1)
   assert.deepEqual(archived.pitchTypes, [])
   assert.equal(archived.simHRProb, 0.15)
+  assert.equal(archived.zoneEvidence, null)
   assert.equal(log.featureArchive.schemaVersion, 2)
   assert.equal(log.featureArchive.schemaV2Rows, 0)
   assert.equal(log.featureArchive.legacyRows, 35)

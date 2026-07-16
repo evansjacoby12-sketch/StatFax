@@ -13,6 +13,8 @@
     "validate:mlb-data-health": "node server/tools/validate-mlb-data-health.mjs",
     "mlb:data-health-history": "node server/mlb-data-health-history.mjs",
     "validate:mlb-data-health-history": "node server/tools/validate-mlb-data-health-history.mjs",
+    "mlb:zone-evaluate": "node server/zone-evaluate.mjs",
+    "validate:zone-evaluation": "node server/tools/validate-zone-evaluation.mjs",
     "mlb:list-builder-evidence": "node server/list-builder-evidence.mjs",
     "mlb:feature-coverage": "node server/tools/report-historical-feature-coverage.mjs",
     "validate:list-builder-evidence": "node server/tools/validate-list-builder-evidence.mjs",

@@ -40,6 +40,7 @@ import {
   historicalFeatureVersionOf,
   normalizeHistoricalFeatureVector,
 } from './lib/historicalFeatureArchive.mjs';
+import { buildZoneEvidenceArchive } from './lib/zoneEvaluation.mjs';
 
 const MLB_BASE = 'https://statsapi.mlb.com/api/v1';
 const ROLLING_DAYS = 30;
@@ -91,7 +92,7 @@ function significanceBand(rate, n, overallRate, deltaMax = DELTA_MAX) {
 // surfaced. NOTE: these keys are tracked for REPORTING only — scoring
 // calibration applies only the badges ProbabilityEngine passes in
 // activeBadgeKeys (which excludes zone/barrel/park, since their signal is
-// already baked into the raw score), so nothing here double-counts.
+// handled elsewhere or advisory-only), so nothing here double-counts.
 const BADGE_KEYS = ['hot', 'due', 'cold', 'bullpenLegend', 'homeEdge', 'awayEdge', 'powerReady', 'barrelReady', 'zoneMaster', 'barrelKing', 'launchPad'];
 const GRADE_KEYS = ['PRIME', 'STRONG', 'LEAN', 'SKIP'];
 
@@ -214,6 +215,8 @@ export function extractPredictionRecord(row) {
     pos:  positiveReasonCount(row),           // good-tone trend count (gate: >=8)
     neg:  negativeReasonCount(row),           // bad-tone trend count (gate: <=3)
   });
+  const simHRProb = Number.isFinite(row.simHRProb) ? +Number(row.simHRProb).toFixed(4) : null;
+  const zoneEvidence = buildZoneEvidenceArchive(row.zoneMatchup, simHRProb);
   return {
     feat,
     featureVersion: HISTORICAL_FEATURE_VERSION,
@@ -245,7 +248,10 @@ export function extractPredictionRecord(row) {
     // weight (server/lib/simResolution.mjs) becomes empirically tunable once a
     // few weeks of reconciled outcomes carry it. Snapshot stores the undecayed
     // engine sim as simHRProb, so this is the frozen pre-game value.
-    simHRProb:      Number.isFinite(row.simHRProb) ? +Number(row.simHRProb).toFixed(4) : null,
+    simHRProb,
+    // Prospective, outcome-blind location evidence. The fixed shadow value is
+    // evaluated after settlement and is never read by production scoring.
+    zoneEvidence,
   };
 }
 
@@ -335,6 +341,9 @@ export function compactModelRecord(record) {
     lineupConfirmed: typeof record?.lineupConfirmed === 'boolean' ? record.lineupConfirmed : null,
     dataTrusted:    typeof record?.dataTrusted === 'boolean' ? record.dataTrusted : null,
     simHRProb:      Number.isFinite(record?.simHRProb) ? record.simHRProb : null,
+    zoneEvidence:   record?.zoneEvidence && typeof record.zoneEvidence === 'object'
+      ? { ...record.zoneEvidence }
+      : null,
     featureVersion: featureVersion || null,
     feat:           featureVersion >= HISTORICAL_FEATURE_VERSION && validFeat ? normalizeHistoricalFeatureVector(rawFeat) : rawFeat,
     pitchTypes:     compactHistoricalPitchTypes(record?.pitchTypes),

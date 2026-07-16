@@ -3,6 +3,7 @@ import {
   buildHistoricalFeatureCoverage,
   validateHistoricalFeatureRecord,
 } from './historicalFeatureArchive.mjs'
+import { validateZoneEvidenceArchive } from './zoneEvaluation.mjs'
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 const GRADE_LABELS = new Set(['PRIME', 'STRONG', 'LEAN', 'SKIP'])
@@ -46,6 +47,23 @@ function validateKDistribution(key, dist, errors) {
       }
     }
   }
+}
+
+function validateZoneMatchup(prefix, zone, errors) {
+  if (!isObject(zone)) {
+    errors.push(`${prefix}: expected an object`)
+    return
+  }
+  if (!Number.isInteger(zone.modelVersion) || zone.modelVersion < 2) errors.push(`${prefix}.modelVersion: expected 2+`)
+  if (zone.advisoryOnly !== true) errors.push(`${prefix}.advisoryOnly: must be true`)
+  for (const field of ['attackZones', 'chaseZones', 'matchedZones', 'cellEvidence']) {
+    if (!Array.isArray(zone[field])) errors.push(`${prefix}.${field}: expected an array`)
+  }
+  if (Array.isArray(zone.cellEvidence) && zone.cellEvidence.length !== 13) errors.push(`${prefix}.cellEvidence: expected 13 cells`)
+  if (Array.isArray(zone.attackZones) && Array.isArray(zone.matchedZones) && JSON.stringify(zone.attackZones) !== JSON.stringify(zone.matchedZones)) errors.push(`${prefix}.matchedZones: must equal attackZones`)
+  if (zone.zoneRating != null && (!Number.isFinite(zone.zoneRating) || zone.zoneRating < 0 || zone.zoneRating > 10)) errors.push(`${prefix}.zoneRating: expected null or 0..10`)
+  if (!['high', 'medium', 'limited'].includes(zone.reliability?.status)) errors.push(`${prefix}.reliability.status: unsupported`)
+  if (zone.badge != null && zone.badge !== 'ZONE_MASTER') errors.push(`${prefix}.badge: unsupported`)
 }
 
 export function validateDailySnapshot(snapshot) {
@@ -112,6 +130,8 @@ export function validateDailySnapshot(snapshot) {
     if (row.hrProbability != null && (!Number.isFinite(row.hrProbability) || row.hrProbability < 0 || row.hrProbability > 1)) {
       errors.push(`${prefix}.hrProbability: expected null or probability in [0,1]`)
     }
+    if (row.zoneBonus != null || row.baseScore != null) errors.push(`${prefix}: retired zone score adjustment fields are forbidden`)
+    if (row.zoneMatchup != null) validateZoneMatchup(`${prefix}.zoneMatchup`, row.zoneMatchup, errors)
     const grade = row.grade?.label || row.grade
     if (grade != null && !GRADE_LABELS.has(grade)) errors.push(`${prefix}.grade: unsupported label ${String(grade)}`)
   }
@@ -154,6 +174,7 @@ function validateRecordRows(records, dates, prefix, errors, warnings, { compact 
       if (typeof row.homered !== 'boolean') errors.push(`${at}.homered: must be boolean`)
       if (compact && typeof row.actuallyPlayed !== 'boolean') errors.push(`${at}.actuallyPlayed: must be boolean`)
       if (row.feat != null && !isObject(row.feat)) errors.push(`${at}.feat: must be an object or null`)
+      if (row.zoneEvidence != null) errors.push(...validateZoneEvidenceArchive(row.zoneEvidence, row.simHRProb, `${at}.zoneEvidence`))
       errors.push(...validateHistoricalFeatureRecord(row, at))
       if (compact && !row.feat) missingFeatures++
       if (row.gamePk == null) {
