@@ -36,11 +36,11 @@ test('player explainer builds engine-owned case, caution, and variance candidate
   ])
   assert.equal(signals.at(-1).id, 'variance')
   assert.equal(signals.at(-1).tone, 'caution')
-  assert.match(signals.at(-1).text, /23\.7%/)
+  assert.match(signals.at(-1).text, /hittable pitch/)
 
   const payload = playerExplainPayload(batter)
   assert.equal(payload.kind, 'player')
-  assert.equal(payload.version, 2)
+  assert.equal(payload.version, 3)
   assert.equal(payload.hrProb, 0.237)
   assert.equal(payload.pitcher, 'Aaron Nola')
   assert.deepEqual(Object.keys(payload).sort(), ['grade', 'hrProb', 'kind', 'name', 'park', 'pitcher', 'signals', 'version'])
@@ -48,7 +48,7 @@ test('player explainer builds engine-owned case, caution, and variance candidate
 
 test('browser normalization rejects invented IDs, duplicate evidence, and numeric AI claims', () => {
   const result = normalizePlayerExplain(batter, {
-    version: 2,
+    version: 3,
     caseIds: ['signal:1', 'signal:1', 'invented'],
     cautionId: 'invented-caution',
     bottomLine: 'This is a 99% lock and the best value on the slate.',
@@ -63,16 +63,37 @@ test('browser normalization rejects invented IDs, duplicate evidence, and numeri
   assert.equal('probabilityBoost' in result, false)
 })
 
-test('variance remains the caution when no player-specific negative exists', () => {
+test('fallback caution avoids repeating the model probability disclaimer', () => {
   const positiveOnly = { ...batter, eli5Reasons: batter.eli5Reasons.slice(0, 2) }
   const result = normalizePlayerExplain(positiveOnly, {
-    version: 2,
+    version: 3,
     caseIds: ['signal:0', 'signal:1'],
     cautionId: 'variance',
     bottomLine: 'Power and matchup evidence support the model while outcome variance remains central.',
   })
   assert.equal(result.cautionSignal.id, 'variance')
-  assert.match(result.cautionSignal.text, /estimated home-run chance/)
+  assert.match(result.cautionSignal.text, /hittable pitch/)
+  assert.doesNotMatch(result.cautionSignal.text, /estimated home-run chance|predicted outcome/)
+})
+
+test('player-specific context replaces generic variance even when AI selects it', () => {
+  const projected = {
+    ...batter,
+    lineupConfirmed: false,
+    pitcher: { name: 'Aaron Nola', season: { kPer9: 9.46 }, savant: { barrelPctAllowed: 6.8 } },
+    eli5Reasons: batter.eli5Reasons.slice(0, 2),
+  }
+  const signals = buildPlayerExplainSignals(projected)
+  assert.ok(signals.some((signal) => signal.id === 'context:lineup'))
+  assert.ok(signals.some((signal) => signal.id === 'context:pitcher-k'))
+  const result = normalizePlayerExplain(projected, {
+    version: 3,
+    caseIds: ['signal:0', 'signal:1'],
+    cautionId: 'variance',
+    bottomLine: 'Power and matchup evidence lead, while the projected lineup remains actionable context.',
+  })
+  assert.equal(result.cautionSignal.id, 'context:lineup')
+  assert.match(result.cautionSignal.text, /lineup is still projected/i)
 })
 
 test('variance survives the candidate cap on a large legacy evidence set', () => {
@@ -113,7 +134,7 @@ test('worker schema permits only supplied evidence IDs and repairs a hostile res
     }), { OPENAI_API_KEY: 'test-key' }, {})
     assert.equal(response.status, 200)
     const payload = await response.json()
-    assert.equal(payload.version, 2)
+    assert.equal(payload.version, 3)
     assert.deepEqual(payload.caseIds, ['signal:1', 'signal:0'])
     assert.equal(payload.cautionId, 'signal:2')
     assert.equal(payload.bottomLine, 'The engine sees a favorable combination, but the home-run outcome remains high variance.')
@@ -122,7 +143,7 @@ test('worker schema permits only supplied evidence IDs and repairs a hostile res
 
     const schema = openAiRequest.text.format.schema
     assert.deepEqual(schema.properties.caseIds.items.enum, ['signal:0', 'signal:1'])
-    assert.deepEqual(schema.properties.cautionId.enum, ['signal:2', 'variance'])
+    assert.deepEqual(schema.properties.cautionId.enum, ['signal:2'])
     assert.equal(JSON.stringify(schema).includes('probability'), false)
     assert.equal(openAiRequest.input.includes('probabilityBoost'), false)
     assert.equal(openAiRequest.input.includes('hiddenScore'), false)

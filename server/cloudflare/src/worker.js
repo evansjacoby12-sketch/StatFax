@@ -645,7 +645,7 @@ function normalizeExplainSignals(rawSignals) {
     const id = String(raw?.id || '').trim().slice(0, 40);
     const tone = raw?.tone === 'case' ? 'case' : raw?.tone === 'caution' ? 'caution' : null;
     const text = String(raw?.text || '').replace(/\s+/g, ' ').trim().slice(0, 220);
-    if (!/^(?:signal|reason):\d+$|^variance$/.test(id) || !tone || !text || seen.has(id)) continue;
+    if (!/^(?:signal|reason):\d+$|^context:[a-z-]+$|^variance$/.test(id) || !tone || !text || seen.has(id)) continue;
     seen.add(id);
     signals.push({ id, tone, text });
   }
@@ -653,17 +653,20 @@ function normalizeExplainSignals(rawSignals) {
 }
 
 async function handleStructuredPlayerExplain(body, env) {
+  const explainVersion = Number(body.version);
   const name = String(body.name || 'This hitter').slice(0, 60).trim();
   const grade = String(body.grade || '').slice(0, 12).trim().toUpperCase();
   const signals = normalizeExplainSignals(body.signals);
   const caseCandidates = signals.filter((signal) => signal.tone === 'case');
-  const cautionCandidates = signals.filter((signal) => signal.tone === 'caution');
+  const allCautions = signals.filter((signal) => signal.tone === 'caution');
+  const specificCautions = allCautions.filter((signal) => signal.id !== 'variance');
+  const cautionCandidates = specificCautions.length ? specificCautions : allCautions;
   if (!caseCandidates.length) return jsonResponse({ error: 'No case evidence supplied.' }, 400, env);
   if (!cautionCandidates.length) {
     cautionCandidates.push({
       id: 'variance',
       tone: 'caution',
-      text: 'Home-run outcomes remain high variance even for the strongest model cases.',
+      text: 'No single matchup warning stands out; the case still depends on getting a hittable pitch to drive.',
     });
   }
   if (!env.OPENAI_API_KEY) return jsonResponse({ error: 'OPENAI_API_KEY not set on the worker' }, 500, env);
@@ -738,7 +741,7 @@ async function handleStructuredPlayerExplain(body, env) {
     || 'The engine sees a favorable combination, but the home-run outcome remains high variance.';
 
   return jsonResponse({
-    version: 2,
+    version: explainVersion,
     caseIds: selectedCaseIds,
     cautionId,
     bottomLine,
@@ -758,7 +761,7 @@ async function handleExplain(request, env) {
     return jsonResponse({ error: 'bad json' }, 400, env);
   }
 
-  if (body?.kind === 'player' && Number(body?.version) === 2) {
+  if (body?.kind === 'player' && [2, 3].includes(Number(body?.version))) {
     return handleStructuredPlayerExplain(body, env);
   }
 

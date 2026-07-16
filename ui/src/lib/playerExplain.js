@@ -2,7 +2,7 @@
 // the root Node test suite can validate the browser boundary without loading
 // UI dependencies before the UI install step runs in CI.
 
-export const PLAYER_EXPLAIN_VERSION = 2
+export const PLAYER_EXPLAIN_VERSION = 3
 
 function compact(value, max = 220) {
   return String(value || '').replace(/\s+/g, ' ').trim().slice(0, max).trim()
@@ -49,13 +49,40 @@ export function buildPlayerExplainSignals(batter) {
       })
   }
 
-  const probability = Number.isFinite(batter?.hrProbability)
-    ? `${(batter.hrProbability * 100).toFixed(1)}%`
-    : 'The model probability'
+  // Prefer a concrete counter-case over a generic probability disclaimer.
+  // These are all engine-owned facts already present on the player-game row.
+  if (batter?.lineupConfirmed === false) {
+    add('context:lineup', 'caution', 'The lineup is still projected, so the confirmed spot and plate-appearance opportunity can still change.', 'clock')
+  }
+  if (Number.isFinite(batter?.battingOrder) && batter.battingOrder >= 7) {
+    add('context:order', 'caution', 'The lower lineup spot can reduce the number of plate appearances available to do damage.', 'clock')
+  }
+  if (Number.isFinite(batter?.pitcher?.season?.kPer9) && batter.pitcher.season.kPer9 >= 9) {
+    add('context:pitcher-k', 'caution', `${compact(batter.pitcher?.name, 60) || 'The opposing pitcher'} still has strong strikeout ability, which can erase a plate appearance before a hittable mistake arrives.`, 'activity')
+  }
+  if (Number.isFinite(batter?.pitcher?.savant?.barrelPctAllowed) && batter.pitcher.savant.barrelPctAllowed <= 7) {
+    add('context:pitcher-contact', 'caution', `${compact(batter.pitcher?.name, 60) || 'The opposing pitcher'} has limited barrels overall, so the hitter may not get the ideal contact the matchup case needs.`, 'shield')
+  }
+  if (Number.isFinite(batter?.envScore) && batter.envScore < 55) {
+    add('context:environment', 'caution', 'Park and weather are the weakest part of the case and do not add much margin for a home run.', 'cloud')
+  }
+  if (Number.isFinite(batter?.matchupScore) && batter.matchupScore < 55) {
+    add('context:matchup', 'caution', 'The pitcher matchup is the weakest model pillar, so the hitter may have to create the damage without much matchup help.', 'shield')
+  }
+  if (Number.isFinite(batter?.batterScore) && batter.batterScore < 55) {
+    add('context:contact', 'caution', 'The underlying batter-quality pillar is the weakest part of the case, leaving less room if the matchup does not carry it.', 'activity')
+  }
+
+  ;(Array.isArray(batter?.reasons) ? batter.reasons : [])
+    .slice(0, 14)
+    .forEach((reason, index) => {
+      if (TECHNICAL_CAUTION.test(String(reason || ''))) add(`reason:${index}`, 'caution', reason, 'shield')
+    })
+
   add(
     'variance',
     'caution',
-    `${probability} is an estimated home-run chance, not a predicted outcome.`,
+    'No single matchup warning stands out; the case still depends on getting a hittable pitch to drive.',
     'shield',
   )
   const variance = signals.find((signal) => signal.id === 'variance')
@@ -84,7 +111,9 @@ export function normalizePlayerExplain(batter, raw) {
 
   const signals = buildPlayerExplainSignals(batter)
   const caseCandidates = signals.filter((signal) => signal.tone === 'case')
-  const cautionCandidates = signals.filter((signal) => signal.tone === 'caution')
+  const allCautions = signals.filter((signal) => signal.tone === 'caution')
+  const specificCautions = allCautions.filter((signal) => signal.id !== 'variance')
+  const cautionCandidates = specificCautions.length ? specificCautions : allCautions
   const caseById = new Map(caseCandidates.map((signal) => [signal.id, signal]))
   const cautionById = new Map(cautionCandidates.map((signal) => [signal.id, signal]))
   const selectedCase = []

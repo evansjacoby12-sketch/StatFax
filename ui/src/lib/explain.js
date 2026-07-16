@@ -22,7 +22,7 @@ export const WORKER_URL = import.meta.env?.VITE_WORKER_URL || ''
 const mem = new Map()
 const today = () => { try { return new Date().toISOString().slice(0, 10) } catch { return 'x' } }
 const keyFor = (id, version = 1) => version === PLAYER_EXPLAIN_VERSION
-  ? `sf_explain_v2_${id}_${today()}`
+  ? `sf_explain_v${version}_${id}_${today()}`
   : `sf_explain_${id}_${today()}`
 
 export function readExplainCache(id, version = 1) {

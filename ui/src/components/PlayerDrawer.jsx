@@ -15,7 +15,7 @@ import { useLiveMode } from '../lib/liveMode.js'
 import { useEliLevel, reasonsForLevel } from '../lib/eliLevel.js'
 import { toast } from './Toast.jsx'
 import { sharePickCard } from '../lib/shareCard.js'
-import { useExplain } from '../lib/explain.js'
+import { PLAYER_EXPLAIN_VERSION, useExplain } from '../lib/explain.js'
 import { buildPlayerExplainSignals } from '../lib/playerExplain.js'
 import { locationRating5, arsenalRating5, combinedEdge5 } from '../lib/zoneEdge.js'
 import { powerReadyCriteria, barrelReadyCriteria } from '../lib/powerReady.js'
@@ -623,11 +623,6 @@ function signalGroups(b, level) {
     plain.forEach((reason) => add(reason))
     technical.forEach((reason) => add(reason))
   }
-  add({
-    text: `${Number.isFinite(b?.hrProbability) ? pct(b.hrProbability, 1) : 'The model probability'} is an estimated home-run chance, not a predicted outcome.`,
-    tone: 'bad',
-    icon: 'shield',
-  })
   return groups
 }
 
@@ -2331,7 +2326,7 @@ function CaseVsCaution({ b }) {
     const cautionSignal = signals.find((signal) => signal.tone === 'caution') || null
     if (!caseSignals.length || !cautionSignal) return null
     return {
-      version: 2,
+      version: PLAYER_EXPLAIN_VERSION,
       caseSignals,
       cautionSignal,
       bottomLine: 'The engine sees a favorable combination, but the home-run outcome remains high variance.',
@@ -2347,7 +2342,7 @@ function CaseVsCaution({ b }) {
     )
   }
 
-  const structured = status === 'done' && Number(explanation?.version) === 2
+  const structured = status === 'done' && Number(explanation?.version) === PLAYER_EXPLAIN_VERSION
 
   return (
     <Section title="Case vs Caution" icon="Shield" className="explain-pick-card">
