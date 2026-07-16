@@ -96,7 +96,7 @@ function stackCalibration(snapshot, strategy, scope, legCount) {
   return scopeResult?.byLegCount?.[String(legCount)] || scopeResult?.byLegCount?.[legCount] || null
 }
 
-function selectDiversified(combos, limit = 12) {
+function selectDiversified(combos, limit = 5) {
   const selected = []
   const playerExposure = new Map()
   const teamExposure = new Map()
@@ -147,7 +147,7 @@ function rationaleFor(legs, strategy, scope) {
   return scope === 'same-game' ? `One-game Anytime TD core averaging ${(averageProbability * 100).toFixed(1)}% per leg with ${signalCount} supporting signals.` : `Anytime TD anchors across ${games} games averaging ${(averageProbability * 100).toFixed(1)}% per leg.`
 }
 
-export function buildNFLComboBoard(snapshot, { legs = 2, strategy = 'scorer-core', scope = 'all', minGrade = 'LEAN', limit = 12 } = {}) {
+export function buildNFLComboBoard(snapshot, { legs = 2, strategy = 'scorer-core', scope = 'all', minGrade = 'LEAN', limit = 5 } = {}) {
   const legCount = Math.max(2, Math.min(4, Number(legs) || 2))
   const candidates = (snapshot?.players || []).flatMap((player) => eligiblePropMarkets(player).map((market) => {
     const model = scoreNFLProp(player, market.id)

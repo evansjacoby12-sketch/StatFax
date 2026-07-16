@@ -56,6 +56,14 @@ test('TD stack board enforces exposure caps and reports coverage', () => {
   assert.ok(['ready', 'limited'].includes(board.coverage.status))
 })
 
+test('each stack board stays focused on at most five diversified builds', () => {
+  for (const strategy of NFL_COMBO_STRATEGIES) for (const scope of strategy.scopes) {
+    const board = buildNFLComboBoard(snapshot, { legs: 2, strategy: strategy.id, scope, minGrade: 'SKIP' })
+    assert.equal(board.coverage.requestedBuilds, 5)
+    assert.ok(board.combos.length <= 5)
+  }
+})
+
 test('same-game boards disclose an independent baseline until joint calibration is ready', () => {
   const board = buildNFLComboBoard(snapshot, { legs: 2, strategy: 'scorer-core', scope: 'same-game', minGrade: 'LEAN' })
   assert.equal(board.calibration.ready, false)
