@@ -19,7 +19,7 @@ const PLAYBOOK = [
 
 const GUIDE_SECTIONS = [
   ['Zap', 'Signals', 'Ranked QB, RB, WR, and TE props with market-specific probability, line or odds, model edge, role, matchup, weather, and live state.'],
-  ['Beaker', 'Bet Lab', 'Explore model combinations, build a custom slip, and isolate one matchup.'],
+  ['Beaker', 'TD Bet Lab', 'Build touchdown-only parlays from Anytime TD, First TD, and 2+ TD scorer markets.'],
   ['Gauge', 'Performance', 'NFL feed health, season tracking, probability calibration, projection error, and market-level results.'],
   ['SlidersHorizontal', 'Signal filters', 'Combine Role Up, Goal-Line, Red Zone, Route Share, Target Share, Snap Share, streak, matchup, split, weather, and lineup filters.'],
   ['BookOpen', 'Player research', 'Open a player for Overview, Role, Matchup, and Game Log evidence without losing the selected market.'],
@@ -66,7 +66,7 @@ function NFLGuide() {
     <div className="guide-callout"><span className="guide-callout-h"><Icon name="TriangleAlert" size={14} />Read availability before projection</span><span className="dim">NFL workloads change quickly. Depth, injury, restriction, lineup, and live-snap context should be checked before treating a model probability as actionable.</span></div>
     <h3 className="section-title"><Icon name="LayoutGrid" size={14} />The workspaces</h3><div className="guide-list">{GUIDE_SECTIONS.map(([icon, name, desc]) => <div className="guide-row" key={name}><span className="guide-ico"><Icon name={icon} size={15} /></span><span className="guide-txt"><b>{name}</b><span className="dim">{desc}</span></span></div>)}</div>
     <h3 className="section-title" style={{ marginTop: 18 }}><Icon name="Gauge" size={14} />Reading a prop</h3><p className="guide-p dim">Lead with the selected market, model probability, line or odds, edge, availability, and role. Then use matchup, recent production, weather, and live pace as supporting evidence. A missing price is shown as missing—not as a positive edge.</p>
-    <h3 className="section-title" style={{ marginTop: 18 }}><Icon name="GitBranch" size={14} />Reading Bet Lab</h3><p className="guide-p dim">Explore and Same Game rank NFL combinations from eligible player props. Custom Builder reviews the active slip. The displayed all-hit probability remains an independent product.</p>
+    <h3 className="section-title" style={{ marginTop: 18 }}><Icon name="GitBranch" size={14} />Reading TD Bet Lab</h3><p className="guide-p dim">Explore and Same Game rank touchdown-only combinations from Anytime TD, First TD, and 2+ TD markets. Custom Builder ignores yardage and reception legs. The displayed all-hit probability remains an independent product.</p>
   </div>
 }
 

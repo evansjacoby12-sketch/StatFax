@@ -11,7 +11,7 @@ import { NFL_PROP_MARKET_LIST, eligiblePropMarkets, eligibilityReason } from '..
 import { scoreNFLSnapshot, scoreNFLProp } from '../../../src/sports/nfl/logic/ScoringEngine.js'
 import { assessNFLSignals } from '../../../src/sports/nfl/logic/signals.js'
 import { loadNFLSnapshot } from '../../../src/sports/nfl/api/NFLService.js'
-import { nflLegKey, settleNFLTicket } from '../lib/nflTickets.js'
+import { isNFLTDMarket, nflLegKey, settleNFLTicket } from '../lib/nflTickets.js'
 import { useEliLevel } from '../lib/eliLevel.js'
 import { nflSignalCaption, nflSignalText } from '../lib/nflExplanations.js'
 import { SPORT_UI } from '../lib/sportUi.js'
@@ -359,11 +359,16 @@ export default function NFLBoard({ snapshot: suppliedSnapshot = null, view: cont
     const model = scoreNFLProp(player, legMarketId)
     return { key, playerId, gameId: player.gameId, name: player.name, marketId: legMarketId, marketLabel: NFL_PROP_MARKET_LIST.find((item) => item.id === legMarketId)?.label || legMarketId, line: model.line, odds: model.odds, probability: model.probability, status: 'pending' }
   }).filter(Boolean), [slip, snapshot])
-  const saveTicket = () => {
-    if (!slipLegs.length) return
-    const ticket = settleNFLTicket({ id: `nfl-${Date.now()}`, createdAt: new Date().toISOString(), status: 'pending', legs: slipLegs }, snapshot)
+  const saveTicket = (ticketLegs = slipLegs) => {
+    const tdLegs = ticketLegs.filter((leg) => isNFLTDMarket(leg.marketId))
+    if (tdLegs.length < 2) return
+    const ticket = settleNFLTicket({ id: `nfl-${Date.now()}`, createdAt: new Date().toISOString(), status: 'pending', legs: tdLegs }, snapshot)
     setTickets((current) => [ticket, ...current].slice(0, 50))
-    setSlip(new Set())
+    setSlip((current) => {
+      const next = new Set(current)
+      for (const leg of tdLegs) next.delete(leg.key)
+      return next
+    })
   }
   const addComboToSlip = (combo) => {
     setSlip((current) => {
@@ -385,7 +390,7 @@ export default function NFLBoard({ snapshot: suppliedSnapshot = null, view: cont
   return <div className="nfl-workspace nfl-prop-workspace">
     <div className="nfl-workspace-head"><div><span className="nfl-eyebrow"><Icon name="Shield" size={13} /> NFL prop engine</span><h1>NFL Signals</h1><p>Slate-ranked QB, RB, WR and TE signals powered by role, matchup, form, lineup, weather, price and live pace.</p></div><CommandTabs tabs={SPORT_UI.nfl.primaryViews} value={view} onChange={setView} label="NFL view" className="nfl-view-tabs" variant="workspace" /></div>
     <div className={`nfl-demo-banner is-${snapshotStale ? 'critical' : snapshot.dataHealth?.status || 'ready'}`} role="status" aria-live="polite"><Icon name={snapshotStale || snapshot.dataHealth?.status === 'critical' || !snapshot.dataQuality?.playByPlay ? 'TriangleAlert' : 'CircleCheck'} size={15} /><span><b>{snapshotStale ? 'NFL pipeline update delayed' : snapshot.source?.mode === 'demo' ? 'Demo slate' : snapshot.dataHealth?.status === 'ready' ? 'All NFL feeds healthy' : snapshot.dataQuality?.playByPlay ? 'NFL core data connected' : 'NFL data connected · limited context'}</b> {snapshotStale ? 'The published slate is more than 45 minutes old. Open Performance for feed details.' : snapshot.dataHealth?.issues?.length ? `${snapshot.dataHealth.issues.length} supporting feed${snapshot.dataHealth.issues.length === 1 ? '' : 's'} limited. Open Performance for details.` : 'Red-zone, depth, availability, weather, defense and tracking coverage are active.'}</span></div>
-    {view === 'performance' ? <NFLPerformance snapshot={snapshot} /> : view === 'bet-lab' ? <div className="nfl-bet-lab-workspace"><NFLBetLab snapshot={snapshot} slip={slip} slipLegs={slipLegs} tab={betLabView} onTabChange={setBetLabView} onAddCombo={addComboToSlip} onToggleLeg={(key) => toggleSet(setSlip, key)} onClearSlip={() => setSlip(new Set())} onSaveTicket={saveTicket} /></div> : <>
+    {view === 'performance' ? <NFLPerformance snapshot={snapshot} /> : view === 'bet-lab' ? <div className="nfl-bet-lab-workspace"><NFLBetLab snapshot={snapshot} slip={slip} slipLegs={slipLegs} tab={betLabView} onTabChange={setBetLabView} onAddCombo={addComboToSlip} onToggleLeg={(key) => toggleSet(setSlip, key)} onSaveTicket={saveTicket} /></div> : <>
       <SportMarketRail sport="nfl" markets={NFL_PROP_MARKET_LIST} value={marketId} onChange={setMarketId} icons={MARKET_ICONS} ariaLabel="NFL prop market" />
       {marketId === 'first_td' && <div className="nfl-variance-note"><Icon name="TriangleAlert" size={14} /><span><b>First TD is high variance.</b> Listed offense receives {pct(snapshot.firstTdReserve?.listedOffense ?? .86, 0)}; other offense {pct(snapshot.firstTdReserve?.otherOffense ?? .06, 0)}, defense/special teams {pct(snapshot.firstTdReserve?.defenseSpecialTeams ?? .06, 0)}, and no touchdown {pct(snapshot.firstTdReserve?.noTouchdown ?? .02, 0)} are modeled separately.</span></div>}
       {marketId === 'two_plus_td' && <div className="nfl-variance-note"><Icon name="Flame" size={14} /><span><b>2+ TD is calibrated separately.</b> Multi-score probability is evaluated independently from Anytime TD.</span></div>}

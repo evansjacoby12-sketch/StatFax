@@ -13,6 +13,7 @@ test('NFL Bet Lab builds deterministic 2-4 leg combos without duplicate players'
       assert.equal(combo.legs.length, legs)
       assert.equal(new Set(combo.legs.map((leg) => leg.playerId)).size, legs)
       assert.ok(combo.probability > 0 && combo.probability < 1)
+      assert.ok(combo.legs.every((leg) => ['anytime_td', 'first_td', 'two_plus_td'].includes(leg.marketId)))
     }
   }
 })
@@ -20,14 +21,16 @@ test('NFL Bet Lab builds deterministic 2-4 leg combos without duplicate players'
 test('same-game combos keep every leg inside one matchup', () => {
   const combos = buildNFLCombos(snapshot, { legs: 2, strategy: 'balanced', scope: 'same-game', minGrade: 'LEAN' })
   assert.ok(combos.length > 0)
-  for (const combo of combos) assert.equal(new Set(combo.legs.map((leg) => leg.gameKey)).size, 1)
+  for (const combo of combos) {
+    assert.equal(new Set(combo.legs.map((leg) => leg.gameKey)).size, 1)
+    assert.ok(combo.legs.filter((leg) => leg.marketId === 'first_td').length <= 1)
+  }
 })
 
-test('strategy filters constrain touchdown and volume builds', () => {
-  const touchdowns = buildNFLCombos(snapshot, { legs: 2, strategy: 'touchdown', minGrade: 'LEAN' })
-  const volume = buildNFLCombos(snapshot, { legs: 2, strategy: 'volume', minGrade: 'LEAN' })
-  assert.ok(touchdowns.length > 0)
-  assert.ok(volume.length > 0)
-  assert.ok(touchdowns.every((combo) => combo.legs.every((leg) => ['anytime_td', 'first_td', 'two_plus_td'].includes(leg.marketId))))
-  assert.ok(volume.every((combo) => combo.legs.every((leg) => !['anytime_td', 'first_td', 'two_plus_td'].includes(leg.marketId))))
+test('every NFL Bet Lab strategy is touchdown-only', () => {
+  for (const strategy of ['balanced', 'safe', 'value', 'red-zone']) {
+    const combos = buildNFLCombos(snapshot, { legs: 2, strategy, minGrade: 'LEAN' })
+    assert.ok(combos.length > 0)
+    assert.ok(combos.every((combo) => combo.legs.every((leg) => ['anytime_td', 'first_td', 'two_plus_td'].includes(leg.marketId))))
+  }
 })

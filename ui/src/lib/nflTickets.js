@@ -1,5 +1,9 @@
 const TD_MARKETS = new Set(['anytime_td', 'first_td', 'two_plus_td'])
 
+export function isNFLTDMarket(marketId) {
+  return TD_MARKETS.has(marketId)
+}
+
 export function nflLegKey(playerId, marketId) {
   return `${playerId}:${marketId}`
 }

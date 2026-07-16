@@ -1,16 +1,14 @@
 import { NFL_PROP_MARKET_LIST, eligiblePropMarkets } from '../../../src/sports/nfl/logic/propEligibility.js'
 import { scoreNFLProp } from '../../../src/sports/nfl/logic/ScoringEngine.js'
-import { nflLegKey } from './nflTickets.js'
+import { isNFLTDMarket, nflLegKey } from './nflTickets.js'
 
 export const NFL_COMBO_STRATEGIES = Object.freeze([
-  { id: 'balanced', label: 'Balanced', icon: 'Layers', description: 'Blends confidence, price and market variety.' },
-  { id: 'safe', label: 'High confidence', icon: 'Shield', description: 'Prioritizes the strongest model probabilities.' },
-  { id: 'value', label: 'Best value', icon: 'CircleDollarSign', description: 'Prioritizes positive model edge at available prices.' },
-  { id: 'touchdown', label: 'TD stack', icon: 'Flame', description: 'Builds scorer-only combinations.' },
-  { id: 'volume', label: 'Volume', icon: 'Activity', description: 'Builds yardage and reception combinations.' },
+  { id: 'balanced', label: 'Balanced TD', icon: 'Layers', description: 'Balances scorer probability, model strength and available TD value.' },
+  { id: 'safe', label: 'Safest scorers', icon: 'Shield', description: 'Prioritizes the strongest touchdown probabilities.' },
+  { id: 'value', label: 'Best TD value', icon: 'CircleDollarSign', description: 'Prioritizes touchdown edge at available prices.' },
+  { id: 'red-zone', label: 'Red-zone roles', icon: 'Target', description: 'Prioritizes goal-line work, end-zone targets and scoring role.' },
 ])
 
-const TD_MARKETS = new Set(['anytime_td', 'first_td', 'two_plus_td'])
 const GRADE_RANK = { SKIP: 0, LEAN: 1, STRONG: 2, PRIME: 3 }
 
 const gameKey = (player) => player.gameId || [player.team, player.opponent].filter(Boolean).sort().join('-')
@@ -39,10 +37,10 @@ function candidateScore(candidate, strategy) {
   const probability = candidate.model.probability || 0
   const edge = candidate.model.edge == null ? 0 : candidate.model.edge
   const model = (candidate.model.score || 0) / 100
+  const redZoneRole = candidate.model.signals?.some((signal) => /red.?zone|goal.?line|end.?zone|inside.?five/i.test(`${signal.key || ''} ${signal.text || ''}`)) ? 1 : 0
   if (strategy === 'safe') return probability * .72 + model * .28
   if (strategy === 'value') return edge * 1.8 + model * .34 + probability * .22
-  if (strategy === 'touchdown') return probability * .52 + model * .32 + Math.max(0, edge) * .9
-  if (strategy === 'volume') return probability * .58 + model * .34 + Math.max(0, edge) * .7
+  if (strategy === 'red-zone') return probability * .44 + model * .31 + redZoneRole * .18 + Math.max(0, edge) * .7
   return probability * .42 + model * .38 + Math.max(0, edge) * .9
 }
 
@@ -52,8 +50,7 @@ function rationaleFor(legs, strategy, scope) {
   const games = new Set(legs.map((leg) => leg.gameKey)).size
   if (strategy === 'safe') return `Top-confidence legs with ${signalCount} active model signals.`
   if (strategy === 'value') return `${positiveEdges}/${legs.length} legs show positive edge at the listed price.`
-  if (strategy === 'touchdown') return 'Scorer stack built from role, red-zone and matchup evidence.'
-  if (strategy === 'volume') return 'Volume stack built from projected workload and defensive matchup.'
+  if (strategy === 'red-zone') return 'Scorer stack built from goal-line work, end-zone targets and red-zone role.'
   return scope === 'same-game'
     ? `One-game build with ${signalCount} active role and matchup signals.`
     : `Balanced across ${games} game${games === 1 ? '' : 's'} with confidence and price in the mix.`
@@ -69,14 +66,17 @@ export function buildNFLCombos(snapshot, { legs = 2, strategy = 'balanced', scop
       odds: model.odds, probability: model.probability, grade: model.grade, model,
     }
   }))
+    .filter((candidate) => isNFLTDMarket(candidate.marketId))
     .filter((candidate) => GRADE_RANK[candidate.grade] >= GRADE_RANK[minGrade])
-    .filter((candidate) => strategy !== 'touchdown' || TD_MARKETS.has(candidate.marketId))
-    .filter((candidate) => strategy !== 'volume' || !TD_MARKETS.has(candidate.marketId))
     .sort((a, b) => candidateScore(b, strategy) - candidateScore(a, strategy))
     .slice(0, scope === 'same-game' ? 32 : 18)
 
   const combos = combinationRows(candidates, Math.max(2, Math.min(4, Number(legs) || 2)))
     .filter((combo) => new Set(combo.map((leg) => leg.playerId)).size === combo.length)
+    .filter((combo) => {
+      const firstTDGames = combo.filter((leg) => leg.marketId === 'first_td').map((leg) => leg.gameKey)
+      return new Set(firstTDGames).size === firstTDGames.length
+    })
     .filter((combo) => scope !== 'same-game' || new Set(combo.map((leg) => leg.gameKey)).size === 1)
     .map((combo) => {
       const probability = combo.reduce((product, leg) => product * leg.probability, 1)
