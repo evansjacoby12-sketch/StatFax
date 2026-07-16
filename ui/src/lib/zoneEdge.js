@@ -2,8 +2,9 @@
 // drawer's Zone teaser so they always show the same numbers (they drifted apart
 // once the full view gained an Arsenal rating; this keeps them locked together).
 
-const LEAGUE_SLG = { ff: 0.382, si: 0.372, fc: 0.350, sl: 0.300, cu: 0.275, kc: 0.293, ch: 0.323, fs: 0.305, sw: 0.298, st: 0.278 }
-const PITCH_CODES = ['ff', 'si', 'fc', 'sl', 'cu', 'kc', 'ch', 'fs']
+import { MIN_PITCH_MIX_COVERED_USAGE, pitchLeagueSlg } from './scout.js'
+
+const PITCH_CODES = ['ff', 'si', 'fc', 'sl', 'st', 'sv', 'cu', 'kc', 'ch', 'fs', 'kn']
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
 
 // Pitch-arsenal edge on the 0–5 scale: usage-weighted (batter SLG − league SLG)
@@ -16,12 +17,13 @@ export function arsenalRating5(b) {
   for (const code of PITCH_CODES) {
     const usage = mix[`${code}Pct`]
     const slg = arsenal[`${code}Slg`]
-    if (!(usage > 0) || !Number.isFinite(slg) || LEAGUE_SLG[code] == null) continue
+    if (!(usage > 0) || !Number.isFinite(slg)) continue
+    const league = pitchLeagueSlg({ key: code, leagueSlg: arsenal.leagueSlg?.[code] })
     const w = usage / 100
-    eSum += w * (slg - LEAGUE_SLG[code])
+    eSum += w * (slg - league)
     wSum += w
   }
-  if (wSum <= 0) return null
+  if (wSum * 100 < MIN_PITCH_MIX_COVERED_USAGE) return null
   return +clamp(2.5 + (eSum / wSum) * 15, 0, 5).toFixed(1)
 }
 

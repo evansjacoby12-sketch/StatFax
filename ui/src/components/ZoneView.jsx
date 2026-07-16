@@ -5,6 +5,7 @@ import { pct, num, rate } from '../lib/format.js'
 import { gradeColor } from '../lib/badges.js'
 import { hexA } from './atoms.jsx'
 import { locationRating5, arsenalRating5 as arsenalRating5Of, combinedEdge5 } from '../lib/zoneEdge.js'
+import { pitchLeagueSlg } from '../lib/scout.js'
 
 const r3 = (v) => (v == null || Number.isNaN(v) ? '—' : rate(v))
 const p0 = (v) => (v == null || Number.isNaN(v) ? '—' : pct(v, 0))
@@ -43,10 +44,13 @@ const PITCHES = [
   { code: 'si', label: 'Sinker', bucket: 'fastball' },
   { code: 'fc', label: 'Cutter', bucket: 'fastball' },
   { code: 'sl', label: 'Slider', bucket: 'breaking' },
+  { code: 'st', label: 'Sweeper', bucket: 'breaking' },
+  { code: 'sv', label: 'Slurve', bucket: 'breaking' },
   { code: 'cu', label: 'Curve', bucket: 'breaking' },
   { code: 'kc', label: 'Knuckle-Curve', bucket: 'breaking' },
   { code: 'ch', label: 'Changeup', bucket: 'offspeed' },
   { code: 'fs', label: 'Splitter', bucket: 'offspeed' },
+  { code: 'kn', label: 'Knuckleball', bucket: 'offspeed' },
 ]
 const PITCH_FILTERS = [
   { key: 'all', label: 'All' },
@@ -58,8 +62,6 @@ const PITCH_FILTERS = [
 // Catcher's view, top-row = up in the zone. "Heart" = dead-center (1).
 const ZONE_NAMES = ['Up & Left', 'Up', 'Up & Right', 'Left', 'Heart', 'Right', 'Low & Left', 'Low', 'Low & Right']
 
-// League-average SLG allowed per pitch type (for the Arsenal edge rating).
-const LEAGUE_SLG = { ff: 0.382, si: 0.372, fc: 0.350, sl: 0.300, cu: 0.275, kc: 0.293, ch: 0.323, fs: 0.305, sw: 0.298, st: 0.278 }
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
 
 // Cells with fewer BIP than this are shrunk hard toward the batter's season line
@@ -309,7 +311,7 @@ export default function ZoneView({ batter: b, onClose }) {
   // pitcher's WHOLE mix (unfiltered), so the headline reflects the pitch-type
   // edge the location rating is blind to. Same 0–5 scale.
   const allPitches = useMemo(() => PITCHES
-    .map((p) => ({ code: p.code, label: p.label, usage: mix[`${p.code}Pct`] ?? null, bSlg: arsenal[`${p.code}Slg`] ?? null }))
+    .map((p) => ({ code: p.code, key: p.code, label: p.label, usage: mix[`${p.code}Pct`] ?? null, bSlg: arsenal[`${p.code}Slg`] ?? null, leagueSlg: arsenal.leagueSlg?.[p.code] ?? null }))
     .filter((p) => (p.usage ?? 0) > 0), [mix, arsenal])
   // Arsenal rating via the shared helper (identical to the drawer teaser). Blind
   // spot + coverage stay local — they need per-pitch detail beyond the rating.
@@ -318,12 +320,12 @@ export default function ZoneView({ batter: b, onClose }) {
     let coveredUsage = 0, totalUsage = 0
     for (const p of allPitches) {
       totalUsage += p.usage
-      if (Number.isFinite(p.bSlg) && LEAGUE_SLG[p.code] != null) coveredUsage += p.usage
+      if (Number.isFinite(p.bSlg)) coveredUsage += p.usage
     }
     const top = allPitches.slice().sort((a, c) => (c.usage ?? 0) - (a.usage ?? 0))[0]
     return {
       blindSpot: top && !Number.isFinite(top.bSlg) ? top : null,
-      coverage: totalUsage > 0 ? coveredUsage / totalUsage : null,
+      coverage: totalUsage > 0 ? Math.min(1, coveredUsage / 100) : null,
     }
   }, [allPitches])
   // Headline = the stronger of the two edges (location vs arsenal).
@@ -334,7 +336,7 @@ export default function ZoneView({ batter: b, onClose }) {
     const parts = []
     const ranked = allPitches
       .filter((p) => Number.isFinite(p.bSlg) && (p.usage ?? 0) >= 8)
-      .map((p) => ({ ...p, edge: p.bSlg - (LEAGUE_SLG[p.code] ?? 0.33) }))
+      .map((p) => ({ ...p, edge: p.bSlg - pitchLeagueSlg(p) }))
       .sort((a, c) => c.edge - a.edge)
     const best = ranked[0]
     if (best && best.edge > 0.06) parts.push(`Feasts on the ${best.label.toLowerCase()} (${r3(best.bSlg)}, ${Math.round(best.usage)}% usage)`)

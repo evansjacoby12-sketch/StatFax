@@ -8,7 +8,7 @@ import { bookLabel } from '../lib/data.js'
 import { compass, skyLabel } from '../lib/weather.js'
 import { interpretWind } from '../lib/wind.js'
 import { playerHeadshot, teamAbbr } from '../lib/teams.js'
-import { toolGrades, heatBreakdown, gradeLabel, hrSetup } from '../lib/scout.js'
+import { toolGrades, heatBreakdown, gradeLabel, hrSetup, hasPitchBook, pitchLeagueSlg, pitchMixSummary } from '../lib/scout.js'
 import { blastOf, blastVsHandOf } from '../lib/groups.js'
 import { estimatedKs, projectedK } from '../lib/pitchers.js'
 import { useLiveMode } from '../lib/liveMode.js'
@@ -1386,8 +1386,6 @@ function PaCurve({ b, color }) {
 // PitchMixAdvantage (new)
 // ---------------------------------------------------------------------------
 
-const LEAGUE_SLG = { FF: 0.382, SI: 0.372, FC: 0.350, SL: 0.300, CU: 0.275, KC: 0.293, CH: 0.323, FS: 0.305, SW: 0.298, ST: 0.278 }
-
 function PitchBar({ adv }) {
   if (adv == null) return <div style={{ flex: 1, height: '10px', background: 'rgba(255,255,255,0.04)', borderRadius: '4px', position: 'relative' }}><div style={{ position: 'absolute', left: '50%', top: 0, bottom: 0, width: '1px', background: 'rgba(255,255,255,0.12)', transform: 'translateX(-50%)' }} /></div>
   const MAX = 0.15
@@ -1410,28 +1408,15 @@ function PitchMixAdvantage({ b }) {
     </Section>
   )
 
-  // A pitch showing 0 SLG AND 0 whiff has no tracked book — a hitter who'd
-  // actually faced it would show *some* outcome. Treat it as missing, not as a
-  // .000 (max-tough) matchup, so a high-usage unseen pitch can't sink the rating.
-  const hasBook = (p) => p.slg != null && !(p.slg === 0 && !(p.whiff > 0))
-
-  let totalW = 0, totalAdv = 0, coveredUsage = 0, totalUsage = 0
-  for (const p of splits) {
-    totalUsage += p.usage ?? 0
-    if (!hasBook(p)) continue
-    const league = LEAGUE_SLG[p.key] ?? 0.330
-    totalW += p.usage ?? 0
-    totalAdv += (p.slg - league) * (p.usage ?? 0)
-    coveredUsage += p.usage ?? 0
-  }
-  const avgAdv = totalW > 0 ? totalAdv / totalW : 0
-  const rating = totalW > 0 ? Math.max(0, Math.min(10, 5 + avgAdv * 25)) : null
-  const ratingLabel = rating == null ? 'No book' : rating >= 7.5 ? 'Great' : rating >= 6 ? 'Favorable' : rating >= 5 ? 'Lean Batter' : rating >= 4 ? 'Neutral' : rating >= 2.5 ? 'Lean Pitcher' : 'Tough'
+  const { score: rating, coveredUsage, coverage: coverageRate } = pitchMixSummary(b)
+  const ratingLabel = rating == null
+    ? (coveredUsage > 0 ? 'Thin data' : 'No book')
+    : rating >= 7.5 ? 'Great' : rating >= 6 ? 'Favorable' : rating >= 5 ? 'Lean Batter' : rating >= 4 ? 'Neutral' : rating >= 2.5 ? 'Lean Pitcher' : 'Tough'
   const ratingColor = rating == null ? 'var(--text-faint)' : rating >= 6 ? 'var(--strong)' : rating >= 4 ? '#fff' : 'var(--bad)'
   // Biggest unseen pitch — flagged when it's a meaningful share of the arsenal.
-  const blindSpot = splits.filter((p) => !hasBook(p)).sort((a, c) => (c.usage ?? 0) - (a.usage ?? 0))[0]
+  const blindSpot = splits.filter((p) => !hasPitchBook(p)).sort((a, c) => (c.usage ?? 0) - (a.usage ?? 0))[0]
   const bigBlind = blindSpot && (blindSpot.usage ?? 0) >= 12 ? blindSpot : null
-  const coverage = totalUsage > 0 ? Math.round((coveredUsage / totalUsage) * 100) : null
+  const coverage = coverageRate != null ? Math.round(coverageRate * 100) : null
 
   return (
     <Section title="Pitch Mix Matchup Advantage" icon="ChartSpline">
@@ -1467,8 +1452,8 @@ function PitchMixAdvantage({ b }) {
           <span style={{ textAlign: 'right' }}>SLG</span>
         </div>
         {splits.slice(0, 7).map(p => {
-          const league = LEAGUE_SLG[p.key] ?? 0.330
-          const seen = hasBook(p)
+          const league = pitchLeagueSlg(p)
+          const seen = hasPitchBook(p)
           const adv = seen ? p.slg - league : null
           return (
             <div key={p.key} style={{ display: 'grid', gridTemplateColumns: '1fr 36px 1fr 44px', gap: '6px 8px', alignItems: 'center', marginBottom: '10px', opacity: seen ? 1 : 0.55 }}>

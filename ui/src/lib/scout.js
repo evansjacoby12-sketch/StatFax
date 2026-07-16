@@ -125,25 +125,44 @@ export function hrSetup(b) {
   return { checks, n: checks.filter((c) => c.pass).length }
 }
 
-const PITCH_LEAGUE_SLG = { FF: 0.382, SI: 0.372, FC: 0.350, SL: 0.300, CU: 0.275, KC: 0.293, CH: 0.323, FS: 0.305, SW: 0.298, ST: 0.278 }
+export const PITCH_LEAGUE_SLG = {
+  ff: 0.415, si: 0.405, fc: 0.395,
+  sl: 0.375, st: 0.365, sv: 0.370, cu: 0.360, kc: 0.370,
+  ch: 0.410, fs: 0.390, kn: 0.350,
+}
+export const MIN_PITCH_MIX_COVERED_USAGE = 50
 
-// A pitch with 0 SLG AND 0 whiff has no tracked book — a hitter who'd faced it
-// would show *some* outcome. Treat it as missing, not as a real .000 (max-tough)
-// matchup, so a high-usage unseen pitch can't drag the score down. (Same fix as
-// the drawer's PitchMixAdvantage + the zone view.)
-const hasPitchBook = (p) => p.slg != null && !(p.slg === 0 && !(p.whiff > 0))
+// Missing Savant values stay null end to end. A real .000 SLG is still a book;
+// excluding it would systematically hide the batter's worst observed results.
+export const hasPitchBook = (p) => Number.isFinite(p?.slg)
+export const pitchLeagueSlg = (p) => Number.isFinite(p?.leagueSlg)
+  ? p.leagueSlg
+  : PITCH_LEAGUE_SLG[String(p?.key || '').toLowerCase()] ?? 0.400
+
+export function pitchMixSummary(b) {
+  const splits = b?.pitchTypeSplits
+  if (!splits?.length) return { score: null, coveredUsage: 0, totalUsage: 0, coverage: null }
+  let totalW = 0, totalAdv = 0, totalUsage = 0
+  for (const p of splits) {
+    const usage = Number(p?.usage)
+    if (!Number.isFinite(usage) || usage <= 0) continue
+    totalUsage += usage
+    if (!hasPitchBook(p)) continue
+    totalW += usage
+    totalAdv += (p.slg - pitchLeagueSlg(p)) * usage
+  }
+  // Usage is already expressed as percentage points of the pitcher's full mix.
+  // Dividing by only the rows present would label a sparse 40%-tracked mix as
+  // "100% covered"; use the actual 100-point arsenal denominator instead.
+  const coverage = totalUsage > 0 ? Math.min(1, totalW / 100) : null
+  const score = totalW >= MIN_PITCH_MIX_COVERED_USAGE
+    ? Math.max(0, Math.min(10, 5 + (totalAdv / totalW) * 25))
+    : null
+  return { score, coveredUsage: totalW, totalUsage, coverage }
+}
 
 export function pitchMixScore(b) {
-  const splits = b.pitchTypeSplits
-  if (!splits?.length) return null
-  let totalW = 0, totalAdv = 0
-  for (const p of splits) {
-    if (!hasPitchBook(p)) continue
-    const league = PITCH_LEAGUE_SLG[p.key] ?? 0.330
-    totalW += p.usage ?? 0
-    totalAdv += (p.slg - league) * (p.usage ?? 0)
-  }
-  return totalW > 0 ? Math.max(0, Math.min(10, 5 + (totalAdv / totalW) * 25)) : null
+  return pitchMixSummary(b).score
 }
 
 export function toolGrades(b) {

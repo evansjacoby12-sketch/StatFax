@@ -22,6 +22,11 @@ const AI_REVIEW_KINDS = new Set([
 const ISSUE_SOURCES = new Set(['deterministic', 'ai-context'])
 const ISSUE_SEVERITIES = new Set(['critical', 'warning', 'info'])
 const ISSUE_SCOPES = new Set(['slate', 'game', 'batter'])
+const EXACT_PITCH_MIX_FIELDS = [
+  'ffPct', 'siPct', 'fcPct',
+  'slPct', 'stPct', 'svPct', 'cuPct', 'kcPct',
+  'chPct', 'fsPct', 'knPct',
+]
 
 const finite = (value) => value !== null && value !== '' && Number.isFinite(Number(value))
 const same = (left, right) => left != null && right != null && String(left) === String(right)
@@ -55,6 +60,16 @@ function rowSide(row, game) {
   if (row?.isHome === false) return 'away'
   if (row?.isHome === true) return 'home'
   return null
+}
+
+function pitchMixUsageGap(mix) {
+  if (!isObject(mix)) return null
+  const familyUsage = ['fastballPct', 'breakingPct', 'offspeedPct']
+    .reduce((sum, field) => sum + (finite(mix[field]) ? Number(mix[field]) : 0), 0)
+  if (familyUsage <= 0) return null
+  const exactUsage = EXACT_PITCH_MIX_FIELDS
+    .reduce((sum, field) => sum + (finite(mix[field]) ? Number(mix[field]) : 0), 0)
+  return Math.max(0, familyUsage - exactUsage)
 }
 
 function addQaFlagIssues(slate, issues, seen) {
@@ -189,6 +204,19 @@ function deterministicIssues(slate, generatedAt) {
         code: 'listed-starter-missing', scope: 'game', gamePk, playerId: null,
         message: `${gameLabel(game)} does not have both probable starters listed.`, blocksPublish: false,
       })
+    }
+    for (const pitcher of [game?.awayPitcher, game?.homePitcher]) {
+      if (!finite(pitcher?.id)) continue
+      const gap = pitchMixUsageGap(slate?.pitcherPitchMix?.[pitcher.id])
+      if (gap != null && gap >= 5) {
+        addIssue(issues, seen, {
+          id: issueId('pitch-mix-taxonomy-gap', gamePk, null, pitcher.id),
+          source: 'deterministic', severity: 'warning',
+          code: 'pitch-mix-taxonomy-gap', scope: 'game', gamePk, playerId: null,
+          message: `${clean(pitcher?.name, 80) || `Pitcher ${pitcher.id}`} has ${gap.toFixed(0)}% of arsenal usage in a pitch family that is missing from exact pitch-type data.`,
+          blocksPublish: false,
+        })
+      }
     }
     if (rows.length < 5) {
       addIssue(issues, seen, {

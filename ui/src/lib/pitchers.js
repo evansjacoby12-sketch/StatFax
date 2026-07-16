@@ -128,6 +128,7 @@ export const PITCH_LABELS = {
   ch: 'Change',
   fs: 'Splitter',
   fo: 'Forkball',
+  kn: 'Knuckleball',
 }
 
 // Build a sorted, display-ready pitch-usage list from pitcher.pitchMix. Handles

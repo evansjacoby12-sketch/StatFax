@@ -224,7 +224,7 @@ export function kBrain(pitcher, targets, { weather, umpire, parkFactorK } = {}) 
 
   const pitchMix = pitcher?.pitchMix
   const pitchDiversity = pitchMix
-    ? ['ffPct', 'siPct', 'fcPct', 'slPct', 'cuPct', 'kcPct', 'chPct', 'fsPct']
+    ? ['ffPct', 'siPct', 'fcPct', 'slPct', 'stPct', 'svPct', 'cuPct', 'kcPct', 'chPct', 'fsPct', 'knPct']
       .filter((field) => (pitchMix[field] ?? 0) >= 10).length
     : 2
   const tttoRate = pitchDiversity >= 4 ? 0.096 : pitchDiversity <= 2 ? 0.144 : 0.12
@@ -236,7 +236,7 @@ export function kBrain(pitcher, targets, { weather, umpire, parkFactorK } = {}) 
   const umpireZone = umpire?.zoneStyle
   if (umpireZone && pitchMix) {
     const fastballPct = ((pitchMix.ffPct ?? 0) + (pitchMix.siPct ?? 0) + (pitchMix.fcPct ?? 0)) / 100
-    const breakingPct = ((pitchMix.slPct ?? 0) + (pitchMix.cuPct ?? 0) + (pitchMix.kcPct ?? 0)) / 100
+    const breakingPct = ((pitchMix.slPct ?? 0) + (pitchMix.stPct ?? 0) + (pitchMix.svPct ?? 0) + (pitchMix.cuPct ?? 0) + (pitchMix.kcPct ?? 0)) / 100
     let zoneInteraction = 1
     if (umpireZone === 'high' && fastballPct > 0.40) zoneInteraction = 1 + (fastballPct - 0.40) * 0.08
     else if (umpireZone === 'low' && breakingPct > 0.25) zoneInteraction = 1 + (breakingPct - 0.25) * 0.08

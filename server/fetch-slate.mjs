@@ -1376,9 +1376,9 @@ async function fetchBlastVsHand(year = SEASON, win = {}) {
 // batter's blast vs the exact MIX today's starter throws (the "vs his mix"
 // number sharps quote). Returns { [PITCH_CODE]: Map<id, blastPerContact%> }.
 // Season (not recent) so each pitch-type slice has a usable sample.
-const BLAST_PITCH_TYPES = ['FF', 'SI', 'FC', 'SL', 'CU', 'KC', 'CH', 'FS'];
+const BLAST_PITCH_TYPES = ['FF', 'SI', 'FC', 'SL', 'ST', 'CU', 'KC', 'CH', 'FS'];
 // pitchMix usage keys (server pitcher block) → Savant pitch-type codes.
-const PITCH_USAGE_KEY = { FF: 'ffPct', SI: 'siPct', FC: 'fcPct', SL: 'slPct', CU: 'cuPct', KC: 'kcPct', CH: 'chPct', FS: 'fsPct' };
+const PITCH_USAGE_KEY = { FF: 'ffPct', SI: 'siPct', FC: 'fcPct', SL: 'slPct', ST: 'stPct', CU: 'cuPct', KC: 'kcPct', CH: 'chPct', FS: 'fsPct' };
 // A batter's blast rate vs the exact mix a starter throws: usage-weighted blend
 // of his per-pitch-type blast over the pitches the starter uses. coverage = the
 // share of the starter's arsenal we actually have a blast number for (so a
@@ -1489,7 +1489,16 @@ async function fetchSavantPitcherStats(year = SEASON) {
 // pitch MOVEMENT, not usage/results — reading ff_pct / ff_slg / ff_run_value off
 // it returned null for every player, silently killing the whole pitch-matchup
 // signal. pitch-arsenal-stats carries usage + run value + slg + whiff.
-const ARSENAL_PT_KEY = { FF: 'ff', SI: 'si', FC: 'fc', SL: 'sl', CU: 'cu', KC: 'kc', CH: 'ch', FS: 'fs' };
+// Keep the exact-pitch path aligned with Savant's current taxonomy. Sweepers
+// are no longer a niche pitch: omitting ST discarded a meaningful share of
+// many starters' arsenals while the broader "breaking" bucket still counted
+// it, so the family and exact-match reads disagreed. SV/KN are included as
+// forward-compatible sparse types; missing batter books remain explicit nulls.
+const ARSENAL_PT_KEY = {
+  FF: 'ff', SI: 'si', FC: 'fc',
+  SL: 'sl', ST: 'st', SV: 'sv', CU: 'cu', KC: 'kc',
+  CH: 'ch', FS: 'fs', KN: 'kn',
+};
 const arsenalBucket = (pt) =>
   ['FF', 'SI', 'FC', 'FA'].includes(pt)               ? 'fastball'
   : ['CH', 'FS', 'FO', 'SC', 'KN', 'EP'].includes(pt) ? 'offspeed'
@@ -1553,11 +1562,13 @@ async function fetchSavantPitcherPitchMix(year = SEASON) {
 
       out[id] = {
         fastballPct, breakingPct, offspeedPct,
-        ffPct: pct.ff ?? 0, siPct: pct.si ?? 0, fcPct: pct.fc ?? 0, slPct: pct.sl ?? 0,
-        cuPct: pct.cu ?? 0, kcPct: pct.kc ?? 0, chPct: pct.ch ?? 0, fsPct: pct.fs ?? 0,
+        ffPct: pct.ff ?? 0, siPct: pct.si ?? 0, fcPct: pct.fc ?? 0,
+        slPct: pct.sl ?? 0, stPct: pct.st ?? 0, svPct: pct.sv ?? 0,
+        cuPct: pct.cu ?? 0, kcPct: pct.kc ?? 0,
+        chPct: pct.ch ?? 0, fsPct: pct.fs ?? 0, knPct: pct.kn ?? 0,
         fastballRunVal: wAvg(['ff', 'si', 'fc']),
-        breakingRunVal: wAvg(['sl', 'cu', 'kc']),
-        offspeedRunVal: wAvg(['ch', 'fs']),
+        breakingRunVal: wAvg(['sl', 'st', 'sv', 'cu', 'kc']),
+        offspeedRunVal: wAvg(['ch', 'fs', 'kn']),
         totalRunVal: rvDen ? rvNum / rvDen : 0,
         worstPitch,
         shape: null,
@@ -1582,7 +1593,11 @@ async function fetchSavantPitcherPitchMix(year = SEASON) {
             whiff:   wh[k] ?? null,
             putAway: null,
           });
-          o.shape = { ff: mk('ff'), si: mk('si'), fc: mk('fc'), sl: mk('sl'), cu: mk('cu'), kc: mk('kc'), ch: mk('ch'), fs: mk('fs') };
+          o.shape = {
+            ff: mk('ff'), si: mk('si'), fc: mk('fc'),
+            sl: mk('sl'), st: mk('st'), sv: mk('sv'), cu: mk('cu'), kc: mk('kc'),
+            ch: mk('ch'), fs: mk('fs'), kn: mk('kn'),
+          };
         }
       }
     } catch {}
@@ -1638,6 +1653,25 @@ async function fetchSavantBatterPitchPerf(year = SEASON) {
       return xs.length ? xs.reduce((s, v) => s + v, 0) / xs.length : null;
     };
 
+    // Derive this season's pitch baselines from the same Savant response as the
+    // batter books. Static constants drift as the run environment changes and
+    // previously differed across three UI/model implementations. PA weighting
+    // matches the population represented by each row's SLG.
+    const leagueAcc = {};
+    for (const r of rows) {
+      const key = ARSENAL_PT_KEY[(r.pitch_type || '').toUpperCase()];
+      const sg = pf(r.slg), pa = pf(r.pa);
+      if (!key || !Number.isFinite(sg) || !(pa > 0)) continue;
+      leagueAcc[key] ??= { n: 0, d: 0 };
+      leagueAcc[key].n += sg * pa;
+      leagueAcc[key].d += pa;
+    }
+    const leagueSlg = Object.fromEntries(
+      Object.entries(leagueAcc)
+        .filter(([, v]) => v.d > 0)
+        .map(([key, v]) => [key, +(v.n / v.d).toFixed(3)]),
+    );
+
     for (const [id, prs] of groupByPlayerId(rows)) {
       const slg = {}, rv = {}, whiff = {};
       const all = [];
@@ -1656,17 +1690,24 @@ async function fetchSavantBatterPitchPerf(year = SEASON) {
 
       out[id] = {
         fastballSlg: avg(slg.ff, slg.si, slg.fc),
-        breakingSlg: avg(slg.sl, slg.cu, slg.kc),
-        offspeedSlg: avg(slg.ch, slg.fs),
+        breakingSlg: avg(slg.sl, slg.st, slg.sv, slg.cu, slg.kc),
+        offspeedSlg: avg(slg.ch, slg.fs, slg.kn),
         fastballRV:  avg(rv.ff, rv.si, rv.fc),
-        breakingRV:  avg(rv.sl, rv.cu, rv.kc),
-        offspeedRV:  avg(rv.ch, rv.fs),
-        ffSlg: slg.ff ?? null, siSlg: slg.si ?? null, fcSlg: slg.fc ?? null, slSlg: slg.sl ?? null,
-        cuSlg: slg.cu ?? null, kcSlg: slg.kc ?? null, chSlg: slg.ch ?? null, fsSlg: slg.fs ?? null,
-        ffRV: rv.ff ?? null, siRV: rv.si ?? null, fcRV: rv.fc ?? null, slRV: rv.sl ?? null,
-        cuRV: rv.cu ?? null, kcRV: rv.kc ?? null, chRV: rv.ch ?? null, fsRV: rv.fs ?? null,
-        ffWhiff: whiff.ff ?? null, siWhiff: whiff.si ?? null, fcWhiff: whiff.fc ?? null, slWhiff: whiff.sl ?? null,
-        cuWhiff: whiff.cu ?? null, kcWhiff: whiff.kc ?? null, chWhiff: whiff.ch ?? null, fsWhiff: whiff.fs ?? null,
+        breakingRV:  avg(rv.sl, rv.st, rv.sv, rv.cu, rv.kc),
+        offspeedRV:  avg(rv.ch, rv.fs, rv.kn),
+        ffSlg: slg.ff ?? null, siSlg: slg.si ?? null, fcSlg: slg.fc ?? null,
+        slSlg: slg.sl ?? null, stSlg: slg.st ?? null, svSlg: slg.sv ?? null,
+        cuSlg: slg.cu ?? null, kcSlg: slg.kc ?? null,
+        chSlg: slg.ch ?? null, fsSlg: slg.fs ?? null, knSlg: slg.kn ?? null,
+        ffRV: rv.ff ?? null, siRV: rv.si ?? null, fcRV: rv.fc ?? null,
+        slRV: rv.sl ?? null, stRV: rv.st ?? null, svRV: rv.sv ?? null,
+        cuRV: rv.cu ?? null, kcRV: rv.kc ?? null,
+        chRV: rv.ch ?? null, fsRV: rv.fs ?? null, knRV: rv.kn ?? null,
+        ffWhiff: whiff.ff ?? null, siWhiff: whiff.si ?? null, fcWhiff: whiff.fc ?? null,
+        slWhiff: whiff.sl ?? null, stWhiff: whiff.st ?? null, svWhiff: whiff.sv ?? null,
+        cuWhiff: whiff.cu ?? null, kcWhiff: whiff.kc ?? null,
+        chWhiff: whiff.ch ?? null, fsWhiff: whiff.fs ?? null, knWhiff: whiff.kn ?? null,
+        leagueSlg,
         bestPitch,
         worstPitch,
       };
@@ -3018,8 +3059,9 @@ async function main() {
         // fetchSavantBatterPitchPerf (ffSlg, siSlg, …).
         const PITCH_NAMES = {
           ff: '4-seam', si: 'sinker', fc: 'cutter',
-          sl: 'slider', cu: 'curveball', kc: 'knuckle curve',
-          ch: 'changeup', fs: 'splitter',
+          sl: 'slider', st: 'sweeper', sv: 'slurve',
+          cu: 'curveball', kc: 'knuckle curve',
+          ch: 'changeup', fs: 'splitter', kn: 'knuckleball',
         };
         let primaryPitchEdge = null;
         if (pitchMix && bArsenal) {
@@ -3033,8 +3075,10 @@ async function main() {
             }
           }
           if (topKey && topFreq >= 10) {   // topFreq is a usage % (0–100)
-            const batterSlg = Number(bArsenal[`${topKey}Slg`]);
-            const seasonSlg = Number(batter.season?.slg);
+            const rawBatterSlg = bArsenal[`${topKey}Slg`];
+            const batterSlg = rawBatterSlg == null ? null : Number(rawBatterSlg);
+            const rawSeasonSlg = batter.season?.slg;
+            const seasonSlg = rawSeasonSlg == null ? null : Number(rawSeasonSlg);
             if (Number.isFinite(batterSlg) && Number.isFinite(seasonSlg)) {
               // "Passes" when batter's SLG against this exact pitch
               // exceeds his season SLG by 30+ points — significant
@@ -3050,23 +3094,29 @@ async function main() {
             }
           }
         }
-        // Compact pitch-type splits: for each pitch the starter throws ≥10%, the
+        // Compact pitch-type splits: for each tracked pitch the starter throws, the
         // batter's SLG (and whiff%) vs that exact pitch type. Powers the
-        // pitch-type matchup row. Only pitches actually thrown → tiny payload.
+        // pitch-type matchup row. Keeping low-usage rows lets the client measure
+        // true arsenal coverage instead of treating excluded pitches as covered.
         let pitchTypeSplits = null;
         if (pitchMix && bArsenal) {
           const rows = [];
           for (const k of Object.keys(PITCH_NAMES)) {
             const usage = Number(pitchMix[`${k}Pct`]);
-            if (!Number.isFinite(usage) || usage < 10) continue;
-            const slg = Number(bArsenal[`${k}Slg`]);
-            const whiff = Number(bArsenal[`${k}Whiff`]);
+            if (!Number.isFinite(usage) || usage <= 0) continue;
+            // Number(null) is 0. Preserve true missing books as null so a pitch
+            // the batter has not faced cannot masquerade as a real .000 SLG.
+            const rawSlg = bArsenal[`${k}Slg`];
+            const rawWhiff = bArsenal[`${k}Whiff`];
+            const slg = rawSlg == null ? null : Number(rawSlg);
+            const whiff = rawWhiff == null ? null : Number(rawWhiff);
             rows.push({
               key: k,
               name: PITCH_NAMES[k],
               usage: +usage.toFixed(0),
               slg: Number.isFinite(slg) ? +slg.toFixed(3) : null,
               whiff: Number.isFinite(whiff) ? +whiff.toFixed(1) : null,
+              leagueSlg: Number.isFinite(bArsenal.leagueSlg?.[k]) ? bArsenal.leagueSlg[k] : null,
             });
           }
           if (rows.length) { rows.sort((a, b) => b.usage - a.usage); pitchTypeSplits = rows; }
@@ -3192,7 +3242,7 @@ async function main() {
           // mash the pitcher's bread-and-butter?" signal for Heat Index.
           // Null when we don't have both arsenals to compute it.
           primaryPitchEdge,
-          // Batter SLG/whiff vs each pitch the starter throws (≥10% usage).
+          // Batter SLG/whiff vs each tracked pitch the starter throws.
           pitchTypeSplits,
           // Today's-venue hand-resolved park HR factor (1.0 = neutral).
           // Always present (unlike parkWeatherHandFactor) so the Heat Index

@@ -845,9 +845,9 @@ function computeStuffEdge(batterPerf, pitchMix) {
 
   // MLB baseline velocity per pitch type (rounded 2024 league averages).
   // A 99 mph 4-seamer is +5 vs the 94 avg; a 87 mph slider is +3 vs the 84 avg.
-  const VELO_AVG = { ff: 94.0, si: 93.5, fc: 89.5, sl: 84.5, cu: 79.5, kc: 81.5, ch: 84.5, fs: 86.0 };
+  const VELO_AVG = { ff: 94.0, si: 93.5, fc: 89.5, sl: 84.5, st: 82.5, sv: 82.0, cu: 79.5, kc: 81.5, ch: 84.5, fs: 86.0 };
   // MLB baseline pitcher whiff% per pitch type. Above-avg = nasty pitch.
-  const WHIFF_AVG = { ff: 22, si: 17, fc: 25, sl: 35, cu: 31, kc: 33, ch: 30, fs: 33 };
+  const WHIFF_AVG = { ff: 22, si: 17, fc: 25, sl: 35, st: 32, sv: 28, cu: 31, kc: 33, ch: 30, fs: 33, kn: 21 };
 
   // Pair each pitch type with the batter's per-pitch metrics for that type
   const PITCH_KEYS = [
@@ -855,10 +855,13 @@ function computeStuffEdge(batterPerf, pitchMix) {
     { code: 'si', slgKey: 'siSlg', whiffKey: 'siWhiff' },
     { code: 'fc', slgKey: 'fcSlg', whiffKey: 'fcWhiff' },
     { code: 'sl', slgKey: 'slSlg', whiffKey: 'slWhiff' },
+    { code: 'st', slgKey: 'stSlg', whiffKey: 'stWhiff' },
+    { code: 'sv', slgKey: 'svSlg', whiffKey: 'svWhiff' },
     { code: 'cu', slgKey: 'cuSlg', whiffKey: 'cuWhiff' },
     { code: 'kc', slgKey: 'kcSlg', whiffKey: 'kcWhiff' },
     { code: 'ch', slgKey: 'chSlg', whiffKey: 'chWhiff' },
     { code: 'fs', slgKey: 'fsSlg', whiffKey: 'fsWhiff' },
+    { code: 'kn', slgKey: 'knSlg', whiffKey: 'knWhiff' },
   ];
 
   let weightedEdge = 0;

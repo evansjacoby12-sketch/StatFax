@@ -660,7 +660,11 @@ export const MLBService = {
         );
         if (!rows.length) return new Map();
         const pf = (v) => (v != null && v !== '' ? parseFloat(v) : null);
-        const PT_KEY = { FF: 'ff', SI: 'si', FC: 'fc', SL: 'sl', CU: 'cu', KC: 'kc', CH: 'ch', FS: 'fs' };
+        const PT_KEY = {
+          FF: 'ff', SI: 'si', FC: 'fc',
+          SL: 'sl', ST: 'st', SV: 'sv', CU: 'cu', KC: 'kc',
+          CH: 'ch', FS: 'fs', KN: 'kn',
+        };
         const bucketOf = (pt) =>
           ['FF', 'SI', 'FC', 'FA'].includes(pt)               ? 'fastball'
           : ['CH', 'FS', 'FO', 'SC', 'KN', 'EP'].includes(pt) ? 'offspeed'
@@ -692,11 +696,13 @@ export const MLBService = {
 
           map.set(id, {
             fastballPct, breakingPct, offspeedPct,
-            ffPct: pct.ff ?? 0, siPct: pct.si ?? 0, fcPct: pct.fc ?? 0, slPct: pct.sl ?? 0,
-            cuPct: pct.cu ?? 0, kcPct: pct.kc ?? 0, chPct: pct.ch ?? 0, fsPct: pct.fs ?? 0,
+            ffPct: pct.ff ?? 0, siPct: pct.si ?? 0, fcPct: pct.fc ?? 0,
+            slPct: pct.sl ?? 0, stPct: pct.st ?? 0, svPct: pct.sv ?? 0,
+            cuPct: pct.cu ?? 0, kcPct: pct.kc ?? 0,
+            chPct: pct.ch ?? 0, fsPct: pct.fs ?? 0, knPct: pct.kn ?? 0,
             fastballRunVal: wAvg(['ff', 'si', 'fc']),
-            breakingRunVal: wAvg(['sl', 'cu', 'kc']),
-            offspeedRunVal: wAvg(['ch', 'fs']),
+            breakingRunVal: wAvg(['sl', 'st', 'sv', 'cu', 'kc']),
+            offspeedRunVal: wAvg(['ch', 'fs', 'kn']),
             totalRunVal: rvDen ? rvNum / rvDen : 0,
             worstPitch,
             shape: null,  // movement not in this CSV; modal uses the snapshot's
@@ -731,9 +737,28 @@ export const MLBService = {
         if (!rows.length) return new Map();
         const pf = (v) => (v != null && v !== '' ? parseFloat(v) : null);
         const avg = (...vals) => { const xs = vals.filter(v => v != null); return xs.length ? xs.reduce((s, v) => s + v, 0) / xs.length : null; };
-        const PT_KEY = { FF: 'ff', SI: 'si', FC: 'fc', SL: 'sl', CU: 'cu', KC: 'kc', CH: 'ch', FS: 'fs' };
+        const PT_KEY = {
+          FF: 'ff', SI: 'si', FC: 'fc',
+          SL: 'sl', ST: 'st', SV: 'sv', CU: 'cu', KC: 'kc',
+          CH: 'ch', FS: 'fs', KN: 'kn',
+        };
         const byId = new Map();
         for (const r of rows) { const id = Number(r.player_id); if (!id) continue; if (!byId.has(id)) byId.set(id, []); byId.get(id).push(r); }
+
+        const leagueAcc = {};
+        for (const r of rows) {
+          const key = PT_KEY[(r.pitch_type || '').toUpperCase()];
+          const sg = pf(r.slg), pa = pf(r.pa);
+          if (!key || !Number.isFinite(sg) || !(pa > 0)) continue;
+          leagueAcc[key] ??= { n: 0, d: 0 };
+          leagueAcc[key].n += sg * pa;
+          leagueAcc[key].d += pa;
+        }
+        const leagueSlg = Object.fromEntries(
+          Object.entries(leagueAcc)
+            .filter(([, v]) => v.d > 0)
+            .map(([key, v]) => [key, +(v.n / v.d).toFixed(3)]),
+        );
 
         const map = new Map();
         for (const [id, prs] of byId) {
@@ -754,17 +779,24 @@ export const MLBService = {
 
           map.set(id, {
             fastballSlg: avg(slg.ff, slg.si, slg.fc),
-            breakingSlg: avg(slg.sl, slg.cu, slg.kc),
-            offspeedSlg: avg(slg.ch, slg.fs),
+            breakingSlg: avg(slg.sl, slg.st, slg.sv, slg.cu, slg.kc),
+            offspeedSlg: avg(slg.ch, slg.fs, slg.kn),
             fastballRV:  avg(rv.ff, rv.si, rv.fc),
-            breakingRV:  avg(rv.sl, rv.cu, rv.kc),
-            offspeedRV:  avg(rv.ch, rv.fs),
-            ffSlg: slg.ff ?? null, siSlg: slg.si ?? null, fcSlg: slg.fc ?? null, slSlg: slg.sl ?? null,
-            cuSlg: slg.cu ?? null, kcSlg: slg.kc ?? null, chSlg: slg.ch ?? null, fsSlg: slg.fs ?? null,
-            ffRV: rv.ff ?? null, siRV: rv.si ?? null, fcRV: rv.fc ?? null, slRV: rv.sl ?? null,
-            cuRV: rv.cu ?? null, kcRV: rv.kc ?? null, chRV: rv.ch ?? null, fsRV: rv.fs ?? null,
-            ffWhiff: whiff.ff ?? null, siWhiff: whiff.si ?? null, fcWhiff: whiff.fc ?? null, slWhiff: whiff.sl ?? null,
-            cuWhiff: whiff.cu ?? null, kcWhiff: whiff.kc ?? null, chWhiff: whiff.ch ?? null, fsWhiff: whiff.fs ?? null,
+            breakingRV:  avg(rv.sl, rv.st, rv.sv, rv.cu, rv.kc),
+            offspeedRV:  avg(rv.ch, rv.fs, rv.kn),
+            ffSlg: slg.ff ?? null, siSlg: slg.si ?? null, fcSlg: slg.fc ?? null,
+            slSlg: slg.sl ?? null, stSlg: slg.st ?? null, svSlg: slg.sv ?? null,
+            cuSlg: slg.cu ?? null, kcSlg: slg.kc ?? null,
+            chSlg: slg.ch ?? null, fsSlg: slg.fs ?? null, knSlg: slg.kn ?? null,
+            ffRV: rv.ff ?? null, siRV: rv.si ?? null, fcRV: rv.fc ?? null,
+            slRV: rv.sl ?? null, stRV: rv.st ?? null, svRV: rv.sv ?? null,
+            cuRV: rv.cu ?? null, kcRV: rv.kc ?? null,
+            chRV: rv.ch ?? null, fsRV: rv.fs ?? null, knRV: rv.kn ?? null,
+            ffWhiff: whiff.ff ?? null, siWhiff: whiff.si ?? null, fcWhiff: whiff.fc ?? null,
+            slWhiff: whiff.sl ?? null, stWhiff: whiff.st ?? null, svWhiff: whiff.sv ?? null,
+            cuWhiff: whiff.cu ?? null, kcWhiff: whiff.kc ?? null,
+            chWhiff: whiff.ch ?? null, fsWhiff: whiff.fs ?? null, knWhiff: whiff.kn ?? null,
+            leagueSlg,
             bestPitch,   // batter's best pitch type to hit
             worstPitch,  // batter's worst pitch type
           });

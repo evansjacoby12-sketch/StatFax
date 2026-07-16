@@ -19,10 +19,13 @@
  *   • si (Sinker)
  *   • fc (Cutter)
  *   • sl (Slider)
+ *   • st (Sweeper)
+ *   • sv (Slurve)
  *   • cu (Curveball)
  *   • kc (Knuckle-Curve)
  *   • ch (Changeup)
  *   • fs (Splitter)
+ *   • kn (Knuckleball)
  *
  * DATA SOURCES (already in the snapshot — no new fetches required)
  * ────────────────────────────────────────────────────────────────
@@ -40,14 +43,22 @@ const LEAGUE_AVG_SLG_BY_PITCH = {
   si: 0.405,
   fc: 0.395,
   sl: 0.375,
+  st: 0.365,
+  sv: 0.370,
   cu: 0.360,
   kc: 0.370,
   ch: 0.410,
   fs: 0.390,
+  kn: 0.350,
 };
 
 /** Pitch codes that have matching keys in batterArsenal and pitchMix. */
-const PITCH_CODES = ['ff', 'si', 'fc', 'sl', 'cu', 'kc', 'ch', 'fs'];
+const PITCH_CODES = ['ff', 'si', 'fc', 'sl', 'st', 'sv', 'cu', 'kc', 'ch', 'fs', 'kn'];
+
+// An exact-pitch signal should represent most of the opposing arsenal, not one
+// isolated secondary pitch. Usage values are percentages, so 50 means at least
+// half of the starter's tracked mix has a real batter book.
+export const MIN_PITCH_MIX_COVERED_USAGE = 50;
 
 /**
  * Compute a per-PA HR-probability multiplier from the batter's SLG vs each
@@ -85,18 +96,17 @@ export function expectedHRMultiplierFromPitchMix(batterArsenal, pitchMix) {
   for (const code of PITCH_CODES) {
     const freq = pitchMix[`${code}Pct`];
     const slg  = batterArsenal[`${code}Slg`];
-    const base = LEAGUE_AVG_SLG_BY_PITCH[code];
+    const base = batterArsenal.leagueSlg?.[code] ?? LEAGUE_AVG_SLG_BY_PITCH[code];
 
-    if (freq == null || freq <= 0) continue;
-    if (slg  == null)              continue;
+    if (!Number.isFinite(freq) || freq <= 0) continue;
+    if (!Number.isFinite(slg) || !Number.isFinite(base)) continue;
 
     weightedSlgSum  += slg  * freq;
     weightedBaseSum += base * freq;
     totalFreq       += freq;
   }
 
-  // Need at least two pitch types worth of overlap to form a meaningful signal.
-  if (totalFreq < 10 || weightedBaseSum === 0) return 1.0;
+  if (totalFreq < MIN_PITCH_MIX_COVERED_USAGE || weightedBaseSum === 0) return 1.0;
 
   const multiplier = weightedSlgSum / weightedBaseSum;
   return Math.min(1.20, Math.max(0.85, multiplier));
@@ -131,16 +141,16 @@ export function getPitchAlignmentScore(batterArsenal, pitchMix) {
   for (const code of PITCH_CODES) {
     const freq = pitchMix[`${code}Pct`];
     const slg  = batterArsenal[`${code}Slg`];
-    const base = LEAGUE_AVG_SLG_BY_PITCH[code];
+    const base = batterArsenal.leagueSlg?.[code] ?? LEAGUE_AVG_SLG_BY_PITCH[code];
 
-    if (freq == null || freq <= 0) continue;
-    if (slg  == null)              continue;
+    if (!Number.isFinite(freq) || freq <= 0) continue;
+    if (!Number.isFinite(slg) || !Number.isFinite(base)) continue;
 
     rawEdge   += (slg - base) * (freq / 100);
     totalFreq += freq;
   }
 
-  if (totalFreq < 10) return 50;
+  if (totalFreq < MIN_PITCH_MIX_COVERED_USAGE) return 50;
 
   // rawEdge typical range: -0.10 to +0.10 (SLG deviation × usage fraction).
   // Map to 0-100: 0 → 50, ±0.10 → ±40 pts, clamped.

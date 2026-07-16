@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { toGrade, gradeLabel, heatIndex, toolGrades, scoutVerdict } from '../ui/src/lib/scout.js'
+import { toGrade, gradeLabel, heatIndex, pitchMixScore, pitchMixSummary, toolGrades, scoutVerdict } from '../ui/src/lib/scout.js'
 
 test('toGrade maps 0–100 onto the 20–80 scout scale (rounded to 5s)', () => {
   assert.equal(toGrade(0), 20)
@@ -43,4 +43,32 @@ test('scoutVerdict reflects grade + standout tools', () => {
   const v = scoutVerdict({ grade: { label: 'PRIME' }, batterScore: 85, matchupScore: 80, envScore: 80, season: {}, recent: {} })
   assert.ok(v.startsWith('Strong HR play'))
   assert.ok(/Carried by/.test(v))
+})
+
+test('pitch-mix score uses per-pitch league baselines and requires majority coverage', () => {
+  assert.equal(pitchMixScore({ pitchTypeSplits: [
+    { key: 'ff', usage: 60, slg: 0.432, leagueSlg: 0.432 },
+  ] }), 5)
+
+  assert.ok(Math.abs(pitchMixScore({ pitchTypeSplits: [
+    { key: 'st', usage: 60, slg: 0.465, leagueSlg: 0.365 },
+  ] }) - 7.5) < 1e-9, 'sweeper matchup is scored instead of dropped')
+
+  assert.equal(pitchMixScore({ pitchTypeSplits: [
+    { key: 'ff', usage: 40, slg: 0.700, leagueSlg: 0.432 },
+  ] }), null, 'thin partial arsenal cannot receive a full-strength rating')
+})
+
+test('a real zero-SLG pitch book stays valid while null remains missing', () => {
+  const zero = pitchMixSummary({ pitchTypeSplits: [
+    { key: 'ff', usage: 60, slg: 0, whiff: 0, leagueSlg: 0.432 },
+  ] })
+  assert.equal(zero.score, 0)
+  assert.equal(zero.coveredUsage, 60)
+
+  const missing = pitchMixSummary({ pitchTypeSplits: [
+    { key: 'ff', usage: 60, slg: null, whiff: null, leagueSlg: 0.432 },
+  ] })
+  assert.equal(missing.score, null)
+  assert.equal(missing.coveredUsage, 0)
 })

@@ -110,6 +110,21 @@ test('missing supporting feeds produce visible warnings without blocking', () =>
   assert.doesNotThrow(() => assertPublishableMlbDataHealth(result.report))
 })
 
+test('pitch-mix watchdog catches taxonomy usage dropped from the exact arsenal', () => {
+  const slate = makeSlate()
+  slate.pitcherPitchMix = {
+    50: { fastballPct: 45, breakingPct: 50, offspeedPct: 5, ffPct: 45, slPct: 10, chPct: 5 },
+    60: { fastballPct: 55, breakingPct: 35, offspeedPct: 10, ffPct: 55, stPct: 35, chPct: 10 },
+  }
+  const result = applyMlbDataHealth({ slate, context: contextFor(slate, []), generatedAt })
+  const gaps = result.report.issues.filter((issue) => issue.code === 'pitch-mix-taxonomy-gap')
+
+  assert.equal(gaps.length, 1)
+  assert.equal(gaps[0].gamePk, 101)
+  assert.match(gaps[0].message, /40% of arsenal usage/)
+  assert.equal(result.report.status, 'limited')
+})
+
 test('active sourced AI anomalies become non-blocking review markers on affected rows only', () => {
   const slate = makeSlate()
   const context = contextFor(slate, [{
