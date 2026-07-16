@@ -1,6 +1,6 @@
-// Shared zone/arsenal edge math — used by BOTH the full Zone view and the
-// drawer's Zone teaser so they always show the same numbers (they drifted apart
-// once the full view gained an Arsenal rating; this keeps them locked together).
+// Shared location and arsenal research helpers. These are separate lenses:
+// neither is allowed to hide weakness in the other, and neither changes the
+// production HR projection.
 
 import { MIN_PITCH_MIX_COVERED_USAGE, pitchLeagueSlg } from './scout.js'
 
@@ -29,12 +29,21 @@ export function arsenalRating5(b) {
 
 // Location rating (0–5) from the server's 0–10 zoneRating.
 export function locationRating5(z) {
-  return z?.zoneRating != null ? Math.max(0, Math.min(5, Math.round((z.zoneRating / 2) * 10) / 10)) : null
+  return Number.isFinite(z?.zoneRating)
+    ? Math.max(0, Math.min(5, Math.round((z.zoneRating / 2) * 10) / 10))
+    : null
 }
 
-// Headline edge = the stronger of location vs arsenal, so the real edge shows
-// even when one lens is flat. Null when neither is available.
-export function combinedEdge5(b) {
-  const vals = [locationRating5(b?.zoneMatchup), arsenalRating5(b)].filter((v) => v != null)
-  return vals.length ? Math.max(...vals) : null
+export function verifiedAttackCount(z) {
+  if ((z?.modelVersion ?? 0) < 2) return 0
+  return Array.isArray(z?.attackZones) ? z.attackZones.length : 0
+}
+
+export function hasVerifiedZoneEdge(z) {
+  return (z?.modelVersion ?? 0) >= 2
+    && z?.advisoryOnly === true
+    && z?.reliability?.status !== 'limited'
+    && verifiedAttackCount(z) >= 2
+    && Number.isFinite(z?.zoneRating)
+    && z.zoneRating >= 6.5
 }

@@ -871,7 +871,10 @@ export default function App() {
           inSlip={slipSet.has(selected.id)}
           onToggleWatch={toggleWatch}
           onToggleSlip={toggleSlip}
-          onOpenZone={(bb) => setZoneId(bb.id)}
+          onOpenZone={(bb) => {
+            setSelectedId(null)
+            setZoneId(bb.id)
+          }}
           onOpenPitcher={openPitcher}
         />
       )}

@@ -26,7 +26,7 @@ export const BADGES = [
   { key: 'cold', label: 'Cold', lucide: 'Snowflake', color: 'var(--b-cold)', tone: 'bad', desc: 'Cold stretch at the plate' },
   { key: 'bullpenLegend', label: 'Pen Edge', lucide: 'Swords', color: 'var(--b-bullpen)', tone: 'good', desc: 'Opposing bullpen is HR-prone late' },
   { key: 'pitchEdge', label: 'Pitch Edge', lucide: 'Radar', color: 'var(--b-pitch)', tone: 'good', desc: "Mashes the pitcher's most-used pitch (SLG well above his season norm)" },
-  { key: 'zoneEdge', label: 'Zone Edge', lucide: 'Grid3x3', color: 'var(--b-pitch)', tone: 'good', desc: "Strong zone matchup — above-average ISO in the pitcher's most-used zones (rating 7+/10)" },
+  { key: 'zoneEdge', label: 'Zone Edge', lucide: 'Grid3x3', color: 'var(--b-pitch)', tone: 'good', desc: 'Advisory location evidence: 2+ reliable strike-zone attacks with adjusted ISO ≥.200, pitcher exposure ≥1.10× the handedness baseline, and location rating ≥6.5/10.' },
   { key: 'pitchMixEdge', label: 'Pitch Mix', lucide: 'ChartSpline', color: 'var(--strong)', tone: 'good', desc: "Favorable pitch-type matchup — SLG advantage across the pitcher's arsenal (score 7.0+/10)" },
   { key: 'wxEdge', label: 'WX Edge', lucide: 'CloudSun', color: 'var(--b-wx)', tone: 'good', desc: 'Park & weather conditions boost HR tonight (favorable air)' },
   { key: 'barrelKing', label: 'Barrel King', lucide: 'Crown', color: 'var(--b-barrel)', tone: 'good', desc: 'Elite barrel rate — top ~10% of MLB (≥13% of batted balls)' },

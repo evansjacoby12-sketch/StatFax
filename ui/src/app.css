@@ -19171,6 +19171,7 @@ button.th:focus-visible {
 .spray-trend-head small { color: var(--text-faint); font-size: 8px; }
 
 .zone-blueprint-head { margin-bottom: 8px; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.zone-advisory-chip { margin-left: 4px; padding: 2px 6px; color: var(--text-faint); border: 1px solid var(--border-soft); border-radius: 999px; font-size: 7px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
 .zone-blueprint-controls { min-width: 0; display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
 .blueprint-score-ribbon { margin-bottom: 18px; display: grid; grid-template-columns: 1.15fr repeat(3, 1fr); overflow: hidden; border: 1px solid var(--border-soft); border-radius: 11px; background: rgba(0,0,0,.17); }
 .blueprint-score-ribbon > div { min-height: 58px; padding: 9px 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px; border-right: 1px solid var(--border-soft); }
@@ -19182,12 +19183,16 @@ button.th:focus-visible {
 .blueprint-layout { display: grid; grid-template-columns: minmax(320px, 1.2fr) minmax(270px, .8fr); gap: 24px; align-items: start; }
 .z3-cell { appearance: none; padding: 0; color: inherit; font: inherit; }
 .z3-cell.selected { outline: 2px solid var(--accent); outline-offset: -2px; box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 80%, transparent), 0 0 16px var(--accent-glow); z-index: 3; }
+.z3-cell.state-relative:not(.selected) { border-style: dashed !important; border-color: color-mix(in srgb, var(--accent) 52%, transparent) !important; }
+.z3-cell.state-limited { filter: saturate(.55); }
 .z3-cell:focus-visible { outline: 2px solid #fff; outline-offset: -3px; }
 .z3-priority { position: absolute; top: 5px; left: 5px; width: 19px; height: 19px; display: grid; place-items: center; color: #08090b; border-radius: 6px; background: var(--prime); box-shadow: 0 0 9px rgba(198,154,87,.42); font-size: 9px; font-weight: 900; }
+.z3-state-mark { position: absolute; top: 5px; left: 5px; width: 18px; height: 18px; display: grid; place-items: center; color: var(--accent); border: 1px dashed color-mix(in srgb, var(--accent) 58%, transparent); border-radius: 6px; background: rgba(0,0,0,.35); font-size: 8px; font-weight: 900; }
 .blueprint-matchup-read,
 .selected-zone-read { padding: 12px; border: 1px solid var(--border-soft); border-radius: 11px; background: rgba(255,255,255,.018); }
 .blueprint-read-label { display: flex; align-items: center; gap: 6px; color: var(--accent); font-size: 8px; font-weight: 850; letter-spacing: .07em; text-transform: uppercase; }
 .blueprint-matchup-read > p { margin: 9px 0 0; color: var(--text-dim); font-size: 10px; line-height: 1.5; }
+.zone-no-attack { margin-top: 9px; padding: 7px 8px; display: flex; align-items: flex-start; gap: 6px; color: var(--text-dim); border: 1px solid var(--border-soft); border-radius: 7px; background: rgba(255,255,255,.018); font-size: 8px; line-height: 1.45; }
 .blueprint-read-facts { margin-top: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .blueprint-read-facts > span { min-width: 0; padding: 7px 8px; display: grid; gap: 3px; border: 1px solid var(--border-soft); border-radius: 7px; background: rgba(0,0,0,.16); }
 .blueprint-read-facts small,
@@ -19198,16 +19203,26 @@ button.th:focus-visible {
 .selected-zone-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .selected-zone-head span { color: var(--text-faint); font-size: 8px; font-weight: 850; letter-spacing: .06em; text-transform: uppercase; }
 .selected-zone-head strong { color: #fff; font-size: 12px; }
-.selected-zone-stats { margin-top: 9px; display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 5px; }
+.selected-zone-stats { margin-top: 9px; display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 5px; }
 .selected-zone-stats > span { min-width: 0; padding: 7px; display: grid; gap: 3px; border-radius: 7px; background: rgba(0,0,0,.17); }
 .selected-zone-stats b { color: var(--text); font-size: 10px; }
 .selected-zone-read > p { margin: 9px 0 0; color: var(--text-dim); font-size: 9px; line-height: 1.45; }
+.selected-zone-state { width: fit-content; margin-top: 8px; padding: 3px 6px; color: var(--text-dim); border: 1px solid var(--border-soft); border-radius: 999px; font-size: 7px; font-weight: 850; letter-spacing: .05em; text-transform: uppercase; }
+.selected-zone-state.attack { color: var(--prime); border-color: color-mix(in srgb, var(--prime) 38%, transparent); }
+.selected-zone-state.relative { color: var(--accent); border-style: dashed; border-color: color-mix(in srgb, var(--accent) 42%, transparent); }
+.selected-zone-state.chase { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 38%, transparent); }
+.selected-zone-state.avoid { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 34%, transparent); }
 .selected-zone-warning { margin-top: 8px; display: flex; align-items: center; gap: 5px; color: var(--prime); font-size: 8px; font-weight: 700; }
 .attack-priority-list { display: grid; gap: 6px; }
 .attack-priority-title { margin-bottom: 1px; display: flex; align-items: center; gap: 5px; color: var(--text-faint); font-size: 8px; font-weight: 850; letter-spacing: .06em; text-transform: uppercase; }
 .attack-priority-title svg { color: var(--prime); }
 .attack-priority-card { min-width: 0; min-height: 46px; padding: 6px 8px; display: grid; grid-template-columns: 26px minmax(0,1fr) auto 14px; align-items: center; gap: 8px; color: var(--text); border: 1px solid color-mix(in srgb, var(--prime) 20%, var(--border-soft)); border-radius: 9px; background: color-mix(in srgb, var(--prime) 5%, transparent); text-align: left; }
 .attack-priority-card:hover { border-color: color-mix(in srgb, var(--prime) 42%, transparent); background: color-mix(in srgb, var(--prime) 8%, transparent); }
+.attack-priority-empty { padding: 9px 10px; color: var(--text-faint); border: 1px dashed var(--border-soft); border-radius: 9px; font-size: 8px; line-height: 1.45; }
+.attack-priority-card.relative { border-style: dashed; border-color: color-mix(in srgb, var(--accent) 30%, var(--border-soft)); background: color-mix(in srgb, var(--accent) 4%, transparent); }
+.attack-priority-card.relative .attack-priority-rank { color: #fff; background: var(--accent); }
+.attack-priority-card.chase { border-color: color-mix(in srgb, var(--warn) 25%, var(--border-soft)); background: color-mix(in srgb, var(--warn) 4%, transparent); }
+.attack-priority-card.chase .attack-priority-rank { color: #0a0b0d; background: var(--warn); }
 .attack-priority-card.avoid { border-color: color-mix(in srgb, var(--bad) 18%, var(--border-soft)); background: color-mix(in srgb, var(--bad) 4%, transparent); }
 .attack-priority-rank { width: 26px; height: 26px; display: grid; place-items: center; color: #090a0c; border-radius: 7px; background: var(--prime); font-size: 11px; font-weight: 900; }
 .attack-priority-card.avoid .attack-priority-rank { color: #fff; background: var(--bad); }
@@ -19244,6 +19259,7 @@ button.th:focus-visible {
   .spray-field { max-width: 390px; }
 
   .zone-page { padding: calc(10px + env(safe-area-inset-top,0px)) 10px calc(12px + env(safe-area-inset-bottom,0px)) !important; }
+  body:has(.zone-page) .bottom-nav { display: none !important; }
   .zone-blueprint-head { align-items: stretch; flex-direction: column; }
   .zone-blueprint-controls { position: sticky; top: 0; z-index: 4; padding: 4px; justify-content: stretch; border: 1px solid var(--border-soft); border-radius: 11px; background: rgba(7,6,12,.94); backdrop-filter: blur(14px); }
   .zone-blueprint-controls .z3-seg { width: 100%; }
@@ -19255,6 +19271,7 @@ button.th:focus-visible {
   .blueprint-score-ribbon > div:nth-child(2) { border-right: 0; }
   .blueprint-score-ribbon > div:nth-child(-n+2) { border-bottom: 1px solid var(--border-soft); }
   .blueprint-layout { grid-template-columns: 1fr; gap: 14px; }
+  .selected-zone-stats { grid-template-columns: 1fr 1fr; }
   .z3-frame { max-width: 390px !important; }
   .attack-priority-card { min-height: 48px; }
   .arsenal-summary { min-height: 52px; padding-inline: 12px; }

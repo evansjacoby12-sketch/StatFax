@@ -6,7 +6,7 @@ import { american, num, pct } from '../lib/format.js'
 import { isBenched } from '../lib/combo-engine.js'
 import { playerHeadshot } from '../lib/teams.js'
 import { pitcherVulnerability } from '../lib/vulnerability.js'
-import { combinedEdge5 } from '../lib/zoneEdge.js'
+import { hasVerifiedZoneEdge, locationRating5, verifiedAttackCount } from '../lib/zoneEdge.js'
 import { lineupActionability } from '../lib/actionability.js'
 
 const ELIGIBLE_GRADES = new Set(['PRIME', 'STRONG', 'LEAN'])
@@ -26,7 +26,8 @@ function addEvidence(list, key, label, icon, detail, points) {
 function buildCase(batter) {
   const grade = batter.grade?.label || batter.grade || 'SKIP'
   const probability = Number(batter.hrProbability)
-  const zone = combinedEdge5(batter)
+  const zone = locationRating5(batter.zoneMatchup)
+  const verifiedZone = hasVerifiedZoneEdge(batter.zoneMatchup)
   const vulnerability = pitcherVulnerability(batter.pitcher)
   const barrel = Number.isFinite(batter.barrelPctBBE) ? batter.barrelPctBBE : batter.barrelPct
   const air = Number.isFinite(batter.parkWeatherHandFactor) ? batter.parkWeatherHandFactor : 1
@@ -46,7 +47,9 @@ function buildCase(batter) {
     batter.hrPlatoonEdge || signalKeys.has('hrPlatoonEdge'),
     batter.flyBallMatchup || signalKeys.has('flyBallMatchup'),
   ].filter(Boolean).length
-  const matchup = clamp(34 + matchupCount * 13 + (Number.isFinite(zone) ? (zone - 2.5) * 12 : 0))
+  // Location remains visible evidence but stays out of this ranking until its
+  // independent forward value clears the promotion gate.
+  const matchup = clamp(34 + matchupCount * 13)
   const pitcher = vulnerability?.score ?? 50
   const barrelScore = Number.isFinite(barrel) ? clamp(((barrel - 5) / 13) * 100) : 45
   const liveForm = clamp(
@@ -77,7 +80,7 @@ function buildCase(batter) {
   const caseScore = Math.round(clamp(rawScore - penaltyTotal))
 
   const evidence = []
-  if (Number.isFinite(zone) && zone >= 3.1) addEvidence(evidence, 'zone', 'Zone match', 'Grid3x3', `${num(zone, 1)}/5 zone-location or arsenal edge.`, Math.round(zone * 4))
+  if (verifiedZone) addEvidence(evidence, 'zone', 'Verified location', 'Grid3x3', `${verifiedAttackCount(batter.zoneMatchup)} qualified strike-zone attacks; advisory only.`, 12)
   if (batter.primaryPitchEdge?.passes) addEvidence(evidence, 'pitch', 'Pitch edge', 'Crosshair', `Strong result against ${batter.primaryPitchEdge.pitchName || 'the primary pitch'} (${pct(batter.primaryPitchEdge.pitcherFreq, 0)} usage).`, 17)
   if (batter.pitchMixEdge || signalKeys.has('pitchMixEdge') || (batter.pmScore ?? 0) >= 7) addEvidence(evidence, 'mix', 'Pitch mix', 'BarChart2', 'The batter’s damage profile fits the starter’s full arsenal.', 16)
   if ((vulnerability?.score ?? 0) >= 58) addEvidence(evidence, 'vulnerability', 'Pitcher outlook', 'Shield', `${vulnerability.score}/100 pitcher vulnerability favors contact damage.`, Math.round((vulnerability.score - 35) / 2))

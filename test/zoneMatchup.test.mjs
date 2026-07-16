@@ -12,6 +12,12 @@ import {
   primeFromPriorCache,
   zoneFrequencyBaselineFromCache,
 } from '../server/fetch-zone-matchup.mjs'
+import {
+  hasVerifiedZoneEdge,
+  locationRating5,
+  verifiedAttackCount,
+} from '../ui/src/lib/zoneEdge.js'
+import { zoneEdgeOf } from '../ui/src/lib/combo-engine.js'
 
 const batterGrid = (iso = 0.16, count = 12) => Array.from({ length: 13 }, () => ({ iso, count }))
 const pitcherGrid = (hand = 'R', samplePitches = 1_000) => {
@@ -123,4 +129,42 @@ test('zone enrichment is advisory-only and fetch-slate no longer mutates project
   assert.doesNotMatch(source, /row\.baseScore\s*=/)
   assert.doesNotMatch(source, /zone bonus applied/i)
   assert.match(source, /advisory-only/i)
+})
+
+test('frontend edge helpers reject legacy relative matches and require reliable v2 evidence', () => {
+  const legacy = { matchedZones: [0, 1], zoneRating: 9, badge: 'ZONE_MASTER' }
+  assert.equal(verifiedAttackCount(legacy), 0)
+  assert.equal(hasVerifiedZoneEdge(legacy), false)
+  assert.equal(zoneEdgeOf({ zoneMatchup: legacy }), false)
+
+  const current = {
+    modelVersion: 2,
+    advisoryOnly: true,
+    attackZones: [0, 1],
+    matchedZones: [0, 1],
+    zoneRating: 7,
+    reliability: { status: 'high' },
+    badge: 'ZONE_MASTER',
+  }
+  assert.equal(verifiedAttackCount(current), 2)
+  assert.equal(hasVerifiedZoneEdge(current), true)
+  assert.equal(zoneEdgeOf({ zoneMatchup: current }), true)
+  assert.equal(locationRating5(current), 3.5)
+
+  current.reliability.status = 'limited'
+  assert.equal(hasVerifiedZoneEdge(current), false)
+  assert.equal(zoneEdgeOf({ zoneMatchup: current }), false)
+})
+
+test('zone UI consumes canonical evidence without best-of scoring or forced attacks', () => {
+  const view = readFileSync(new URL('../ui/src/components/ZoneView.jsx', import.meta.url), 'utf8')
+  const drawer = readFileSync(new URL('../ui/src/components/PlayerDrawer.jsx', import.meta.url), 'utf8')
+  const straights = readFileSync(new URL('../ui/src/components/TopStraightsView.jsx', import.meta.url), 'utf8')
+  const app = readFileSync(new URL('../ui/src/App.jsx', import.meta.url), 'utf8')
+  assert.match(view, /No verified attack/)
+  assert.match(view, /zoneEvidence\?\.attackZones/)
+  assert.doesNotMatch(view, /combinedEdge5|Attack first|\.iso \?\? .*\.slg/)
+  assert.doesNotMatch(drawer, /zoneBonus|combinedEdge5/)
+  assert.doesNotMatch(straights, /combinedEdge5|\(zone - 2\.5\)/)
+  assert.match(app, /setSelectedId\(null\)[\s\S]*setZoneId\(bb\.id\)/)
 })

@@ -71,7 +71,10 @@ export const negativeReasonCount = (raw) =>
 // (client) and comboRowFromSnapshot (server) attach to the canonical row.
 // Keeping them here means a single code path defines the signal on both sides.
 export const pitchEdgeOf     = (raw) => raw?.primaryPitchEdge?.passes === true
-export const zoneEdgeOf      = (raw) => (raw?.zoneMatchup?.matchedZones?.length ?? 0) >= 2
+export const zoneEdgeOf      = (raw) => (raw?.zoneMatchup?.modelVersion ?? 0) >= 2
+  && raw?.zoneMatchup?.advisoryOnly === true
+  && raw?.zoneMatchup?.reliability?.status !== 'limited'
+  && raw?.zoneMatchup?.badge === 'ZONE_MASTER'
 export const flyBallMatchupOf = (raw) =>
   (raw?.pitcher?.season?.ip ?? 0) >= 30 && (raw?.pitcher?.season?.goAo ?? 99) <= 0.92
 export function hrPlatoonEdgeOf(raw) {
