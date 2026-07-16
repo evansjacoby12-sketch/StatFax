@@ -56,6 +56,9 @@ test('parlayAllHit: mixed parlay remains independent with uplift disabled', () =
 test('parlayAllHit: correlate=false forces the independent product', () => {
   const r = parlayAllHit([leg(0.2, 1, null, 1.3), leg(0.25, 1, null, 1.3)], { correlate: false })
   assert.ok(approx(r.modelAllHit, 0.05))
+  assert.equal(r.sameGame, true)
+  assert.equal(r.byGame.length, 1)
+  assert.equal(r.byGame[0].legs.length, 2)
 })
 
 test('parlayAllHit: empty parlay is 0', () => {
@@ -81,7 +84,7 @@ test('parlayMarket: one unpriced leg → not all priced, no EV', () => {
 })
 
 test('buildParlay: full summary identifies same-game legs without an uplift', () => {
-  const p = buildParlay([leg(0.2, 1, 6, 1.3), leg(0.25, 1, 6, 1.3)])
+  const p = buildParlay([leg(0.2, 1, 6, 1.3), leg(0.25, 1, 6, 1.3)], { correlate: false })
   assert.equal(p.n, 2)
   assert.equal(p.sameGame, true)
   assert.ok(approx(p.modelAllHit, p.independent))

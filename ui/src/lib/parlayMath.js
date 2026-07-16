@@ -80,7 +80,7 @@ export function parlayAllHit(legs, { correlate = true } = {}) {
   const independent = list.length
     ? list.reduce((acc, b) => acc * (Number.isFinite(b.hrProbability) ? b.hrProbability : 0), 1)
     : 0
-  if (!correlate || list.length === 0) {
+  if (list.length === 0) {
     return { modelAllHit: independent, independent, sameGame: false, allFinite, byGame: [] }
   }
   let model = 1
@@ -93,8 +93,8 @@ export function parlayAllHit(legs, { correlate = true } = {}) {
     let joint = indep
     if (gl.length >= 2) {
       sameGame = true
-      rho = gameCorrelation(envTiltOf(gl))
-      joint = correlatedJoint(ps, rho)
+      rho = correlate ? gameCorrelation(envTiltOf(gl)) : 0
+      joint = correlate ? correlatedJoint(ps, rho) : indep
     }
     model *= joint
     byGame.push({ gamePk, legs: gl, rho, joint, indep })
