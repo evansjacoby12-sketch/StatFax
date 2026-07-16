@@ -9,7 +9,7 @@ import { useLiveMode } from '../lib/liveMode.js'
 import { hexA } from './atoms.jsx'
 
 const WX_SORTS = [
-  { key: 'air', label: 'Best air', icon: 'Wind' },
+  { key: 'air', label: 'Best air', icon: 'CloudSun' },
   { key: 'park', label: 'Best parks', icon: 'Gauge' },
   { key: 'wind', label: 'Wind out', icon: 'TrendingUp' },
   { key: 'warm', label: 'Warmest', icon: 'Thermometer' },
@@ -55,12 +55,12 @@ export default function WeatherView({ batters, onSelect, selectedId }) {
   return (
     <>
       <div className="mobile-page-kicker wx-mobile-kicker">
-        <span><Icon name="Cloud" size={14} /> Weather impact</span>
+        <span><Icon name="CloudSun" size={14} /> Weather impact</span>
         <small className="mono">{games.length} matchups</small>
       </div>
       <section className="wx-summary" aria-label="Slate weather summary">
         <div className="wx-summary-copy">
-          <span className="wx-summary-icon"><Icon name="Cloud" size={22} /></span>
+          <span className="wx-summary-icon"><Icon name="CloudSun" size={22} /></span>
           <div>
             <span className="wx-summary-kicker">Slate conditions</span>
             <h1>Weather Impact</h1>

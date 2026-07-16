@@ -117,7 +117,7 @@ function ScoreCard({ sc }) {
   return (
     <details className="combo-sc">
       <summary className="combo-sc-sum">
-        <Icon name="Activity" size={13} />
+          <Icon name="RadioTower" size={13} />
         <span className="combo-sc-head">
           Combo scorecard · <b className="mono">{pct(ov.hitRate, 0)}</b> cashed
         </span>
@@ -547,7 +547,7 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard, g
           aria-pressed={confirmedOnly}
           title="Only batters in a confirmed lineup"
         >
-          <Icon name="UserCheck" size={12} /> Confirmed only
+            <Icon name="UserRoundCheck" size={12} /> Confirmed only
         </button>
         <button
           className={`badge-toggle ${spread ? 'on' : ''}`}
@@ -706,7 +706,7 @@ function GroupCard({ g, idx = 0, onSelect, selectedId, comboConf = 'off', slipSe
           </span>
         ) : (
           <span className="grp-projected-tag" title={`Projected — ${g.legs.filter((b) => b.lineupConfirmed !== true).length} of ${g.legs.length} legs aren't in a confirmed lineup yet. The combo is frozen at the morning lock and won't drift, but a leg could still be scratched or moved down the order before first pitch.`}>
-            <Icon name="Clock" size={10} /> PROJECTED
+            <Icon name="Clock3" size={10} /> PROJECTED
           </span>
         )}
         {comboConf === 'percent' && (
@@ -914,14 +914,14 @@ function GroupLeg({ b, idx, onSelect, selected, bad, weakest, reasons, unconfirm
             </span>
           ) : st.code === 'live' ? (
             <span className="grp-chip" style={{ color: 'var(--accent)', background: 'color-mix(in srgb, var(--accent) 10%, transparent)', borderColor: 'color-mix(in srgb, var(--accent) 30%, transparent)' }} title="Game in progress">
-              <Icon name="Activity" size={10} /> {st.label}
+              <Icon name="RadioTower" size={10} /> {st.label}
             </span>
           ) : st.code === 'dead' ? (
             <span className="grp-chip" style={{ color: 'var(--text-faint)' }} title="Game final — no HR">no HR</span>
           ) : null}
           {unconfirmed && (
             <span className="grp-chip unconf" title="Lineup not posted yet — this bat isn't confirmed in the order. Combo can still change before first pitch.">
-              <Icon name="Clock" size={10} /> NO LINEUP
+              <Icon name="Clock3" size={10} /> NO LINEUP
             </span>
           )}
           {bad && (

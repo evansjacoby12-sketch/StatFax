@@ -98,9 +98,9 @@ function normalizer(vals) {
 const hasMetric = (grid, key) => Array.isArray(grid) && grid.some((c) => Number.isFinite(c?.[key]))
 
 const MODES = [
-  { key: 'attack', label: 'Attack', icon: 'Crosshair' },
+  { key: 'attack', label: 'Attack', icon: 'Focus' },
   { key: 'batter', label: 'Batter', icon: 'User' },
-  { key: 'pitcher', label: 'Pitcher', icon: 'Shield' },
+  { key: 'pitcher', label: 'Pitcher', icon: 'Radar' },
 ]
 
 function MetricChips({ metrics, value, onChange }) {
@@ -439,7 +439,7 @@ export default function ZoneView({ batter: b, onClose }) {
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '8px' }}>
                 <h3 className="zone-h3" style={{ fontSize: '13px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px', color: '#fff' }}>
-                  <Icon name="Crosshair" size={14} style={{ color: 'var(--accent)' }} /> Strike-Zone Attack Map
+                  <Icon name="Focus" size={14} style={{ color: 'var(--accent)' }} /> Strike-Zone Attack Map
                 </h3>
                 <CommandTabs
                   className="z3-seg"
@@ -531,7 +531,7 @@ export default function ZoneView({ batter: b, onClose }) {
             }}>
               <div className="zone-side-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
                 <h3 className="zone-h3" style={{ fontSize: '13px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px', color: '#fff' }}>
-                  <Icon name="Layers" size={14} style={{ color: 'var(--accent)' }} /> Pitch types
+                  <Icon name="ChartSpline" size={14} style={{ color: 'var(--accent)' }} /> Pitch types
                   {b?.pitcher?.name && <span style={{ fontSize: '11px', fontWeight: '600', textTransform: 'none', letterSpacing: 0, color: 'var(--text-faint)' }}>· {b.pitcher.name}{pHand ? ` (${pHand})` : ''}</span>}
                 </h3>
                 <div className="zone-metrics" role="group" aria-label="Filter pitch types">

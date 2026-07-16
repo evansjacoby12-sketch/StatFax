@@ -6,10 +6,10 @@ import SameGameView from './SameGameView.jsx'
 import TopStraightsView from './TopStraightsView.jsx'
 
 const TABS = [
-  { id: 'explore', label: 'Explore combos', icon: 'Layers' },
+  { id: 'explore', label: 'Explore combos', icon: 'GitMerge' },
   { id: 'straights', label: 'Top 10 straights', icon: 'ListOrdered' },
-  { id: 'builder', label: 'Custom builder', icon: 'Sparkles' },
-  { id: 'same-game', label: 'Same game', icon: 'Zap' },
+  { id: 'builder', label: 'Custom builder', icon: 'SlidersHorizontal' },
+  { id: 'same-game', label: 'Same game', icon: 'MapPinHouse' },
 ]
 
 export default function BetLab({ initialTab = 'explore', onClose, batters, selectedId, onSelect, scorecard, generatedAt, windowMode, comboConf, favorConsistency, lockedBoard, slipSet, onToggleSlip, comboLock, legs, onRemove, onClear, onReplace, sgpScorecard }) {

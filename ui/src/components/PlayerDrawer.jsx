@@ -1335,7 +1335,7 @@ function PitchBar({ adv }) {
 function PitchMixAdvantage({ b }) {
   const splits = b.pitchTypeSplits
   if (!splits?.length) return (
-    <Section title="Pitch Mix Matchup" icon="BarChart2">
+    <Section title="Pitch Mix Matchup" icon="ChartSpline">
       <p style={{ fontSize: '12px', color: 'var(--text-faint)' }}>No pitch split data available for this matchup.</p>
     </Section>
   )
@@ -1364,7 +1364,7 @@ function PitchMixAdvantage({ b }) {
   const coverage = totalUsage > 0 ? Math.round((coveredUsage / totalUsage) * 100) : null
 
   return (
-    <Section title="Pitch Mix Matchup Advantage" icon="BarChart2">
+    <Section title="Pitch Mix Matchup Advantage" icon="ChartSpline">
       {/* Rating header */}
       <div style={{ marginBottom: '16px' }}>
         <div style={{ fontSize: '10px', color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>PITCH MIX RATING</div>

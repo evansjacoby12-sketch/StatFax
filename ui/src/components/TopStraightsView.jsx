@@ -57,10 +57,10 @@ function buildCase(batter) {
   const market = marketEdge == null ? 50 : clamp(50 + marketEdge * 350)
 
   const penalties = []
-  if (batter.lineupConfirmed !== true) penalties.push({ key: 'lineup', label: 'Lineup pending', icon: 'Clock', detail: 'Projected lineup lowers confidence until the batting order is confirmed.', points: 4 })
+  if (batter.lineupConfirmed !== true) penalties.push({ key: 'lineup', label: 'Lineup pending', icon: 'Clock3', detail: 'Projected lineup lowers confidence until the batting order is confirmed.', points: 4 })
   if (batter.cold || (batter.hotnessMultiplier ?? 1) < 0.97) penalties.push({ key: 'cold', label: 'Cold form', icon: 'Snowflake', detail: 'Recent contact is below the batter’s normal power baseline.', points: 6 })
-  if (air < 0.97) penalties.push({ key: 'air', label: 'Weather drag', icon: 'Wind', detail: 'Park and air conditions suppress expected carry.', points: 4 })
-  if (pitcher < 38) penalties.push({ key: 'pitcher', label: 'Tough pitcher', icon: 'Shield', detail: 'The opposing starter grades as difficult to attack.', points: 5 })
+  if (air < 0.97) penalties.push({ key: 'air', label: 'Weather drag', icon: 'CloudSun', detail: 'Park and air conditions suppress expected carry.', points: 4 })
+  if (pitcher < 38) penalties.push({ key: 'pitcher', label: 'Tough pitcher', icon: 'Radar', detail: 'The opposing starter grades as difficult to attack.', points: 5 })
   if (marketEdge != null && marketEdge < -0.02) penalties.push({ key: 'price', label: 'Price tax', icon: 'DollarSign', detail: 'The posted price implies a higher hit rate than the model.', points: 4 })
   if (negativeReasons >= 4) penalties.push({ key: 'conflict', label: 'Signal conflict', icon: 'TriangleAlert', detail: 'Several negative matchup reasons oppose the positive case.', points: 3 })
 

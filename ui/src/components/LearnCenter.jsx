@@ -5,7 +5,7 @@ import Guide from './Guide.jsx'
 import Legend from './Legend.jsx'
 
 const TABS = [
-  { id: 'playbook', label: 'Playbook', icon: 'Target' },
+  { id: 'playbook', label: 'Playbook', icon: 'Focus' },
   { id: 'guide', label: 'Guide', icon: 'BookOpen' },
   { id: 'glossary', label: 'Glossary', icon: 'Search' },
 ]

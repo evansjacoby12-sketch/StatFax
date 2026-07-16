@@ -5,9 +5,9 @@ import CheatSheet from './CheatSheet.jsx'
 import ListBuilderView from './ListBuilderView.jsx'
 
 const TABS = [
-  { id: 'weather', label: 'Weather', icon: 'Wind' },
-  { id: 'cheat-sheet', label: 'Cheat sheet', icon: 'LayoutGrid' },
-  { id: 'list-builder', label: 'List builder', icon: 'Filter' },
+  { id: 'weather', label: 'Weather', icon: 'CloudSun' },
+  { id: 'cheat-sheet', label: 'Cheat sheet', icon: 'Rows3' },
+  { id: 'list-builder', label: 'List builder', icon: 'ClipboardList' },
 ]
 
 export default function FindPlays({

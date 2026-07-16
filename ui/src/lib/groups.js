@@ -143,13 +143,13 @@ export const blastMixOf = (b) => {
 const STRAT_META = {
   precision: { label: 'Precision',    icon: 'ScanSearch', desc: 'hottest elite-barrel bats — power surge + barrel ≥12% · 2.3× HR lift' },
   hot:       { label: 'Hot Hand',     icon: 'Flame',      desc: 'heat-led bats on live power — best audited leg hit rate (42.9%)' },
-  matchup:   { label: 'Soft Matchup', icon: 'Target',     desc: 'facing HR-prone pitchers (HR/9 ≥1.3)' },
-  mix:       { label: 'Best Mix',     icon: 'Sparkles',   desc: 'grade + barrel + heat blend — best audited all-hit rate' },
-  park:      { label: 'Park & Air',   icon: 'Wind',       desc: 'park × weather × hand boosts HR' },
+  matchup:   { label: 'Soft Matchup', icon: 'Radar',      desc: 'facing HR-prone pitchers (HR/9 ≥1.3)' },
+  mix:       { label: 'Best Mix',     icon: 'ChartSpline', desc: 'grade + barrel + heat blend — best audited all-hit rate' },
+  park:      { label: 'Park & Air',   icon: 'CloudSun',   desc: 'park × weather × hand boosts HR' },
   value:     { label: 'Value',        icon: 'DollarSign', desc: 'the +EV pairing — bats the market underprices (model HR% > the fair line)' },
-  edge:      { label: 'Edge Stack',   icon: 'Zap',        desc: '2+ matchup signals converge (pitch type, zones, platoon, fly-ball)' },
+  edge:      { label: 'Edge Stack',   icon: 'Swords',     desc: '2+ matchup signals converge (pitch type, zones, platoon, fly-ball)' },
   powerReady: { label: 'Power Ready (beta)', icon: 'Gauge',    desc: 'every leg carries the POWER READY (beta) signal — elite ceiling + soft matchup + live form. Unvalidated beta; forward-testing its hit rate.' },
-  barrelReady: { label: 'Barrel Ready (beta)', icon: 'Flame',  desc: 'every leg carries the BARREL READY (beta) signal — solid power + genuinely hot form (no matchup gate). Unvalidated beta; forward-testing its hit rate.' },
+  barrelReady: { label: 'Barrel Ready (beta)', icon: 'CircleDotDashed', desc: 'every leg carries the BARREL READY (beta) signal — solid power + genuinely hot form (no matchup gate). Unvalidated beta; forward-testing its hit rate.' },
 }
 
 // Map a live scored batter → the engine's canonical combo row. `ref` carries the

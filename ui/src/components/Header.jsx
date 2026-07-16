@@ -144,7 +144,7 @@ function HelpMenu({ sport, onOpenWeather, onOpenGroups, onOpenSplits, onOpenBack
     {
       title: 'Validate',
       items: [
-        { label: 'Proof', desc: 'Test grades and signals against historical outcomes', icon: 'Activity', fn: onOpenBacktest },
+        { label: 'Proof', desc: 'Test grades and signals against historical outcomes', icon: 'ChartNoAxesCombined', fn: onOpenBacktest },
       ],
     },
     {
@@ -156,8 +156,8 @@ function HelpMenu({ sport, onOpenWeather, onOpenGroups, onOpenSplits, onOpenBack
     {
       title: 'App',
       items: [
-        { label: 'Model Performance', desc: 'Accuracy, calibration and recent results', icon: 'Gauge', fn: onOpenModel, mobileOnly: true },
-        { label: liveScores ? 'Live Scores On' : 'Pregame View', desc: liveScores ? 'Tap to pause live scores and innings' : 'Tap to enable live scores and innings', icon: liveScores ? 'Activity' : 'Clock', fn: onToggleLive, mobileOnly: true },
+        { label: 'Model Performance', desc: 'Accuracy, calibration and recent results', icon: 'ChartNoAxesCombined', fn: onOpenModel, mobileOnly: true },
+        { label: liveScores ? 'Live Scores On' : 'Pregame View', desc: liveScores ? 'Tap to pause live scores and innings' : 'Tap to enable live scores and innings', icon: liveScores ? 'RadioTower' : 'Clock3', fn: onToggleLive, mobileOnly: true },
         { label: eliLevel === 'eli5' ? 'Plain Explanations' : 'Stats Explanations', desc: 'Switch explanation depth', icon: eliLevel === 'eli5' ? 'Sparkles' : 'BarChart3', fn: onCycleEli, mobileOnly: true },
         { label: refreshing ? 'Refreshing Slate…' : 'Refresh Slate', desc: 'Reload the latest model board', icon: refreshing ? 'Loader' : 'RefreshCw', fn: onRefresh, mobileOnly: true },
         { label: 'Settings', desc: 'Display, updates, parlays and experimental controls', icon: 'SlidersHorizontal', fn: onOpenSettings },
@@ -183,7 +183,7 @@ function HelpMenu({ sport, onOpenWeather, onOpenGroups, onOpenSplits, onOpenBack
     { label: 'Learn', meta: 'NFL guide', icon: 'GraduationCap', fn: onOpenHowTo, keywords: 'nfl football learn center playbook glossary guide' },
   ] : [
     { label: 'Find Plays', meta: 'Discovery', icon: 'ScanSearch', fn: onOpenWeather, keywords: 'weather cheat sheets filtered lists' },
-    { label: 'Proof', meta: 'Backtests', icon: 'Activity', fn: onOpenBacktest, keywords: 'validate grades signals historical outcomes' },
+    { label: 'Proof', meta: 'Backtests', icon: 'ChartNoAxesCombined', fn: onOpenBacktest, keywords: 'validate grades signals historical outcomes' },
     { label: 'Learn', meta: 'Guide', icon: 'GraduationCap', fn: onOpenHowTo, keywords: 'learn center playbook glossary help' },
   ]
   const utilityTools = isNFL ? [
@@ -203,11 +203,11 @@ function HelpMenu({ sport, onOpenWeather, onOpenGroups, onOpenSplits, onOpenBack
       keywords: 'nfl explanations detail eli5 stats plain',
     },
   ] : [
-    { label: 'Model', meta: 'Metrics', icon: 'Gauge', fn: onOpenModel, keywords: 'performance accuracy calibration results' },
+    { label: 'Model', meta: 'Metrics', icon: 'ChartNoAxesCombined', fn: onOpenModel, keywords: 'performance accuracy calibration results' },
     {
       label: 'Scores',
       meta: liveScores ? 'Live on' : 'Pregame',
-      icon: liveScores ? 'Activity' : 'Clock',
+      icon: liveScores ? 'RadioTower' : 'Clock3',
       fn: onToggleLive,
       active: liveScores,
       keywords: 'live scores innings pause enable',

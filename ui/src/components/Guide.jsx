@@ -76,7 +76,7 @@ export default function Guide({ onClose, embedded = false }) {
         </div>
 
         <h3 className="section-title">
-          <Icon name="LayoutGrid" size={14} /> The views
+          <Icon name="Rows3" size={14} /> The views
         </h3>
         <div className="guide-list">
           {VIEWS.map(([icon, name, desc]) => (
@@ -107,7 +107,7 @@ export default function Guide({ onClose, embedded = false }) {
         </div>
 
         <h3 className="section-title" style={{ marginTop: 18 }}>
-          <Icon name="Layers" size={14} /> Parlay Combos
+          <Icon name="GitMerge" size={14} /> Parlay Combos
         </h3>
         <p className="guide-p dim">
           Six live strategies each pick <b>one bat per game</b> and build 2-, 3-, and 4-leg parlays (4-leg is the lottery
@@ -149,7 +149,7 @@ export default function Guide({ onClose, embedded = false }) {
         </p>
 
         <h3 className="section-title" style={{ marginTop: 18 }}>
-          <Icon name="Zap" size={14} /> Blast rate
+          <Icon name="Bomb" size={14} /> Blast rate
         </h3>
         <p className="guide-p dim">
           A <b>blast</b> is a swing that’s both fast and squared-up — the most HR-predictive slice of Statcast bat
@@ -159,7 +159,7 @@ export default function Guide({ onClose, embedded = false }) {
         </p>
 
         <h3 className="section-title" style={{ marginTop: 18 }}>
-          <Icon name="SlidersHorizontal" size={14} /> Signals
+          <Icon name="Focus" size={14} /> Signals
         </h3>
         <div className="guide-badges">
           {BADGES.map((b) => (

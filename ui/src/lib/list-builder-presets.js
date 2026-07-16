@@ -31,7 +31,7 @@ export const LIST_BUILDER_PRESETS = Object.freeze([
   preset({
     id: 'hot-model',
     tier: 'primary',
-    icon: 'TrendingUp',
+    icon: 'Flame',
     title: 'Hot model',
     description: 'Score 70+ with the model hot-bat signal.',
     criteria: { minScore: 70, signals: ['hot'], signalMode: 'all' },
@@ -40,7 +40,7 @@ export const LIST_BUILDER_PRESETS = Object.freeze([
   preset({
     id: 'elite-model',
     tier: 'primary',
-    icon: 'Zap',
+    icon: 'Gauge',
     title: 'Elite model',
     description: 'Top-end model cases with a score of 80 or higher.',
     criteria: { minScore: 80 },
@@ -58,7 +58,7 @@ export const LIST_BUILDER_PRESETS = Object.freeze([
   preset({
     id: 'three-way',
     tier: 'primary',
-    icon: 'Target',
+    icon: 'Swords',
     title: 'Three-way edge',
     description: 'Score 70+, barrels 10%+ and opponent HR/9 of 1.30+.',
     criteria: { minScore: 70, minBarrel: 10, minOppHr9: 1.3 },
@@ -67,7 +67,7 @@ export const LIST_BUILDER_PRESETS = Object.freeze([
   preset({
     id: 'power',
     tier: 'primary',
-    icon: 'Activity',
+    icon: 'CircleDotDashed',
     title: 'Power surge',
     description: '12%+ season and recent barrels inside an 8–32° launch window.',
     criteria: { minBarrel: 12, minRecBarrel: 12, minLaunchAngle: 8, maxLaunchAngle: 32 },
@@ -76,7 +76,7 @@ export const LIST_BUILDER_PRESETS = Object.freeze([
   preset({
     id: 'model-statcast',
     tier: 'more',
-    icon: 'Layers',
+    icon: 'ChartSpline',
     title: 'Model + Statcast',
     description: 'Score 70+ supported by a 10%+ barrel rate.',
     criteria: { minScore: 70, minBarrel: 10 },
@@ -85,7 +85,7 @@ export const LIST_BUILDER_PRESETS = Object.freeze([
   preset({
     id: 'pitcher-target',
     tier: 'more',
-    icon: 'Crosshair',
+    icon: 'Radar',
     title: 'Pitcher target',
     description: '10%+ barrels against an opponent HR/9 of 1.30+.',
     criteria: { minBarrel: 10, minOppHr9: 1.3 },
@@ -103,7 +103,7 @@ export const LIST_BUILDER_PRESETS = Object.freeze([
   preset({
     id: 'matchup',
     tier: 'more',
-    icon: 'Gauge',
+    icon: 'Radar',
     title: 'Soft matchup',
     description: 'Opponent HR/9 of 1.30+ with pitch-mix score of 6.5+.',
     criteria: { minOppHr9: 1.3, minPitchMix: 6.5 },
@@ -112,7 +112,7 @@ export const LIST_BUILDER_PRESETS = Object.freeze([
   preset({
     id: 'pitch-type-punish',
     tier: 'advanced',
-    icon: 'Crosshair',
+    icon: 'ChartSpline',
     title: 'Pitch-Type Punish',
     description: 'A .200+ ISO bat whose weighted SLG clears the starter’s actual pitch mix.',
     criteria: { minISO: 0.2, minPitchMix: 6.5 },
@@ -125,7 +125,7 @@ export const LIST_BUILDER_PRESETS = Object.freeze([
   preset({
     id: 'recent-pitcher-leak',
     tier: 'advanced',
-    icon: 'TrendingUp',
+    icon: 'Radar',
     title: 'Recent Pitcher Leak',
     description: 'A .200+ ISO bat against a starter allowing at least 1.50 HR/9 recently.',
     criteria: { minISO: 0.2, minRecentPitcherHr9: 1.5 },
@@ -138,7 +138,7 @@ export const LIST_BUILDER_PRESETS = Object.freeze([
   preset({
     id: 'contact-collision',
     tier: 'advanced',
-    icon: 'Activity',
+    icon: 'Orbit',
     title: 'Contact Collision',
     description: 'A 10%+ barrel bat meeting a starter with a positive hard-contact allowance edge.',
     criteria: { minBarrel: 10, minContactCollision: 0.5 },

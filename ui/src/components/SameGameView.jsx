@@ -93,7 +93,7 @@ export default function SameGameView({ batters, onSelect, favorConsistency = fal
       </div>
       <div className="sgp-lineup-policy">
         <span>
-          <Icon name={includeProjected ? 'Clock' : 'UserCheck'} size={15} />
+          <Icon name={includeProjected ? 'Clock3' : 'UserRoundCheck'} size={15} />
           <span>
             <b>{includeProjected ? 'Projected lineups included' : 'Confirmed lineups only'}</b>
             <small>{includeProjected ? 'Preview mode · verify before betting' : 'Safer default · starters verified'}</small>

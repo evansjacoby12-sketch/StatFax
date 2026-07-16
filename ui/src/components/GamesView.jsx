@@ -213,8 +213,8 @@ export default function GamesView({ games, batters, onSelect, selectedId, watchl
           value={view}
           onChange={setView}
           tabs={[
-            { id: 'extractor', label: 'HR Extractor', icon: 'Crosshair' },
-            { id: 'detail', label: 'Detail Silos', icon: 'LayoutGrid' },
+            { id: 'extractor', label: 'HR Extractor', icon: 'Focus' },
+            { id: 'detail', label: 'Detail Silos', icon: 'Rows3' },
           ]}
         />
       </div>

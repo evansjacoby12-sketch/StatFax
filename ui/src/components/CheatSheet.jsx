@@ -196,10 +196,10 @@ export default function CheatSheet({ batters, onSelect, onOpenPitcher }) {
   if (!anything) return <div className="empty-note">No cheat-sheet data for today's slate yet.</div>
 
   const TABS = [
-    { k: 'batters', label: 'Batters', icon: 'Crosshair' },
+    { k: 'batters', label: 'Batters', icon: 'Focus' },
     { k: 'alerts', label: 'Alerts', icon: 'Flame' },
-    { k: 'splits', label: 'Splits', icon: 'LayoutGrid' },
-    { k: 'arms', label: 'Pitchers', icon: 'Target' },
+    { k: 'splits', label: 'Splits', icon: 'Split' },
+    { k: 'arms', label: 'Pitchers', icon: 'Radar' },
   ]
 
   return (

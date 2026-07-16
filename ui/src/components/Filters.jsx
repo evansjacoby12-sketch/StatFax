@@ -190,8 +190,8 @@ export default function Filters({ value, onChange, gradeCounts, games, badgeCoun
           {v.confirmedOnly && <FilterChip label="Confirmed" onClear={() => onChange({ confirmedOnly: false })} />}
           {v.watchedOnly && <FilterChip label="Watchlist" onClear={() => onChange({ watchedOnly: false })} />}
           {v.hotOnly && <FilterChip label="Heating up" icon="Flame" onClear={() => onChange({ hotOnly: false })} />}
-          {v.precisionOnly && <FilterChip label="Precision" icon="Sparkles" onClear={() => onChange({ precisionOnly: false })} />}
-          {v.sleepersOnly && <FilterChip label="Sleepers" icon="Moon" onClear={() => onChange({ sleepersOnly: false })} />}
+          {v.precisionOnly && <FilterChip label="Precision" icon="Focus" onClear={() => onChange({ precisionOnly: false })} />}
+          {v.sleepersOnly && <FilterChip label="Sleepers" icon="MoonStar" onClear={() => onChange({ sleepersOnly: false })} />}
           {badgeDefs.map((bd) => (
             <FilterChip
               key={bd.key}
@@ -313,7 +313,7 @@ export default function Filters({ value, onChange, gradeCounts, games, badgeCoun
                 color: 'var(--accent)'
               } : {}}
             >
-              <Icon name="Sparkles" size={14} />
+              <Icon name="Focus" size={14} />
               Precision
             </button>
 
@@ -328,7 +328,7 @@ export default function Filters({ value, onChange, gradeCounts, games, badgeCoun
                 color: '#a78bfa'
               } : {}}
             >
-              <Icon name="Moon" size={14} />
+              <Icon name="MoonStar" size={14} />
               Sleepers
             </button>
               </div>

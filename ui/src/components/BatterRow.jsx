@@ -52,13 +52,13 @@ export default function BatterRow({
   const strongestSignal = betaEnabled && b.powerReady
     ? { label: 'Power Ready', tone: 'warn', icon: 'Gauge', beta: true }
     : betaEnabled && b.barrelReady
-      ? { label: 'Barrel Ready', tone: 'warn', icon: 'Flame', beta: true }
+      ? { label: 'Barrel Ready', tone: 'warn', icon: 'CircleDotDashed', beta: true }
       : pmScore >= 7
-        ? { label: `Pitch ${pmScore.toFixed(1)}`, tone: 'good', icon: 'Target' }
+        ? { label: `Pitch ${pmScore.toFixed(1)}`, tone: 'good', icon: 'ChartSpline' }
         : dueSetup.n >= 4
-          ? { label: `Due ${dueSetup.n}/${dueSetup.checks.length}`, tone: 'warn', icon: 'Hourglass' }
+          ? { label: `Due ${dueSetup.n}/${dueSetup.checks.length}`, tone: 'warn', icon: 'TimerReset' }
           : airTone === 'good'
-            ? { label: `Air ${signedPct(air - 1, 0)}`, tone: 'good', icon: 'Wind' }
+            ? { label: `Air ${signedPct(air - 1, 0)}`, tone: 'good', icon: 'CloudSun' }
             : momentum
               ? { label: momentum.label, tone: momentum.cls, icon: momentum.icon }
               : null

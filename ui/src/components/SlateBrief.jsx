@@ -34,7 +34,7 @@ function BriefHeader({ brief, structured }) {
   return (
     <div className="slate-brief-head">
       <span className="slate-brief-title" id="slate-brief-title">
-        <Icon name="Sparkles" size={14} className="slate-brief-spark" />
+        <Icon name="Focus" size={14} className="slate-brief-spark" />
         {structured ? 'Decision Brief' : "Today's Brief"}
       </span>
       {dateLabel && <span className="slate-brief-date">{dateLabel}</span>}

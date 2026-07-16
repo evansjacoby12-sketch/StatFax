@@ -31,9 +31,9 @@ function computeAuc(rows) {
 }
 
 const RESULTS_TABS = [
-  { id: 'overview', label: 'Overview', icon: 'LayoutGrid' },
+  { id: 'overview', label: 'Overview', icon: 'Rows3' },
   { id: 'tickets', label: 'My Tickets', icon: 'Bookmark' },
-  { id: 'model', label: 'Model', icon: 'Activity' },
+  { id: 'model', label: 'Model', icon: 'ChartNoAxesCombined' },
 ]
 
 // Results hub: the model track record and the parlay-combo record share one tab

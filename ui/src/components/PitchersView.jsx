@@ -71,9 +71,9 @@ export default function PitchersView({ batters, kDistByPitcher = {}, liveKsByPit
           onChange={setView}
           ariaPressed
           tabs={[
-            { id: 'preview', label: 'Vulnerability', icon: 'Shield' },
-            { id: 'detail', label: <><span className="pitcher-detail-label">Detail Cards</span><span className="pitcher-cards-label">Cards</span></>, icon: 'LayoutGrid' },
-            { id: 'kbrain', label: 'K Brain', icon: 'Zap', iconSize: 11 },
+            { id: 'preview', label: 'Vulnerability', icon: 'Swords' },
+            { id: 'detail', label: <><span className="pitcher-detail-label">Detail Cards</span><span className="pitcher-cards-label">Cards</span></>, icon: 'Rows3' },
+            { id: 'kbrain', label: 'K Brain', icon: 'Radar', iconSize: 11 },
           ]}
         />
         
