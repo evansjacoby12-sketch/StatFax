@@ -706,10 +706,7 @@ function SprayTab({ b }) {
   )
 
   return (
-    <>
-      <SprayChart bips={bips} />
-      <StatcastTrend bips={bips} />
-    </>
+    <SprayChart bips={bips} batter={b} />
   )
 }
 
@@ -727,85 +724,148 @@ function bipDotColor(b) {
   return 'rgba(148,163,184,0.45)'
 }
 
-function SprayChart({ bips }) {
-  const [filter, setFilter] = useState('all')
+const CONTACT_FILTERS = [
+  { key: 'all', label: 'All contact' },
+  { key: 'gb', label: 'Ground' },
+  { key: 'ld', label: 'Line' },
+  { key: 'fb', label: 'Fly' },
+]
+const RESULT_FILTERS = [
+  { key: 'all', label: 'All results' },
+  { key: 'hard', label: 'Hard hit' },
+  { key: 'hr', label: 'HR only' },
+]
 
-  const displayed = bips.filter(b => {
-    if (filter === 'gb') return b.bbType === 'ground_ball'
-    if (filter === 'ld') return b.bbType === 'line_drive'
-    if (filter === 'fb') return b.bbType === 'fly_ball'
-    if (filter === 'hr') return b.events === 'home_run'
-    return true
+function eventLabel(event) {
+  return String(event || 'out').replaceAll('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
+function contactLabel(type) {
+  return ({ ground_ball: 'Ground ball', line_drive: 'Line drive', fly_ball: 'Fly ball', popup: 'Popup' })[type] || 'Batted ball'
+}
+
+function share(n, total) {
+  return total ? Math.round((n / total) * 100) : 0
+}
+
+function SprayStat({ label, value, tone }) {
+  return (
+    <div className="spray-stat">
+      <small>{label}</small>
+      <strong className="mono" style={tone ? { color: tone } : undefined}>{value}</strong>
+    </div>
+  )
+}
+
+function SprayChart({ bips, batter }) {
+  const [contactFilter, setContactFilter] = useState('all')
+  const [resultFilter, setResultFilter] = useState('all')
+  const [selectedIndex, setSelectedIndex] = useState(0)
+
+  const displayed = bips.filter((b) => {
+    const contactPass = contactFilter === 'all'
+      || (contactFilter === 'gb' && b.bbType === 'ground_ball')
+      || (contactFilter === 'ld' && b.bbType === 'line_drive')
+      || (contactFilter === 'fb' && b.bbType === 'fly_ball')
+    const resultPass = resultFilter === 'all'
+      || (resultFilter === 'hard' && Number(b.ev) >= 95)
+      || (resultFilter === 'hr' && b.events === 'home_run')
+    return contactPass && resultPass
   })
-
-  const hits = displayed.filter(b => HIT_EVENTS.has(b.events)).length
-  const hrs  = displayed.filter(b => b.events === 'home_run').length
-
-  const FILTERS = [
-    { key: 'all', label: 'All'  },
-    { key: 'gb',  label: 'GB'   },
-    { key: 'ld',  label: 'LD'   },
-    { key: 'fb',  label: 'FB'   },
-    { key: 'hr',  label: 'HR'   },
-  ]
+  const selected = displayed.length ? displayed[Math.min(selectedIndex, displayed.length - 1)] : null
+  const tracked = displayed.filter((b) => Number.isFinite(Number(b.ev)))
+  const avgEV = tracked.length ? tracked.reduce((sum, b) => sum + Number(b.ev), 0) / tracked.length : null
+  const hardHits = tracked.filter((b) => Number(b.ev) >= 95).length
+  const hrs = displayed.filter((b) => b.events === 'home_run').length
+  const hits = displayed.filter((b) => HIT_EVENTS.has(b.events)).length
+  const ground = displayed.filter((b) => b.bbType === 'ground_ball').length
+  const line = displayed.filter((b) => b.bbType === 'line_drive').length
+  const fly = displayed.filter((b) => b.bbType === 'fly_ball').length
+  const located = displayed.filter((b) => Number.isFinite(Number(b.x)))
+  const left = located.filter((b) => Number(b.x) < 95).length
+  const center = located.filter((b) => Number(b.x) >= 95 && Number(b.x) <= 155).length
+  const right = located.length - left - center
+  const effectiveSide = batter?.batSide === 'S'
+    ? (batter?.pitcher?.hand === 'L' ? 'R' : 'L')
+    : batter?.batSide
+  const pull = effectiveSide === 'L' ? right : left
+  const opposite = effectiveSide === 'L' ? left : right
 
   return (
-    <Section title="Spray Chart" icon="Target">
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
-        {FILTERS.map(f => (
-          <button key={f.key} onClick={() => setFilter(f.key)} style={{
-            padding: '3px 10px', borderRadius: 12, border: 'none',
-            fontSize: 11, fontWeight: 600, cursor: 'pointer',
-            background: filter === f.key ? 'var(--accent)' : 'rgba(255,255,255,0.06)',
-            color: filter === f.key ? '#fff' : 'var(--text-dim)',
-          }}>{f.label}</button>
-        ))}
-        <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text-faint)' }}>
-          {hits}H / {hrs}HR · {displayed.length} BIP
-        </span>
+    <Section title="Ball Flight Board" icon="Target" className="spray-blueprint-card">
+      <div className="spray-command-bar">
+        <div className="spray-filter-group" role="group" aria-label="Contact type">
+          {CONTACT_FILTERS.map((item) => (
+            <button key={item.key} className={contactFilter === item.key ? 'on' : ''} onClick={() => { setContactFilter(item.key); setSelectedIndex(0) }} aria-pressed={contactFilter === item.key}>{item.label}</button>
+          ))}
+        </div>
+        <div className="spray-filter-group secondary" role="group" aria-label="Result">
+          {RESULT_FILTERS.map((item) => (
+            <button key={item.key} className={resultFilter === item.key ? 'on' : ''} onClick={() => { setResultFilter(item.key); setSelectedIndex(0) }} aria-pressed={resultFilter === item.key}>{item.label}</button>
+          ))}
+        </div>
       </div>
 
-      <svg viewBox="0 0 250 250" style={{ width: '100%', maxWidth: 300, display: 'block', margin: '0 auto', borderRadius: 8 }}>
-        <rect width="250" height="250" fill="#0c1a0c" rx="6"/>
-        {/* Fair territory */}
-        <path d="M 125,205 L 0,78 Q 125,2 250,78 Z" fill="#1a3d1a"/>
-        {/* Foul lines */}
-        <line x1="125" y1="205" x2="0"   y2="78" stroke="rgba(255,255,255,0.45)" strokeWidth="0.8"/>
-        <line x1="125" y1="205" x2="250" y2="78" stroke="rgba(255,255,255,0.45)" strokeWidth="0.8"/>
-        {/* Outfield fence arc */}
-        <path d="M 15,85 Q 125,8 235,85" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="1.2" strokeDasharray="4,3"/>
-        {/* Infield dirt */}
-        <polygon points="125,205 190,142 125,79 60,142" fill="#5c3d1e" stroke="#7a5230" strokeWidth="0.5"/>
-        {/* Pitcher's mound */}
-        <circle cx="125" cy="150" r="5" fill="#6b4820"/>
-        {/* Bases — 2B */}
-        <g transform="rotate(45,125,79)"><rect x="121.5" y="75.5" width="7" height="7" fill="white"/></g>
-        {/* 1B */}
-        <g transform="rotate(45,190,142)"><rect x="186.5" y="138.5" width="7" height="7" fill="white"/></g>
-        {/* 3B */}
-        <g transform="rotate(45,60,142)"><rect x="56.5" y="138.5" width="7" height="7" fill="white"/></g>
-        {/* Home plate */}
-        <polygon points="125,210 130,205 130,200 120,200 120,205" fill="white"/>
-        {/* BIP dots */}
-        {displayed.map((b, i) => (
-          <circle key={i} cx={b.x} cy={b.y}
-            r={b.events === 'home_run' ? 4.5 : 3}
-            fill={bipDotColor(b)}
-            opacity={b.events === 'home_run' ? 0.95 : 0.72}
-            stroke={b.events === 'home_run' ? 'rgba(255,255,255,0.55)' : 'none'}
-            strokeWidth={0.8}
-          />
-        ))}
-      </svg>
-
-      <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 10, flexWrap: 'wrap' }}>
-        {[['#4ade80','Single'],['#facc15','Double'],['#f97316','Triple'],['#c96f7e','HR'],['rgba(148,163,184,0.65)','Out']].map(([c,l]) => (
-          <span key={l} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--text-faint)' }}>
-            <svg width="8" height="8"><circle cx="4" cy="4" r="4" fill={c}/></svg>
-            {l}
-          </span>
-        ))}
+      <div className="spray-metric-ribbon">
+        <SprayStat label="BIP" value={displayed.length} />
+        <SprayStat label="Hits" value={hits} tone="var(--strong)" />
+        <SprayStat label="HR" value={hrs} tone="var(--bad)" />
+        <SprayStat label="Avg EV" value={avgEV != null ? `${avgEV.toFixed(1)} mph` : '—'} />
+        <SprayStat label="Hard hit" value={tracked.length ? `${share(hardHits, tracked.length)}%` : '—'} tone="var(--prime)" />
       </div>
+
+      <div className="spray-blueprint-layout">
+        <div className="spray-field-wrap">
+          <svg viewBox="0 0 250 250" className="spray-field" aria-label={`${batter?.name || 'Player'} batted-ball spray chart`}>
+            <rect width="250" height="250" fill="#0b0c10" rx="12" />
+            <path d="M 125,205 L 0,78 Q 125,2 250,78 Z" fill="#17181d" stroke="rgba(255,255,255,0.06)" />
+            <path d="M 125,205 L 76,36" stroke="rgba(255,255,255,0.055)" strokeWidth="0.8" strokeDasharray="3,4" />
+            <path d="M 125,205 L 174,36" stroke="rgba(255,255,255,0.055)" strokeWidth="0.8" strokeDasharray="3,4" />
+            <text x="45" y="70" className="spray-field-label">LF</text>
+            <text x="119" y="29" className="spray-field-label">CF</text>
+            <text x="194" y="70" className="spray-field-label">RF</text>
+            <line x1="125" y1="205" x2="0" y2="78" stroke="rgba(227,227,231,0.42)" strokeWidth="0.9" />
+            <line x1="125" y1="205" x2="250" y2="78" stroke="rgba(227,227,231,0.42)" strokeWidth="0.9" />
+            <path d="M 15,85 Q 125,8 235,85" fill="none" stroke="rgba(227,227,231,0.34)" strokeWidth="1.1" strokeDasharray="4,3" />
+            <polygon points="125,205 190,142 125,79 60,142" fill="#342c23" stroke="#61503a" strokeWidth="0.7" />
+            <circle cx="125" cy="150" r="5" fill="#55452f" />
+            <g transform="rotate(45,125,79)"><rect x="121.5" y="75.5" width="7" height="7" fill="rgba(242,242,245,.85)" /></g>
+            <g transform="rotate(45,190,142)"><rect x="186.5" y="138.5" width="7" height="7" fill="rgba(242,242,245,.85)" /></g>
+            <g transform="rotate(45,60,142)"><rect x="56.5" y="138.5" width="7" height="7" fill="rgba(242,242,245,.85)" /></g>
+            <polygon points="125,210 130,205 130,200 120,200 120,205" fill="rgba(242,242,245,.9)" />
+            {displayed.map((b, index) => {
+              const hard = Number(b.ev) >= 95
+              const homer = b.events === 'home_run'
+              const active = selected === b
+              const radius = homer ? 5.8 : hard ? 4.5 : 3.2
+              return Number.isFinite(Number(b.x)) && Number.isFinite(Number(b.y)) ? (
+                <g key={`${b.date || 'bip'}-${index}`} role="button" tabIndex="0" aria-label={`${eventLabel(b.events)}, ${contactLabel(b.bbType)}${b.ev ? `, ${Number(b.ev).toFixed(1)} mph` : ''}`} onClick={() => setSelectedIndex(index)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') setSelectedIndex(index) }}>
+                  {(homer || active) && <circle cx={b.x} cy={b.y} r={radius + 3.5} fill="none" stroke={homer ? 'rgba(201,111,126,.42)' : 'rgba(184,183,216,.45)'} strokeWidth="1.4" />}
+                  <circle cx={b.x} cy={b.y} r={radius} fill={bipDotColor(b)} opacity={homer ? 1 : 0.82} stroke={hard ? '#69b99e' : active ? '#b8b7d8' : 'rgba(255,255,255,.22)'} strokeWidth={hard || active ? 1.25 : 0.6} />
+                </g>
+              ) : null
+            })}
+          </svg>
+          <div className="spray-legend">
+            {[['#69b99e','Hit'],['#facc15','Double'],['#f97316','Triple'],['#c96f7e','HR'],['rgba(148,163,184,.65)','Out']].map(([color, label]) => <span key={label}><i style={{ background: color }} />{label}</span>)}
+            <span><i className="hard-ring" />95+ mph</span>
+          </div>
+          {selected && (
+            <div className="spray-selection" aria-live="polite">
+              <span className="spray-selection-icon" style={{ color: bipDotColor(selected) }}><Icon name={selected.events === 'home_run' ? 'Flame' : 'CircleDot'} size={14} /></span>
+              <div><strong>{eventLabel(selected.events)}</strong><small>{contactLabel(selected.bbType)} · {selected.date || 'Date unavailable'}</small></div>
+              <span className="mono">{Number.isFinite(Number(selected.ev)) ? `${Number(selected.ev).toFixed(1)} mph` : 'EV —'}</span>
+            </div>
+          )}
+        </div>
+
+        <div className="spray-scouting-rail">
+          <div className="spray-scout-card"><span><Icon name="Layers" size={13} /> Contact shape</span><dl><div><dt>Ground</dt><dd>{share(ground, displayed.length)}%</dd></div><div><dt>Line</dt><dd>{share(line, displayed.length)}%</dd></div><div><dt>Fly</dt><dd>{share(fly, displayed.length)}%</dd></div></dl></div>
+          <div className="spray-scout-card"><span><Icon name="Route" size={13} /> Damage direction</span><dl><div><dt>Pull</dt><dd>{share(pull, located.length)}%</dd></div><div><dt>Center</dt><dd>{share(center, located.length)}%</dd></div><div><dt>Opposite</dt><dd>{share(opposite, located.length)}%</dd></div></dl></div>
+          <div className="spray-scout-card impact"><span><Icon name="Zap" size={13} /> Impact read</span><p><b>{hardHits}</b> hard-hit balls and <b>{hrs}</b> home runs in the current view.</p></div>
+        </div>
+      </div>
+      <StatcastTrend bips={displayed} />
     </Section>
   )
 }
@@ -838,7 +898,8 @@ function StatcastTrend({ bips }) {
 
   const mid = Math.floor(games.length / 2)
   return (
-    <Section title="Exit Velo Trend (per game)" icon="TrendingUp">
+    <div className="spray-trend">
+      <div className="spray-trend-head"><span><Icon name="TrendingUp" size={13} /> Exit velo timeline</span><small>Per game · last 15</small></div>
       {/* Bars all share one baseline — the date labels live in their own row
           below, not inside each bar column (which used to make labelled bars
           float higher than the rest). */}
@@ -871,7 +932,7 @@ function StatcastTrend({ bips }) {
           <span style={{ width: 8, height: 8, borderRadius: 2, background: '#facc15' }} /> ≥90 solid
         </span>
       </div>
-    </Section>
+    </div>
   )
 }
 

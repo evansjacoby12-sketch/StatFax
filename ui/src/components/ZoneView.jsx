@@ -62,8 +62,6 @@ const PITCH_FILTERS = [
 // Catcher's view, top-row = up in the zone. "Heart" = dead-center (1).
 const ZONE_NAMES = ['Up & Left', 'Up', 'Up & Right', 'Left', 'Heart', 'Right', 'Low & Left', 'Low', 'Low & Right']
 
-const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
-
 // Cells with fewer BIP than this are shrunk hard toward the batter's season line
 // and shown dimmed — a raw per-zone SLG on a handful of batted balls is noise.
 const MIN_CELL_BIP = 10
@@ -131,9 +129,9 @@ function MetricChips({ metrics, value, onChange }) {
 }
 
 // The framed 3×3 strike zone with a home-plate base for orientation.
-function ZoneStrike({ cells, mode, bFmt, pFmt }) {
+function ZoneStrike({ cells, mode, bFmt, pFmt, selectedCell, onSelect, priorityByIndex }) {
   return (
-    <div className="z3-frame" style={{ width: '100%', maxWidth: '320px', margin: '0 auto' }}>
+    <div className="z3-frame" style={{ width: '100%', maxWidth: '410px', margin: '0 auto' }}>
       <div className="z3-stage" style={{ position: 'relative', padding: '4px 4px 0' }}>
         <div
           className="z3-grid"
@@ -160,9 +158,13 @@ function ZoneStrike({ cells, mode, bFmt, pFmt }) {
                 ? c.usage != null ? p0(c.usage) : null
                 : c.count != null && c.count > 0 ? `${c.count}` : null
             return (
-              <div
+              <button
+                type="button"
                 key={c.i}
-                className={`z3-cell ${c.matched ? 'matched' : ''}`}
+                className={`z3-cell ${c.matched ? 'matched' : ''}${selectedCell?.i === c.i ? ' selected' : ''}`}
+                onClick={() => onSelect(c.i)}
+                aria-pressed={selectedCell?.i === c.i}
+                aria-label={`${c.name}, ${big}${sub != null ? `, ${sub}` : ''}${c.matched ? ', attack priority' : ''}`}
                 title={`${c.name}${c.iso != null ? ` · ISO ${r3(c.iso)}` : ''}${c.usage != null ? ` · ${p0(c.usage)} usage` : ''}${c.count ? ` · ${c.count} BIP` : ''}`}
                 style={{
                   position: 'relative',
@@ -174,9 +176,10 @@ function ZoneStrike({ cells, mode, bFmt, pFmt }) {
                   borderRadius: '9px',
                   background: heatColor(t),
                   border: '1px solid rgba(255,255,255,0.06)',
-                  cursor: 'default',
+                  cursor: 'pointer',
                 }}
               >
+                {priorityByIndex.has(c.i) && <span className="z3-priority mono">{priorityByIndex.get(c.i)}</span>}
                 {c.matched && (
                   <span className="z3-flame" aria-hidden="true">
                     <Icon name="Flame" size={9} />
@@ -184,7 +187,7 @@ function ZoneStrike({ cells, mode, bFmt, pFmt }) {
                 )}
                 <span className="z3-val mono" title={c.lowSample ? 'Small sample — shrunk toward season' : undefined} style={{ fontSize: '14px', fontWeight: '800', color: '#fff', lineHeight: 1, textShadow: '0 1px 3px rgba(0,0,0,0.5)', opacity: c.lowSample ? 0.5 : 1, fontStyle: c.lowSample ? 'italic' : 'normal' }}>{big}</span>
                 {sub != null && <span className="z3-sub mono" style={{ fontSize: '8.5px', fontWeight: '600', color: 'rgba(255,255,255,0.62)', lineHeight: 1 }}>{mode === 'attack' ? sub : `${sub} BIP`}</span>}
-              </div>
+              </button>
             )
           })}
         </div>
@@ -198,11 +201,25 @@ function ZoneStrike({ cells, mode, bFmt, pFmt }) {
   )
 }
 
+function AttackPriorityCard({ label, cell, rank, tone = 'attack', onSelect }) {
+  if (!cell) return null
+  return (
+    <button type="button" className={`attack-priority-card ${tone}`} onClick={() => onSelect(cell.i)}>
+      <span className="attack-priority-rank mono">{rank}</span>
+      <span className="attack-priority-copy"><small>{label}</small><strong>{cell.name}</strong></span>
+      <span className="attack-priority-data mono"><b>{r3(cell.iso)}</b>{cell.usage != null && <small>{p0(cell.usage)} use</small>}</span>
+      <Icon name="ChevronRight" size={14} />
+    </button>
+  )
+}
+
 export default function ZoneView({ batter: b, onClose }) {
   const [mode, setMode] = useState('attack')
   const [bMetric, setBMetric] = useState('iso')
   const [pMetric, setPMetric] = useState('freq')
   const [pitchFilter, setPitchFilter] = useState('all')
+  const [selectedZone, setSelectedZone] = useState(4)
+  const [arsenalOpen, setArsenalOpen] = useState(false)
 
   const z = b?.zoneMatchup
   const color = gradeColor(b?.grade?.label || 'SKIP')
@@ -291,6 +308,14 @@ export default function ZoneView({ batter: b, onClose }) {
     () => (cells || []).filter((c) => c.matched).sort((a, c) => (c.edgeT ?? 0) - (a.edgeT ?? 0)),
     [cells],
   )
+  const rankedCells = useMemo(
+    () => (cells || []).filter((c) => c.edgeT != null).slice().sort((a, c) => (c.edgeT ?? 0) - (a.edgeT ?? 0)),
+    [cells],
+  )
+  const selectedCell = (cells || []).find((c) => c.i === selectedZone) || attackZones[0] || cells?.[4] || null
+  const priorityCells = [attackZones[0] || rankedCells[0], attackZones[1] || rankedCells[1]].filter(Boolean)
+  const avoidCell = rankedCells.length ? rankedCells[rankedCells.length - 1] : null
+  const priorityByIndex = new Map(priorityCells.map((cell, index) => [cell.i, index + 1]))
 
   const arsenal = b?.arsenal || {}
   const mix = b?.pitchMix || {}
@@ -313,6 +338,10 @@ export default function ZoneView({ batter: b, onClose }) {
   const allPitches = useMemo(() => PITCHES
     .map((p) => ({ code: p.code, key: p.code, label: p.label, usage: mix[`${p.code}Pct`] ?? null, bSlg: arsenal[`${p.code}Slg`] ?? null, leagueSlg: arsenal.leagueSlg?.[p.code] ?? null }))
     .filter((p) => (p.usage ?? 0) > 0), [mix, arsenal])
+  const bestPitchEdge = allPitches
+    .filter((p) => Number.isFinite(p.bSlg) && (p.usage ?? 0) >= 8)
+    .map((p) => ({ ...p, edge: p.bSlg - (pitchLeagueSlg(p.code) ?? 0.33) }))
+    .sort((a, c) => c.edge - a.edge)[0] || null
   // Arsenal rating via the shared helper (identical to the drawer teaser). Blind
   // spot + coverage stay local — they need per-pitch detail beyond the rating.
   const arsenalRating5 = useMemo(() => arsenalRating5Of(b), [b])
@@ -439,75 +468,72 @@ export default function ZoneView({ batter: b, onClose }) {
               borderRadius: '14px',
               padding: '20px',
             }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '8px' }}>
+              <div className="zone-blueprint-head">
                 <h3 className="zone-h3" style={{ fontSize: '13px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px', color: '#fff' }}>
-                  <Icon name="Focus" size={14} style={{ color: 'var(--accent)' }} /> Strike-Zone Attack Map
+                  <Icon name="Focus" size={14} style={{ color: 'var(--accent)' }} /> Attack Blueprint
                 </h3>
-                <CommandTabs
-                  className="z3-seg"
-                  variant="compact"
-                  label="Map mode"
-                  value={mode}
-                  onChange={setMode}
-                  tabs={MODES.map((item) => ({ ...item, id: item.key, iconSize: 11 }))}
-                  ariaPressed
-                />
+                <div className="zone-blueprint-controls">
+                  <CommandTabs
+                    className="z3-seg"
+                    variant="compact"
+                    label="Map mode"
+                    value={mode}
+                    onChange={setMode}
+                    tabs={MODES.map((item) => ({ ...item, id: item.key, iconSize: 11 }))}
+                    ariaPressed
+                  />
+                  {(mode === 'batter' || mode === 'pitcher') && (
+                    mode === 'batter'
+                      ? <MetricChips metrics={bMetricsAvail} value={bMetricEff} onChange={setBMetric} />
+                      : <MetricChips metrics={pMetricsAvail} value={pMetricEff} onChange={setPMetric} />
+                  )}
+                </div>
               </div>
 
               <p className="zone-explain dim" style={{ fontSize: '12px', marginBottom: '16px', lineHeight: '1.45', minHeight: '34px' }}>
                 {modeCaption}
               </p>
 
-              <div className="z3-wrap" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 320px) 1fr', gap: '22px', alignItems: 'start' }}>
+              <div className="blueprint-score-ribbon">
+                <div className="primary"><small>Overall edge</small><strong className="mono" style={{ color }}>{overall5 ?? '—'}<span>/5</span></strong></div>
+                <div><small>Location</small><strong className="mono">{rating5 ?? '—'}<span>/5</span></strong></div>
+                <div><small>Arsenal</small><strong className="mono">{arsenalRating5 ?? '—'}<span>/5</span></strong></div>
+                <div><small>Pitch book</small><strong className="mono">{coverage != null ? `${Math.round(coverage * 100)}%` : '—'}</strong></div>
+              </div>
+
+              <div className="z3-wrap blueprint-layout">
                 <div>
-                  {(mode === 'batter' || mode === 'pitcher') && (
-                    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px' }}>
-                      {mode === 'batter'
-                        ? <MetricChips metrics={bMetricsAvail} value={bMetricEff} onChange={setBMetric} />
-                        : <MetricChips metrics={pMetricsAvail} value={pMetricEff} onChange={setPMetric} />}
-                    </div>
-                  )}
-                  <ZoneStrike cells={cells} mode={mode} bFmt={bFmt} pFmt={pFmt} />
+                  <ZoneStrike cells={cells} mode={mode} bFmt={bFmt} pFmt={pFmt} selectedCell={selectedCell} onSelect={setSelectedZone} priorityByIndex={priorityByIndex} />
                 </div>
 
                 <div className="z3-readout" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                  <div className="z3-edge-head">
-                    <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
-                      <RatingStat label="Location" value={rating5} hint="Batter's damage zones × where this pitcher lives" />
-                      <RatingStat label="Arsenal" value={arsenalRating5} hint="Batter SLG vs this pitcher's pitch types, usage-weighted" />
+                  <div className="blueprint-matchup-read">
+                    <div className="blueprint-read-label"><Icon name="Sparkles" size={12} /> Matchup read</div>
+                    {synthesis && <p>{synthesis}</p>}
+                    <div className="blueprint-read-facts">
+                      <span><small>Best pitch edge</small><b>{bestPitchEdge ? `${bestPitchEdge.label} · ${r3(bestPitchEdge.bSlg)}` : 'No qualified edge'}</b></span>
+                      <span className={blindSpot ? 'warn' : ''}><small>Unknown</small><b>{blindSpot ? `${blindSpot.label} · ${Math.round(blindSpot.usage)}% use` : 'Pitch book covered'}</b></span>
                     </div>
-                    {synthesis && (
-                      <p className="z3-synth" style={{ fontSize: '11.5px', lineHeight: 1.45, color: 'var(--text-dim)', margin: '10px 0 0' }}>
-                        <Icon name="Sparkles" size={11} style={{ color: 'var(--accent)', verticalAlign: '-1px', marginRight: '4px' }} />{synthesis}
-                      </p>
-                    )}
                   </div>
 
-                  <div>
-                    <div style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-faint)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                      <Icon name="Flame" size={12} style={{ color: 'var(--prime)' }} /> Attack zones {attackZones.length ? `(${attackZones.length})` : ''}
-                    </div>
-                    {attackZones.length ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        {attackZones.map((c) => (
-                          <div key={c.i} className="z3-attack-row" style={{
-                            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                            padding: '7px 10px', borderRadius: '8px',
-                            background: 'rgba(198,154,87,0.07)', border: '1px solid rgba(198,154,87,0.18)',
-                          }}>
-                            <span style={{ fontSize: '12px', fontWeight: '700', color: '#fff' }}>{c.name}</span>
-                            <span className="mono" style={{ fontSize: '11px', color: 'var(--text-dim)', display: 'flex', gap: '10px' }}>
-                              <span title="Batter ISO in this zone" style={{ color: 'var(--prime)', fontWeight: '700' }}>{r3(c.iso)}</span>
-                              {c.usage != null && <span title="Pitcher usage to this zone">{p0(c.usage)}</span>}
-                            </span>
-                          </div>
-                        ))}
+                  {selectedCell && (
+                    <div className={`selected-zone-read${selectedCell.lowSample ? ' low-sample' : ''}`}>
+                      <div className="selected-zone-head"><span>Selected zone</span><strong>{selectedCell.name}</strong></div>
+                      <div className="selected-zone-stats">
+                        <span><small>Batter ISO</small><b className="mono">{r3(selectedCell.iso)}</b></span>
+                        <span><small>Pitcher use</small><b className="mono">{selectedCell.usage != null ? p0(selectedCell.usage) : '—'}</b></span>
+                        <span><small>Sample</small><b className="mono">{selectedCell.count != null ? `${selectedCell.count} BIP` : '—'}</b></span>
                       </div>
-                    ) : (
-                      <p className="dim" style={{ fontSize: '12px', color: 'var(--text-faint)', margin: 0 }}>
-                        No standout overlap — this pitcher avoids {b?.name?.split(' ').slice(-1)[0] || 'his'} damage zones.
-                      </p>
-                    )}
+                      <p>{selectedCell.matched ? 'Priority overlap: batter damage and pitcher location both point here.' : 'Not a primary overlap in the current attack model.'}</p>
+                      {selectedCell.lowSample && <div className="selected-zone-warning"><Icon name="TriangleAlert" size={11} /> Small sample · shrunk toward season form</div>}
+                    </div>
+                  )}
+
+                  <div className="attack-priority-list">
+                    <div className="attack-priority-title"><Icon name="Flame" size={12} /> Attack priorities</div>
+                    <AttackPriorityCard label="Attack first" cell={priorityCells[0]} rank="1" onSelect={setSelectedZone} />
+                    <AttackPriorityCard label="Secondary window" cell={priorityCells[1]} rank="2" onSelect={setSelectedZone} />
+                    <AttackPriorityCard label={blindSpot ? 'Unknown / avoid' : 'Avoid'} cell={avoidCell} rank="!" tone="avoid" onSelect={setSelectedZone} />
                   </div>
 
                   <div className="z3-legend dim" style={{ fontSize: '11px', display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '12px', color: 'var(--text-faint)' }}>
@@ -525,17 +551,16 @@ export default function ZoneView({ batter: b, onClose }) {
               </div>
             </section>
 
-            <section className="zone-card" style={{
-              background: 'rgba(17, 18, 20, 0.45)',
-              border: '1px solid rgba(255,255,255,0.06)',
-              borderRadius: '14px',
-              padding: '20px',
-            }}>
-              <div className="zone-side-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
-                <h3 className="zone-h3" style={{ fontSize: '13px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px', color: '#fff' }}>
-                  <Icon name="ChartSpline" size={14} style={{ color: 'var(--accent)' }} /> Pitch types
-                  {b?.pitcher?.name && <span style={{ fontSize: '11px', fontWeight: '600', textTransform: 'none', letterSpacing: 0, color: 'var(--text-faint)' }}>· {b.pitcher.name}{pHand ? ` (${pHand})` : ''}</span>}
-                </h3>
+            <section className="zone-card arsenal-disclosure">
+              <button type="button" className="arsenal-summary" onClick={() => setArsenalOpen((open) => !open)} aria-expanded={arsenalOpen}>
+                <span><Icon name="ChartSpline" size={14} /> Arsenal · pitch types</span>
+                <span>{b?.pitcher?.name}{pHand ? ` (${pHand})` : ''}</span>
+                <Icon name="ChevronDown" size={15} className="arsenal-chevron" />
+              </button>
+              {arsenalOpen && (
+              <div className="arsenal-content">
+              <div className="zone-side-head arsenal-filter-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
+                <span className="arsenal-filter-label">Pitch family</span>
                 <div className="zone-metrics" role="group" aria-label="Filter pitch types">
                   {PITCH_FILTERS.map((f) => (
                     <button
@@ -579,8 +604,8 @@ export default function ZoneView({ batter: b, onClose }) {
                   </div>
                   {pitchRows.map((p) => (
                     <div className="pitch-row" key={p.code} style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.5fr 1fr 1fr 1fr', padding: '8px 10px', borderBottom: '1px solid rgba(255,255,255,0.02)', fontSize: '12px', alignItems: 'center' }}>
-                      <span className="pitch-name" style={{ color: '#fff', fontWeight: '600' }}>{p.label}</span>
-                      <span className="pitch-usage" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span className="pitch-name" data-label="Pitch" style={{ color: '#fff', fontWeight: '600' }}>{p.label}</span>
+                      <span className="pitch-usage" data-label="Usage" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <span className="pitch-bar-track" style={{ flex: '1', height: '6px', background: 'rgba(255,255,255,0.05)', borderRadius: '99px', overflow: 'hidden' }}>
                           <span
                             className="pitch-bar-fill"
@@ -596,9 +621,9 @@ export default function ZoneView({ batter: b, onClose }) {
                         </span>
                         <span className="mono" style={{ width: '36px', textAlign: 'right' }}>{p.usage != null ? `${num(p.usage, 0)}%` : '—'}</span>
                       </span>
-                      <span className="mono">{p.speed != null ? `${num(p.speed, 0)} mph` : '—'}</span>
-                      <span className="mono pitch-slg" style={{ color: 'var(--accent)', fontWeight: '700' }}>{r3(p.bSlg)}</span>
-                      <span className="mono">{p.bWhiff != null ? `${num(p.bWhiff, 0)}%` : '—'}</span>
+                      <span className="mono" data-label="Velo">{p.speed != null ? `${num(p.speed, 0)} mph` : '—'}</span>
+                      <span className="mono pitch-slg" data-label="Batter SLG" style={{ color: 'var(--accent)', fontWeight: '700' }}>{r3(p.bSlg)}</span>
+                      <span className="mono" data-label="Whiff">{p.bWhiff != null ? `${num(p.bWhiff, 0)}%` : '—'}</span>
                     </div>
                   ))}
                 </div>
@@ -610,26 +635,11 @@ export default function ZoneView({ batter: b, onClose }) {
                 <Bucket label="Breaking" usage={mix.breakingPct} slg={arsenal.breakingSlg} />
                 <Bucket label="Offspeed" usage={mix.offspeedPct} slg={arsenal.offspeedSlg} />
               </div>
+              </div>
+              )}
             </section>
           </>
         )}
-      </div>
-    </div>
-  )
-}
-
-function RatingStat({ label, value, hint }) {
-  const c = value == null ? 'var(--text-faint)' : value >= 3.5 ? 'var(--strong)' : value >= 2 ? 'var(--accent)' : 'var(--text-dim)'
-  return (
-    <div title={hint}>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
-        <span className="mono" style={{ fontSize: '28px', fontWeight: '800', color: c, lineHeight: 1 }}>{value != null ? value : '—'}<span style={{ fontSize: '13px', color: 'var(--text-faint)', fontWeight: '700' }}>/5</span></span>
-        <span style={{ fontSize: '10px', color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: '700' }}>{label}</span>
-      </div>
-      <div style={{ display: 'flex', gap: '3px', marginTop: '6px' }} aria-label={`${label} ${value ?? 0} of 5`}>
-        {[1, 2, 3, 4, 5].map((n) => (
-          <span key={n} style={{ width: '10px', height: '10px', borderRadius: '50%', background: n <= Math.round(value ?? 0) ? c : 'rgba(255,255,255,0.10)', boxShadow: n <= Math.round(value ?? 0) ? `0 0 6px ${c}` : 'none' }} />
-        ))}
       </div>
     </div>
   )
