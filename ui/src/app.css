@@ -14436,6 +14436,170 @@ button.th:focus-visible {
   .mobile-player-signals > span { padding-inline: 6px; }
 }
 
+/* Structured player explainer: engine-owned projection and evidence wrapped in
+   one AI bottom line. Legacy paragraph responses remain readable during rollout. */
+.explain-decision {
+  min-width: 0;
+  display: grid;
+  gap: 12px;
+}
+.explain-decision-strip {
+  min-width: 0;
+  min-height: 40px;
+  padding: 7px 9px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, transparent);
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+.explain-decision-grade {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--text-faint);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.explain-decision-grade .sb-chip { flex: none; font-size: 8px; padding: 2px 6px; }
+.explain-decision-grade .sb-chip:not(.sb-prime):not(.sb-strong) {
+  color: var(--text-dim);
+  border: 1px solid var(--border-soft);
+  background: rgba(255,255,255,.045);
+}
+.explain-decision-strip > strong {
+  flex: none;
+  color: #fff;
+  font-family: var(--mono);
+  font-size: 14px;
+  letter-spacing: -.03em;
+}
+.explain-decision-strip > strong small {
+  color: var(--text-faint);
+  font-family: var(--sans);
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: .04em;
+}
+.explain-balance {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.explain-side {
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid var(--border-soft);
+  border-radius: 9px;
+  background: rgba(255,255,255,.018);
+}
+.explain-case {
+  border-color: color-mix(in srgb, var(--strong) 22%, transparent);
+  background: color-mix(in srgb, var(--strong) 4%, transparent);
+}
+.explain-caution {
+  border-color: color-mix(in srgb, var(--warn) 22%, transparent);
+  background: color-mix(in srgb, var(--warn) 4%, transparent);
+}
+.explain-side-label {
+  min-width: 0;
+  margin-bottom: 7px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-dim);
+  font-size: 8px;
+  font-weight: 850;
+  letter-spacing: .045em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+.explain-case .explain-side-label { color: var(--strong); }
+.explain-caution .explain-side-label { color: var(--warn); }
+.explain-signal-list { min-width: 0; display: grid; gap: 7px; }
+.explain-signal {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 13px minmax(0, 1fr);
+  align-items: start;
+  gap: 5px;
+  color: var(--text-dim);
+  font-size: 10px;
+  line-height: 1.38;
+}
+.explain-signal svg { margin-top: 1px; color: var(--text-faint); }
+.explain-case .explain-signal svg { color: var(--strong); }
+.explain-caution .explain-signal svg { color: var(--warn); }
+.explain-signal span { min-width: 0; overflow-wrap: anywhere; }
+.explain-bottom-line {
+  margin: 0;
+  padding-top: 10px;
+  color: var(--text);
+  border-top: 1px solid var(--border-soft);
+  font-size: 11.5px;
+  line-height: 1.48;
+}
+.explain-bottom-line span {
+  margin-right: 5px;
+  color: var(--accent);
+  font-size: 9px;
+  font-weight: 850;
+  letter-spacing: .045em;
+  text-transform: uppercase;
+}
+.explain-advisory {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-faint);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  line-height: 1.25;
+  text-transform: uppercase;
+}
+.explain-prompt {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+.explain-run {
+  min-height: 40px;
+  padding: 8px 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--accent);
+  border: 1px solid rgba(151,149,203,.25);
+  border-radius: 9px;
+  background: rgba(151,149,203,.08);
+  font-size: 13px;
+  font-weight: 750;
+  cursor: pointer;
+  transition: background .15s, border-color .15s, transform .1s;
+}
+.explain-run:hover:not(:disabled) { border-color: rgba(151,149,203,.42); background: rgba(151,149,203,.13); }
+.explain-run:active:not(:disabled) { transform: scale(.98); }
+.explain-run:disabled { cursor: default; opacity: .7; }
+.explain-run:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.explain-helper { color: var(--text-faint); font-size: 11px; line-height: 1.4; }
+.explain-legacy { margin: 0; color: var(--text); font-size: 13px; line-height: 1.5; }
+
+@media (max-width: 560px) {
+  .explain-run { min-height: 44px; }
+  .explain-pick-card { padding: 12px !important; }
+}
+@media (max-width: 380px) {
+  .explain-balance { grid-template-columns: 1fr; }
+}
+
 /* Mobile board filters: compact scope, one-line quick filters, and progressive
    signal disclosure. The wrappers flatten on desktop, preserving its toolbar. */
 .mobile-filter-panel-head,

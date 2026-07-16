@@ -18,7 +18,7 @@ import WeatherView from '../src/components/WeatherView.jsx'
 import GroupsView from '../src/components/GroupsView.jsx'
 import ResultsView from '../src/components/ResultsView.jsx'
 import CombosView from '../src/components/CombosView.jsx'
-import PlayerDrawer from '../src/components/PlayerDrawer.jsx'
+import PlayerDrawer, { PlayerCaseVsCaution } from '../src/components/PlayerDrawer.jsx'
 import ZoneView from '../src/components/ZoneView.jsx'
 import ParlaySlip from '../src/components/ParlaySlip.jsx'
 import ParlayBuilder from '../src/components/ParlayBuilder.jsx'
@@ -200,6 +200,15 @@ add('UpdateBanner', <UpdateBanner />)
 add('PullToRefresh', <PullToRefresh onRefresh={noop} />)
 add('BacktestView', <BacktestView />)
 add('PickOfDay', <PickOfDay batter={normal} onSelect={noop} watched={false} inSlip={false} onToggleWatch={noop} onToggleSlip={noop} />)
+add('PlayerCaseVsCaution', <PlayerCaseVsCaution b={normal} explanation={{
+  version: 2,
+  bottomLine: 'Power and matchup evidence support the model while outcome variance remains central.',
+  caseSignals: [
+    { id: 'signal:0', icon: 'flame', text: 'Serious power is meeting a favorable pitch profile.' },
+    { id: 'signal:1', icon: 'target', text: 'The contact-quality evidence supports the model grade.' },
+  ],
+  cautionSignal: { id: 'variance', icon: 'shield', text: 'The projection is an estimated chance, not a predicted outcome.' },
+}} />)
 add('ListBuilderView', <ListBuilderView batters={batters} onSelect={noop} watchlist={new Set()} slip={new Set()} onToggleWatch={noop} onToggleSlip={noop} />)
 add('MlbDataHealthBanner.ready', <MlbDataHealthBanner health={{ status: 'ready' }} />)
 add('MlbDataHealthBanner.limited', <MlbDataHealthBanner health={{

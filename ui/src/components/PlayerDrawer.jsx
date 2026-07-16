@@ -2233,40 +2233,91 @@ function LiveSection({ b }) {
 // reason lines to narrate.
 // ---------------------------------------------------------------------------
 
+export function PlayerCaseVsCaution({ b, explanation }) {
+  const grade = String(b.grade?.label || b.grade || 'SKIP').toUpperCase()
+  return (
+    <div className="explain-decision">
+      <div className="explain-decision-strip">
+        <div className="explain-decision-grade">
+          <span className={`sb-chip sb-${grade.toLowerCase()}`}>{grade}</span>
+          <span>Model grade</span>
+        </div>
+        {Number.isFinite(b.hrProbability) && (
+          <strong>{pct(b.hrProbability, 1)} <small>HR</small></strong>
+        )}
+      </div>
+
+      <div className="explain-balance">
+        <div className="explain-side explain-case">
+          <div className="explain-side-label">
+            <Icon name="TrendingUp" size={12} /> Best case
+          </div>
+          <div className="explain-signal-list">
+            {(explanation.caseSignals || []).slice(0, 2).map((signal) => (
+              <div className="explain-signal" key={signal.id}>
+                <Icon name={eli5IconName(signal.icon)} size={11} />
+                <span>{signal.text}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="explain-side explain-caution">
+          <div className="explain-side-label">
+            <Icon name="TriangleAlert" size={12} /> What can stop it
+          </div>
+          <div className="explain-signal-list">
+            <div className="explain-signal">
+              <Icon name={eli5IconName(explanation.cautionSignal?.icon)} size={11} />
+              <span>{explanation.cautionSignal?.text}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <p className="explain-bottom-line">
+        <span>AI bottom line</span>{explanation.bottomLine}
+      </p>
+      <div className="explain-advisory">
+        <Icon name="Shield" size={9} /> Engine projection unchanged · advisory only
+      </div>
+    </div>
+  )
+}
+
 function ExplainPick({ b }) {
-  const { status, text, run, available } = useExplain(b)
+  const { status, explanation, run, available } = useExplain(b)
   if (!available) return null
 
+  const structured = status === 'done' && Number(explanation?.version) === 2
+
   return (
-    <Section title="Explain this pick" icon="Sparkles">
-      {status === 'done' && (
-        <p style={{ fontSize: '13px', lineHeight: '1.5', color: 'var(--text)', margin: 0 }}>{text}</p>
+    <Section title="Explain this pick" icon="Sparkles" className="explain-pick-card">
+      {structured && (
+        <PlayerCaseVsCaution b={b} explanation={explanation} />
+      )}
+      {status === 'done' && !structured && explanation?.text && (
+        <p className="explain-legacy">{explanation.text}</p>
       )}
       {status !== 'done' && (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '8px' }}>
+        <div className="explain-prompt">
           <button
             onClick={run}
             disabled={status === 'loading'}
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: '7px',
-              background: 'rgba(151,149,203,0.08)', border: '1px solid rgba(151,149,203,0.25)',
-              color: 'var(--accent)', padding: '8px 14px', borderRadius: '9px',
-              fontSize: '13px', fontWeight: '700', cursor: status === 'loading' ? 'default' : 'pointer',
-              opacity: status === 'loading' ? 0.7 : 1,
-            }}
+            className="explain-run"
           >
             <Icon name={status === 'loading' ? 'Loader' : 'Sparkles'} size={14}
               style={status === 'loading' ? { animation: 'spin 1s linear infinite' } : undefined} />
-            {status === 'loading' ? 'Thinking…' : 'Explain this pick'}
+            {status === 'loading' ? 'Building case…' : 'Explain this pick'}
           </button>
           {status === 'error' && (
-            <span style={{ fontSize: '11px', color: 'var(--text-faint)' }}>
+            <span className="explain-helper">
               Couldn't reach the explainer — tap to retry.
             </span>
           )}
           {status === 'idle' && (
-            <span style={{ fontSize: '11px', color: 'var(--text-faint)' }}>
-              Plain-English summary of why the model rates {b.name.split(' ').slice(-1)[0]} this way.
+            <span className="explain-helper">
+              See the strongest case, the clearest caution, and the model's bottom line.
             </span>
           )}
         </div>

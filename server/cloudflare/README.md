@@ -92,7 +92,7 @@ app calls directly from the browser:
 | `/parse` | POST | Natural-language → backtest filter chips (Signal Backtest UI). |
 | `/list-builder` | POST | Natural-language → visible, editable List Builder criteria. |
 | `/list-builder-analyst` | POST | Aggregate-only List Builder diagnosis, recipe comparison, and one allow-listed safe relaxation. |
-| `/explain` | POST | Plain-English "why this pick" narration for the player card. |
+| `/explain` | POST | Structured Case-vs-Caution player explanation; legacy paragraph narration for combos. |
 | `/savant-bip` | GET | CORS proxy for Baseball Savant batted-ball data (spray chart). |
 
 `/parse`, `/list-builder`, `/list-builder-analyst`, and `/explain` use OpenAI structured outputs, so they need an OpenAI
