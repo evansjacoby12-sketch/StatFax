@@ -87,13 +87,38 @@ test('Decision Brief summary deduplicates and exposes deterministic candidates',
   assert.equal(summary.primeCount, 2)
   assert.equal(summary.strongCount, 1)
   assert.equal(summary.confirmedCount, 2)
-  assert.deepEqual(summary.leaders.map((item) => item.id), ['player:9', 'player:7', 'player:8'])
+  assert.deepEqual(summary.leaders.map((item) => item.id), ['player:9:102', 'player:7:101', 'player:8:101'])
   assert.deepEqual(summary.environments.map((item) => item.id), ['game:102', 'game:101'])
   assert.equal(summary.environments[0].venue, 'Bay Park')
   assert.equal(summary.environments[0].score, 88)
   assert.deepEqual(summary.watchouts.map((item) => item.id), ['alert:0', 'concentration', 'lineups', 'variance'])
-  assert.equal(summary.watchouts[1].fact, '2 of 3 hitters come from NYY @ BOS.')
-  assert.equal(summary.watchouts[2].fact, '2 of 3 hitters have confirmed lineup spots.')
+  assert.equal(summary.watchouts[1].fact, '2 of 3 board entries come from NYY @ BOS.')
+  assert.equal(summary.watchouts[2].fact, '2 of 3 board entries have confirmed lineup spots.')
+})
+
+test('Decision Brief keeps both doubleheader matchups distinct', () => {
+  const doubleheader = {
+    ...slate,
+    games: [
+      ...slate.games,
+      { gamePk: 103, venueName: 'Test Park', awayTeam: { abbr: 'NYY' }, homeTeam: { abbr: 'BOS' } },
+    ],
+    scoredBatters: {
+      ...slate.scoredBatters,
+      '7-103': {
+        ...slate.scoredBatters['7-101'],
+        gamePk: 103,
+        score: 91,
+        hrProbability: 0.27,
+        pitcher: { name: 'Game Two Arm' },
+      },
+    },
+  }
+  const summary = summarizeSlateBrief(doubleheader, [])
+  assert.equal(summary.batCount, 4)
+  assert.deepEqual(summary.leaders.slice(0, 2).map((item) => item.id), ['player:7:103', 'player:9:102'])
+  assert.equal(summary.leaders[0].pitcher, 'Game Two Arm')
+  assert.ok(summary.leaders.some((item) => item.id === 'player:7:101'))
 })
 
 test('Decision Brief schema restricts every selection to engine IDs', () => {
@@ -104,7 +129,7 @@ test('Decision Brief schema restricts every selection to engine IDs', () => {
   assert.equal(schema.properties.leaders.maxItems, 2)
   assert.deepEqual(
     schema.properties.leaders.items.properties.id.enum,
-    ['player:9', 'player:7', 'player:8'],
+    ['player:9:102', 'player:7:101', 'player:8:101'],
   )
   assert.deepEqual(
     schema.properties.environment.properties.id.enum,
@@ -118,7 +143,7 @@ test('Decision Brief schema restricts every selection to engine IDs', () => {
   const prompt = buildBriefPrompt(summary)
   assert.match(prompt, /Choose exactly 2 distinct leader IDs/)
   assert.match(prompt, /Never invent or alter/)
-  assert.match(prompt, /player:9/)
+  assert.match(prompt, /player:9:102/)
 })
 
 test('Decision Brief assembly rejects invented facts and preserves engine values', () => {
@@ -126,9 +151,9 @@ test('Decision Brief assembly rejects invented facts and preserves engine values
   const result = assembleDecisionBrief(summary, {
     headline: 'Ninety nine percent lock of the day',
     leaders: [
-      { id: 'player:7', note: 'A 24% lock with massive value', probability: 0.99 },
-      { id: 'player:7', note: 'Duplicate selection' },
-      { id: 'player:999', note: 'Invented player' },
+      { id: 'player:7:101', note: 'A 24% lock with massive value', probability: 0.99 },
+      { id: 'player:7:101', note: 'Duplicate selection' },
+      { id: 'player:999:999', note: 'Invented player' },
     ],
     environment: { id: 'game:999', note: 'Invented environment' },
     watchout: { id: 'alert:999', note: 'Invented alert' },
@@ -142,7 +167,7 @@ test('Decision Brief assembly rejects invented facts and preserves engine values
   assert.equal(result.generatedAt, '2026-07-16T12:00:00.000Z')
   assert.equal(result.model, 'gpt-test')
   assert.equal(result.headline, 'Alex Power leads the current home-run board.')
-  assert.deepEqual(result.leaders.map((item) => item.id), ['player:7', 'player:9'])
+  assert.deepEqual(result.leaders.map((item) => item.id), ['player:7:101', 'player:9:102'])
   assert.equal(result.leaders[0].name, 'Alex Power')
   assert.equal(result.leaders[0].grade, 'PRIME')
   assert.equal(result.leaders[0].hrProbability, 0.18)
@@ -161,15 +186,15 @@ test('Decision Brief accepts concise narrative for valid allow-listed selections
   const result = assembleDecisionBrief(summary, {
     headline: 'A concentrated board puts matchup quality ahead of volume.',
     leaders: [
-      { id: 'player:9', note: 'Contact quality and matchup shape reinforce the model lead.' },
-      { id: 'player:8', note: 'Pitch shape creates a useful secondary path.' },
+      { id: 'player:9:102', note: 'Contact quality and matchup shape reinforce the model lead.' },
+      { id: 'player:8:101', note: 'Pitch shape creates a useful secondary path.' },
     ],
     environment: { id: 'game:101', note: 'The park context supports both sides of this matchup.' },
     watchout: { id: 'lineups', note: 'Wait for the remaining batting order to settle.' },
   })
 
   assert.equal(result.headline, 'A concentrated board puts matchup quality ahead of volume.')
-  assert.deepEqual(result.leaders.map((item) => item.id), ['player:9', 'player:8'])
+  assert.deepEqual(result.leaders.map((item) => item.id), ['player:9:102', 'player:8:101'])
   assert.match(result.leaders[0].note, /Contact quality/)
   assert.equal(result.environment.id, 'game:101')
   assert.match(result.watchout.note, /batting order/)

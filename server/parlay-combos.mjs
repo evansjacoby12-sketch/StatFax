@@ -163,7 +163,8 @@ export function freezeComboInputs(row) {
 /**
  * Build the canonical combo records from a list of comboRowFromSnapshot rows.
  * Delegates construction to the shared engine, then flattens to compact records:
- * { strategy, size, legs: [playerId, …], pred } — just enough to grade and report.
+ * { strategy, size, legs: [{ playerId, gamePk }, …], pred } so every modern
+ * record can be graded against the exact selected doubleheader game.
  * `pred` = predicted all-hit prob (product of leg HR probs, null if any leg lacks
  * one) so the scorecard can compare predicted vs actual cash rate.
  */
@@ -173,8 +174,9 @@ export function buildComboRecords(rows, opts = {}) {
   return buildCombos(rows, { includeBeta: true, ...opts }).map((c) => ({
     strategy: c.strategy,
     size: c.size,
-    legs: c.legs.map((l) => l.playerId),
+    legs: c.legs.map((l) => ({ playerId: l.playerId, gamePk: l.gamePk })),
     pred: allHitProb(c.legs.map((l) => l.hrProb)),
+    identityVersion: 2,
   }));
 }
 
@@ -185,32 +187,93 @@ export function buildComboRecords(rows, opts = {}) {
  * a day the canonical combos went 0-fer, the grades were right and it was combo
  * variance, not a model miss.
  */
-export function bestAvailableCombo(rows, homerers, tiers = ['PRIME', 'STRONG']) {
-  const byGame = new Map();
+export function bestAvailableCombo(rows, outcomes, tiers = ['PRIME', 'STRONG']) {
+  const homerersByGame = outcomes?.homerersByKey instanceof Set ? outcomes.homerersByKey : null;
+  const homerersByPlayer = outcomes instanceof Set
+    ? outcomes
+    : (outcomes?.homerers instanceof Set ? outcomes.homerers : new Set());
+  const bestByGame = new Map();
   for (const b of rows) {
     if (!b || b.gamePk == null) continue;
     if (!tiers.includes(b.grade)) continue;
-    if (!homerers.has(Number(b.playerId))) continue;
-    const cur = byGame.get(b.gamePk);
-    if (!cur || (b.score ?? 0) > (cur.score ?? 0)) byGame.set(b.gamePk, b);
+    const homered = homerersByGame
+      ? homerersByGame.has(`${Number(b.playerId)}-${b.gamePk}`)
+      : homerersByPlayer.has(Number(b.playerId));
+    if (!homered) continue;
+    const cur = bestByGame.get(b.gamePk);
+    if (!cur || (b.score ?? 0) > (cur.score ?? 0)) bestByGame.set(b.gamePk, b);
   }
-  const all = [...byGame.values()].sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+  const ranked = [...bestByGame.values()].sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+  const seenPlayers = new Set();
+  const all = ranked.filter((leg) => {
+    if (seenPlayers.has(leg.playerId)) return false;
+    seenPlayers.add(leg.playerId);
+    return true;
+  });
   // Cap at the largest buildable combo size — a perfect parlay you couldn't have
   // built (more legs than the max size) isn't actionable. `games` keeps the raw
   // count so we can note when even more were sittable.
   const cap = Math.max(...SIZES);
   const legs = all.slice(0, cap);
-  return { n: legs.length, games: all.length, legs: legs.map((l) => ({ playerId: l.playerId, name: l.name, grade: l.grade })) };
+  return { n: legs.length, games: all.length, legs: legs.map((l) => ({ playerId: l.playerId, gamePk: l.gamePk, name: l.name, grade: l.grade })) };
 }
 
 /**
- * Grade combos against a Set<number> of playerIds who homered. Adds nHit (legs
- * that homered) and allHit (the parlay cashed).
+ * Grade combos against official outcome indexes. Modern legs require exact
+ * player-game outcomes; ambiguous legacy legs remain visible but ungraded.
  */
-export function gradeCombos(combos, homerers) {
+export function gradeCombos(combos, outcomes = {}) {
+  const homerersByGame = outcomes?.homerersByKey instanceof Set ? outcomes.homerersByKey : null;
+  const homerersByPlayer = outcomes instanceof Set
+    ? outcomes
+    : (outcomes?.homerers instanceof Set ? outcomes.homerers : new Set());
+  const gamesByPlayer = new Map();
+  if (outcomes?.playedByKey instanceof Set) {
+    for (const key of outcomes.playedByKey) {
+      const [playerId, gamePk] = String(key).split('-');
+      if (!gamesByPlayer.has(playerId)) gamesByPlayer.set(playerId, new Set());
+      gamesByPlayer.get(playerId).add(gamePk);
+    }
+  }
   return combos.map((c) => {
-    const nHit = c.legs.filter((pid) => homerers.has(Number(pid))).length;
-    return { strategy: c.strategy, size: c.size, legs: c.legs, nHit, allHit: nHit === c.legs.length, pred: Number.isFinite(c.pred) ? c.pred : null };
+    const legs = Array.isArray(c.legs) ? c.legs : [];
+    const modern = legs.every((leg) => leg && typeof leg === 'object' && leg.playerId != null && leg.gamePk != null);
+    if (modern && !homerersByGame) {
+      return {
+        ...c,
+        nHit: null,
+        allHit: null,
+        identityVersion: 2,
+        settlementUnavailable: true,
+        pred: Number.isFinite(c.pred) ? c.pred : null,
+      };
+    }
+    const ambiguousLegacy = !modern && legs.some((leg) => (
+      (gamesByPlayer.get(String(Number(leg?.playerId ?? leg)))?.size || 0) > 1
+    ));
+    if (ambiguousLegacy) {
+      return {
+        ...c,
+        nHit: null,
+        allHit: null,
+        identityVersion: 1,
+        legacyIdentity: true,
+        settlementUnavailable: true,
+        pred: Number.isFinite(c.pred) ? c.pred : null,
+      };
+    }
+    const didHomer = (leg) => modern
+      ? homerersByGame.has(`${Number(leg.playerId)}-${leg.gamePk}`)
+      : homerersByPlayer.has(Number(leg?.playerId ?? leg));
+    const nHit = legs.filter(didHomer).length;
+    return {
+      ...c,
+      nHit,
+      allHit: legs.length > 0 && nHit === legs.length,
+      identityVersion: modern ? 2 : 1,
+      legacyIdentity: !modern,
+      pred: Number.isFinite(c.pred) ? c.pred : null,
+    };
   });
 }
 

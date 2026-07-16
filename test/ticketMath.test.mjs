@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { gradeTicket, summarizeTickets, ticketEconomics } from '../ui/src/lib/ticketMath.js'
+import { ticketId } from '../ui/src/lib/ticketIdentity.js'
 
 const ticket = (patch = {}) => ({
   id: 't1',
@@ -23,6 +24,29 @@ test('gradeTicket preserves doubleheader game identity and reports live progress
   assert.equal(graded.status, 'live')
   assert.equal(graded.hits, 1)
   assert.deepEqual(graded.legs.map((leg) => leg.code), ['hit', 'live'])
+})
+
+test('gradeTicket never falls back to the other doubleheader game', () => {
+  const graded = gradeTicket(ticket({ legs: [{ playerId: 1, gamePk: 10, name: 'One' }] }), [
+    { playerId: 1, gamePk: 9, game: { isFinal: true }, homeredThisGame: true },
+  ])
+  assert.equal(graded.legs[0].code, 'unknown')
+  assert.equal(graded.legs[0].batter, null)
+})
+
+test('legacy ticket without gamePk stays ungraded on a doubleheader slate', () => {
+  const graded = gradeTicket(ticket({ legs: [{ playerId: 1, name: 'One' }] }), [
+    { playerId: 1, gamePk: 9, game: { isFinal: true }, homeredThisGame: true },
+    { playerId: 1, gamePk: 10, game: { isFinal: true }, homeredThisGame: false },
+  ])
+  assert.equal(graded.legs[0].code, 'unknown')
+  assert.equal(graded.legs[0].legacyIdentity, true)
+})
+
+test('ticket IDs include game identity for different doubleheader assignments', () => {
+  const first = ticketId([{ playerId: 1, gamePk: 9 }, { playerId: 2, gamePk: 20 }], '2026-07-16')
+  const second = ticketId([{ playerId: 1, gamePk: 10 }, { playerId: 2, gamePk: 20 }], '2026-07-16')
+  assert.notEqual(first, second)
 })
 
 test('ticketEconomics only computes profit when wager and odds are complete', () => {

@@ -261,7 +261,8 @@ function makeLegCmp(rank, items) {
   return (a, b) =>
     (quantize(rank(b), rTol) - quantize(rank(a), rTol)) ||
     (quantize(b.score ?? 0, sTol) - quantize(a.score ?? 0, sTol)) ||
-    ((a.playerId ?? 0) - (b.playerId ?? 0))
+    ((a.playerId ?? 0) - (b.playerId ?? 0)) ||
+    ((a.gamePk ?? 0) - (b.gamePk ?? 0))
 }
 
 const COMBO_TIERS = new Set(['PRIME', 'STRONG'])

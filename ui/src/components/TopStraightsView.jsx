@@ -195,12 +195,12 @@ export default function TopStraightsView({ batters, onSelect, slipSet, onToggleS
       const grade = batter.grade?.label || batter.grade || 'SKIP'
       return ELIGIBLE_GRADES.has(grade) && Number.isFinite(batter.hrProbability) && !batter.game?.isFinal && !batter.game?.isLive && !isBenched(batter)
     })
-    const boardOrder = [...eligible].sort((a, b) => (b.hrProbability ?? 0) - (a.hrProbability ?? 0) || (b.score ?? 0) - (a.score ?? 0) || String(a.playerId).localeCompare(String(b.playerId)))
-    const boardRanks = new Map(boardOrder.map((batter, index) => [batter.playerId ?? batter.id, index + 1]))
+    const boardOrder = [...eligible].sort((a, b) => (b.hrProbability ?? 0) - (a.hrProbability ?? 0) || (b.score ?? 0) - (a.score ?? 0) || String(a.id ?? `${a.playerId}-${a.gamePk}`).localeCompare(String(b.id ?? `${b.playerId}-${b.gamePk}`)))
+    const boardRanks = new Map(boardOrder.map((batter, index) => [batter.id ?? `${batter.playerId}-${batter.gamePk}`, index + 1]))
     return eligible
       .map(buildCase)
-      .map((item) => ({ ...item, boardRank: boardRanks.get(item.batter.playerId ?? item.batter.id) }))
-      .sort((a, b) => b.caseScore - a.caseScore || b.topEvidence.length - a.topEvidence.length || b.probability - a.probability || String(a.batter.playerId).localeCompare(String(b.batter.playerId)))
+      .map((item) => ({ ...item, boardRank: boardRanks.get(item.batter.id ?? `${item.batter.playerId}-${item.batter.gamePk}`) }))
+      .sort((a, b) => b.caseScore - a.caseScore || b.topEvidence.length - a.topEvidence.length || b.probability - a.probability || String(a.batter.id ?? `${a.batter.playerId}-${a.batter.gamePk}`).localeCompare(String(b.batter.id ?? `${b.batter.playerId}-${b.batter.gamePk}`)))
       .slice(0, 10)
   }, [batters])
 

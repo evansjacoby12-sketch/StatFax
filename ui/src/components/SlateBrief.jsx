@@ -64,7 +64,7 @@ function DecisionBrief({ brief }) {
                 <div className="slate-brief-leader-copy">
                   <div className="slate-brief-leader-name">
                     <strong>{leader.name}</strong>
-                    {leader.team && <span>{leader.team}</span>}
+                    {leader.team && <span>{leader.team}{Number.isFinite(leader.gameNumber) ? ` · G${leader.gameNumber}` : ''}</span>}
                   </div>
                   {leader.note && <p className="slate-brief-leader-note">{leader.note}</p>}
                   {leader.pitcher && <span className="slate-brief-matchup">vs {leader.pitcher}</span>}

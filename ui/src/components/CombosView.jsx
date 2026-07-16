@@ -72,10 +72,29 @@ export default function CombosView({ batters, onSelect, favorConsistency = false
       ...windows.map((w, i) => ({ value: `w${i}`, label: `${w.label} (${w.games}g)` })),
       ...(!windows.length && hasLate ? [{ value: 'late', label: 'Evening Board' }] : []),
     ]
-    const recByDay = (d) => { const map = new Map(); for (const r of log.records?.[d] || []) map.set(Number(r.playerId), r); return map }
+    const indexRows = (rows) => {
+      const byGame = new Map()
+      const byPlayer = new Map()
+      const ambiguousPlayers = new Set()
+      for (const row of rows || []) {
+        const playerId = Number(row?.playerId)
+        if (!Number.isFinite(playerId)) continue
+        if (byPlayer.has(playerId)) ambiguousPlayers.add(playerId)
+        else byPlayer.set(playerId, row)
+        if (row.gamePk != null) byGame.set(`${playerId}:${row.gamePk}`, row)
+      }
+      return { byGame, byPlayer, ambiguousPlayers }
+    }
+    const resolveLeg = (index, leg, fallbackGamePk = null) => {
+      const playerId = Number(leg?.playerId ?? leg)
+      const gamePk = leg && typeof leg === 'object' && leg.gamePk != null ? leg.gamePk : fallbackGamePk
+      if (gamePk != null) return index.byGame.get(`${playerId}:${gamePk}`) || null
+      return index.ambiguousPlayers.has(playerId) ? null : (index.byPlayer.get(playerId) || null)
+    }
+    const recByDay = (d) => indexRows(log.records?.[d] || [])
     // Live fallback for today's un-reconciled day (no records yet → read HR
     // status from the live slate instead of showing #playerId / all misses).
-    const liveById = new Map((batters || []).map((b) => [Number(b.playerId), { name: b.name, st: legStatus(b) }]))
+    const liveIndex = indexRows(batters || [])
     const dayCombos = (() => {
       if (!activeComboDay) return []
       const recs = recByDay(activeComboDay)
@@ -83,18 +102,21 @@ export default function CombosView({ batters, onSelect, favorConsistency = false
       return (src || [])
         .filter((c) => showCombo(c) && c.size <= 3 && (!comboSize || c.size === comboSize))
         .map((c) => {
-          const legs = (c.legs || []).map((pid) => {
-            const r = recs.get(Number(pid))
-            const lb = liveById.get(Number(pid))
-            const name = r?.name || lb?.name || `#${pid}`
+          const legacyIdentity = c.legacyIdentity === true || (c.legs || []).some((leg) => !leg || typeof leg !== 'object' || leg.gamePk == null)
+          const legs = (c.legs || []).map((leg) => {
+            const playerId = Number(leg?.playerId ?? leg)
+            const r = resolveLeg(recs, leg)
+            const lb = resolveLeg(liveIndex, leg)
+            const name = r?.name || lb?.name || `#${playerId}`
             let status
             if (r) status = r.homered === true ? 'hit' : 'dead'
-            else if (lb) status = lb.st.code === 'hit' ? 'hit' : lb.st.code === 'dead' ? 'dead' : 'live'
-            else status = 'dead'
+            else if (lb) { const st = legStatus(lb); status = st.code === 'hit' ? 'hit' : st.code === 'dead' ? 'dead' : 'live' }
+            else status = 'unknown'
             return { name: surname(name), homered: status === 'hit', status }
           })
           const nHit = legs.filter((l) => l.homered).length
-          return { strategy: c.strategy, size: c.size, nHit, allHit: legs.length > 0 && nHit === legs.length, legs }
+          const settledKnown = legs.length > 0 && legs.every((leg) => leg.status !== 'unknown')
+          return { strategy: c.strategy, size: c.size, nHit, allHit: settledKnown && nHit === legs.length, legs, legacyIdentity, settledKnown }
         })
         .sort((a, b) => Number(b.allHit) - Number(a.allHit) || a.size - b.size)
     })()
@@ -105,7 +127,7 @@ export default function CombosView({ batters, onSelect, favorConsistency = false
         let hit = 0, tot = 0
         for (const c of combos || []) {
           if (!showCombo(c) || c.size > 3) continue
-          const legs = (c.legs || []).map((pid) => recs.get(Number(pid)))
+          const legs = (c.legs || []).map((leg) => resolveLeg(recs, leg))
           if (!legs.length || legs.some((r) => !r)) continue
           tot++
           if (legs.every((r) => r.homered === true)) hit++
@@ -140,18 +162,19 @@ export default function CombosView({ batters, onSelect, favorConsistency = false
       return out
     }
     const sgpRaw = activeComboDay ? sgpSource(activeComboDay) : []
-    const recsForSgp = activeComboDay ? recByDay(activeComboDay) : new Map()
+    const recsForSgp = activeComboDay ? recByDay(activeComboDay) : indexRows([])
     const sgpDay = sgpRaw
       .filter((s) => !comboSize || s.size === comboSize)
       .map((s) => {
-        const legs = (s.legs || []).map((pid) => {
-          const r = recsForSgp.get(Number(pid))
-          const lb = liveById.get(Number(pid))
-          const name = r?.name || lb?.name || `#${pid}`
+        const legs = (s.legs || []).map((leg) => {
+          const playerId = Number(leg?.playerId ?? leg)
+          const r = resolveLeg(recsForSgp, leg, s.gamePk)
+          const lb = resolveLeg(liveIndex, leg, s.gamePk)
+          const name = r?.name || lb?.name || `#${playerId}`
           let status
           if (r) status = r.homered === true ? 'hit' : 'dead'
-          else if (lb) status = lb.st.code === 'hit' ? 'hit' : lb.st.code === 'dead' ? 'dead' : 'live'
-          else status = 'dead'
+          else if (lb) { const st = legStatus(lb); status = st.code === 'hit' ? 'hit' : st.code === 'dead' ? 'dead' : 'live' }
+          else status = 'unknown'
           return { name: surname(name), status }
         })
         const nHit = legs.filter((l) => l.status === 'hit').length
@@ -259,14 +282,15 @@ export default function CombosView({ batters, onSelect, favorConsistency = false
                 border: `1px solid ${c.allHit ? 'rgba(105, 185, 158, 0.2)' : 'rgba(255,255,255,0.04)'}`,
                 padding: '10px 14px', borderRadius: '8px'
               }}>
-                <span className="combo-res-badge" style={{ fontSize: '16px' }}>{c.allHit ? <Icon name="Check" size={15} /> : `${c.nHit}/${c.size}`}</span>
+                <span className="combo-res-badge" style={{ fontSize: '16px' }}>{c.allHit ? <Icon name="Check" size={15} /> : c.settledKnown ? `${c.nHit}/${c.size}` : '—'}</span>
                 <span className="combo-res-strat" style={{ fontWeight: '700', fontSize: '13px', color: '#fff', width: '100px' }}>{STRAT_LABEL[c.strategy] || c.strategy}</span>
                 <span className="combo-res-size dim" style={{ fontSize: '11px', width: '50px' }}>{c.size}-leg</span>
+                {c.legacyIdentity && <span className="dim" style={{ fontSize: '9px' }} title="Legacy record lacks game identity and is not used when a player appears in both games of a doubleheader.">LEGACY ID</span>}
                 <span className="combo-res-legs" style={{ fontSize: '12px', flex: '1' }}>
                   {c.legs.map((l, j) => (
                     <span key={j} className="combo-leg" style={{ color: l.status === 'hit' ? 'var(--strong)' : l.status === 'live' ? 'var(--accent)' : 'var(--text-dim)', fontWeight: l.status === 'hit' ? '700' : '400' }}>
                       {l.name}
-                      <Icon className="combo-leg-status" name={l.status === 'hit' ? 'Check' : l.status === 'live' ? 'Clock' : 'X'} size={10} aria-label={l.status} />
+                      <Icon className="combo-leg-status" name={l.status === 'hit' ? 'Check' : l.status === 'live' ? 'Clock' : l.status === 'unknown' ? 'HelpCircle' : 'X'} size={10} aria-label={l.status} />
                       {j < c.legs.length - 1 ? <span className="combo-leg-sep">·</span> : null}
                     </span>
                   ))}

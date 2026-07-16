@@ -23,7 +23,10 @@ const snaps = hist.snapshots || []
 if (!snaps.length) { console.error('board-history has no snapshots yet.'); process.exit(1) }
 
 const et = (iso) => new Date(iso).toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit' })
-const keyOf = (c) => `${c.s}${c.n}:${[...c.legs].sort().join('-')}`
+const legKey = (leg) => leg && typeof leg === 'object' && leg.playerId != null && leg.gamePk != null
+  ? `${leg.playerId}@${leg.gamePk}`
+  : String(leg?.playerId ?? leg)
+const keyOf = (c) => `${c.s}${c.n}:${(c.legs || []).map(legKey).sort().join('-')}`
 
 console.log(`\nBOARD EVOLUTION — ${hist.date} · ${snaps.length} snapshots (${et(snaps[0].at)}–${et(snaps.at(-1).at)} ET)\n${'─'.repeat(64)}`)
 
@@ -66,15 +69,32 @@ if (loadedLog) {
   const recs = log.records?.[hist.date]
   if (recs?.length) {
     const hr = new Set(recs.filter((r) => r.homered).map((r) => Number(r.playerId)))
+    const hrByGame = new Set(recs.filter((r) => r.homered && r.gamePk != null).map((r) => `${Number(r.playerId)}@${r.gamePk}`))
+    const gamesByPlayer = new Map()
+    for (const record of recs) {
+      if (record.gamePk == null) continue
+      const playerId = Number(record.playerId)
+      if (!gamesByPlayer.has(playerId)) gamesByPlayer.set(playerId, new Set())
+      gamesByPlayer.get(playerId).add(record.gamePk)
+    }
     const hitRate = (combos) => {
-      const cashed = combos.filter((c) => c.legs.every((id) => hr.has(Number(id)))).length
-      return { cashed, n: combos.length }
+      const gradable = combos.filter((c) => (c.legs || []).every((leg) => (
+        leg && typeof leg === 'object' && leg.gamePk != null
+          ? true
+          : (gamesByPlayer.get(Number(leg?.playerId ?? leg))?.size || 0) <= 1
+      )))
+      const cashed = gradable.filter((c) => (c.legs || []).every((leg) => (
+        leg && typeof leg === 'object' && leg.gamePk != null
+          ? hrByGame.has(legKey(leg))
+          : hr.has(Number(leg?.playerId ?? leg))
+      ))).length
+      return { cashed, n: gradable.length, skipped: combos.length - gradable.length }
     }
     console.log(`\nGRADED HIT RATE vs actual HRs (${hr.size} homered ${hist.date})`)
     const first = snaps[0], last = snaps.at(-1)
     const f = hitRate(first.combos), l = hitRate(last.combos)
-    console.log(`  earliest board ${et(first.at)} (lineups ${first.lineupsConfirmed}/${first.lineupsTotal}):  ${f.cashed}/${f.n} cashed`)
-    console.log(`  final board    ${et(last.at)} (lineups ${last.lineupsConfirmed}/${last.lineupsTotal}):  ${l.cashed}/${l.n} cashed`)
+    console.log(`  earliest board ${et(first.at)} (lineups ${first.lineupsConfirmed}/${first.lineupsTotal}):  ${f.cashed}/${f.n} cashed${f.skipped ? ` · ${f.skipped} legacy ambiguous` : ''}`)
+    console.log(`  final board    ${et(last.at)} (lineups ${last.lineupsConfirmed}/${last.lineupsTotal}):  ${l.cashed}/${l.n} cashed${l.skipped ? ` · ${l.skipped} legacy ambiguous` : ''}`)
   } else {
     console.log(`\n(no settled HR outcomes for ${hist.date} in the backtest log yet — re-run after it reconciles to grade early-vs-final.)`)
   }

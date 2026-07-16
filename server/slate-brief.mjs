@@ -20,7 +20,7 @@ const MODEL = process.env.BRIEF_MODEL || OPENAI_DEFAULT_MODEL;
 const DRY_RUN = process.argv.includes('--dry-run');
 const STALE_HOURS = Number(process.env.BRIEF_STALE_HOURS || 4);
 
-export const BRIEF_VERSION = 2;
+export const BRIEF_VERSION = 3;
 
 function cleanText(value, max = 160) {
   return String(value || '')
@@ -57,7 +57,8 @@ function matchupOf(game) {
 function stableBatterSort(a, b) {
   return (Number(b.score) || 0) - (Number(a.score) || 0)
     || (Number(b.hrProbability) || 0) - (Number(a.hrProbability) || 0)
-    || String(a.playerId ?? a.name ?? '').localeCompare(String(b.playerId ?? b.name ?? ''));
+    || String(a.playerId ?? a.name ?? '').localeCompare(String(b.playerId ?? b.name ?? ''))
+    || String(a.gamePk ?? '').localeCompare(String(b.gamePk ?? ''));
 }
 
 function priorIsFresh(slateDate) {
@@ -112,7 +113,9 @@ export function summarizeSlateBrief(slate, alerts = loadAlerts()) {
   const rawBatters = Object.values(slate.scoredBatters || {});
   const seen = new Set();
   const batters = rawBatters.filter((batter) => {
-    const key = String(batter.playerId ?? `${batter.name}|${batter.team}|${batter.gamePk}`);
+    const key = batter.playerId != null && batter.gamePk != null
+      ? `${batter.playerId}:${batter.gamePk}`
+      : `${batter.name}|${batter.team}|${batter.gamePk}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -122,15 +125,21 @@ export function summarizeSlateBrief(slate, alerts = loadAlerts()) {
   const leaderPool = (actionable.length >= 2 ? actionable : batters).slice(0, 8);
   const leaders = leaderPool.map((batter) => {
     const game = gamesByPk.get(String(batter.gamePk));
-    const idPart = batter.playerId ?? `${batter.name}|${batter.team}|${batter.gamePk}`;
+    const idPart = batter.playerId != null && batter.gamePk != null
+      ? `${batter.playerId}:${batter.gamePk}`
+      : `${batter.name}|${batter.team}|${batter.gamePk}`;
     return {
       id: `player:${idPart}`,
+      playerId: batter.playerId ?? null,
+      gamePk: batter.gamePk ?? null,
+      gameNumber: Number.isFinite(game?.gameNumber) ? game.gameNumber : null,
       name: cleanText(batter.name, 80),
       team: cleanText(batter.team, 20),
       grade: cleanText(gradeOf(batter), 16),
       hrProbability: Number.isFinite(batter.hrProbability) ? batter.hrProbability : null,
       score: Number.isFinite(batter.score) ? batter.score : null,
       pitcher: cleanText(batter.pitcher?.name || '', 80) || null,
+      matchup: matchupOf(game),
       venue: cleanText(game?.venueName || '', 100) || null,
       lineupConfirmed: batter.lineupConfirmed === true,
       reason: cleanText(batter.reasons?.[0] || 'Ranks near the top of the current model board.', 140),
@@ -181,7 +190,7 @@ export function summarizeSlateBrief(slate, alerts = loadAlerts()) {
     watchouts.push({
       id: 'concentration',
       label: 'Concentrated slate',
-      fact: `${concentrated[1]} of ${batters.length} hitters come from ${matchupOf(game)}.`,
+      fact: `${concentrated[1]} of ${batters.length} board entries come from ${matchupOf(game)}.`,
     });
   }
 
@@ -190,7 +199,7 @@ export function summarizeSlateBrief(slate, alerts = loadAlerts()) {
     watchouts.push({
       id: 'lineups',
       label: 'Lineup readiness',
-      fact: `${confirmedCount} of ${batters.length} hitters have confirmed lineup spots.`,
+      fact: `${confirmedCount} of ${batters.length} board entries have confirmed lineup spots.`,
     });
   }
   watchouts.push({
@@ -217,7 +226,7 @@ export function buildBriefPrompt(sum) {
     date: sum.date,
     board: {
       games: sum.gameCount,
-      hitters: sum.batCount,
+      entries: sum.batCount,
       prime: sum.primeCount,
       strong: sum.strongCount,
       confirmedLineups: sum.confirmedCount,
@@ -314,6 +323,9 @@ export function assembleDecisionBrief(sum, aiResult = {}, meta = {}) {
     hrProbability: candidate.hrProbability,
     score: candidate.score,
     pitcher: candidate.pitcher,
+    gamePk: candidate.gamePk,
+    gameNumber: candidate.gameNumber,
+    matchup: candidate.matchup,
     note: note || candidate.reason,
   }));
 

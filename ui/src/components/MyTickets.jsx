@@ -167,9 +167,17 @@ function AddTicket({ batters, slateDate, onDone, onAdd }) {
     .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
     .slice(0, 40), [batters, query])
 
-  const pickedIds = new Set(picked.map((batter) => batter.playerId))
-  const toggle = (batter) => setPicked((current) => current.some((item) => item.playerId === batter.playerId)
-    ? current.filter((item) => item.playerId !== batter.playerId)
+  const batterKey = (batter) => batter?.id ?? `${batter?.playerId}-${batter?.gamePk ?? '?'}`
+  const gameLabel = (batter) => {
+    if (Number.isFinite(batter?.game?.gameNumber)) return `G${batter.game.gameNumber}`
+    const time = batter?.game?.gameDate ? new Date(batter.game.gameDate) : null
+    return time && Number.isFinite(time.getTime())
+      ? time.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+      : `Game ${batter?.gamePk ?? '?'}`
+  }
+  const pickedIds = new Set(picked.map(batterKey))
+  const toggle = (batter) => setPicked((current) => current.some((item) => batterKey(item) === batterKey(batter))
+    ? current.filter((item) => batterKey(item) !== batterKey(batter))
     : current.length >= 4 ? current : [...current, batter])
 
   const save = () => {
@@ -198,12 +206,12 @@ function AddTicket({ batters, slateDate, onDone, onAdd }) {
     <div className="ticket-add-form">
       <div className="ticket-add-head"><span><b>Log the ticket you actually placed</b><small>Pick 1–4 legs. Odds and wager unlock honest ROI.</small></span><span>{picked.length}/4 legs</span></div>
       <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search a hitter to add…" aria-label="Search ticket players" />
-      {picked.length > 0 && <div className="ticket-picked">{picked.map((batter) => <button type="button" key={batter.playerId} onClick={() => toggle(batter)}>{surname(batter.name)} <Icon name="X" size={10} /></button>)}</div>}
+      {picked.length > 0 && <div className="ticket-picked">{picked.map((batter) => <button type="button" key={batterKey(batter)} onClick={() => toggle(batter)}>{surname(batter.name)} {gameLabel(batter)} <Icon name="X" size={10} /></button>)}</div>}
       <div className="ticket-player-pool">
         {pool.map((batter) => (
-          <button type="button" key={batter.playerId} onClick={() => toggle(batter)} disabled={!pickedIds.has(batter.playerId) && picked.length >= 4} className={pickedIds.has(batter.playerId) ? 'on' : ''}>
-            <Icon name={pickedIds.has(batter.playerId) ? 'CheckSquare' : 'Square'} size={14} />
-            <span><b>{batter.name}</b><small>{batter.team} · {batter.grade?.label || batter.grade}</small></span>
+          <button type="button" key={batterKey(batter)} onClick={() => toggle(batter)} disabled={!pickedIds.has(batterKey(batter)) && picked.length >= 4} className={pickedIds.has(batterKey(batter)) ? 'on' : ''}>
+            <Icon name={pickedIds.has(batterKey(batter)) ? 'CheckSquare' : 'Square'} size={14} />
+            <span><b>{batter.name}</b><small>{batter.team} · {gameLabel(batter)} · {batter.grade?.label || batter.grade}</small></span>
             <span className="mono">{pct(batter.hrProbability, 1)}</span>
           </button>
         ))}

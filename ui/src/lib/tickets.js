@@ -10,6 +10,9 @@
 // hook instance — the Track buttons on cards and the My Tickets panel — in sync.
 
 import { useState, useEffect, useCallback } from 'react'
+import { ticketId } from './ticketIdentity.js'
+
+export { ticketId } from './ticketIdentity.js'
 
 const KEY = 'sf_tickets'
 const EVT = 'sf_tickets_change'
@@ -38,11 +41,6 @@ export function trackTicket(ticket) {
 
 // Stable id from the leg set + slate date, so the same pair on the same day is
 // one ticket (idempotent Track), but the same pair on another day is distinct.
-export function ticketId(legs, date) {
-  const ids = (legs || []).map((l) => l.playerId).filter((x) => x != null).slice().sort((a, b) => a - b).join('-')
-  return `${date || '?'}:${ids}`
-}
-
 // Build a ticket record from a display combo group (or a manual leg list).
 export function makeTicket({ legs, date, strategy = 'custom', label = 'Custom', size = null, allHit = null, american = null, wager = null, book = null }) {
   const slim = (legs || []).map((b) => ({

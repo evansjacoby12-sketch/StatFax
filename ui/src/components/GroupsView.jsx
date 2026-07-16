@@ -22,8 +22,13 @@ const LOCK_STRAT_LABEL = { precision: 'Precision', matchup: 'Soft Matchup', mix:
 function LockedBoard({ locked, batters, onSelect }) {
   const [open, setOpen] = useState(false)
   if (!locked?.final || !locked?.combos?.length) return null
-  const byId = new Map()
-  for (const b of batters || []) if (!byId.has(b.playerId)) byId.set(b.playerId, b)
+  const byGame = new Map()
+  const byPlayer = new Map()
+  for (const b of batters || []) {
+    if (b.playerId == null) continue
+    if (!byPlayer.has(Number(b.playerId))) byPlayer.set(Number(b.playerId), b)
+    if (b.gamePk != null) byGame.set(`${Number(b.playerId)}:${b.gamePk}`, b)
+  }
   const at = new Date(locked.at)
   const time = Number.isFinite(at.getTime()) ? at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : ''
   return (
@@ -43,14 +48,17 @@ function LockedBoard({ locked, batters, onSelect }) {
               <span className="locked-strat">{LOCK_STRAT_LABEL[c.strategy] || c.strategy}</span>
               <span className="locked-size mono">{c.size}-leg</span>
               <span className="locked-legs">
-                {c.legs.map((id) => {
-                  const b = byId.get(id)
+                {c.legs.map((leg) => {
+                  const playerId = Number(leg?.playerId ?? leg)
+                  const gamePk = leg && typeof leg === 'object' ? leg.gamePk : null
+                  const key = gamePk != null ? `${playerId}:${gamePk}` : String(playerId)
+                  const b = gamePk != null ? byGame.get(key) : byPlayer.get(playerId)
                   return b ? (
-                    <button key={id} className="locked-leg" onClick={() => onSelect?.(b)} title={`${b.name} — open card`}>
+                    <button key={key} className="locked-leg" onClick={() => onSelect?.(b)} title={`${b.name} — open card`}>
                       {lastFirst(b.name)}
                     </button>
                   ) : (
-                    <span key={id} className="locked-leg dim">#{id}</span>
+                    <span key={key} className="locked-leg dim">#{playerId}</span>
                   )
                 })}
               </span>

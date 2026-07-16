@@ -10,15 +10,18 @@ const finiteNumber = (value) => {
 export function gradeTicket(ticket, batters = []) {
   const byGame = new Map()
   const byPlayer = new Map()
+  const ambiguousPlayers = new Set()
   for (const batter of batters || []) {
-    byPlayer.set(Number(batter.playerId), batter)
+    const playerId = Number(batter.playerId)
+    if (byPlayer.has(playerId)) ambiguousPlayers.add(playerId)
+    else byPlayer.set(playerId, batter)
     if (batter.gamePk != null) byGame.set(`${Number(batter.playerId)}:${batter.gamePk}`, batter)
   }
 
   const legs = (ticket?.legs || []).map((leg) => {
     const batter = leg.gamePk != null
-      ? byGame.get(`${Number(leg.playerId)}:${leg.gamePk}`) || byPlayer.get(Number(leg.playerId))
-      : byPlayer.get(Number(leg.playerId))
+      ? byGame.get(`${Number(leg.playerId)}:${leg.gamePk}`)
+      : ambiguousPlayers.has(Number(leg.playerId)) ? null : byPlayer.get(Number(leg.playerId))
     const status = batter ? legStatus(batter) : null
     return {
       ...leg,
@@ -26,6 +29,7 @@ export function gradeTicket(ticket, batters = []) {
       code: batter ? status.code : 'unknown',
       statusLabel: batter ? status.label : 'unavailable',
       final: batter?.game?.isFinal === true,
+      legacyIdentity: leg.gamePk == null,
     }
   })
 

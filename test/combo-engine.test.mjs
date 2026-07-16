@@ -262,7 +262,7 @@ test('client buildGroups ≡ server buildComboRecords on aligned data', () => {
 
   // Server path.
   const serverRows = batters.map(comboRowFromSnapshot)
-  const serverSigs = buildComboRecords(serverRows).map((c) => sig(c.strategy, c.size, c.legs))
+  const serverSigs = buildComboRecords(serverRows).map((c) => sig(c.strategy, c.size, c.legs.map((leg) => leg.playerId)))
 
   assert.deepEqual(clientSigs.slice().sort(), serverSigs.slice().sort())
   assert.ok(clientSigs.length > 0, 'expected some combos to be built')
@@ -281,6 +281,42 @@ test('gradeCombos marks allHit only when every leg homered', () => {
   assert.equal(graded[0].allHit, true)
   assert.equal(graded[1].nHit, 1)
   assert.equal(graded[1].allHit, false)
+  assert.equal(graded[0].legacyIdentity, true)
+})
+
+test('cross-game combo records select and settle the exact doubleheader game', () => {
+  const records = buildComboRecords([
+    row({ playerId: 1, gamePk: 100, score: 60, hrProb: 0.18 }),
+    row({ playerId: 1, gamePk: 101, score: 88, hrProb: 0.28 }),
+    row({ playerId: 2, gamePk: 102, score: 80, hrProb: 0.24 }),
+  ], { sizes: [2] })
+  assert.ok(records.length > 0)
+  for (const record of records) {
+    const selected = record.legs.find((leg) => leg.playerId === 1)
+    assert.equal(selected?.gamePk, 101, 'the better Game 2 matchup is persisted')
+  }
+
+  const outcomes = {
+    homerers: new Set([1, 2]),
+    homerersByKey: new Set(['1-100', '2-102']),
+  }
+  const graded = gradeCombos(records, outcomes)
+  assert.ok(graded.every((record) => record.nHit === 1 && record.allHit === false))
+  assert.ok(graded.every((record) => record.identityVersion === 2 && !record.legacyIdentity))
+})
+
+test('legacy cross-game combo remains ungraded when a player appeared in both games', () => {
+  const [graded] = gradeCombos([
+    { strategy: 'mix', size: 2, legs: [1, 2], pred: 0.04 },
+  ], {
+    homerers: new Set([1, 2]),
+    homerersByKey: new Set(['1-100', '2-102']),
+    playedByKey: new Set(['1-100', '1-101', '2-102']),
+  })
+  assert.equal(graded.allHit, null)
+  assert.equal(graded.nHit, null)
+  assert.equal(graded.legacyIdentity, true)
+  assert.equal(graded.settlementUnavailable, true)
 })
 
 test('gradeSGPRecords settles by player + game and is doubleheader-safe', () => {

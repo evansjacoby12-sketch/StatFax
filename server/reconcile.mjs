@@ -270,7 +270,7 @@ export async function fetchHomerersForDate(date) {
   const games = sched?.dates?.[0]?.games || [];
   if (!games.length) return { homerers: new Set(), played: new Set() };
 
-  const homerers = new Set();      // playerId — combo scorecard (1 bat/game; a leg is a bare playerId)
+  const homerers = new Set();      // playerId — legacy combo/history compatibility only
   const played   = new Set();
   const homerersByKey = new Set(); // `${playerId}-${gamePk}` — per-batter reconcile (doubleheader-safe)
   const playedByKey   = new Set();

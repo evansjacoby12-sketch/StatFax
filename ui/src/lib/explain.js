@@ -101,7 +101,11 @@ export function useExplain(batter) {
 
 // Combo “Why?” keeps the existing paragraph response and cache contract.
 function comboKey(group, date) {
-  const ids = (group?.legs || []).map((b) => b.playerId).filter((x) => x != null).slice().sort((a, b) => a - b).join('-')
+  const ids = (group?.legs || [])
+    .filter((b) => b?.playerId != null)
+    .map((b) => b.gamePk != null ? `${b.playerId}@${b.gamePk}` : String(b.playerId))
+    .sort()
+    .join('-')
   return `combo_${date || '?'}_${ids}`
 }
 

@@ -272,19 +272,28 @@ import {
 // later measure how much the board changes morning → first pitch and prove
 // whether early (unconfirmed) boards are systematically worse. Rolls over daily,
 // capped. Non-fatal. Analyze with model-lab/board-evolution.mjs once a day settles.
+function comboRowsFromScoredBatters(scoredBatters, include = null) {
+  const seen = new Set();
+  const rows = [];
+  for (const row of Object.values(scoredBatters || {})) {
+    if (!row || row.playerId == null || row.gamePk == null) continue;
+    const key = `${row.playerId}-${row.gamePk}`;
+    if (seen.has(key) || (include && !include(row))) continue;
+    seen.add(key);
+    const normalized = comboRowFromSnapshot(row);
+    if (normalized) rows.push(normalized);
+  }
+  return rows;
+}
+
 function appendBoardSnapshot(scoredBatters, games, date) {
   try {
     const liveOrFinal = new Set((games || []).filter(g => g.isLive || g.isFinal).map(g => g.gamePk));
     const rows = Object.values(scoredBatters || {});
-    const seen = new Set();
-    const pool = [];
-    for (const r of rows) {
-      if (r.playerId == null || seen.has(r.playerId)) continue;
-      seen.add(r.playerId);
-      if (liveOrFinal.has(r.gamePk)) continue;      // bettable board = pregame games only
-      const cr = comboRowFromSnapshot(r);
-      if (cr) { cr.lineupConfirmed = r.lineupConfirmed === true; pool.push(cr); }
-    }
+    const pool = comboRowsFromScoredBatters(
+      scoredBatters,
+      (row) => !liveOrFinal.has(row.gamePk),
+    );
     // Lineup-confirmation summary over still-playable games.
     const gconf = new Map();
     for (const r of rows) {
@@ -333,21 +342,13 @@ function buildWindowBoards(scoredBatters, games) {
     else wins.push({ pks: new Set([g.pk]), minT: g.t, maxT: g.t });
   }
   if (wins.length < 2) return null; // single window — full board already covers it
-  const rows = Object.values(scoredBatters || {});
-  const seen = new Set();
-  const cr = [];
-  for (const r of rows) {
-    if (r.playerId == null || seen.has(r.playerId)) continue;
-    seen.add(r.playerId);
-    const x = comboRowFromSnapshot(r);
-    if (x) cr.push(x);
-  }
+  const cr = comboRowsFromScoredBatters(scoredBatters);
   const short = (ms) => new Date(ms).toLocaleTimeString('en-US', { timeZone: SLATE_TZ, hour: 'numeric', minute: '2-digit' });
   return wins.map((w) => ({
     label: w.minT === w.maxT ? short(w.minT) : `${short(w.minT)}–${short(w.maxT)}`,
     minT: w.minT,
     games: w.pks.size,
-    combos: buildComboRecords(cr.filter((r) => w.pks.has(r.gamePk))).map((c) => ({ strategy: c.strategy, size: c.size, legs: c.legs })),
+    combos: buildComboRecords(cr.filter((r) => w.pks.has(r.gamePk))),
   }));
 }
 
@@ -361,8 +362,17 @@ function computeDayRating(scoredBatters, games) {
   const clamp01 = (x) => Math.max(0, Math.min(1, x));
   const all = Object.values(scoredBatters || {});
   const seen = new Set();
-  const rows = all.filter((r) => (r.playerId != null && !seen.has(r.playerId) ? (seen.add(r.playerId), true) : false));
-  const gamePks = new Set(rows.map((r) => r.gamePk).filter((p) => p != null));
+  const rows = all.filter((r) => {
+    if (r?.playerId == null || r?.gamePk == null) return false;
+    const key = `${r.playerId}-${r.gamePk}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  const scheduledGamePks = new Set((games || []).map((game) => game?.gamePk).filter((gamePk) => gamePk != null));
+  const gamePks = scheduledGamePks.size
+    ? scheduledGamePks
+    : new Set(rows.map((r) => r.gamePk).filter((p) => p != null));
   const nGames = Math.max(1, gamePks.size);
 
   // Supply (25%): PRIME bats per game — depth of playable HR threats.
@@ -377,7 +387,7 @@ function computeDayRating(scoredBatters, games) {
   const MIN_IP = 20;
   const arms = [...new Map(
     rows.filter((b) => b.pitcher?.id != null && Number.isFinite(b.pitcher?.season?.hrPer9) && (b.pitcher?.season?.ip ?? 0) >= MIN_IP)
-        .map((b) => [b.pitcher.id, b.pitcher.season.hrPer9]),
+        .map((b) => [`${b.pitcher.id}-${b.gamePk}`, b.pitcher.season.hrPer9]),
   ).values()];
   const softShare = arms.length ? arms.filter((h) => h >= 1.3).length / arms.length : 0;
   const avgHr9 = arms.length ? arms.reduce((s, h) => s + h, 0) / arms.length : 1.2;
@@ -394,7 +404,7 @@ function computeDayRating(scoredBatters, games) {
   }
   let favGames = 0;
   for (const [, g] of byGame) if (g.park >= 1.08 || g.air >= 1.05) favGames++;
-  const environment = clamp01((favGames / byGame.size) / 0.5);
+  const environment = byGame.size ? clamp01((favGames / byGame.size) / 0.5) : 0;
 
   const score = Math.round(100 * (0.45 * pitching + 0.30 * environment + 0.25 * supply));
   const stars = score >= 80 ? 5 : score >= 62 ? 4 : score >= 45 ? 3 : score >= 30 ? 2 : 1;
@@ -409,7 +419,7 @@ function computeDayRating(scoredBatters, games) {
     stars, score, verdict: VERDICT[stars],
     factors: { pitching: +pitching.toFixed(2), environment: +environment.toFixed(2), supply: +supply.toFixed(2) },
     primePerGame: +primePerGame.toFixed(1), softArmPct: Math.round(softShare * 100),
-    favGames, games: byGame.size,
+    favGames, games: nGames,
   };
 }
 
@@ -619,6 +629,8 @@ async function fetchSchedule(date) {
       games.push({
         gamePk:        g.gamePk,
         gameDate:      g.gameDate,
+        doubleHeader:  g.doubleHeader || 'N',
+        gameNumber:    Number.isFinite(g.gameNumber) ? g.gameNumber : null,
         status:        g.status?.detailedState || g.status?.abstractGameState,
         // MLB tags "Warmup" with abstractGameState === 'Live' even though first
         // pitch hasn't been thrown — so it isn't really started and its props
@@ -2139,8 +2151,8 @@ async function main() {
   // late west-coast game in progress can't freeze a half-day as all-miss.
   try {
     if (comboRows.length && yesterdayOutcomes?.allFinal && !backtestLog?.combos?.byDate?.[yesterdayCT]) {
-      const graded = gradeCombos(buildComboRecords(comboRows), yesterdayOutcomes.homerers);
-      const best = bestAvailableCombo(comboRows, yesterdayOutcomes.homerers);
+      const graded = gradeCombos(buildComboRecords(comboRows), yesterdayOutcomes);
+      const best = bestAvailableCombo(comboRows, yesterdayOutcomes);
       backtestLog = appendComboDay(backtestLog, yesterdayCT, graded, best);
       const hit = graded.filter((c) => c.allHit).length;
       console.log(`[combo] graded ${graded.length} pregame combos for ${yesterdayCT} — ${hit} cashed · best available ${best.n}/${best.n}`);
@@ -2191,7 +2203,7 @@ async function main() {
       if (!fb?.length) continue;
       const out = await fetchHomerersForDate(dd);
       if (!out?.allFinal) continue;
-      backtestLog = appendComboDay(backtestLog, dd, gradeCombos(fb, out.homerers), null);
+      backtestLog = appendComboDay(backtestLog, dd, gradeCombos(fb, out), null);
       console.log(`[combo] self-healed ${dd} full board from fullByDate (${fb.length} combos)`);
     }
   } catch (e) {
@@ -4369,15 +4381,8 @@ async function main() {
     const lbMap = backtestLog.combos.lockedByDate = backtestLog.combos.lockedByDate || {};
     const anyStarted = (payload.games || []).some((g) => g.isLive || g.isFinal);
     if (!anyStarted) {
-      const seenL = new Set();
-      const lockCr = [];
-      for (const r of Object.values(payload.scoredBatters || {})) {
-        if (r.playerId == null || seenL.has(r.playerId)) continue;
-        seenL.add(r.playerId);
-        const x = comboRowFromSnapshot(r);
-        if (x) lockCr.push(x);
-      }
-      const board = buildComboRecords(lockCr).map((c) => ({ strategy: c.strategy, size: c.size, legs: c.legs }));
+      const lockCr = comboRowsFromScoredBatters(payload.scoredBatters);
+      const board = buildComboRecords(lockCr);
       if (board.length) lbMap[date] = { at: new Date().toISOString(), final: false, combos: board };
     } else if (lbMap[date] && !lbMap[date].final) {
       lbMap[date] = { ...lbMap[date], final: true };
@@ -4426,15 +4431,8 @@ async function main() {
   // next-day grading) lets byDate self-heal if a late game wasn't Final at the
   // rollover. The canonical record the scorecard + Results Full board read.
   try {
-    const seenF = new Set();
-    const allCr = [];
-    for (const r of Object.values(payload.scoredBatters || {})) {
-      if (r.playerId == null || seenF.has(r.playerId)) continue;
-      seenF.add(r.playerId);
-      const x = comboRowFromSnapshot(r);
-      if (x) allCr.push(x);
-    }
-    const fullBoard = buildComboRecords(allCr).map((c) => ({ strategy: c.strategy, size: c.size, legs: c.legs }));
+    const allCr = comboRowsFromScoredBatters(payload.scoredBatters);
+    const fullBoard = buildComboRecords(allCr);
     if (fullBoard.length) {
       backtestLog.combos = backtestLog.combos || {};
       backtestLog.combos.fullByDate = backtestLog.combos.fullByDate || {};
