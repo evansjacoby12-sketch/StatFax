@@ -72,12 +72,12 @@ export default function SameGameView({ batters, onSelect, favorConsistency = fal
       <p className="sgp-intro dim">
         Every leg must homer in the same game. The headline is the independent
         product of each calibrated leg rate, with no unvalidated correlation boost.
-        Wait for confirmed lineups and treat three- and four-leg tickets as lottery plays.
+        Research projected stacks early, finalize after every lineup is posted, and treat three- and four-leg tickets as lottery plays.
       </p>
       <div className="sgp-mobile-brief">
         <Icon name="GitBranch" size={16} />
         <span>
-          <b>Confirmed lineups first.</b>
+          <b>Research early, confirm before betting.</b>
           <small>Independent estimate · every leg must homer</small>
         </span>
       </div>
@@ -95,7 +95,7 @@ export default function SameGameView({ batters, onSelect, favorConsistency = fal
         <span>
           <Icon name={includeProjected ? 'Clock3' : 'UserRoundCheck'} size={15} />
           <span>
-            <b>{includeProjected ? 'Projected lineups included' : 'Confirmed lineups only'}</b>
+            <b>{includeProjected ? 'Projected lineups included' : 'Action-ready lineups only'}</b>
             <small>{includeProjected ? 'Preview mode · verify before betting' : 'Safer default · starters verified'}</small>
           </span>
         </span>
@@ -115,7 +115,7 @@ export default function SameGameView({ batters, onSelect, favorConsistency = fal
         <div className="empty-note">
           {includeProjected
             ? `No game has ${size} eligible bats right now.`
-            : `No fully confirmed ${size}-leg SGPs yet. Use Show projections only for an early preview.`}
+            : `No fully action-ready ${size}-leg SGPs yet. Use Show projections only for an early preview.`}
         </div>
       ) : (
         <div className="grp-list">

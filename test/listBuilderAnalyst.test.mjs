@@ -91,7 +91,7 @@ test('analyst never offers state, lineup, trust, or pregame relaxations', () => 
   })
   assert.equal(context.current.nearCount, 1)
   assert.deepEqual(context.relaxations, [])
-  assert.equal(context.current.blockedGates[0].label, 'Confirmed lineup')
+  assert.equal(context.current.blockedGates[0].label, 'Action ready only')
 })
 
 test('browser analyst sends only aggregate context and rejects an unapproved relaxation ID', async () => {

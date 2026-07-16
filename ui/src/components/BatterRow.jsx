@@ -7,6 +7,7 @@ import { risingForm } from '../lib/groups.js'
 import { useSwipeActions } from '../lib/useSwipeActions.js'
 import { hrSetup, pitchMixScore } from '../lib/scout.js'
 import { playerHeadshot } from '../lib/teams.js'
+import { lineupActionability } from '../lib/actionability.js'
 
 export default function BatterRow({
   batter: b,
@@ -28,6 +29,7 @@ export default function BatterRow({
   const grade = b.grade?.label || 'SKIP'
   const gradeScore = Math.round(b.score ?? 0)
   const color = gradeColor(grade)
+  const actionability = lineupActionability(b)
   const canOpenPitcher = !!onOpenPitcher && b.pitcher?.id != null
   const liveMode = useLiveMode()
   const live = liveMode && b.game?.isLive
@@ -163,7 +165,7 @@ export default function BatterRow({
               <strong>{b.name}</strong>
               <small className="mono">{b.batSide}</small>
               {b.battingOrder && <small className="mono">#{b.battingOrder}</small>}
-              <span className={`mobile-dl-lineup ${b.lineupConfirmed ? 'confirmed' : ''}`} title={b.lineupConfirmed ? 'Confirmed lineup' : 'Projected lineup'} />
+              <span className={`lineup-state ${actionability.key}`} title={actionability.label}><Icon name={actionability.icon} size={9} /> {actionability.shortLabel}</span>
               {momentum && (
                 <span className={`mobile-dl-momentum ${momentum.cls}`}>
                   <Icon name={momentum.icon} size={9} /> {momentum.label}
@@ -233,7 +235,7 @@ export default function BatterRow({
             <strong>{b.name}</strong>
             <span className="bathand mono">{b.batSide}</span>
             {b.battingOrder && <span className="order-pill mono">#{b.battingOrder}</span>}
-            <span className={`confirm-dot ${b.lineupConfirmed ? '' : 'pending'}`} title={b.lineupConfirmed ? 'Confirmed lineup' : 'Projected lineup'} />
+            <span className={`lineup-state ${actionability.key}`} title={actionability.label}><Icon name={actionability.icon} size={9} /> {actionability.shortLabel}</span>
             {momentum && <span className={`dl-momentum ${momentum.cls}`}><Icon name={momentum.icon} size={10} /> {momentum.label}</span>}
             {live && <span className="live-tag"><span className="live-dot" /> LIVE</span>}
             {isFinal && <span className="final-tag">FINAL</span>}

@@ -553,9 +553,9 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard, g
           className={`badge-toggle ${confirmedOnly ? 'on' : ''}`}
           onClick={() => setConfirmedOnly((v) => !v)}
           aria-pressed={confirmedOnly}
-          title="Only batters in a confirmed lineup"
+          title="Only hitters in posted starting lineups"
         >
-            <Icon name="UserRoundCheck" size={12} /> Confirmed only
+            <Icon name="UserRoundCheck" size={12} /> Action ready only
         </button>
         <button
           className={`badge-toggle ${spread ? 'on' : ''}`}

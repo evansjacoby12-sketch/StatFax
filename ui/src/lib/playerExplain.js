@@ -51,9 +51,6 @@ export function buildPlayerExplainSignals(batter) {
 
   // Prefer a concrete counter-case over a generic probability disclaimer.
   // These are all engine-owned facts already present on the player-game row.
-  if (batter?.lineupConfirmed === false) {
-    add('context:lineup', 'caution', 'The lineup is still projected, so the confirmed spot and plate-appearance opportunity can still change.', 'clock')
-  }
   if (Number.isFinite(batter?.battingOrder) && batter.battingOrder >= 7) {
     add('context:order', 'caution', 'The lower lineup spot can reduce the number of plate appearances available to do damage.', 'clock')
   }

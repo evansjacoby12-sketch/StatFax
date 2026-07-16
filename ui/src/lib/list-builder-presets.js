@@ -24,8 +24,8 @@ export const LIST_BUILDER_PRESETS = Object.freeze([
     tier: 'primary',
     icon: 'Crown',
     title: 'Best available',
-    description: 'Score 70+, HR projection 12%+, confirmed lineup and clean data.',
-    criteria: { minScore: 70, minHrProb: 12, confirmedOnly: true, trustedOnly: true },
+    description: 'Score 70+ with a 12%+ HR projection, regardless of projected or confirmed lineup state.',
+    criteria: { minScore: 70, minHrProb: 12 },
     evidence: { hits: 20, sample: 71, hitRate: 28.17, lift: 2.14 },
   }),
   preset({

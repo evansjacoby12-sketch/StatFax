@@ -141,8 +141,8 @@ test('state-gate near misses disclose and apply an explicit relaxation', () => {
   const result = buildListBuilderResults([row], criteria)
   assert.equal(result.nearMisses.length, 1)
   const failure = result.nearMisses[0].evaluation.failed[0]
-  assert.equal(failure.label, 'Confirmed lineup')
-  assert.equal(failure.relaxation.description, 'Confirmed lineup: required → off')
+  assert.equal(failure.label, 'Action ready only')
+  assert.equal(failure.relaxation.description, 'Action ready only: required → off')
   assert.equal(relaxListBuilderGate(criteria, failure).confirmedOnly, false)
 })
 

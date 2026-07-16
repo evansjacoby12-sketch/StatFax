@@ -51,4 +51,5 @@ test('every audited recipe uses supported deterministic criteria', () => {
 
   assert.equal(LIST_BUILDER_PRESETS.some((preset) => preset.id === 'park'), false)
   assert.equal(LIST_BUILDER_PRESETS.some((preset) => preset.id === 'confirmed'), false)
+  assert.equal(LIST_BUILDER_PRESETS.find((preset) => preset.id === 'best').criteria.confirmedOnly, undefined)
 })

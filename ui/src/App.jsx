@@ -3,6 +3,7 @@ import { loadSlate, loadBrief, forceSlateRefresh, normName, projectedSlateHRs } 
 import { GRADE_ORDER, BADGES } from './lib/badges.js'
 import { HOT_HEAT, DESC_BY_DEFAULT, DEFAULT_FILTERS, SORTS } from './lib/constants.js'
 import { risingForm, precisionSignal, sleeperSignal } from './lib/groups.js'
+import { selectTopModelPick } from './lib/actionability.js'
 import * as store from './lib/storage.js'
 import { buzz } from './lib/haptics.js'
 import { LiveModeContext } from './lib/liveMode.js'
@@ -128,7 +129,6 @@ export default function App() {
   // testing) — off = the board re-ranks live from current heat/park/edge signals.
   const [comboLock, setComboLock] = useState(() => store.load('comboLock', false))
   const [betaCeil, setBetaCeil] = useState(() => store.load('betaCeil', false)) // private beta: advisory Ceiling/Form in the player drawer
-  const [splitProjected, setSplitProjected] = useState(() => store.load('splitProjected', false))
   const [watchlist, setWatchlist] = useState(() => new Set(store.load('watchlist', [])))
   const [slipIds, setSlipIds] = useState(() => store.load('slip', []))
   const [autoRefresh, setAutoRefresh] = useState(() => store.load('autoRefresh', false))
@@ -177,7 +177,6 @@ export default function App() {
       }
     })
   }, [betaCeil])
-  useEffect(() => store.save('splitProjected', splitProjected), [splitProjected])
   useEffect(() => store.save('eliLevel', eliLevel), [eliLevel])
   useEffect(() => store.save('podDismissed', podDismissedId), [podDismissedId])
   useEffect(() => {
@@ -564,16 +563,8 @@ export default function App() {
       (b.expectedHRs ?? 0) - (a.expectedHRs ?? 0) ||
       (a.name || '').localeCompare(b.name || '')
     rows = rows.slice().sort((a, b) => {
-      // When the lineup split is on, confirmed lineups always rank above
-      // projected (roster-fallback) bats, independent of the chosen sort — a
-      // late lineup post can't let a projected bat leapfrog a confirmed play,
-      // so the pre-lineup churn stays in the projected group below the divider.
-      // Toggleable in Settings; off = one flat board ranked purely by the sort.
-      if (splitProjected) {
-        const ca = a.lineupConfirmed ? 0 : 1
-        const cb = b.lineupConfirmed ? 0 : 1
-        if (ca !== cb) return ca - cb
-      }
+      // Lineup readiness never changes research rank. The selected model sort
+      // applies equally to projected and confirmed hitters.
       const va = get(a)
       const vb = get(b)
       // nulls always last
@@ -586,7 +577,7 @@ export default function App() {
       return cmp !== 0 ? cmp : tiebreak(a, b)
     })
     return rows
-  }, [all, filters, watchlist, splitProjected])
+  }, [all, filters, watchlist])
 
   const selected = useMemo(
     () => (selectedId != null ? all.find((b) => b.id === selectedId) || null : null),
@@ -597,25 +588,14 @@ export default function App() {
     [all, zoneId],
   )
 
-  // Pick of the Day: the model's single best HR play with the lineup set.
+  // Featured pick: the model's single best eligible HR case. Lineup state is
+  // displayed as actionability and never used to choose a weaker hitter.
   // Lead with MODEL SCORE, not HR probability — probability saturates at a
   // ceiling (~26.5%), so the top tier ties on it and the pick flickers on every
-  // 10-min rebuild. Score has real resolution. Prefer confirmed-lineup bats, and
-  // finish with a deterministic tie-break (xHR → stable id) so the pick only
+  // 10-min rebuild. Score has real resolution. Finish with a deterministic
+  // tie-break (xHR → stable id) so the pick only
   // changes when the numbers actually move, never on iteration-order noise.
-  const pick = useMemo(() => {
-    const pool = all.filter((b) => (b.grade?.label || 'SKIP') !== 'SKIP')
-    if (!pool.length) return null
-    const confirmed = pool.filter((b) => b.lineupConfirmed)
-    const base = confirmed.length ? confirmed : pool
-    return base.slice().sort(
-      (a, b) =>
-        (b.score ?? 0) - (a.score ?? 0) ||
-        (b.hrProbability ?? 0) - (a.hrProbability ?? 0) ||
-        (b.expectedHRs ?? 0) - (a.expectedHRs ?? 0) ||
-        String(a.id).localeCompare(String(b.id)),
-    )[0]
-  }, [all])
+  const pick = useMemo(() => selectTopModelPick(all), [all])
 
   if (sport === 'nfl') {
     const nflData = nflSnapshot
@@ -794,7 +774,6 @@ export default function App() {
                 onToggleWatch={toggleWatch}
                 onToggleSlip={toggleSlip}
                 onOpenPitcher={openPitcher}
-                splitProjected={splitProjected}
                 betaEnabled={betaCeil}
                 signalLimit={2}
                 total={all.length}
@@ -965,8 +944,6 @@ export default function App() {
             onSetComboConf={setComboConf}
             eliLevel={eliLevel}
             onSetEli={setEliLevel}
-            splitProjected={splitProjected}
-            onToggleSplit={() => setSplitProjected((v) => !v)}
             comboLock={comboLock}
             onToggleComboLock={() => setComboLock((v) => !v)}
             betaCeil={betaCeil}

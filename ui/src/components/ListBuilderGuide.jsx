@@ -17,7 +17,7 @@ const CHAPTERS = Object.freeze([
 const QUICK_STEPS = [
   ['Choose D14, D30, or All', 'Use the evidence window that matches how much recency and sample depth you want.'],
   ['Apply one recipe', 'Start from a visible, evidence-backed setup before adding your own gates.'],
-  ['Keep the list actionable', 'Pregame, confirmed-lineup, and clean-data gates remove avoidable uncertainty.'],
+  ['Rank the baseball case first', 'Projected and confirmed hitters use the same research criteria. Turn on Action ready only when you are finalizing a bet.'],
   ['Read exact matches first', 'Every exact result passes every active gate. Open a player to verify tonight’s context.'],
   ['Use near misses deliberately', 'A near miss fails exactly one gate. Relax it only when the displayed difference is acceptable.'],
   ['Save the finished recipe', 'Saving starts a new tracked version without rewriting older frozen picks.'],
@@ -84,7 +84,7 @@ function ChapterContent({ id }) {
   if (id === 'ai') return (
     <>
       <div className="lbg-chapter-head"><span>03</span><div><h3>Describe your list with AI</h3><p>Turn plain language into visible, editable criteria.</p></div></div>
-      <div className="lbg-example-prompt"><small>Example request</small><b>“Confirmed power bats with 12% barrels and launch angle between 8° and 32°.”</b></div>
+      <div className="lbg-example-prompt"><small>Example request</small><b>“Power bats with 12% barrels and launch angle between 8° and 32°.”</b></div>
       <StepList items={[
         ['Describe the profile', 'Use baseball language and include thresholds when you already know them.'],
         ['Translate', 'The assistant maps supported phrases to the same gates available in Advanced filters.'],
@@ -100,7 +100,7 @@ function ChapterContent({ id }) {
       <div className="lbg-chapter-head"><span>04</span><div><h3>Actionability, metric gates, and signals</h3><p>Control who is eligible before interpreting the result list.</p></div></div>
       <DefinitionGrid items={[
         ['Pregame', 'Excludes games that have started or finished.'],
-        ['Confirmed lineup', 'Requires the hitter to be in a confirmed starting lineup.'],
+        ['Action ready only', 'Optional final-bet gate requiring the hitter to be in the posted starting lineup. It does not improve the research score.'],
         ['Clean data', 'Excludes rows carrying a model data-review warning.'],
         ['Pitcher & park', 'Opposing-starter HR exposure, pitch-mix score, and park factor.'],
         ['Advanced matchup', 'ISO, recent pitcher HR/9, pitcher K/9, contact collision, and lineup position.'],
@@ -167,11 +167,12 @@ function ChapterContent({ id }) {
       <StepList items={[
         ['Set the evidence window to D30', 'Begin with the balanced window and note the slate baseline, sample size, and coverage.'],
         ['Apply Best available', 'Use the preset as the base instead of manually recreating every gate.'],
-        ['Keep Pregame, Confirmed lineup, and Clean data on', 'Make the output actionable before adding more specificity.'],
+        ['Keep Pregame on', 'Build the research list without allowing lineup status to rerank the underlying baseball case.'],
         ['Add a contact-quality idea', 'For example, require a 12% barrel rate and an 8°–32° launch-angle window.'],
-        ['Review Exact results', 'Compare model HR probability, gate reasons, lineup state, and the player’s full research evidence.'],
+        ['Review Exact results', 'Compare model HR probability, gate reasons, lineup readiness, and the player’s full research evidence.'],
         ['Inspect Near misses once', 'Relax a single gate only if the displayed difference is acceptable before you see the player name.'],
-        ['Save the final criteria', 'Use a descriptive name such as “Confirmed barrel window” and let forward tracking begin.'],
+        ['Save the final criteria', 'Use a descriptive name such as “Barrel window” and let forward tracking begin.'],
+        ['Check actionability last', 'Before placing a bet, verify every selected hitter is marked Ready or turn on Action ready only.'],
         ['Copy or act on the list', 'Copy preserves the criteria and ranking; Watch and Add to slip remain individual decisions.'],
       ]} />
     </>

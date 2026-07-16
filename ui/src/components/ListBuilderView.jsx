@@ -8,6 +8,7 @@ import { pct, num } from '../lib/format.js'
 import * as store from '../lib/storage.js'
 import { loadBacktestLog } from '../lib/backtestLog.js'
 import { analyzeListBuilder, translateListBuilderQuery } from '../lib/list-builder-ai.js'
+import { lineupActionability } from '../lib/actionability.js'
 import {
   buildListBuilderAnalystContext,
   findListBuilderAnalystRelaxation,
@@ -140,10 +141,7 @@ function sameTrackingLedger(left, right) {
 }
 
 function lineupLabel(batter) {
-  if (batter.lineupConfirmed && Number.isFinite(batter.battingOrder)) return `Confirmed · batting ${batter.battingOrder}`
-  if (batter.lineupConfirmed) return 'Confirmed lineup'
-  if (Number.isFinite(batter.battingOrder)) return `Projected · batting ${batter.battingOrder}`
-  return 'Lineup unconfirmed'
+  return lineupActionability(batter).label
 }
 
 function formatEvidenceRange(startDate, endDate) {
@@ -336,6 +334,7 @@ function AdvancedPresetCard({ preset, evidence, active, onApply }) {
 
 function ResultCard({ item, index, nearMiss = false, onRelax, onSelect, watched, inSlip, onToggleWatch, onToggleSlip }) {
   const { batter, evaluation } = item
+  const actionability = lineupActionability(batter)
   const failure = nearMiss ? evaluation.failed[0] : null
   const reasons = evaluation.passed.slice(0, 3)
   const failureSymbol = failure?.mode === 'max' ? '≤' : '≥'
@@ -361,8 +360,8 @@ function ResultCard({ item, index, nearMiss = false, onRelax, onSelect, watched,
       </div>
 
       <div className="lbv-result-evidence">
-        <span className={`lbv-lineup${batter.lineupConfirmed ? ' confirmed' : ''}`}>
-          <Icon name={batter.lineupConfirmed ? 'CircleCheck' : 'Clock'} size={13} /> {lineupLabel(batter)}
+        <span className={`lbv-lineup${actionability.actionReady ? ' confirmed' : ''}`}>
+          <Icon name={actionability.icon} size={13} /> {lineupLabel(batter)}
         </span>
         {batter.dataTrust?.status && (
           <span className="lbv-data-warning"><Icon name="TriangleAlert" size={13} /> Data review</span>
@@ -776,7 +775,7 @@ export default function ListBuilderView({
               type="text"
               value={aiQuery}
               maxLength={500}
-              placeholder="Example: confirmed power bats, 12% barrels, launch angle 8–32"
+              placeholder="Example: power bats, 12% barrels, launch angle 8–32"
               onChange={(event) => setAiQuery(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === 'Enter') {
@@ -870,7 +869,7 @@ export default function ListBuilderView({
             <div className="lbv-trust">
               {[
                 ['pregameOnly', 'Pregame', 'Clock'],
-                ['confirmedOnly', 'Confirmed lineup', 'UserCheck'],
+                ['confirmedOnly', 'Action ready only', 'UserCheck'],
                 ['trustedOnly', 'Clean data', 'Shield'],
               ].map(([key, label, icon]) => (
                 <button key={key} type="button" className={form[key] ? 'on' : ''} onClick={() => update({ [key]: !form[key] })} aria-pressed={form[key]}>

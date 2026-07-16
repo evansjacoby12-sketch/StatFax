@@ -187,7 +187,7 @@ export default function Filters({ value, onChange, gradeCounts, games, badgeCoun
               }}
             />
           ))}
-          {v.confirmedOnly && <FilterChip label="Confirmed" onClear={() => onChange({ confirmedOnly: false })} />}
+          {v.confirmedOnly && <FilterChip label="Action ready" onClear={() => onChange({ confirmedOnly: false })} />}
           {v.watchedOnly && <FilterChip label="Watchlist" onClear={() => onChange({ watchedOnly: false })} />}
           {v.hotOnly && <FilterChip label="Heating up" icon="Flame" onClear={() => onChange({ hotOnly: false })} />}
           {v.precisionOnly && <FilterChip label="Precision" icon="Focus" onClear={() => onChange({ precisionOnly: false })} />}
@@ -260,7 +260,7 @@ export default function Filters({ value, onChange, gradeCounts, games, badgeCoun
               className={`toggle-btn ${v.confirmedOnly ? 'on' : ''}`}
               onClick={() => onChange({ confirmedOnly: !v.confirmedOnly })}
               aria-pressed={v.confirmedOnly}
-              title="Only batters in confirmed lineups"
+              title="Only hitters in posted starting lineups"
               style={v.confirmedOnly ? {
                 background: 'rgba(105, 185, 158, 0.1)',
                 borderColor: 'var(--strong)',
@@ -268,7 +268,7 @@ export default function Filters({ value, onChange, gradeCounts, games, badgeCoun
               } : {}}
             >
               <Icon name={v.confirmedOnly ? 'Check' : 'ListFilter'} size={14} />
-              Confirmed
+              Action ready
             </button>
 
             <button

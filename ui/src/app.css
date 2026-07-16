@@ -975,36 +975,6 @@ button.th:focus-visible {
   display: flex;
   flex-direction: column;
 }
-/* Section divider between confirmed-lineup plays and the projected roster bats.
-   Amber = "not final" so it reads as a soft warning, and it's a button (collapses
-   the projected group, which pre-lineup is the whole roster). */
-.board-proj-divider {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 9px 16px;
-  background: rgba(214, 181, 111, 0.06);
-  border: none;
-  border-top: 1px solid rgba(214, 181, 111, 0.20);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  color: var(--prime);
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  cursor: pointer;
-  text-align: left;
-  transition: background 0.15s;
-}
-.board-proj-divider:hover { background: rgba(214, 181, 111, 0.10); }
-.board-proj-divider .proj-count {
-  background: rgba(214, 181, 111, 0.16);
-  padding: 1px 8px;
-  border-radius: 99px;
-  font-size: 10px;
-  font-weight: 800;
-}
 .board-row {
   min-height: 68px;
   cursor: pointer;
@@ -1170,6 +1140,39 @@ button.th:focus-visible {
 .confirm-dot.pending {
   background: var(--text-faint);
   box-shadow: none;
+}
+.lineup-state {
+  min-height: 18px;
+  padding: 2px 5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex: none;
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+  color: var(--text-faint);
+  background: rgba(255,255,255,.025);
+  font-size: 7px;
+  font-style: normal;
+  font-weight: 800;
+  letter-spacing: .04em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+.lineup-state.ready {
+  border-color: color-mix(in srgb,var(--strong) 28%,var(--border-soft));
+  color: var(--strong);
+  background: color-mix(in srgb,var(--strong) 7%,transparent);
+}
+.lineup-state.projected {
+  border-color: color-mix(in srgb,var(--warn) 22%,var(--border-soft));
+  color: var(--warn);
+  background: color-mix(in srgb,var(--warn) 6%,transparent);
+}
+.lineup-state.out {
+  border-color: color-mix(in srgb,var(--bad) 26%,var(--border-soft));
+  color: var(--bad);
+  background: color-mix(in srgb,var(--bad) 7%,transparent);
 }
 .live-tag {
   display: inline-flex;
@@ -22442,6 +22445,8 @@ button.th:focus-visible {
   .mobile-potd-verdict > b { color: var(--prime); letter-spacing: .02em; }
   .mobile-potd-verdict > i { font-style: normal; opacity: .35; }
   .mobile-potd-verdict > span { display: inline-flex; align-items: center; gap: 3px; color: var(--b-hot); font-weight: 700; }
+  .mobile-potd-verdict > .mobile-potd-actionability.ready { color: var(--strong); }
+  .mobile-potd-verdict > .mobile-potd-actionability.projected { color: var(--warn); }
   .mobile-potd-prob { align-self: start; display: flex; flex-direction: column; align-items: flex-end; }
   .mobile-potd-prob > b { color: var(--mobile-potd-color); font-size: 18px; font-weight: 900; line-height: 1; text-shadow: 0 0 14px color-mix(in srgb, var(--mobile-potd-color) 34%, transparent); }
   .mobile-potd-prob > small { margin-top: 3px; color: var(--text-faint); font-size: 7px; font-weight: 800; letter-spacing: .06em; }

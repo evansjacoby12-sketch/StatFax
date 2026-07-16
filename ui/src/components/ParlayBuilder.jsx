@@ -397,7 +397,7 @@ export default function ParlayBuilder({ batters, legs, slipSet, onToggle, onRemo
               <div style={{ fontSize: '9px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-faint)', marginBottom: '7px' }}>Filters</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '14px' }}>
                 {[
-                  ['qbConfirmed',  qbConfirmed,  () => { setQbConfirmed(v => !v); setQbBuilt(null) }, 'Confirmed only'],
+                  ['qbConfirmed',  qbConfirmed,  () => { setQbConfirmed(v => !v); setQbBuilt(null) }, 'Action ready only'],
                   ['qbNoDayGame',  qbNoDayGame,  () => { setQbNoDayGame(v => !v); setQbBuilt(null) }, 'Avoid day games'],
                   ['qbSameWindow', qbSameWindow, () => { setQbSameWindow(v => !v); setQbBuilt(null) }, 'Same window'],
                 ].map(([key, val, toggle, label]) => (

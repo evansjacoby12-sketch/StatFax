@@ -8,7 +8,7 @@ const VIEWS = [
   ['Crosshair', 'Pitchers', 'One card per starter: a 0–100 vulnerability score, the lineup ranked as HR targets, pitch mix, and splits.'],
   ['Wind', 'Weather', 'One card per game ranked by the air — real wind OUT/IN verdict, temp, park factor, and who it helps.'],
   ['Layers', 'Parlay Combos', 'Auto-built cross-game parlays — one bat per game across six live strategies and 2–4 legs.'],
-  ['GitBranch', 'Same-Game Parlays', 'Confirmed-lineup 2–4 leg tickets from one game. All-hit uses the independent product with no correlation uplift.'],
+  ['GitBranch', 'Same-Game Parlays', 'Action-ready 2–4 leg tickets from one game, with projected previews available. All-hit uses the independent product with no correlation uplift.'],
   ['Activity', 'Results', 'The model’s track record — AUC, top-decile hit rate, calibration — plus the exact graded combos per day.'],
 ]
 
@@ -27,7 +27,7 @@ const GUARDS = [
   ['Check', 'Tail (green)', 'Every leg is clean — PRIME, healthy barrel, no HR-stingy arm. The combos to lean on.'],
   ['TriangleAlert', 'Caution (yellow)', 'A leg trips a minor flag — sub-PRIME grade, low barrel (<13%), or a stingy arm (<0.85 HR/9).'],
   ['TriangleAlert', 'Weak leg (red)', 'A leg likely to sink the parlay — long-shot HR%, a tiny barrel under a weak grade, or 2+ flags. That leg gets a WEAK badge; the weakest is tagged WEAKEST.'],
-  ['Clock', 'Provisional / NO LINEUP', 'A leg’s lineup isn’t posted yet, so the combo can still reshuffle. The card is dimmed + dashed — not safe to bet.'],
+  ['Clock', 'Provisional / NO LINEUP', 'A leg’s lineup isn’t posted yet. It remains a ranked research candidate, but the combo is only a preview until every starter is verified.'],
   ['Clock', 'Spread warning', 'Legs >2.5h apart: the ticket locks at the EARLIEST first pitch, before the later game’s lineup is set — so you’d bet the late leg blind.'],
   ['Zap', 'BLAST', 'Elite blast rate — fast, squared-up contact (bat tracking). A live power signal.'],
 ]
@@ -35,7 +35,7 @@ const GUARDS = [
 const TOOLS = [
   ['Search', 'Search', 'Filter by batter, team, or pitcher name.'],
   ['Trophy', 'Grade chips', 'Toggle PRIME / STRONG / LEAN / SKIP to focus the board.'],
-  ['SlidersHorizontal', 'Filters (chevron)', 'Game, confirmed-lineup-only, watchlist-only, heating-up (Heat ≥ 58), and the signal chips.'],
+  ['SlidersHorizontal', 'Filters (chevron)', 'Game, action-ready-only, watchlist-only, heating-up (Heat ≥ 58), and the signal chips.'],
   ['Activity', 'Live / Pregame', 'Flip the whole board between live scores + innings and a clean pregame projection look.'],
   ['Radio', 'Auto', 'Soft-refresh the slate every 60s for live games — filters and selection survive.'],
   ['Star', 'Watchlist', 'Star any batter (row or drawer), then filter to just your list.'],
@@ -93,7 +93,8 @@ export default function Guide({ onClose, embedded = false }) {
         <p className="guide-p dim">
           Each row leads with the engine’s <b>grade</b> and its <b>HR probability</b> (calibrated chance of ≥1 HR today),
           plus the top reason. Tap any row for the full drawer — score breakdown, Statcast, the opposing pitcher,
-          weather, career H2H, and recent starts.
+          weather, career H2H, and recent starts. Projected and confirmed hitters share the same research ranking;
+          lineup status tells you whether a pick is ready to act on, not whether the model likes it.
         </p>
         <div className="guide-grades">
           {GRADE_ORDER.map((g) => {
@@ -142,8 +143,8 @@ export default function Guide({ onClose, embedded = false }) {
           <Icon name="GitBranch" size={14} /> Same-Game Parlays
         </h3>
         <p className="guide-p dim">
-          SGPs stack 2–4 hitters from one game. StatFax defaults to <b>confirmed lineups</b>; projected tickets are
-          available only as an early preview. The shown all-hit chance is the <b>independent product</b> of the
+          SGPs stack 2–4 hitters from one game. Research projected stacks early, then use the default <b>action-ready
+          lineup</b> view before placing a ticket. Projected tickets remain an early preview. The shown all-hit chance is the <b>independent product</b> of the
           calibrated leg rates—there is no unvalidated same-game uplift. Start with two legs; three and four legs
           are lottery plays. The rolling SGP record settles from official player-and-game box-score outcomes.
         </p>

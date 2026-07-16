@@ -7,6 +7,7 @@ import { isBenched } from '../lib/combo-engine.js'
 import { playerHeadshot } from '../lib/teams.js'
 import { pitcherVulnerability } from '../lib/vulnerability.js'
 import { combinedEdge5 } from '../lib/zoneEdge.js'
+import { lineupActionability } from '../lib/actionability.js'
 
 const ELIGIBLE_GRADES = new Set(['PRIME', 'STRONG', 'LEAN'])
 const GRADE_CASE = { PRIME: 100, STRONG: 78, LEAN: 58 }
@@ -57,7 +58,6 @@ function buildCase(batter) {
   const market = marketEdge == null ? 50 : clamp(50 + marketEdge * 350)
 
   const penalties = []
-  if (batter.lineupConfirmed !== true) penalties.push({ key: 'lineup', label: 'Lineup pending', icon: 'Clock3', detail: 'Projected lineup lowers confidence until the batting order is confirmed.', points: 4 })
   if (batter.cold || (batter.hotnessMultiplier ?? 1) < 0.97) penalties.push({ key: 'cold', label: 'Cold form', icon: 'Snowflake', detail: 'Recent contact is below the batter’s normal power baseline.', points: 6 })
   if (air < 0.97) penalties.push({ key: 'air', label: 'Weather drag', icon: 'CloudSun', detail: 'Park and air conditions suppress expected carry.', points: 4 })
   if (pitcher < 38) penalties.push({ key: 'pitcher', label: 'Tough pitcher', icon: 'Radar', detail: 'The opposing starter grades as difficult to attack.', points: 5 })
@@ -87,7 +87,6 @@ function buildCase(batter) {
   if (air >= 1.03) addEvidence(evidence, 'air', 'Air boost', 'Wind', `${num((air - 1) * 100, 0)}% park/weather/hand lift.`, Math.round((air - 1) * 100))
   if (marketEdge != null && marketEdge >= 0.01) addEvidence(evidence, 'value', 'Price value', 'DollarSign', `${pct(marketEdge, 1)} model edge versus the posted implied rate.`, Math.round(marketEdge * 100))
   if (positiveReasons >= 4) addEvidence(evidence, 'outlook', 'Reason stack', 'Layers', `${positiveReasons} positive model reasons agree on the play.`, positiveReasons)
-  if (batter.lineupConfirmed === true) addEvidence(evidence, 'confirmed', 'Confirmed', 'UserCheck', `Batting ${batter.battingOrder ? `#${batter.battingOrder}` : 'in the posted lineup'}.`, 5)
 
   evidence.sort((a, b) => b.points - a.points || a.label.localeCompare(b.label))
   const topEvidence = evidence.slice(0, 3)
@@ -109,6 +108,7 @@ function buildCase(batter) {
     air,
     positiveReasons,
     negativeReasons,
+    actionability: lineupActionability(batter),
     caseScore,
     evidence,
     topEvidence,
@@ -151,7 +151,7 @@ function StraightRow({ item, rank, onSelect, slipSet, onToggleSlip }) {
       <div className="straight-identity">
         <span className="straight-photo"><img src={playerHeadshot(b.playerId, 96)} alt={b.name} loading="lazy" /></span>
         <span className="straight-player-copy">
-          <span><b>{b.name}</b><GradeChip grade={b.grade} size="sm" /></span>
+          <span><b>{b.name}</b><GradeChip grade={b.grade} size="sm" /><span className={`lineup-state ${item.actionability.key}`} title={item.actionability.label}><Icon name={item.actionability.icon} size={8} />{item.actionability.shortLabel}</span></span>
           <small>{b.team} · vs {b.pitcher?.name || 'TBD'} ({b.pitcher?.hand || '?'}HP)</small>
           <em>Probability order #{item.boardRank}</em>
         </span>

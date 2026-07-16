@@ -76,7 +76,7 @@ test('fallback caution avoids repeating the model probability disclaimer', () =>
   assert.doesNotMatch(result.cautionSignal.text, /estimated home-run chance|predicted outcome/)
 })
 
-test('player-specific context replaces generic variance even when AI selects it', () => {
+test('player-specific matchup context replaces generic variance without treating lineup state as model evidence', () => {
   const projected = {
     ...batter,
     lineupConfirmed: false,
@@ -84,16 +84,16 @@ test('player-specific context replaces generic variance even when AI selects it'
     eli5Reasons: batter.eli5Reasons.slice(0, 2),
   }
   const signals = buildPlayerExplainSignals(projected)
-  assert.ok(signals.some((signal) => signal.id === 'context:lineup'))
+  assert.equal(signals.some((signal) => signal.id === 'context:lineup'), false)
   assert.ok(signals.some((signal) => signal.id === 'context:pitcher-k'))
   const result = normalizePlayerExplain(projected, {
     version: 3,
     caseIds: ['signal:0', 'signal:1'],
     cautionId: 'variance',
-    bottomLine: 'Power and matchup evidence lead, while the projected lineup remains actionable context.',
+    bottomLine: 'Power and matchup evidence lead, while the opposing starter can still limit contact.',
   })
-  assert.equal(result.cautionSignal.id, 'context:lineup')
-  assert.match(result.cautionSignal.text, /lineup is still projected/i)
+  assert.equal(result.cautionSignal.id, 'context:pitcher-k')
+  assert.match(result.cautionSignal.text, /strikeout (rate|ability)/i)
 })
 
 test('variance survives the candidate cap on a large legacy evidence set', () => {

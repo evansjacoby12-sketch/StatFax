@@ -7,6 +7,7 @@ import { pct } from '../lib/format.js'
 import { sharePickCard } from '../lib/shareCard.js'
 import { toast } from './Toast.jsx'
 import { useLiveMode } from '../lib/liveMode.js'
+import { lineupActionability } from '../lib/actionability.js'
 
 const EVIDENCE_ICONS = {
   barrel: 'CircleDotDashed',
@@ -36,6 +37,7 @@ export default function PickOfDay({ batter: b, onSelect, watched, inSlip, onTogg
   const live = liveMode && b.game?.isLive
   const hrToday = liveMode && b.liveContext?.isHRThisGame
   const canOpenPitcher = !!onOpenPitcher && b.pitcher?.id != null
+  const actionability = lineupActionability(b)
   const passedChecks = checks.filter((check) => check.pass)
   const featuredChecks = passedChecks.slice(0, 3)
   const moreEvidence = Math.max(0, passedChecks.length - featuredChecks.length)
@@ -98,6 +100,8 @@ export default function PickOfDay({ batter: b, onSelect, watched, inSlip, onTogg
               <b>{n === 6 ? 'PERFECT SETUP' : 'SETUP MATCH'} {n}/6</b>
               <i>·</i>
               <span><Icon name="Flame" size={10} /> {heat ?? '—'}</span>
+              <i>·</i>
+              <span className={`mobile-potd-actionability ${actionability.key}`}><Icon name={actionability.icon} size={10} /> {actionability.shortLabel}</span>
             </span>
           </span>
           <span className="mobile-potd-prob">
@@ -127,12 +131,12 @@ export default function PickOfDay({ batter: b, onSelect, watched, inSlip, onTogg
         aria-label={`Open research for Pick of the Day ${b.name}`}
       >
         <header className="potd-stack-head">
-          <span className="potd-kicker"><Icon name="Trophy" size={13} /> Pick of the Day</span>
+          <span className="potd-kicker"><Icon name="Trophy" size={13} /> {actionability.actionReady ? 'Top pick' : 'Provisional top pick'}</span>
           <span className="potd-stack-state">
             {hrToday ? <span className="potd-hr-chip"><Icon name="Flame" size={11} /> HOMERED</span> : live ? <span className="live-tag"><Icon name="RadioTower" size={10} /> LIVE</span> : null}
-            <span className={`potd-lineup ${b.lineupConfirmed ? 'on' : 'pending'}`}>
-              <Icon name={b.lineupConfirmed ? 'UserRoundCheck' : 'Clock3'} size={11} />
-              {b.lineupConfirmed ? 'Confirmed' : 'Projected'}{b.battingOrder ? ` · #${b.battingOrder}` : ''}
+            <span className={`potd-lineup ${actionability.actionReady ? 'on' : 'pending'}`}>
+              <Icon name={actionability.icon} size={11} />
+              {actionability.label}
             </span>
             {onDismiss && (
               <button type="button" className="potd-dismiss" onClick={stop(onDismiss)} aria-label="Dismiss Pick of the Day" title="Dismiss">

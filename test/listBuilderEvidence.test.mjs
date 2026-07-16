@@ -81,13 +81,14 @@ test('rolling windows exclude scratches and score recipes against the slate base
   assert.equal(validateListBuilderEvidence(artifact).ok, true)
 })
 
-test('missing historical gates produce limited coverage instead of assumed passes', () => {
+test('Best available evidence measures model gates without requiring historical actionability fields', () => {
   const log = fixture()
   delete log.records['2026-07-01'][0].dataTrusted
+  delete log.records['2026-07-01'][0].lineupConfirmed
   const artifact = buildListBuilderEvidence({ backtestLog: log, generatedAt: '2026-07-03T12:00:00.000Z' })
   const best = artifact.recipes.best.windows.d14
-  assert.equal(best.evaluable, 3)
-  assert.equal(best.missingByGate.trustedOnly, 1)
+  assert.equal(best.evaluable, 4)
+  assert.deepEqual(best.missingByGate, {})
 })
 
 test('advanced evidence distinguishes evaluable legacy recipes from schema-v2 collection', () => {

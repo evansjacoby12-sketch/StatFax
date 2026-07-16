@@ -14,9 +14,10 @@ const STEPS = [
   },
   {
     icon: 'Check',
-    title: '2 · Demand a confirmed lineup',
+    title: '2 · Separate projection from actionability',
     points: [
-      'A green confirm dot (or the “Confirmed” filter) means he’s actually batting today. A hollow/pending dot is a projection — he can be scratched or rested.',
+      'Projected and confirmed hitters compete on the same model ranking. A projected lineup does not make the baseball case weaker by itself.',
+      '“Ready” means the posted starting lineup verifies the hitter and batting spot. Use the “Action ready” filter when you are finalizing a bet; projected picks remain valid research candidates but can still be scratched or rested.',
       'Lineup spot matters: top-of-order bats (1–4) get more plate appearances, so more swings at a homer. Check the #-pill and the xHR column (expected HRs = sum of per-PA odds).',
     ],
   },
@@ -63,7 +64,7 @@ const STEPS = [
     title: '7 · Build parlays last',
     points: [
       'Start with singles, then combine only the legs that survive the checklist. Every parlay leg must homer, so probabilities multiply instead of adding.',
-      'For SGPs, keep the confirmed-lineup default on and begin with two legs. Projected tickets are previews, not finished bets.',
+      'For SGPs, keep the action-ready default on and begin with two legs. Projected tickets are previews, not finished bets.',
       'StatFax currently uses the independent product for same-game all-hit probability. No correlation boost is applied until settled results prove one.',
       'Treat three- and four-leg SGPs as lottery plays. More legs increase payout, not reliability.',
     ],
@@ -72,12 +73,12 @@ const STEPS = [
 
 const CHECKLIST = [
   'PRIME or STRONG, HR% in the top tier',
-  'Lineup confirmed, batting near the top',
+  'Projection ranks well; confirm the lineup before the final bet',
   'Facing a VULNERABLE / SHAKY pitcher',
   'Bandbox / favorable park + wind out or hot',
   'Real power (ISO / barrel%) and not Cold',
   'Two or more signals stacked',
-  'For SGPs: confirmed lineup, two legs, independent all-hit understood',
+  'For SGPs: every leg action ready, two legs, independent all-hit understood',
 ]
 
 export default function HowToPick({ onClose, embedded = false }) {

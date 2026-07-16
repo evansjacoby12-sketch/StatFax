@@ -149,7 +149,7 @@ export function activeListBuilderCriteria(rawCriteria) {
     if (signal) active.push({ type: 'signal', key, label: signal.label })
   }
   if (criteria.pregameOnly) active.push({ type: 'state', key: 'pregameOnly', label: 'Pregame only' })
-  if (criteria.confirmedOnly) active.push({ type: 'state', key: 'confirmedOnly', label: 'Confirmed lineup' })
+  if (criteria.confirmedOnly) active.push({ type: 'state', key: 'confirmedOnly', label: 'Action ready only' })
   if (criteria.trustedOnly) active.push({ type: 'state', key: 'trustedOnly', label: 'No data warnings' })
   return active
 }
@@ -174,10 +174,10 @@ export function evaluateListBuilderBatter(batter, rawCriteria = {}) {
     {
       active: criteria.confirmedOnly,
       key: 'confirmedOnly',
-      label: 'Confirmed lineup',
+      label: 'Action ready only',
       passes: batter?.lineupConfirmed === true && !isBenched(batter),
-      detail: 'Not in a confirmed lineup',
-      actual: isBenched(batter) ? 'Benched' : 'Unconfirmed',
+      detail: 'Starting lineup is not posted',
+      actual: isBenched(batter) ? 'Not starting' : 'Projected',
     },
     {
       active: criteria.trustedOnly,

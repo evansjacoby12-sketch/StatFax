@@ -42,7 +42,8 @@ function copyText(legs, parlay) {
   return [header, ...items].join('\n')
 }
 
-function decisionLabel(parlay) {
+function decisionLabel(parlay, unconfirmed) {
+  if (unconfirmed > 0) return { label: 'Research preview', detail: `${unconfirmed} projected ${unconfirmed === 1 ? 'lineup' : 'lineups'} · verify before betting`, tone: 'warning' }
   if (!parlay.allPriced) return { label: 'Model-ready', detail: 'Awaiting complete market odds', tone: 'neutral' }
   if (parlay.ev >= 0.05) return { label: 'Positive-value build', detail: `${signedPct(parlay.ev, 0)} expected value`, tone: 'positive' }
   if (parlay.ev >= 0) return { label: 'Slight model edge', detail: `${signedPct(parlay.ev, 0)} expected value`, tone: 'positive' }
@@ -79,11 +80,11 @@ export default function ParlaySlip({ legs, batters = [], onRemove, onClear, onSe
   const [replaceOpen, setReplaceOpen] = useState(false)
   const parlay = useMemo(() => buildParlay(legs, { correlate: false }), [legs])
   const live = useMemo(() => comboStatus(legs), [legs])
-  const verdict = decisionLabel(parlay)
+  const unconfirmed = legs.filter((b) => b.lineupConfirmed !== true).length
+  const verdict = decisionLabel(parlay, unconfirmed)
   const grade = parlay.grade
   const gradeTone = grade ? GRADE_COLOR[grade.letter] : null
   const weak = parlay.weak
-  const unconfirmed = legs.filter((b) => b.lineupConfirmed !== true).length
   const missingPrices = parlay.n - parlay.priced
   const sameGameGroups = parlay.byGame.filter((g) => g.legs.length >= 2).length
   const payDecimal = parlay.allPriced ? parlay.decimal : parlay.fairDecimal
@@ -261,7 +262,7 @@ export default function ParlaySlip({ legs, batters = [], onRemove, onClear, onSe
               <Icon name="ArrowRight" size={14} />
               <div><span>Payout{parlay.allPriced ? '' : ' at fair odds'}</span><strong className="mono">{shownPayout != null && Number.isFinite(shownPayout) ? `$${shownPayout >= 100 ? Math.round(shownPayout) : shownPayout.toFixed(2)}` : '—'}</strong></div>
             </div>
-            <button type="button" className="slip-review-btn" onClick={() => { setOpen(false); onOpenBuilder?.() }}><Icon name="ScanSearch" size={16} /> Review parlay</button>
+            <button type="button" className="slip-review-btn" onClick={() => { setOpen(false); onOpenBuilder?.() }}><Icon name="ScanSearch" size={16} /> {unconfirmed ? 'Review preview' : 'Review parlay'}</button>
           </footer>
         </div>
       )}
