@@ -3,6 +3,7 @@ import Icon from './Icon.jsx'
 import { ProbRing } from './atoms.jsx'
 import CommandTabs from './CommandTabs.jsx'
 import NFLBetLab from './NFLBetLab.jsx'
+import { NFL_COMBO_STRATEGIES } from '../lib/nflCombos.js'
 import SportMarketRail from './SportMarketRail.jsx'
 import SportMultiFilterBar from './SportMultiFilterBar.jsx'
 import SportSignalRail from './SportSignalRail.jsx'
@@ -131,14 +132,21 @@ function NFLPerformance({ snapshot }) {
   const health = snapshot.dataHealth
   const tracking = snapshot.modelTracking
   const trackingMarkets = Object.entries(tracking?.markets || {})
+  const trackingStacks = Object.values(tracking?.stacks || {})
+  const stackPerformance = Object.entries(performance?.stacks || {})
   const snapshotStale = snapshot.generatedAt && Date.now() - Date.parse(snapshot.generatedAt) > 45 * 60 * 1000
   const healthIssues = [...(health?.issues || []), ...(snapshotStale ? [{ id: 'pipeline', label: 'Pipeline', message: 'Published slate is more than 45 minutes old' }] : [])]
   return <section className="nfl-performance" aria-labelledby="nfl-performance-title">
     <header><div><span className="nfl-eyebrow"><Icon name="Gauge" size={13} /> Model validation</span><h2 id="nfl-performance-title">NFL Model Performance</h2><p>Walk-forward results use only information available before each game.</p></div><span className="nfl-performance-updated">{performance?.generatedAt ? `Updated ${new Date(performance.generatedAt).toLocaleDateString()}` : 'Awaiting backtest'}</span></header>
     <div className="nfl-coverage-grid" aria-label="NFL data coverage">{coverage.map(([label, ready]) => <div key={label} className={ready ? 'is-ready' : 'is-limited'}><Icon name={ready ? 'CircleCheck' : 'TriangleAlert'} size={15} /><span><b>{label}</b><small>{ready ? 'Connected' : 'Limited'}</small></span></div>)}</div>
     {healthIssues.length > 0 && <div className="nfl-health-alert" role="status" aria-live="polite"><Icon name="TriangleAlert" size={16} /><span><b>{healthIssues.length} feed{healthIssues.length === 1 ? '' : 's'} need attention</b><small>{healthIssues.map((issue) => `${issue.label}: ${issue.message}`).join(' · ')}</small></span></div>}
-    <section className="nfl-tracking-summary" aria-label="Season tracking"><header><span><Icon name="LineChart" size={14} /> Season tracking</span><small>{tracking?.updatedAt ? `Updated ${new Date(tracking.updatedAt).toLocaleString()}` : 'Starts with the next slate'}</small></header><div><span><b className="mono">{Number(tracking?.open || 0).toLocaleString()}</b><small>Open forecasts</small></span><span><b className="mono">{Number(tracking?.settled || 0).toLocaleString()}</b><small>Settled forecasts</small></span><span><b className="mono">{Object.values(tracking?.markets || {}).reduce((sum, market) => sum + Number(market.roiSamples || 0), 0).toLocaleString()}</b><small>Priced ROI samples</small></span></div></section>
+    <section className="nfl-tracking-summary" aria-label="Season tracking"><header><span><Icon name="LineChart" size={14} /> Season tracking</span><small>{tracking?.updatedAt ? `Updated ${new Date(tracking.updatedAt).toLocaleString()}` : 'Starts with the next slate'}</small></header><div><span><b className="mono">{Number(tracking?.open || 0).toLocaleString()}</b><small>Open forecasts</small></span><span><b className="mono">{Number(tracking?.settled || 0).toLocaleString()}</b><small>Settled forecasts</small></span><span><b className="mono">{trackingStacks.reduce((sum, stack) => sum + Number(stack.boards || 0), 0).toLocaleString()}</b><small>Frozen stack boards</small></span><span><b className="mono">{trackingStacks.reduce((sum, stack) => sum + Number(stack.settled || 0), 0).toLocaleString()}</b><small>Settled stack builds</small></span></div></section>
     {trackingMarkets.length > 0 && <div className="nfl-season-market-grid" aria-label="Season results by market">{trackingMarkets.map(([id, metric]) => <article key={id}><b>{NFL_PROP_MARKET_LIST.find((market) => market.id === id)?.shortLabel || id}</b><span><strong className="mono">{metric.brier != null ? metric.brier.toFixed(3) : metric.mae != null ? metric.mae.toFixed(1) : '—'}</strong><small>{metric.brier != null ? 'Brier' : 'MAE'}</small></span><span><strong className="mono">{pct(metric.roi)}</strong><small>ROI · {metric.roiSamples || 0}</small></span></article>)}</div>}
+    {stackPerformance.length > 0 && <section className="nfl-stack-performance" aria-label="TD stack validation"><header><span><Icon name="Layers" size={14} /> TD stack validation</span><small>Leakage-safe · two-leg cross-game baseline</small></header><div>{stackPerformance.map(([id, metric]) => {
+      const stack = NFL_COMBO_STRATEGIES.find((item) => item.id === id)
+      const result = metric.scopes?.all?.byLegCount?.['2'] || metric.scopes?.all?.byLegCount?.[2] || {}
+      return <article key={id}><span><b>{stack?.label || metric.label || id}</b><em className={`is-${stack?.riskTone || 'caution'}`}>{stack?.risk}</em></span><div><strong className="mono">{pct(result.observed)}</strong><small>Observed all-hit</small></div><div><strong className="mono">{pct(result.predicted)}</strong><small>Raw independent</small></div><footer>{Number(result.samples || 0).toLocaleString()} historical builds · Brier {result.brier == null ? '—' : result.brier.toFixed(3)}</footer></article>
+    })}</div></section>}
     {markets.length ? <div className="nfl-performance-grid">{markets.map(([id, metric]) => {
       const market = NFL_PROP_MARKET_LIST.find((item) => item.id === id)
       const primary = metric.type === 'probability' ? (metric.brier == null ? '—' : metric.brier.toFixed(3)) : (metric.mae == null ? '—' : metric.mae.toFixed(1))

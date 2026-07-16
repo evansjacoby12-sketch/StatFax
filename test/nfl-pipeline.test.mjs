@@ -8,12 +8,13 @@ import { parseSportsGameOdds } from '../server/sports/nfl/providers/odds.mjs'
 import { enrichNFLTeamOpportunityShares, indexNFLHistory, matchHistoryPlayer, projectNFLPlayer } from '../server/sports/nfl/projections.mjs'
 import { buildNFLSnapshot, defenseProfile, normalizeFirstTouchdownProbabilities, parseNFLSlateArgs } from '../server/sports/nfl/fetch-nfl-slate.mjs'
 import { assessPlayerAvailability, indexAvailability, externalAvailabilityFor } from '../server/sports/nfl/availability.mjs'
-import { evaluateNFLHistory } from '../server/sports/nfl/backtest.mjs'
+import { evaluateNFLHistory, evaluateNFLStackHistory } from '../server/sports/nfl/backtest.mjs'
 import { calibrateNFLProbability, correctedNFLProjection } from '../src/sports/nfl/logic/calibration.js'
 import { depthFor, indexDepthChart, indexWeather, overlayFreshness, weatherFor } from '../server/sports/nfl/context-overlays.mjs'
 import { buildNFLDataHealth } from '../server/sports/nfl/health.mjs'
 import { summarizeNFLTracking, updateNFLTracking } from '../server/sports/nfl/tracking.mjs'
 import { buildTeamLineup, indexNFLLineups, lineupFor, summarizeLineupCoverage, teamLineupFor } from '../server/sports/nfl/lineups.mjs'
+import NFL_DEMO_SNAPSHOT from '../src/sports/nfl/data/demoSlate.js'
 
 const event = (id, date, week = 1, state = 'pre') => ({
   id, date, season: { year: 2026, slug: 'regular-season' }, week: { number: week },
@@ -79,6 +80,26 @@ test('season tracker freezes forecasts and settles probability and projection re
   assert.equal(summary.markets.anytime_td.calibration[0].observed, 1)
   assert.equal(summary.markets.rushing_yards.mae, 5)
   assert.equal(summary.markets.anytime_td.roiSamples, 1)
+})
+
+test('season tracker archives opening and closing TD stack boards and settles them', () => {
+  const kickoffAt = '2026-09-02T00:00:00Z'
+  const pregamePlayers = NFL_DEMO_SNAPSHOT.players.map((player) => ({
+    ...player,
+    gameId: [player.team, player.opponent].sort().join('-'),
+    kickoffAt,
+    live: { isLive: false, isFinal: false, stats: {} },
+  }))
+  const pregame = { ...NFL_DEMO_SNAPSHOT, generatedAt: '2026-09-01T00:00:00Z', meta: { ...NFL_DEMO_SNAPSHOT.meta, season: 2026, week: 'Week 1' }, players: pregamePlayers }
+  const opened = updateNFLTracking({}, pregame, null, new Date('2026-09-01T01:00:00Z'))
+  assert.equal(opened.version, 2)
+  assert.ok(opened.stackBoards.length > 0)
+  const firstOpening = structuredClone(opened.stackBoards[0].opened)
+  const final = { ...pregame, generatedAt: '2026-09-02T05:00:00Z', players: pregamePlayers.map((player, index) => ({ ...player, live: { isFinal: true, firstTdKnown: true, isFirstTdScorer: index === 0, stats: { totalTds: index % 2 } } })) }
+  const settled = updateNFLTracking(opened, pregame, final, new Date('2026-09-02T05:00:00Z'))
+  assert.deepEqual(settled.stackBoards.find((board) => board.id === opened.stackBoards[0].id).opened.at, firstOpening.at)
+  assert.ok(settled.stackBoards.some((board) => board.locked))
+  assert.ok(Object.values(summarizeNFLTracking(settled).stacks).some((stack) => stack.settled > 0))
 })
 
 test('ESPN schedule normalization selects the nearest complete NFL week', () => {
@@ -274,4 +295,25 @@ test('walk-forward NFL backtest emits probability and projection metrics without
   assert.ok(result.markets.anytime_td.brier >= 0 && result.markets.anytime_td.brier <= 1)
   assert.ok(result.markets.anytime_td.buckets.length > 0)
   assert.ok(result.markets.anytime_td.buckets.every((bucket) => bucket.samples > 0))
+  assert.ok(result.stacks['scorer-core'])
+})
+
+test('walk-forward TD stack validation emits leg-count and same-game calibration', () => {
+  const teams = ['BUF', 'MIA', 'DET', 'GB', 'PHI', 'DAL']
+  const positions = ['RB', 'WR', 'TE', 'RB', 'WR', 'QB']
+  const players = teams.map((team, playerIndex) => ({
+    id: `p${playerIndex}`, name: `Player ${playerIndex}`, position: positions[playerIndex],
+    recentGames: Array.from({ length: 12 }, (_, index) => ({
+      season: 2025, week: index + 1, gameId: `2025_${String(index + 1).padStart(2, '0')}_${teams[playerIndex % 2]}_${teams[(playerIndex % 2) + 1]}`,
+      team, opponent: teams[(playerIndex + 1) % teams.length], totalTds: (index + playerIndex) % 3 === 0 ? 1 : 0,
+      firstTd: (index + playerIndex) % 7 === 0 ? 1 : 0, redZoneTargets: positions[playerIndex] === 'WR' || positions[playerIndex] === 'TE' ? 2 : 0,
+      endZoneTargets: positions[playerIndex] === 'WR' || positions[playerIndex] === 'TE' ? 1 : 0, redZoneCarries: positions[playerIndex] === 'RB' || positions[playerIndex] === 'QB' ? 3 : 0,
+      goalLineCarries: positions[playerIndex] === 'RB' || positions[playerIndex] === 'QB' ? 1 : 0,
+    })),
+  }))
+  const stacks = evaluateNFLStackHistory({ players })
+  assert.ok(stacks['scorer-core'].scopes.all.byLegCount[2].samples > 0)
+  assert.ok(stacks['scorer-core'].scopes['same-game'].byLegCount[2].samples > 0)
+  assert.ok(stacks['goal-line-hammer'].scopes.all.byLegCount[2].buckets.length > 0)
+  assert.ok(stacks['end-zone-alpha'].scopes.all.byLegCount[2].buckets.length > 0)
 })

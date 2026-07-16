@@ -168,3 +168,12 @@ test('NFL ranked board shares the approved MLB decision-ladder structure', async
   assert.match(styles, /\.nfl-decision-ladder-head,[\s\S]*?\.nfl-decision-ladder-row/)
   assert.match(styles, /\.nfl-mobile-risk\.is-avoid/)
 })
+
+test('NFL performance surfaces frozen stack tracking and historical stack validation', async () => {
+  const board = await readFile(new URL('../ui/src/components/NFLBoard.jsx', import.meta.url), 'utf8')
+  assert.match(board, /Frozen stack boards/)
+  assert.match(board, /Settled stack builds/)
+  assert.match(board, /TD stack validation/)
+  assert.match(board, /Observed all-hit/)
+  assert.match(board, /Raw independent/)
+})

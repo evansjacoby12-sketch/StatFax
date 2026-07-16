@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import snapshot from '../src/sports/nfl/data/demoSlate.js'
-import { buildNFLCombos, NFL_COMBO_STRATEGIES } from '../ui/src/lib/nflCombos.js'
+import { buildNFLComboBoard, buildNFLCombos, NFL_COMBO_STRATEGIES } from '../ui/src/lib/nflCombos.js'
 
 test('NFL Bet Lab builds deterministic 2-4 leg combos without duplicate players', () => {
   for (const legs of [2, 3, 4]) {
@@ -45,4 +45,43 @@ test('every named NFL stack has a distinct touchdown recipe and disclosed risk',
   assert.ok(builds['first-strike'].every((combo) => combo.legs.every((leg) => leg.marketId === 'first_td') && new Set(combo.legs.map((leg) => leg.gameKey)).size === combo.legs.length))
   assert.ok(builds['double-tap'].every((combo) => combo.legs.every((leg) => leg.marketId === 'two_plus_td')))
   assert.deepEqual(byId['first-strike'].scopes, ['all'])
+})
+
+test('TD stack board enforces exposure caps and reports coverage', () => {
+  const board = buildNFLComboBoard(snapshot, { legs: 2, strategy: 'scorer-core', scope: 'all', minGrade: 'SKIP' })
+  assert.ok(board.combos.length > 0)
+  assert.ok(board.combos.length <= board.coverage.requestedBuilds)
+  assert.ok(Math.max(...Object.values(board.exposure.players)) <= board.exposure.caps.player)
+  assert.ok(Math.max(...Object.values(board.exposure.teams)) <= board.exposure.caps.team)
+  assert.ok(['ready', 'limited'].includes(board.coverage.status))
+})
+
+test('same-game boards disclose an independent baseline until joint calibration is ready', () => {
+  const board = buildNFLComboBoard(snapshot, { legs: 2, strategy: 'scorer-core', scope: 'same-game', minGrade: 'LEAN' })
+  assert.equal(board.calibration.ready, false)
+  assert.ok(board.combos.every((combo) => combo.probabilityMethod === 'independent-baseline' && combo.actionableProbability === false))
+  assert.ok(board.coverage.limitations.some((message) => /joint calibration/i.test(message)))
+})
+
+test('same-game boards consume stack-level joint calibration when its sample is ready', () => {
+  const calibrated = {
+    ...snapshot,
+    modelPerformance: { stacks: { 'scorer-core': { scopes: { 'same-game': { byLegCount: { 2: { samples: 100, buckets: [{ samples: 100, predicted: .2, observed: .1 }] } } } } } } },
+  }
+  const board = buildNFLComboBoard(calibrated, { legs: 2, strategy: 'scorer-core', scope: 'same-game', minGrade: 'LEAN' })
+  assert.equal(board.calibration.ready, true)
+  assert.ok(board.combos.every((combo) => combo.probabilityMethod === 'stack-calibrated-joint' && combo.actionableProbability === true && combo.probability < combo.independentProbability))
+})
+
+test('specialized role stacks reject unconfirmed projection-only evidence', () => {
+  const projectedOnly = {
+    ...snapshot,
+    players: snapshot.players.map((player) => ({
+      ...player,
+      usage: { ...player.usage, goalLineTouchesL3: 0, endZoneTargetsL3: 0, redZoneTargetsL3: 0 },
+      lineup: { ...player.lineup, confirmed: false, redZone: { insideFiveShare: .9, designedTouchShare: .9, endZoneRouteShare: .9 } },
+    })),
+  }
+  assert.equal(buildNFLComboBoard(projectedOnly, { strategy: 'goal-line-hammer', minGrade: 'SKIP' }).combos.length, 0)
+  assert.equal(buildNFLComboBoard(projectedOnly, { strategy: 'end-zone-alpha', minGrade: 'SKIP' }).combos.length, 0)
 })

@@ -2,6 +2,7 @@
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { buildNFLComboBoard, NFL_COMBO_STRATEGIES } from '../../../ui/src/lib/nflCombos.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.resolve(__dirname, '..', '..', '..')
@@ -63,6 +64,103 @@ function probabilityMetrics(records) {
   return { samples: records.length, brier, logLoss, buckets: calibrationBuckets(records) }
 }
 
+function historicalPlayer(player, actual, prior) {
+  const recent = prior.slice(-12).reverse()
+  const recentThree = recent.slice(0, 3)
+  const anytime = tdProbability(prior, player.position, 1)
+  const lambda = -Math.log(Math.max(.001, 1 - anytime))
+  const twoPlus = Math.max(.002, Math.min(.65, 1 - Math.exp(-lambda) * (1 + lambda)))
+  const sum = (key) => recentThree.reduce((total, game) => total + (+game[key] || 0), 0)
+  return {
+    id: player.id, name: player.name, position: player.position, team: actual.team, opponent: actual.opponent, gameId: actual.gameId,
+    kickoffAt: `${actual.season}-09-01T00:00:00Z`, isHome: String(actual.gameId || '').split('_').at(-1) === actual.team,
+    markets: { anytime_td: { probability: anytime, line: .5, odds: null }, first_td: { probability: anytime * .22, line: .5, odds: null }, two_plus_td: { probability: twoPlus, line: 1.5, odds: null } },
+    projections: { anytimeTdProbability: anytime, firstTdProbability: anytime * .22 },
+    recentGames: recent.slice(0, 8), historyMatch: { id: player.id, games: prior.length, seasons: [...new Set(prior.map((game) => game.season))] },
+    usage: {
+      redZoneTargetsL3: sum('redZoneTargets'), endZoneTargetsL3: sum('endZoneTargets'), redZoneTouchesL3: sum('redZoneCarries'), goalLineTouchesL3: sum('goalLineCarries'),
+      redZoneOpportunityShare: Math.min(.65, (sum('redZoneTargets') + sum('redZoneCarries')) / 18), goalLineOpportunityShare: Math.min(.6, sum('goalLineCarries') / 10),
+      endZoneTargetShare: sum('redZoneTargets') ? Math.min(1, sum('endZoneTargets') / sum('redZoneTargets')) : 0, roleRank: 1, roleLabel: 'Historical starter', depthSource: 'historical-role',
+    },
+    splits: { activeEdge: 0 }, availability: { eligible: true, multiplier: 1, tone: 'good' }, lineup: null,
+  }
+}
+
+function normalizeHistoricalFirstTD(players) {
+  const games = new Map()
+  for (const player of players) {
+    if (!games.has(player.gameId)) games.set(player.gameId, [])
+    games.get(player.gameId).push(player)
+  }
+  for (const group of games.values()) {
+    const weights = group.map((player) => Math.max(.002, player.markets.anytime_td.probability * .22 * (1 + Number(player.usage.redZoneOpportunityShare || 0) * .2)))
+    const total = weights.reduce((sum, value) => sum + value, 0) || 1
+    group.forEach((player, index) => {
+      const probability = weights[index] / total * .86
+      player.markets.first_td.probability = probability
+      player.projections.firstTdProbability = probability
+    })
+  }
+  return players
+}
+
+function stackOutcome(combo, outcomes) {
+  let active = 0
+  for (const leg of combo.legs) {
+    const actual = outcomes.get(`${leg.gameKey}:${leg.playerId}`)
+    if (!actual) return null
+    if (leg.marketId === 'first_td' && actual.firstTd == null) continue
+    active++
+    const won = leg.marketId === 'anytime_td' ? (+actual.totalTds || 0) >= 1
+      : leg.marketId === 'two_plus_td' ? (+actual.totalTds || 0) >= 2
+        : Boolean(actual.firstTd)
+    if (!won) return 0
+  }
+  return active ? 1 : null
+}
+
+export function evaluateNFLStackHistory(history) {
+  const weeks = new Map()
+  for (const player of history?.players || []) {
+    const games = [...(player.recentGames || [])].sort((a, b) => (+a.season - +b.season) || (+a.week - +b.week))
+    for (let index = 4; index < games.length; index++) {
+      const actual = games[index]
+      const key = `${actual.season}:${actual.week}`
+      if (!weeks.has(key)) weeks.set(key, [])
+      weeks.get(key).push({ player, actual, prior: games.slice(0, index) })
+    }
+  }
+  const records = {}
+  for (const [key, rows] of [...weeks].sort(([a], [b]) => a.localeCompare(b))) {
+    const players = normalizeHistoricalFirstTD(rows.map(({ player, actual, prior }) => historicalPlayer(player, actual, prior)))
+    const [season, week] = key.split(':').map(Number)
+    const snapshot = { generatedAt: `${season}-01-01T00:00:00Z`, meta: { season, week: `Week ${week}` }, players, modelPerformance: null }
+    const outcomes = new Map(rows.map(({ player, actual }) => [`${actual.gameId}:${player.id}`, actual]))
+    for (const strategy of NFL_COMBO_STRATEGIES) for (const scope of strategy.scopes) for (const legs of [2, 3, 4]) {
+      const board = buildNFLComboBoard(snapshot, { strategy: strategy.id, scope, legs, minGrade: 'LEAN' })
+      const bucket = records[strategy.id] ||= {}
+      const scopeBucket = bucket[scope] ||= {}
+      const legBucket = scopeBucket[legs] ||= []
+      for (const combo of board.combos) {
+        const outcome = stackOutcome(combo, outcomes)
+        if (outcome != null) legBucket.push({ probability: combo.independentProbability, outcome })
+      }
+    }
+  }
+  return Object.fromEntries(NFL_COMBO_STRATEGIES.map((strategy) => [strategy.id, {
+    label: strategy.label,
+    scopes: Object.fromEntries(strategy.scopes.map((scope) => [scope, {
+      byLegCount: Object.fromEntries([2, 3, 4].map((legs) => {
+        const rows = records[strategy.id]?.[scope]?.[legs] || []
+        const metrics = probabilityMetrics(rows)
+        const predicted = rows.length ? rows.reduce((sum, row) => sum + row.probability, 0) / rows.length : null
+        const observed = rows.length ? rows.reduce((sum, row) => sum + row.outcome, 0) / rows.length : null
+        return [legs, { ...metrics, predicted, observed, jointFactor: predicted ? Math.max(.5, Math.min(1.5, observed / predicted)) : null }]
+      })),
+    }]))
+  }]))
+}
+
 function regressionMetrics(records) {
   if (!records.length) return { samples: 0, mae: null, rmse: null, bias: null, within10: null }
   const errors = records.map((r) => r.projection - r.outcome)
@@ -95,7 +193,7 @@ export function evaluateNFLHistory(history) {
     }
   }
   return {
-    version: 2,
+    version: 4,
     sport: 'nfl',
     generatedAt: new Date().toISOString(),
     seasons: history?.seasons || [],
@@ -104,6 +202,7 @@ export function evaluateNFLHistory(history) {
       ...Object.fromEntries(Object.entries(numeric).map(([id, records]) => [id, { type: 'projection', ...regressionMetrics(records) }])),
       ...Object.fromEntries(Object.entries(touchdown).map(([id, records]) => [id, { type: 'probability', ...probabilityMetrics(records) }])),
     },
+    stacks: evaluateNFLStackHistory(history),
   }
 }
 
