@@ -8,7 +8,7 @@ import { bookLabel } from '../lib/data.js'
 import { compass, skyLabel } from '../lib/weather.js'
 import { interpretWind } from '../lib/wind.js'
 import { playerHeadshot, teamAbbr } from '../lib/teams.js'
-import { toolGrades, heatBreakdown, scoutVerdict, gradeLabel, hrSetup } from '../lib/scout.js'
+import { toolGrades, heatBreakdown, gradeLabel, hrSetup } from '../lib/scout.js'
 import { blastOf, blastVsHandOf } from '../lib/groups.js'
 import { estimatedKs, projectedK } from '../lib/pitchers.js'
 import { useLiveMode } from '../lib/liveMode.js'
@@ -16,6 +16,7 @@ import { useEliLevel, reasonsForLevel } from '../lib/eliLevel.js'
 import { toast } from './Toast.jsx'
 import { sharePickCard } from '../lib/shareCard.js'
 import { useExplain } from '../lib/explain.js'
+import { buildPlayerExplainSignals } from '../lib/playerExplain.js'
 import { locationRating5, arsenalRating5, combinedEdge5 } from '../lib/zoneEdge.js'
 import { powerReadyCriteria, barrelReadyCriteria } from '../lib/powerReady.js'
 import * as store from '../lib/storage.js'
@@ -160,7 +161,7 @@ const TABS = [
   { id: 'matchup',   label: 'Matchup'   },
   { id: 'form',      label: 'Form'      },
   { id: 'splits',    label: 'Splits'    },
-  { id: 'trends',    label: 'Trends'    },
+  { id: 'signals',   label: 'All Signals' },
   { id: 'spray',     label: 'Spray'     },
 ]
 
@@ -383,7 +384,7 @@ export default function PlayerDrawer({ batter: b, batters, onClose, watched, inS
               {tab === 'form'      && <FormTab      b={b} />}
               {tab === 'splits'    && <SplitsTab    b={b} />}
               {tab === 'statcast'  && <StatcastTab  b={b} />}
-              {tab === 'trends'    && <TrendsTab    b={b} />}
+              {tab === 'signals'   && <AllSignalsTab b={b} />}
               {tab === 'spray'     && <SprayTab     b={b} />}
             </div>
           </div>
@@ -404,13 +405,12 @@ function OverviewTab({ b, color, onOpenZone, liveMode }) {
     <>
       <ResearchThesis b={b} />
       <PlateMatchup b={b} onOpenZone={onOpenZone} />
-      <ScoutReport b={b} />
-      <ExplainPick b={b} />
+      <ModelBreakdown b={b} />
+      <CaseVsCaution b={b} />
       <PaCurve b={b} color={color} />
       <EnvSection b={b} />
       <OddsSection b={b} />
       {liveMode && b.game?.isLive && <LiveSection b={b} />}
-      <TechReasons b={b} />
     </>
   )
 }
@@ -433,6 +433,7 @@ function FormTab({ b }) {
     <>
       <HrSetupSection b={b} />
       <HrFormSection b={b} />
+      <DueIndicatorSection b={b} />
       <GameLogTable log={log} loading={loading} />
     </>
   )
@@ -602,12 +603,82 @@ function SignalChecklist({ title, badge, crit, meaning }) {
   )
 }
 
-function TrendsTab({ b }) {
+function signalGroups(b, level) {
+  const seen = new Set()
+  const groups = { good: [], bad: [], neutral: [] }
+  const add = (reason, fallbackTone = 'neutral') => {
+    const text = String(reason?.text ?? reason ?? '').replace(/\s+/g, ' ').trim()
+    const key = text.toLowerCase()
+    if (!text || seen.has(key)) return
+    seen.add(key)
+    const tone = reason?.tone === 'good' || reason?.tone === 'bad' ? reason.tone : fallbackTone
+    groups[tone].push({ text, tone, icon: reason?.icon || 'activity' })
+  }
+  const plain = Array.isArray(b?.eli5Reasons) ? b.eli5Reasons : []
+  const technical = Array.isArray(b?.reasons) ? b.reasons : []
+  if (level === 'eli15') {
+    technical.forEach((reason) => add(reason))
+    plain.forEach((reason) => add(reason))
+  } else {
+    plain.forEach((reason) => add(reason))
+    technical.forEach((reason) => add(reason))
+  }
+  add({
+    text: `${Number.isFinite(b?.hrProbability) ? pct(b.hrProbability, 1) : 'The model probability'} is an estimated home-run chance, not a predicted outcome.`,
+    tone: 'bad',
+    icon: 'shield',
+  })
+  return groups
+}
+
+function SignalGroup({ title, tone, icon, items, defaultOpen = false }) {
   return (
-    <>
-      <TodaysOutlook b={b} />
-      <DueIndicatorSection b={b} />
-    </>
+    <details className={`all-signals-group ${tone}`} open={defaultOpen || undefined}>
+      <summary>
+        <span className="all-signals-group-title">
+          <span className="all-signals-group-icon"><Icon name={icon} size={16} /></span>
+          {title}
+          <span className="all-signals-count mono">{items.length}</span>
+        </span>
+        <Icon name="ChevronDown" size={16} className="all-signals-chevron" />
+      </summary>
+      <div className="all-signals-list">
+        {items.length ? items.map((reason, index) => (
+          <div className="all-signal" key={`${reason.text}-${index}`}>
+            <Icon name={eli5IconName(reason.icon)} size={13} />
+            <span>{reason.text}</span>
+          </div>
+        )) : (
+          <div className="all-signals-empty">No {title.toLowerCase()} on this slate.</div>
+        )}
+      </div>
+    </details>
+  )
+}
+
+function AllSignalsTab({ b }) {
+  const level = useEliLevel()
+  const groups = signalGroups(b, level)
+  return (
+    <section className="all-signals" aria-labelledby="all-signals-title">
+      <div className="all-signals-head">
+        <div>
+          <span className="all-signals-kicker"><Icon name="ListFilter" size={12} /> Deep evidence</span>
+          <h2 id="all-signals-title">All Signals</h2>
+          <p>Every model reason, separated by its role in the decision.</p>
+        </div>
+        <div className="all-signals-totals" aria-label={`${groups.good.length} positive, ${groups.bad.length} cautions, ${groups.neutral.length} context signals`}>
+          <span className="good">{groups.good.length} positive</span>
+          <span className="bad">{groups.bad.length} cautions</span>
+          <span className="neutral">{groups.neutral.length} context</span>
+        </div>
+      </div>
+      <div className="all-signals-groups">
+        <SignalGroup title="Positive" tone="good" icon="Plus" items={groups.good} defaultOpen />
+        <SignalGroup title="Cautions" tone="bad" icon="TriangleAlert" items={groups.bad} />
+        <SignalGroup title="Context" tone="neutral" icon="Layers" items={groups.neutral} />
+      </div>
+    </section>
   )
 }
 
@@ -925,7 +996,7 @@ function DesktopResearchRail({ b, color, onClose, watched, inSlip, onToggleWatch
 function ResearchThesis({ b }) {
   return (
     <section className="research-mobile-thesis">
-      <div className="research-thesis-label"><Icon name="Sparkles" size={12} /> Why it rates</div>
+      <div className="research-thesis-label"><Icon name="Sparkles" size={12} /> Strongest reasons</div>
       <ResearchReasons b={b} compact />
     </section>
   )
@@ -1245,7 +1316,7 @@ function PlateMatchup({ b, onOpenZone }) {
 }
 
 // ---------------------------------------------------------------------------
-// ScoutReport
+// Model breakdown
 // ---------------------------------------------------------------------------
 
 const SCOUT_TOOLS = [
@@ -1254,12 +1325,15 @@ const SCOUT_TOOLS = [
   { key: 'environment', label: 'Park / Air', color: 'var(--accent)' },
 ]
 
-function ScoutReport({ b }) {
+function ModelBreakdown({ b }) {
   if (b.batterScore == null && b.matchupScore == null) return null
   const grades = toolGrades(b)
   return (
-    <Section title="Why this play" icon="Crosshair" className="scout-report-card">
-      <div className="scout-verdict" style={{ fontSize: '14px', fontWeight: '600', color: '#fff', marginBottom: '14px', lineHeight: '1.4' }}>{scoutVerdict(b)}</div>
+    <Section title="Model Breakdown" icon="BarChart3" className="scout-report-card model-breakdown-card">
+      <div className="model-breakdown-meta">
+        <span>Model inputs</span>
+        <small>Power quality · matchup fit · park and air</small>
+      </div>
       <div className="scout-tool-list" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
         {SCOUT_TOOLS.map(t => {
           const gv = grades[t.key]
@@ -1277,8 +1351,9 @@ function ScoutReport({ b }) {
         })}
       </div>
       {b.zoneBonus != null && b.zoneBonus !== 0 && (
-        <div style={{ fontSize: '12px', marginTop: '14px', padding: '6px 10px', borderRadius: '6px', background: 'rgba(255,255,255,0.02)', color: 'var(--text-dim)' }}>
-          Zone matchup <span style={{ fontWeight: '700', fontFamily: 'var(--mono)', color: b.zoneBonus >= 0 ? 'var(--strong)' : 'var(--bad)' }}>{b.zoneBonus >= 0 ? '+' : ''}{num(b.zoneBonus)}</span>
+        <div className="model-zone-adjustment">
+          <span>Zone adjustment</span>
+          <strong className="mono" style={{ color: b.zoneBonus >= 0 ? 'var(--strong)' : 'var(--bad)' }}>{b.zoneBonus >= 0 ? '+' : ''}{num(b.zoneBonus)}</strong>
         </div>
       )}
     </Section>
@@ -2041,43 +2116,6 @@ function PercentileSection({ b }) {
   )
 }
 
-// ---------------------------------------------------------------------------
-// Trends tab
-// ---------------------------------------------------------------------------
-
-function TodaysOutlook({ b }) {
-  const level = useEliLevel()
-  const items = reasonsForLevel(b, level)
-  if (!items.length) return null
-  const positives = items.filter(r => r.tone === 'good').length
-  const negatives = items.filter(r => r.tone === 'bad').length
-  const g = b.grade?.label || 'SKIP'
-  const verdictColor = g === 'PRIME' ? 'var(--prime)' : g === 'STRONG' ? 'var(--strong)' : g === 'LEAN' ? '#8b8bff' : 'var(--bad)'
-  const verdictLabel = g === 'PRIME' ? 'Prime Play' : g === 'STRONG' ? 'Strong' : g === 'LEAN' ? 'Lean' : 'Skip'
-  return (
-    <Section title="Today's Outlook" icon="Sparkles">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', paddingBottom: '12px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: verdictColor, display: 'inline-block', boxShadow: `0 0 8px ${verdictColor}` }} />
-          <span style={{ fontSize: '18px', fontWeight: '800', color: verdictColor }}>{verdictLabel}</span>
-        </div>
-        <div style={{ fontSize: '12px' }}>
-          <span style={{ color: 'var(--strong)', fontWeight: '600' }}>{positives} positive</span>
-          {negatives > 0 && <> · <span style={{ color: 'var(--bad)', fontWeight: '600' }}>{negatives} negative</span></>}
-        </div>
-      </div>
-      <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '7px' }}>
-        {items.map((r, i) => (
-          <li key={i} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', padding: '10px 12px', borderRadius: '8px', background: r.tone === 'good' ? 'rgba(105,185,158,0.05)' : r.tone === 'bad' ? 'rgba(239,68,68,0.04)' : 'rgba(255,255,255,0.02)', border: `1px solid ${r.tone === 'good' ? 'rgba(105,185,158,0.15)' : r.tone === 'bad' ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.04)'}` }}>
-            <Icon name={r.tone === 'good' ? 'CheckCircle2' : r.tone === 'bad' ? 'AlertTriangle' : 'Minus'} size={14} style={{ color: r.tone === 'good' ? 'var(--strong)' : r.tone === 'bad' ? 'var(--prime)' : 'var(--text-faint)', marginTop: '1px', flexShrink: 0 }} />
-            <span style={{ fontSize: '12px', color: r.tone === 'good' ? 'var(--text)' : 'var(--text-dim)', lineHeight: '1.45' }}>{r.text}</span>
-          </li>
-        ))}
-      </ul>
-    </Section>
-  )
-}
-
 function DueIndicatorSection({ b }) {
   const { checks, n } = hrSetup(b)
   const total = checks.length
@@ -2276,7 +2314,7 @@ export function PlayerCaseVsCaution({ b, explanation }) {
       </div>
 
       <p className="explain-bottom-line">
-        <span>AI bottom line</span>{explanation.bottomLine}
+        <span>Bottom line</span>{explanation.bottomLine}
       </p>
       <div className="explain-advisory">
         <Icon name="Shield" size={9} /> Engine projection unchanged · advisory only
@@ -2285,14 +2323,34 @@ export function PlayerCaseVsCaution({ b, explanation }) {
   )
 }
 
-function ExplainPick({ b }) {
+function CaseVsCaution({ b }) {
   const { status, explanation, run, available } = useExplain(b)
-  if (!available) return null
+  const fallback = useMemo(() => {
+    const signals = buildPlayerExplainSignals(b)
+    const caseSignals = signals.filter((signal) => signal.tone === 'case').slice(0, 2)
+    const cautionSignal = signals.find((signal) => signal.tone === 'caution') || null
+    if (!caseSignals.length || !cautionSignal) return null
+    return {
+      version: 2,
+      caseSignals,
+      cautionSignal,
+      bottomLine: 'The engine sees a favorable combination, but the home-run outcome remains high variance.',
+    }
+  }, [b])
+
+  if (!available) {
+    if (!fallback) return null
+    return (
+      <Section title="Case vs Caution" icon="Shield" className="explain-pick-card">
+        <PlayerCaseVsCaution b={b} explanation={fallback} />
+      </Section>
+    )
+  }
 
   const structured = status === 'done' && Number(explanation?.version) === 2
 
   return (
-    <Section title="Explain this pick" icon="Sparkles" className="explain-pick-card">
+    <Section title="Case vs Caution" icon="Shield" className="explain-pick-card">
       {structured && (
         <PlayerCaseVsCaution b={b} explanation={explanation} />
       )}
@@ -2308,7 +2366,7 @@ function ExplainPick({ b }) {
           >
             <Icon name={status === 'loading' ? 'Loader' : 'Sparkles'} size={14}
               style={status === 'loading' ? { animation: 'spin 1s linear infinite' } : undefined} />
-            {status === 'loading' ? 'Building case…' : 'Explain this pick'}
+            {status === 'loading' ? 'Building case…' : 'Build case vs caution'}
           </button>
           {status === 'error' && (
             <span className="explain-helper">
@@ -2317,35 +2375,12 @@ function ExplainPick({ b }) {
           )}
           {status === 'idle' && (
             <span className="explain-helper">
-              See the strongest case, the clearest caution, and the model's bottom line.
+              Returns the two best supporting signals, one meaningful caution, and the model's bottom line.
             </span>
           )}
         </div>
       )}
     </Section>
-  )
-}
-
-function TechReasons({ b }) {
-  const [open, setOpen] = useState(false)
-  if (!b.reasons?.length) return null
-  return (
-    <section style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '12px', padding: '12px 16px', marginBottom: '16px' }}>
-      <button onClick={() => setOpen(o => !o)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', fontSize: '12px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-dim)' }}>
-        <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Icon name="ListFilter" size={14} style={{ color: 'var(--accent)' }} /> Model details</span>
-        <Icon name={open ? 'ChevronUp' : 'ChevronDown'} size={14} />
-      </button>
-      {open && (
-        <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '12px' }}>
-          {b.reasons.map((r, i) => (
-            <li key={i} style={{ display: 'flex', gap: '6px', fontSize: '11px', color: 'var(--text-dim)', lineHeight: '1.4' }}>
-              <Icon name="ChevronRight" size={10} style={{ color: 'var(--accent)', marginTop: '2px', flexShrink: 0 }} />
-              <span>{r}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
   )
 }
 
