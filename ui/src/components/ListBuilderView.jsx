@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import Icon from './Icon.jsx'
+import ListBuilderGuide from './ListBuilderGuide.jsx'
 import { GradeChip } from './atoms.jsx'
 import ListBuilderAnalystPanel from './ListBuilderAnalystPanel.jsx'
 import { toast } from './Toast.jsx'
@@ -431,6 +432,7 @@ export default function ListBuilderView({
   const [analystResult, setAnalystResult] = useState(null)
   const [analystLoading, setAnalystLoading] = useState(false)
   const [analystError, setAnalystError] = useState('')
+  const [guideOpen, setGuideOpen] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -678,7 +680,12 @@ export default function ListBuilderView({
     <div className="lbv-root">
       <header className="lbv-hero">
         <div className="lbv-hero-copy">
-          <span className="lbv-eyebrow">Decision workspace</span>
+          <div className="lbv-hero-kicker">
+            <span className="lbv-eyebrow">Decision workspace</span>
+            <button type="button" className="lbv-guide-trigger" onClick={() => setGuideOpen(true)}>
+              <Icon name="BookOpen" size={13} /> How to use List Builder
+            </button>
+          </div>
           <h2>Build an actionable HR list</h2>
           <p>Start with a recipe or tune the evidence gates. Results refresh with the slate and every match shows why it qualified.</p>
         </div>
@@ -975,6 +982,7 @@ export default function ListBuilderView({
           </div>
         )}
       </section>
+      {guideOpen && <ListBuilderGuide onClose={() => setGuideOpen(false)} />}
     </div>
   )
 }
