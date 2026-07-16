@@ -47,8 +47,16 @@ export function parseESPNScoreboard(payload) {
   }).filter((game) => game.home.abbr && game.away.abbr && game.date)
 }
 
-export function selectCurrentNFLSlate(events, now = new Date()) {
+export function selectCurrentNFLSlate(events, now = new Date(), target = {}) {
   if (!events.length) return []
+  const targetWeek = Number(target.week)
+  if (Number.isInteger(targetWeek) && targetWeek > 0) {
+    const targetSeason = Number(target.season) || new Date(now).getUTCFullYear()
+    const targetSeasonType = target.seasonType || 'regular-season'
+    return events
+      .filter((game) => game.season === targetSeason && game.seasonType === targetSeasonType && game.week === targetWeek)
+      .sort((a, b) => +new Date(a.date) - +new Date(b.date))
+  }
   const nowMs = +new Date(now)
   const live = events.filter((game) => game.status.state === 'in')
   const recent = events.filter((game) => game.status.state === 'post' && nowMs - +new Date(game.date) <= 18 * 60 * 60 * 1000)

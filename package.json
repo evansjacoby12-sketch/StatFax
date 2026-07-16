@@ -36,6 +36,7 @@
     "nfl:history": "python server/sports/nfl/build-history.py --from-season 2020",
     "nfl:history:quick": "python server/sports/nfl/build-history.py --from-season 2020 --skip-pbp",
     "nfl:slate": "node server/sports/nfl/fetch-nfl-slate.mjs",
+    "nfl:week1": "node server/sports/nfl/fetch-nfl-slate.mjs --season-type regular-season --week 1",
     "nfl:backtest": "node server/sports/nfl/backtest.mjs",
     "lab:pull": "node model-lab/pull-data.mjs",
     "lab:backtest": "node model-lab/backtest.mjs",

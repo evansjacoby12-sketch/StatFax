@@ -1,11 +1,12 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import path from 'node:path'
 
 import { fetchESPNDepthChart, fetchESPNRoster, parseESPNDepthChart, parseESPNDepthChartHTML, parseESPNRoster, parseESPNScoreboard, parseESPNSummary, selectCurrentNFLSlate } from '../server/sports/nfl/providers/espn.mjs'
 import { nearestHourlyForecast } from '../server/sports/nfl/providers/weather.mjs'
 import { parseSportsGameOdds } from '../server/sports/nfl/providers/odds.mjs'
 import { enrichNFLTeamOpportunityShares, indexNFLHistory, matchHistoryPlayer, projectNFLPlayer } from '../server/sports/nfl/projections.mjs'
-import { buildNFLSnapshot, defenseProfile, normalizeFirstTouchdownProbabilities } from '../server/sports/nfl/fetch-nfl-slate.mjs'
+import { buildNFLSnapshot, defenseProfile, normalizeFirstTouchdownProbabilities, parseNFLSlateArgs } from '../server/sports/nfl/fetch-nfl-slate.mjs'
 import { assessPlayerAvailability, indexAvailability, externalAvailabilityFor } from '../server/sports/nfl/availability.mjs'
 import { evaluateNFLHistory } from '../server/sports/nfl/backtest.mjs'
 import { calibrateNFLProbability, correctedNFLProjection } from '../src/sports/nfl/logic/calibration.js'
@@ -85,6 +86,20 @@ test('ESPN schedule normalization selects the nearest complete NFL week', () => 
   const slate = selectCurrentNFLSlate(games, new Date('2026-09-08T12:00:00Z'))
   assert.deepEqual(slate.map((game) => game.id), ['next-a', 'next-b'])
   assert.equal(slate[0].home.abbr, 'BUF')
+})
+
+test('NFL schedule normalization can explicitly target regular-season Week 1', () => {
+  const preseason = { ...event('preseason', '2026-08-13T00:00:00Z', 1), season: { year: 2026, slug: 'preseason' } }
+  const regular = event('regular', '2026-09-10T00:00:00Z', 1)
+  const games = parseESPNScoreboard({ events: [preseason, regular] })
+  const slate = selectCurrentNFLSlate(games, new Date('2026-07-16T12:00:00Z'), { season: 2026, seasonType: 'regular-season', week: 1 })
+  assert.deepEqual(slate.map((game) => game.id), ['regular'])
+})
+
+test('NFL slate CLI parses an explicit season type and week', () => {
+  assert.deepEqual(parseNFLSlateArgs(['--season', '2026', '--season-type', 'regular-season', '--week', '1', '--output', 'dist/nfl/week-1.json']), {
+    targetSeason: 2026, targetSeasonType: 'regular-season', targetWeek: 1, outputPath: path.resolve('dist/nfl/week-1.json'),
+  })
 })
 
 test('ESPN roster keeps requested positions and maps fullback to RB', () => {

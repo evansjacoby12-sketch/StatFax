@@ -122,10 +122,11 @@ export function normalizeFirstTouchdownProbabilities(players, calibration = {}) 
   return players
 }
 
-export async function buildNFLSnapshot({ now = new Date(), fetchImpl = fetch, historyPath = DEFAULT_HISTORY, availabilityPath = DEFAULT_AVAILABILITY, backtestPath = DEFAULT_BACKTEST, depthChartPath = DEFAULT_DEPTH_CHART, weatherPath = DEFAULT_WEATHER, lineupPath = DEFAULT_LINEUPS, trackingPath = DEFAULT_TRACKING, oddsApiKey = process.env.SPORTSGAMEODDS_API_KEY } = {}) {
-  const year = new Date(now).getUTCFullYear()
+export async function buildNFLSnapshot({ now = new Date(), fetchImpl = fetch, historyPath = DEFAULT_HISTORY, availabilityPath = DEFAULT_AVAILABILITY, backtestPath = DEFAULT_BACKTEST, depthChartPath = DEFAULT_DEPTH_CHART, weatherPath = DEFAULT_WEATHER, lineupPath = DEFAULT_LINEUPS, trackingPath = DEFAULT_TRACKING, oddsApiKey = process.env.SPORTSGAMEODDS_API_KEY, targetSeason = process.env.NFL_TARGET_SEASON || null, targetSeasonType = process.env.NFL_TARGET_SEASON_TYPE || null, targetWeek = process.env.NFL_TARGET_WEEK || null } = {}) {
+  const year = Number(targetSeason) || new Date(now).getUTCFullYear()
   const schedule = await fetchESPNSeason(year, fetchImpl)
-  const games = selectCurrentNFLSlate(schedule, now)
+  const games = selectCurrentNFLSlate(schedule, now, { season: targetSeason, seasonType: targetSeasonType, week: targetWeek })
+  if (targetWeek != null && !games.length) throw new Error(`No ${targetSeasonType || 'regular-season'} Week ${targetWeek} games found for ${year}`)
   const history = await readJSON(historyPath)
   const historyIndex = indexNFLHistory(history)
   const modelPerformance = await readJSON(backtestPath)
@@ -296,10 +297,23 @@ export async function buildNFLSnapshot({ now = new Date(), fetchImpl = fetch, hi
     modelPerformance,
     modelTracking: summarizeNFLTracking(trackingLog),
     firstTdReserve: { listedOffense: .86, otherOffense: .06, defenseSpecialTeams: .06, noTouchdown: .02 },
-    meta: { week: anchor ? `${anchor.seasonType === 'preseason' ? 'Preseason ' : 'Week '}${anchor.week}` : 'No active slate', season: anchor?.season ?? year, seasonType: anchor?.seasonType ?? null, games: games.length, weatherUpdatedAt: new Date().toISOString() },
+    meta: { week: anchor ? `${anchor.seasonType === 'preseason' ? 'Preseason ' : 'Week '}${anchor.week}` : 'No active slate', season: anchor?.season ?? year, seasonType: anchor?.seasonType ?? null, games: games.length, targeted: targetWeek != null, weatherUpdatedAt: new Date().toISOString() },
     games,
     players,
   }
+}
+
+export function parseNFLSlateArgs(args = []) {
+  const options = {}
+  for (let index = 0; index < args.length; index += 1) {
+    const flag = args[index]
+    const value = args[index + 1]
+    if (flag === '--season' && value) { options.targetSeason = Number(value); index += 1 }
+    else if (flag === '--season-type' && value) { options.targetSeasonType = value; index += 1 }
+    else if (flag === '--week' && value) { options.targetWeek = Number(value); index += 1 }
+    else if (flag === '--output' && value) { options.outputPath = path.resolve(value); index += 1 }
+  }
+  return options
 }
 
 export async function writeNFLSnapshot(options = {}) {
@@ -323,5 +337,5 @@ export async function writeNFLSnapshot(options = {}) {
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  writeNFLSnapshot().catch((error) => { console.error('[nfl] fatal:', error); process.exitCode = 1 })
+  writeNFLSnapshot(parseNFLSlateArgs(process.argv.slice(2))).catch((error) => { console.error('[nfl] fatal:', error); process.exitCode = 1 })
 }
