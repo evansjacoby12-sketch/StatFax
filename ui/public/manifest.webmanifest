@@ -1,7 +1,7 @@
 {
-  "name": "StatFax — HR Model Board",
+  "name": "StatFax — Sports Intelligence",
   "short_name": "StatFax",
-  "description": "MLB home-run prop model board — ranked HR probabilities, grades, matchups, and parlay combos.",
+  "description": "Multi-sport model boards, signals, matchup research, and Bet Lab tools.",
   "id": "./",
   "start_url": "./",
   "display": "standalone",
