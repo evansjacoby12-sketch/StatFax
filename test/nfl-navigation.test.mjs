@@ -99,6 +99,8 @@ test('NFL Bet Lab shares the core MLB workspace modes without a Saved destinatio
   assert.match(nflLab, /isNFLTDMarket/)
   assert.match(nflLab, /Yardage and reception props stay outside Bet Lab/)
   assert.match(nflLab, /disabled=\{slipLegs\.length < 2\}/)
+  assert.match(nflLab, /nfl-stack-risk/)
+  assert.match(nflLab, /item\.scopes\.includes\(scope\)/)
   assert.match(nflLab, /className="workspace-brief"/)
   assert.match(nflLab, /tab === 'same-game'[\s\S]*?scope="same-game"/)
   assert.doesNotMatch(nflLab, /savedContent|tab === 'saved'/)

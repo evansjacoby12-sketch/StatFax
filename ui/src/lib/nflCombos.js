@@ -3,13 +3,15 @@ import { scoreNFLProp } from '../../../src/sports/nfl/logic/ScoringEngine.js'
 import { isNFLTDMarket, nflLegKey } from './nflTickets.js'
 
 export const NFL_COMBO_STRATEGIES = Object.freeze([
-  { id: 'balanced', label: 'Balanced TD', icon: 'Layers', description: 'Balances scorer probability, model strength and available TD value.' },
-  { id: 'safe', label: 'Safest scorers', icon: 'Shield', description: 'Prioritizes the strongest touchdown probabilities.' },
-  { id: 'value', label: 'Best TD value', icon: 'CircleDollarSign', description: 'Prioritizes touchdown edge at available prices.' },
-  { id: 'red-zone', label: 'Red-zone roles', icon: 'Target', description: 'Prioritizes goal-line work, end-zone targets and scoring role.' },
+  { id: 'scorer-core', label: 'Scorer Core', cardLabel: 'Core', icon: 'Shield', risk: 'Standard risk', riskTone: 'good', scopes: ['all', 'same-game'], description: 'Highest-confidence Anytime TD anchors.', meaning: 'Anytime TD only · probability, model strength and stable scoring role.' },
+  { id: 'goal-line-hammer', label: 'Goal-Line Hammer', cardLabel: 'Goal-Line', icon: 'Bomb', risk: 'Elevated risk', riskTone: 'caution', scopes: ['all', 'same-game'], description: 'Rushing scorers with real work near the goal line.', meaning: 'QB/RB only · goal-line touches, inside-five share or designed red-zone work required.' },
+  { id: 'end-zone-alpha', label: 'End-Zone Alpha', cardLabel: 'End-Zone', icon: 'Crosshair', risk: 'Elevated risk', riskTone: 'caution', scopes: ['all', 'same-game'], description: 'Primary receiving threats where touchdowns are caught.', meaning: 'WR/TE only · end-zone targets or meaningful red-zone target volume required.' },
+  { id: 'first-strike', label: 'First Strike', cardLabel: 'First Strike', icon: 'Trophy', risk: 'High variance', riskTone: 'avoid', scopes: ['all'], description: 'A cross-game portfolio of First TD scorers.', meaning: 'First TD only · every leg must come from a different game.' },
+  { id: 'double-tap', label: 'Double Tap', cardLabel: 'Double Tap', icon: 'Flame', risk: 'Extreme variance', riskTone: 'avoid', scopes: ['all', 'same-game'], description: 'Multi-score ceiling plays.', meaning: '2+ TD only · longshot outcomes with the highest stack variance.' },
 ])
 
 const GRADE_RANK = { SKIP: 0, LEAN: 1, STRONG: 2, PRIME: 3 }
+const clamp01 = (value) => Math.max(0, Math.min(1, Number(value) || 0))
 
 const gameKey = (player) => player.gameId || [player.team, player.opponent].filter(Boolean).sort().join('-')
 const decimalOdds = (american) => !Number.isFinite(Number(american)) || Number(american) === 0
@@ -33,30 +35,69 @@ function combinationRows(rows, size) {
   return out
 }
 
+function goalLineScore(candidate) {
+  const role = candidate.scoringRole
+  return clamp01(
+    Math.min(1, role.goalLineTouchesL3 / 3) * .34
+    + clamp01(role.goalLineOpportunityShare / .3) * .26
+    + clamp01(role.insideFiveShare / .55) * .2
+    + clamp01(role.designedTouchShare / .3) * .2,
+  )
+}
+
+function endZoneScore(candidate) {
+  const role = candidate.scoringRole
+  return clamp01(
+    Math.min(1, role.endZoneTargetsL3 / 3) * .38
+    + Math.min(1, role.redZoneTargetsL3 / 5) * .24
+    + clamp01(role.endZoneTargetShare / .3) * .2
+    + clamp01(role.endZoneRouteShare / .55) * .18,
+  )
+}
+
+function eligibleForStack(candidate, strategy) {
+  if (strategy === 'scorer-core') return candidate.marketId === 'anytime_td'
+  if (strategy === 'goal-line-hammer') return ['anytime_td', 'two_plus_td'].includes(candidate.marketId)
+    && ['QB', 'RB'].includes(candidate.position)
+    && (candidate.scoringRole.goalLineTouchesL3 >= 1 || candidate.scoringRole.goalLineOpportunityShare >= .12 || candidate.scoringRole.designedTouchShare >= .12)
+  if (strategy === 'end-zone-alpha') return ['anytime_td', 'first_td'].includes(candidate.marketId)
+    && ['WR', 'TE'].includes(candidate.position)
+    && (candidate.scoringRole.endZoneTargetsL3 >= 1 || candidate.scoringRole.redZoneTargetsL3 >= 2 || candidate.scoringRole.endZoneTargetShare >= .1)
+  if (strategy === 'first-strike') return candidate.marketId === 'first_td'
+  if (strategy === 'double-tap') return candidate.marketId === 'two_plus_td'
+  return false
+}
+
 function candidateScore(candidate, strategy) {
   const probability = candidate.model.probability || 0
   const edge = candidate.model.edge == null ? 0 : candidate.model.edge
   const model = (candidate.model.score || 0) / 100
-  const redZoneRole = candidate.model.signals?.some((signal) => /red.?zone|goal.?line|end.?zone|inside.?five/i.test(`${signal.key || ''} ${signal.text || ''}`)) ? 1 : 0
-  if (strategy === 'safe') return probability * .72 + model * .28
-  if (strategy === 'value') return edge * 1.8 + model * .34 + probability * .22
-  if (strategy === 'red-zone') return probability * .44 + model * .31 + redZoneRole * .18 + Math.max(0, edge) * .7
-  return probability * .42 + model * .38 + Math.max(0, edge) * .9
+  if (strategy === 'goal-line-hammer') return probability * .36 + model * .25 + goalLineScore(candidate) * .32 + Math.max(0, edge) * .7
+  if (strategy === 'end-zone-alpha') return probability * .36 + model * .25 + endZoneScore(candidate) * .32 + Math.max(0, edge) * .7
+  if (strategy === 'first-strike') return probability * .56 + model * .3 + Math.max(0, edge) * 1.1
+  if (strategy === 'double-tap') return probability * .5 + model * .35 + Math.max(0, edge) * .9
+  return probability * .62 + model * .3 + Math.max(0, edge) * .8
 }
 
 function rationaleFor(legs, strategy, scope) {
   const signalCount = legs.reduce((sum, leg) => sum + Math.min(2, leg.model.signals?.length || 0), 0)
-  const positiveEdges = legs.filter((leg) => Number(leg.model.edge) > 0).length
   const games = new Set(legs.map((leg) => leg.gameKey)).size
-  if (strategy === 'safe') return `Top-confidence legs with ${signalCount} active model signals.`
-  if (strategy === 'value') return `${positiveEdges}/${legs.length} legs show positive edge at the listed price.`
-  if (strategy === 'red-zone') return 'Scorer stack built from goal-line work, end-zone targets and red-zone role.'
-  return scope === 'same-game'
-    ? `One-game build with ${signalCount} active role and matchup signals.`
-    : `Balanced across ${games} game${games === 1 ? '' : 's'} with confidence and price in the mix.`
+  const averageProbability = legs.reduce((sum, leg) => sum + leg.probability, 0) / legs.length
+  if (strategy === 'goal-line-hammer') {
+    const touches = legs.reduce((sum, leg) => sum + leg.scoringRole.goalLineTouchesL3, 0)
+    return `${touches} combined goal-line touches over the last three games, supported by inside-five or designed rushing work.`
+  }
+  if (strategy === 'end-zone-alpha') {
+    const endZone = legs.reduce((sum, leg) => sum + leg.scoringRole.endZoneTargetsL3, 0)
+    const redZone = legs.reduce((sum, leg) => sum + leg.scoringRole.redZoneTargetsL3, 0)
+    return `${endZone} end-zone targets and ${redZone} red-zone targets over the last three games across this stack.`
+  }
+  if (strategy === 'first-strike') return `One First TD scorer from each of ${games} separate games.`
+  if (strategy === 'double-tap') return `Every leg requires two touchdowns; average modeled leg probability is ${(averageProbability * 100).toFixed(1)}%.`
+  return scope === 'same-game' ? `One-game Anytime TD core averaging ${(averageProbability * 100).toFixed(1)}% per leg with ${signalCount} supporting signals.` : `Anytime TD anchors across ${games} games averaging ${(averageProbability * 100).toFixed(1)}% per leg.`
 }
 
-export function buildNFLCombos(snapshot, { legs = 2, strategy = 'balanced', scope = 'all', minGrade = 'LEAN' } = {}) {
+export function buildNFLCombos(snapshot, { legs = 2, strategy = 'scorer-core', scope = 'all', minGrade = 'LEAN' } = {}) {
   const candidates = (snapshot?.players || []).flatMap((player) => eligiblePropMarkets(player).map((market) => {
     const model = scoreNFLProp(player, market.id)
     return {
@@ -64,9 +105,20 @@ export function buildNFLCombos(snapshot, { legs = 2, strategy = 'balanced', scop
       team: player.team, opponent: player.opponent, gameKey: gameKey(player), kickoff: player.kickoff,
       marketId: market.id, marketLabel: market.shortLabel, marketKind: market.kind, line: model.line,
       odds: model.odds, probability: model.probability, grade: model.grade, model,
+      scoringRole: {
+        goalLineTouchesL3: Number(player.usage?.goalLineTouchesL3 || 0),
+        goalLineOpportunityShare: Number(player.usage?.goalLineOpportunityShare || player.usage?.goalToGoOpportunityShare || 0),
+        insideFiveShare: Number(player.lineup?.redZone?.insideFiveShare || 0),
+        designedTouchShare: Number(player.lineup?.redZone?.designedTouchShare || 0),
+        endZoneTargetsL3: Number(player.usage?.endZoneTargetsL3 || 0),
+        redZoneTargetsL3: Number(player.usage?.redZoneTargetsL3 || 0),
+        endZoneTargetShare: Number(player.usage?.endZoneTargetShare || 0),
+        endZoneRouteShare: Number(player.lineup?.redZone?.endZoneRouteShare || 0),
+      },
     }
   }))
     .filter((candidate) => isNFLTDMarket(candidate.marketId))
+    .filter((candidate) => eligibleForStack(candidate, strategy))
     .filter((candidate) => GRADE_RANK[candidate.grade] >= GRADE_RANK[minGrade])
     .sort((a, b) => candidateScore(b, strategy) - candidateScore(a, strategy))
     .slice(0, scope === 'same-game' ? 32 : 18)
@@ -77,16 +129,17 @@ export function buildNFLCombos(snapshot, { legs = 2, strategy = 'balanced', scop
       const firstTDGames = combo.filter((leg) => leg.marketId === 'first_td').map((leg) => leg.gameKey)
       return new Set(firstTDGames).size === firstTDGames.length
     })
-    .filter((combo) => scope !== 'same-game' || new Set(combo.map((leg) => leg.gameKey)).size === 1)
+    .filter((combo) => scope === 'same-game'
+      ? new Set(combo.map((leg) => leg.gameKey)).size === 1
+      : new Set(combo.map((leg) => leg.gameKey)).size === combo.length)
     .map((combo) => {
       const probability = combo.reduce((product, leg) => product * leg.probability, 1)
       const prices = combo.map((leg) => decimalOdds(leg.odds))
       const decimal = prices.every(Number.isFinite) ? prices.reduce((product, price) => product * price, 1) : null
       const avgScore = combo.reduce((sum, leg) => sum + leg.model.score, 0) / combo.length
       const avgEdge = combo.reduce((sum, leg) => sum + (leg.model.edge || 0), 0) / combo.length
-      const variety = new Set(combo.map((leg) => leg.marketKind)).size / combo.length
       const rank = combo.reduce((sum, leg) => sum + candidateScore(leg, strategy), 0) / combo.length
-        + Math.max(0, avgEdge) * .45 + variety * (strategy === 'balanced' ? .06 : .015)
+        + Math.max(0, avgEdge) * .45
       // Grade the construction quality from its legs. The all-hit probability
       // naturally falls as legs are added and should not downgrade a sound
       // three- or four-leg build merely because multiplication is doing its job.

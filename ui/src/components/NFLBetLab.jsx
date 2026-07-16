@@ -18,8 +18,9 @@ function ComboGrid({ combos, slip, onAddCombo }) {
   return <div className="nfl-combo-grid">{combos.map((combo, index) => {
     const isAdded = combo.legs.every((leg) => slip.has(leg.key))
     const color = GRADE_COLORS[combo.grade]
+    const stack = NFL_COMBO_STRATEGIES.find((item) => item.id === combo.strategy)
     return <article className="nfl-combo-card" key={combo.id} style={{ '--nfl-combo-grade': color }}>
-      <header><div><span className="nfl-combo-rank mono">#{index + 1}</span><span className="nfl-combo-strategy">{NFL_COMBO_STRATEGIES.find((item) => item.id === combo.strategy)?.label}</span>{combo.scope === 'same-game' && <span className="nfl-combo-sgp">Same game</span>}</div><span className="nfl-combo-grade" style={{ color }}>{combo.grade} · {combo.score}</span></header>
+      <header><div><span className="nfl-combo-rank mono">#{index + 1}</span><span className="nfl-combo-strategy">{stack?.cardLabel || stack?.label}</span><span className={`nfl-stack-risk is-${stack?.riskTone || 'caution'}`}>{stack?.risk}</span>{combo.scope === 'same-game' && <span className="nfl-combo-sgp">Same game</span>}</div><span className="nfl-combo-grade" style={{ color }}>{combo.grade} · {combo.score}</span></header>
       <div className="nfl-combo-metrics"><span><small>All-hit model</small><strong className="mono" style={{ color }}>{pct(combo.probability)}</strong></span><span><small>Parlay price</small><strong className="mono">{price(combo.americanOdds)}</strong></span><span><small>Avg. edge</small><strong className={`mono ${combo.avgEdge >= 0 ? 'positive' : 'negative'}`}>{combo.avgEdge >= 0 ? '+' : ''}{pct(combo.avgEdge)}</strong></span></div>
       <ol className="nfl-combo-legs">{combo.legs.map((leg, legIndex) => <li key={leg.key}><span className="nfl-combo-ord mono">{legIndex + 1}</span><div><b>{leg.name}</b><small>{leg.team} vs {leg.opponent} · {leg.marketLabel}</small><span>{leg.model.signals?.slice(0, 2).map((signal) => <em key={signal.key}>{signal.text}</em>)}</span></div><aside><strong className="mono">{pct(leg.probability)}</strong><small className="mono">{price(leg.odds)}</small></aside></li>)}</ol>
       <p className="nfl-combo-why"><Icon name="Sparkles" size={13} />{combo.rationale}</p>
@@ -29,16 +30,18 @@ function ComboGrid({ combos, slip, onAddCombo }) {
 }
 
 function ComboExplorer({ snapshot, slip, onAddCombo, scope, legCount, setLegCount, strategy, setStrategy, minGrade, setMinGrade }) {
-  const combos = useMemo(() => buildNFLCombos(snapshot, { legs: legCount, strategy, scope, minGrade }), [legCount, minGrade, scope, snapshot, strategy])
-  const selectedStrategy = NFL_COMBO_STRATEGIES.find((item) => item.id === strategy)
+  const availableStrategies = NFL_COMBO_STRATEGIES.filter((item) => item.scopes.includes(scope))
+  const activeStrategy = availableStrategies.some((item) => item.id === strategy) ? strategy : 'scorer-core'
+  const combos = useMemo(() => buildNFLCombos(snapshot, { legs: legCount, strategy: activeStrategy, scope, minGrade }), [activeStrategy, legCount, minGrade, scope, snapshot])
+  const selectedStrategy = availableStrategies.find((item) => item.id === activeStrategy)
   return <section className="nfl-combo-explorer" aria-label={scope === 'same-game' ? 'NFL same-game combinations' : 'NFL combination explorer'}>
     <div className="nfl-lab-controls" aria-label="NFL parlay controls">
       <fieldset><legend>Legs</legend><div className="nfl-lab-segment">{[2, 3, 4].map((count) => <button type="button" key={count} className={legCount === count ? 'active' : ''} aria-pressed={legCount === count} onClick={() => setLegCount(count)}>{count}</button>)}</div></fieldset>
-      <label><span>Strategy</span><select value={strategy} onChange={(event) => setStrategy(event.target.value)}>{NFL_COMBO_STRATEGIES.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
+      <label><span>TD stack</span><select value={activeStrategy} onChange={(event) => setStrategy(event.target.value)}>{availableStrategies.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
       <label><span>Minimum grade</span><select value={minGrade} onChange={(event) => setMinGrade(event.target.value)}><option value="LEAN">Lean+</option><option value="STRONG">Strong+</option><option value="PRIME">Prime only</option></select></label>
       <div className="nfl-lab-scope"><span>Game scope</span><b><Icon name={scope === 'same-game' ? 'Zap' : 'LayoutGrid'} size={13} />{scope === 'same-game' ? 'One matchup' : 'Across slate'}</b></div>
     </div>
-    <div className="nfl-lab-summary"><span><Icon name={selectedStrategy?.icon || 'Layers'} size={14} /><b>{selectedStrategy?.label}</b> · {selectedStrategy?.description}</span><small>{combos.length} ranked build{combos.length === 1 ? '' : 's'} · model probabilities assume independent legs</small></div>
+    <div className="nfl-lab-summary"><span><Icon name={selectedStrategy?.icon || 'Layers'} size={14} /><b>{selectedStrategy?.label}</b> · {selectedStrategy?.description}<em>{selectedStrategy?.meaning}</em></span><small>{combos.length} ranked build{combos.length === 1 ? '' : 's'} · model probabilities assume independent legs</small></div>
     <ComboGrid combos={combos} slip={slip} onAddCombo={onAddCombo} />
   </section>
 }
@@ -56,7 +59,7 @@ function CustomBuilder({ slipLegs, onToggleLeg, onClearSlip, onSaveTicket }) {
 
 export default function NFLBetLab({ snapshot, slip, slipLegs, tab, onTabChange, onAddCombo, onToggleLeg, onSaveTicket }) {
   const [legCount, setLegCount] = useState(2)
-  const [strategy, setStrategy] = useState('balanced')
+  const [strategy, setStrategy] = useState('scorer-core')
   const [minGrade, setMinGrade] = useState('LEAN')
   const tdSlipLegs = useMemo(() => slipLegs.filter((leg) => isNFLTDMarket(leg.marketId)), [slipLegs])
   const clearTDSlip = () => tdSlipLegs.forEach((leg) => onToggleLeg(leg.key))

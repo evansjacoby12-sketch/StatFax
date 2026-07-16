@@ -16779,9 +16779,10 @@ button.th:focus-visible {
 .nfl-lab-segment button { color: var(--text-faint); border-radius: 6px; font: 800 10px var(--mono); }
 .nfl-lab-segment button.active { color: var(--text); background: rgba(184,183,216,.13); box-shadow: inset 0 0 0 1px rgba(184,183,216,.14); }
 .nfl-lab-summary { min-height: 42px; margin: 10px 0; padding: 8px 11px; display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--text-faint); border: 1px solid var(--border-soft); border-radius: 10px; background: rgba(255,255,255,.012); font-size: 9px; }
-.nfl-lab-summary > span { display: inline-flex; align-items: center; gap: 6px; }
+.nfl-lab-summary > span { min-width: 0; display: inline-flex; align-items: center; flex-wrap: wrap; gap: 4px 6px; }
 .nfl-lab-summary svg { color: var(--accent); }
 .nfl-lab-summary b { color: var(--text-dim); }
+.nfl-lab-summary em { width: 100%; padding-left: 20px; color: var(--text-faint); font-size: 8px; font-style: normal; }
 .nfl-lab-summary small { text-align: right; }
 .nfl-combo-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
 .nfl-combo-card { min-width: 0; overflow: hidden; position: relative; border: 1px solid var(--border-soft); border-radius: 13px; background: rgba(255,255,255,.018); }
@@ -16794,6 +16795,10 @@ button.th:focus-visible {
 .nfl-combo-grade { padding: 3px 5px; border: 1px solid var(--border-soft); border-radius: 5px; background: rgba(255,255,255,.025); font-size: 7px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
 .nfl-combo-sgp { color: var(--accent); }
 .nfl-combo-grade { flex: none; border-color: color-mix(in srgb, currentColor 24%, transparent); }
+.nfl-stack-risk { padding: 3px 5px; border: 1px solid currentColor; border-radius: 5px; font-size: 7px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
+.nfl-stack-risk.is-good { color: var(--good); background: color-mix(in srgb, var(--good) 8%, transparent); }
+.nfl-stack-risk.is-caution { color: var(--lean); background: color-mix(in srgb, var(--lean) 8%, transparent); }
+.nfl-stack-risk.is-avoid { color: var(--bad); background: color-mix(in srgb, var(--bad) 8%, transparent); }
 .nfl-combo-metrics { display: grid; grid-template-columns: repeat(3,1fr); border-bottom: 1px solid var(--border-soft); }
 .nfl-combo-metrics > span { min-width: 0; min-height: 66px; padding: 10px; display: flex; flex-direction: column; justify-content: center; gap: 5px; text-align: center; }
 .nfl-combo-metrics > span + span { border-left: 1px solid var(--border-soft); }
