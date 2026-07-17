@@ -6,7 +6,7 @@ import {
   validateAiHrContext,
 } from './aiHrContext.mjs'
 
-export const MLB_DATA_HEALTH_VERSION = 1
+export const MLB_DATA_HEALTH_VERSION = 2
 export const MLB_DATA_HEALTH_MODE = 'watchdog'
 
 const AI_REVIEW_KINDS = new Set([
@@ -42,6 +42,10 @@ function gameLabel(game) {
   const away = clean(game?.awayTeam?.abbr || game?.awayTeam?.name, 20) || 'Away'
   const home = clean(game?.homeTeam?.abbr || game?.homeTeam?.name, 20) || 'Home'
   return `${away}@${home}`
+}
+
+function teamLabel(team) {
+  return clean(team?.name || team?.abbr, 40) || 'Opponent'
 }
 
 function addIssue(issues, seen, issue) {
@@ -185,11 +189,11 @@ function deterministicIssues(slate, generatedAt) {
         message: `${clean(row?.name, 80) || `Batter ${playerId}`} is scored against ${clean(row?.pitcher?.name, 80) || row.pitcher.id}, not listed opponent ${clean(expectedPitcher?.name, 80) || expectedPitcher.id}.`,
         blocksPublish: true,
       })
-    } else if (!finite(row?.pitcher?.id) && isPregameMlbGame(game)) {
+    } else if (finite(expectedPitcher?.id) && !finite(row?.pitcher?.id) && isPregameMlbGame(game)) {
       addIssue(issues, seen, {
-        id: issueId('opposing-pitcher-missing', gamePk, playerId), source: 'deterministic', severity: 'warning',
-        code: 'opposing-pitcher-missing', scope: 'batter', gamePk, playerId,
-        message: `${clean(row?.name, 80) || `Batter ${playerId}`} has no opposing pitcher attached.`, blocksPublish: false,
+        id: issueId('opposing-pitcher-attachment-missing', gamePk, playerId), source: 'deterministic', severity: 'critical',
+        code: 'opposing-pitcher-attachment-missing', scope: 'batter', gamePk, playerId,
+        message: `${clean(row?.name, 80) || `Batter ${playerId}`} is missing listed opponent ${clean(expectedPitcher?.name, 80) || expectedPitcher.id}.`, blocksPublish: true,
       })
     }
   }
@@ -198,11 +202,32 @@ function deterministicIssues(slate, generatedAt) {
   for (const [gamePk, game] of games) {
     if (!isPregameMlbGame(game)) continue
     const rows = rowsByGame.get(gamePk) || []
-    if (!finite(game?.awayPitcher?.id) || !finite(game?.homePitcher?.id)) {
+    const starterSides = [
+      {
+        side: 'away', pitcher: game?.awayPitcher, starterTeam: game?.awayTeam,
+        battingTeam: game?.homeTeam, battingSide: 'home',
+      },
+      {
+        side: 'home', pitcher: game?.homePitcher, starterTeam: game?.homeTeam,
+        battingTeam: game?.awayTeam, battingSide: 'away',
+      },
+    ]
+    for (const side of starterSides) {
+      if (finite(side.pitcher?.id)) continue
+      const affectedRows = rows.filter((row) => rowSide(row, game) === side.battingSide)
+      const affectedPlayerIds = affectedRows.map((row) => Number(row.playerId)).filter(finite)
+      const count = affectedPlayerIds.length
+      const battingTeam = teamLabel(side.battingTeam)
+      const impact = count
+        ? `${count} ${battingTeam} hitter${count === 1 ? '' : 's'} use pitcher-neutral inputs`
+        : `${battingTeam} hitter projections use pitcher-neutral inputs`
       addIssue(issues, seen, {
-        id: issueId('listed-starter-missing', gamePk), source: 'deterministic', severity: 'warning',
-        code: 'listed-starter-missing', scope: 'game', gamePk, playerId: null,
-        message: `${gameLabel(game)} does not have both probable starters listed.`, blocksPublish: false,
+        id: issueId('listed-starter-missing', gamePk, null, side.side),
+        source: 'deterministic', severity: 'warning', code: 'listed-starter-missing',
+        scope: 'game', gamePk, playerId: null, teamId: finite(side.battingTeam?.id) ? Number(side.battingTeam.id) : null,
+        affectedPlayerIds,
+        message: `${gameLabel(game)}: ${teamLabel(side.starterTeam)} have no probable starter listed; ${impact} until MLB lists one.`,
+        blocksPublish: false,
       })
     }
     for (const pitcher of [game?.awayPitcher, game?.homePitcher]) {
@@ -284,7 +309,14 @@ function summarize(issues) {
   const warnings = issues.filter((issue) => issue.severity === 'warning').length
   const aiAlerts = issues.filter((issue) => issue.source === 'ai-context').length
   const affectedGames = new Set(issues.map((issue) => issue.gamePk).filter(finite)).size
-  const affectedBatters = new Set(issues.map((issue) => issue.playerId).filter(finite)).size
+  const affectedPlayerIds = new Set()
+  for (const issue of issues) {
+    if (finite(issue.playerId)) affectedPlayerIds.add(Number(issue.playerId))
+    for (const playerId of Array.isArray(issue.affectedPlayerIds) ? issue.affectedPlayerIds : []) {
+      if (finite(playerId)) affectedPlayerIds.add(Number(playerId))
+    }
+  }
+  const affectedBatters = affectedPlayerIds.size
   return { hardFailures, warnings, aiAlerts, affectedGames, affectedBatters }
 }
 
@@ -326,6 +358,7 @@ function issueAppliesToRow(issue, row, game, contextBySignalId) {
   if (issue.scope === 'slate') return true
   if (issue.scope === 'batter') return same(issue.playerId, row.playerId) && (issue.gamePk == null || same(issue.gamePk, row.gamePk))
   if (!same(issue.gamePk, row.gamePk)) return false
+  if (finite(issue.teamId) && !same(issue.teamId, row.teamId)) return false
   if (issue.source !== 'ai-context') return true
   const signal = contextBySignalId.get(issue.signalId)
   return signal ? aiHrSignalAppliesToBatter(signal, row, game) : true
@@ -364,6 +397,8 @@ export function applyMlbDataHealth({ slate, context = null, generatedAt = new Da
       scope: issue.scope,
       gamePk: issue.gamePk,
       playerId: issue.playerId,
+      teamId: issue.teamId ?? null,
+      affectedBatters: Array.isArray(issue.affectedPlayerIds) ? issue.affectedPlayerIds.length : (finite(issue.playerId) ? 1 : 0),
       message: issue.message,
       blocksPublish: issue.blocksPublish,
       confidence: issue.confidence ?? null,
@@ -397,6 +432,10 @@ export function validateMlbDataHealth({ slate, report }) {
     if (!ISSUE_SCOPES.has(issue.scope)) errors.push(`${at}.scope: unsupported value`)
     if (!clean(issue.code, 80) || !clean(issue.message, 280)) errors.push(`${at}: code and message are required`)
     if (typeof issue.blocksPublish !== 'boolean') errors.push(`${at}.blocksPublish: expected boolean`)
+    if (issue.teamId != null && !finite(issue.teamId)) errors.push(`${at}.teamId: expected a finite MLB team ID`)
+    if (issue.affectedPlayerIds != null && (!Array.isArray(issue.affectedPlayerIds) || issue.affectedPlayerIds.some((value) => !finite(value)))) {
+      errors.push(`${at}.affectedPlayerIds: expected finite MLB player IDs`)
+    }
     if (issue.source === 'ai-context') {
       if (issue.blocksPublish) errors.push(`${at}: AI context cannot block publishing`)
       if (!issue.signalId || !issue.entityKey) errors.push(`${at}: AI context requires signal provenance`)

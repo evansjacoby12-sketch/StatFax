@@ -796,6 +796,7 @@
     {
       "team": "TOR",
       "name": "Rogers Centre",
+      "country": "CA",
       "lat": 43.6415,
       "lon": -79.389,
       "bearing": 341,

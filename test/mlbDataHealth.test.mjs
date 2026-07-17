@@ -110,6 +110,36 @@ test('missing supporting feeds produce visible warnings without blocking', () =>
   assert.doesNotThrow(() => assertPublishableMlbDataHealth(result.report))
 })
 
+test('an unlisted probable starter produces one side-level check and scopes trust to opposing hitters', () => {
+  const slate = makeSlate()
+  slate.games[0].awayPitcher = null
+  for (const row of Object.values(slate.scoredBatters)) {
+    if (row.teamId === 2) row.pitcher = null
+  }
+  const result = applyMlbDataHealth({ slate, context: contextFor(slate, []), generatedAt })
+  const starterIssues = result.report.issues.filter((issue) => issue.code === 'listed-starter-missing')
+
+  assert.equal(starterIssues.length, 1)
+  assert.equal(starterIssues[0].teamId, 2)
+  assert.deepEqual(starterIssues[0].affectedPlayerIds, [10, 11, 12])
+  assert.match(starterIssues[0].message, /3 BOS hitters use pitcher-neutral inputs/)
+  assert.equal(result.report.counts.warnings, 1)
+  assert.equal(result.report.counts.affectedBatters, 3)
+  assert.equal(result.slate.scoredBatters['7-101'].dataTrust, undefined)
+  assert.equal(result.slate.scoredBatters['10-101'].dataTrust.status, 'review')
+  assert.doesNotThrow(() => assertPublishableMlbDataHealth(result.report))
+})
+
+test('failure to attach an already-listed starter remains a publish blocker', () => {
+  const slate = makeSlate()
+  slate.scoredBatters['7-101'].pitcher = null
+  const result = applyMlbDataHealth({ slate, context: contextFor(slate, []), generatedAt })
+
+  assert.ok(result.report.issues.some((issue) => issue.code === 'opposing-pitcher-attachment-missing' && issue.blocksPublish))
+  assert.equal(result.slate.scoredBatters['7-101'].dataTrust.status, 'blocked')
+  assert.throws(() => assertPublishableMlbDataHealth(result.report), /blocked publish/)
+})
+
 test('pitch-mix watchdog catches taxonomy usage dropped from the exact arsenal', () => {
   const slate = makeSlate()
   slate.pitcherPitchMix = {
@@ -202,6 +232,7 @@ test('MLB site stays quiet when healthy and exposes sourced review details when 
   assert.match(app, /<MlbDataHealthBanner health=\{data\.meta\.dataHealth\}/)
   assert.match(loader, /dataHealth: d\.dataHealth \|\| null/)
   assert.match(banner, /health\.status === 'ready'/)
-  assert.match(banner, /Projections were not changed by this warning/)
+  assert.match(banner, /affectedBatters/)
+  assert.match(banner, /Projections were not changed by/)
   assert.match(banner, /target="_blank"/)
 })

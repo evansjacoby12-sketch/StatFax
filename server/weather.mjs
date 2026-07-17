@@ -15,9 +15,8 @@
  *     including the ones RG and Weather.com show. Pulling it directly means
  *     our chip + their chip read identical values — no more user trust hits
  *     from "your app says 61° but RG says 68°."
- *   - All MLB venues are in the US (Toronto's Rogers Centre is a permanently
- *     domed venue — roof closed → no outdoor weather needed → no need to
- *     handle non-US venues).
+ *   - NWS remains the preferred source for US venues. International venues
+ *     are routed to Open-Meteo because api.weather.gov does not serve them.
  *   - Numeric `windDirection` (degrees) in the gridpoint endpoint — better
  *     than parsing the hourly endpoint's "NNW" / "NE" text codes.
  *
@@ -73,6 +72,7 @@
  */
 
 const NWS_BASE = 'https://api.weather.gov';
+const OPEN_METEO_BASE = 'https://api.open-meteo.com/v1/forecast';
 // NWS rejects requests without a User-Agent that includes contact info.
 // Identify our app + a way to reach the maintainer.
 const NWS_UA =
@@ -171,6 +171,98 @@ function kmhToMph(v) {
 const MAX_SANE_MPH = 90;
 function saneMph(v) {
   return Number.isFinite(v) && v >= 0 && v <= MAX_SANE_MPH ? v : null;
+}
+
+function finiteNumber(value) {
+  if (value == null || value === '') return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function openMeteoTimeMs(value) {
+  if (value == null || value === '') return NaN;
+  if (Number.isFinite(Number(value))) return Number(value) * 1000;
+  const text = String(value || '');
+  if (!text) return NaN;
+  return Date.parse(/[zZ]|[+-]\d\d:\d\d$/.test(text) ? text : `${text}Z`);
+}
+
+/**
+ * Convert an Open-Meteo hourly response into the same seven-hour weather
+ * contract used by the NWS path. Exported so provider routing and units can
+ * be regression-tested without making a network request.
+ */
+export function buildOpenMeteoForecast(payload, gameStartIso, fetchedAt = new Date().toISOString()) {
+  const gameStartUtcMs = Date.parse(gameStartIso);
+  const times = Array.isArray(payload?.hourly?.time) ? payload.hourly.time : [];
+  if (!Number.isFinite(gameStartUtcMs) || !times.length) return null;
+
+  let firstPitchIdx = 0;
+  for (let index = 0; index < times.length; index++) {
+    const timeMs = openMeteoTimeMs(times[index]);
+    if (!Number.isFinite(timeMs)) continue;
+    if (timeMs <= gameStartUtcMs) firstPitchIdx = index;
+    else break;
+  }
+
+  const hourly = payload.hourly;
+  const hours = [];
+  for (let offset = 0; offset < GAME_HOURS_AHEAD; offset++) {
+    const index = firstPitchIdx + offset;
+    if (index >= times.length) break;
+    const timeMs = openMeteoTimeMs(times[index]);
+    if (!Number.isFinite(timeMs)) continue;
+    hours.push({
+      hourOffset: offset,
+      tIso: new Date(timeMs).toISOString(),
+      tempF: finiteNumber(hourly.temperature_2m?.[index]),
+      windSpeedMph: saneMph(finiteNumber(hourly.wind_speed_10m?.[index])),
+      windDirDeg: finiteNumber(hourly.wind_direction_10m?.[index]),
+      windGustMph: saneMph(finiteNumber(hourly.wind_gusts_10m?.[index])),
+      humidity: finiteNumber(hourly.relative_humidity_2m?.[index]),
+      pressureMb: finiteNumber(hourly.surface_pressure?.[index]),
+      precipProbPct: finiteNumber(hourly.precipitation_probability?.[index]),
+      cloudCoverPct: finiteNumber(hourly.cloud_cover?.[index]),
+    });
+  }
+  if (!hours.length) return null;
+
+  const h0 = hours[0];
+  return {
+    tempF: h0.tempF,
+    windSpeedMph: h0.windSpeedMph,
+    windDirDeg: h0.windDirDeg,
+    windGustMph: h0.windGustMph,
+    humidity: h0.humidity,
+    pressureMb: h0.pressureMb,
+    precipProbPct: h0.precipProbPct,
+    cloudCoverPct: h0.cloudCoverPct,
+    hours,
+    source: 'open-meteo',
+    providerScope: 'international',
+    fetchedAt,
+    gameStartIso,
+    timezone: payload?.timezone || 'UTC',
+  };
+}
+
+async function fetchOpenMeteoForecast(venue, gameStartIso) {
+  const url = new URL(OPEN_METEO_BASE);
+  url.searchParams.set('latitude', String(venue.lat));
+  url.searchParams.set('longitude', String(venue.lon));
+  url.searchParams.set('hourly', [
+    'temperature_2m', 'relative_humidity_2m', 'precipitation_probability',
+    'cloud_cover', 'surface_pressure', 'wind_speed_10m',
+    'wind_direction_10m', 'wind_gusts_10m',
+  ].join(','));
+  url.searchParams.set('temperature_unit', 'fahrenheit');
+  url.searchParams.set('wind_speed_unit', 'mph');
+  url.searchParams.set('timeformat', 'unixtime');
+  url.searchParams.set('timezone', 'UTC');
+  url.searchParams.set('forecast_days', '16');
+  const res = await fetch(url, { headers: { Accept: 'application/json', 'User-Agent': NWS_UA } });
+  if (!res.ok) throw new Error(`Open-Meteo HTTP ${res.status} ${url}`);
+  return buildOpenMeteoForecast(await res.json(), gameStartIso);
 }
 
 /**
@@ -305,6 +397,17 @@ export async function fetchHourlyForecast(venue, gameStartIso) {
 
   const gameStartUtcMs = Date.parse(gameStartIso);
   if (!Number.isFinite(gameStartUtcMs)) return null;
+
+  // api.weather.gov only covers the United States. Keep the higher-trust NWS
+  // source for US parks and route only explicitly international venues to the
+  // compatible global provider.
+  if (String(venue?.country || 'US').toUpperCase() !== 'US') {
+    try {
+      return await fetchOpenMeteoForecast(venue, gameStartIso);
+    } catch {
+      return null;
+    }
+  }
 
   // Doubleheader dedupe: if we already pulled the processed payload for
   // this venue, just re-window it for this game's start time.

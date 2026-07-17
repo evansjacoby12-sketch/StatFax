@@ -9,10 +9,12 @@ export default function MlbDataHealthBanner({ health }) {
   const issues = Array.isArray(health.issues) ? health.issues : []
   const warnings = Number(health.warnings || 0)
   const aiAlerts = Number(health.aiAlerts || 0)
+  const affectedGames = Number(health.affectedGames || 0)
+  const affectedBatters = Number(health.affectedBatters || 0)
   const label = health.status === 'critical' ? 'Slate publish blocked' : 'Data review active'
   const summary = health.status === 'critical'
     ? `${health.hardFailures || 0} feed identity failure${health.hardFailures === 1 ? '' : 's'} detected.`
-    : `${warnings} review item${warnings === 1 ? '' : 's'}${aiAlerts ? ` · ${aiAlerts} source-backed AI alert${aiAlerts === 1 ? '' : 's'}` : ''}. Projections were not changed by this warning.`
+    : `${warnings} data check${warnings === 1 ? '' : 's'}${affectedGames ? ` across ${affectedGames} game${affectedGames === 1 ? '' : 's'}` : ''}${affectedBatters ? ` · ${affectedBatters} hitter${affectedBatters === 1 ? '' : 's'} marked for review` : ''}${aiAlerts ? ` · ${aiAlerts} source-backed AI alert${aiAlerts === 1 ? '' : 's'}` : ''}. Projections were not changed by ${warnings === 1 ? 'this check' : 'these checks'}.`
 
   return (
     <details className={`mlb-data-health is-${health.status}`}>
