@@ -130,6 +130,21 @@ test('an unlisted probable starter produces one side-level check and scopes trus
   assert.doesNotThrow(() => assertPublishableMlbDataHealth(result.report))
 })
 
+test('doubleheader health checks identify the exact game number', () => {
+  const slate = makeSlate()
+  slate.games[0].doubleHeader = 'S'
+  slate.games[0].gameNumber = 2
+  slate.games[0].awayPitcher = null
+  for (const row of Object.values(slate.scoredBatters)) {
+    if (row.teamId === 2) row.pitcher = null
+  }
+  const result = applyMlbDataHealth({ slate, context: contextFor(slate, []), generatedAt })
+  const starterIssue = result.report.issues.find((issue) => issue.code === 'listed-starter-missing')
+
+  assert.match(starterIssue.message, /^NYY@BOS \(Game 2\):/)
+  assert.doesNotMatch(starterIssue.message, /Game 1/)
+})
+
 test('failure to attach an already-listed starter remains a publish blocker', () => {
   const slate = makeSlate()
   slate.scoredBatters['7-101'].pitcher = null

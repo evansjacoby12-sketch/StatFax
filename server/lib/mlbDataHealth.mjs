@@ -41,7 +41,10 @@ function issueId(code, gamePk = null, playerId = null, suffix = null) {
 function gameLabel(game) {
   const away = clean(game?.awayTeam?.abbr || game?.awayTeam?.name, 20) || 'Away'
   const home = clean(game?.homeTeam?.abbr || game?.homeTeam?.name, 20) || 'Home'
-  return `${away}@${home}`
+  const gameNumber = finite(game?.gameNumber) ? Number(game.gameNumber) : null
+  const isDoubleheader = String(game?.doubleHeader || 'N').toUpperCase() !== 'N' || gameNumber > 1
+  const suffix = isDoubleheader && gameNumber ? ` (Game ${gameNumber})` : isDoubleheader ? ' (Doubleheader)' : ''
+  return `${away}@${home}${suffix}`
 }
 
 function teamLabel(team) {
