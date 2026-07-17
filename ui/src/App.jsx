@@ -457,6 +457,15 @@ export default function App() {
   const clearSlip = useCallback(() => setSlipIds([]), [])
   // Replace the whole slip (auto-build / load a saved slip) — dedupes + ignores blanks.
   const replaceSlip = useCallback((ids) => setSlipIds([...new Set((ids || []).filter((x) => x != null))]), [])
+  const useListBuilderParlay = useCallback((ids) => {
+    const legs = [...new Set((ids || []).filter((id) => id != null))]
+    if (legs.length < 2) return
+    buzz()
+    replaceSlip(legs)
+    setFindPlaysTab(null)
+    setBetLabTab('builder')
+    toast.success(`${legs.length}-leg curated parlay loaded`)
+  }, [replaceSlip])
 
   // Attach the RISING signal (recent L14 barrel surging above season) as a real
   // boolean flag so every consumer — board badges, filters, counts, backtest —
@@ -915,6 +924,7 @@ export default function App() {
           slip={slipSet}
           onToggleWatch={toggleWatch}
           onToggleSlip={toggleSlip}
+          onUseParlay={useListBuilderParlay}
         />
       )}
       {showBacktest && (

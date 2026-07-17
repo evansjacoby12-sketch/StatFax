@@ -22723,3 +22723,224 @@ button.th:focus-visible {
   .potd-decision-stack .perfect-setup,
   .mobile-potd-verdict > b { animation: none !important; }
 }
+
+/* ============ List Builder curated parlay engine ============ */
+.lbv-parlay-engine {
+  margin: 0 0 14px;
+  padding: 14px;
+  background: color-mix(in srgb, var(--accent) 3%, rgba(0,0,0,.16));
+  border: 1px solid color-mix(in srgb, var(--accent) 23%, var(--border));
+  border-radius: 12px;
+}
+.lbv-parlay-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+}
+.lbv-parlay-icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  color: var(--strong);
+  background: color-mix(in srgb, var(--strong) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--strong) 22%, var(--border));
+  border-radius: 9px;
+}
+.lbv-parlay-title h4 { margin: 3px 0 3px; color: #fff; font-size: 14px; }
+.lbv-parlay-title p { margin: 0; color: var(--text-faint); font-size: 9px; line-height: 1.45; }
+.lbv-parlay-eligible {
+  align-self: center;
+  padding: 5px 8px;
+  color: var(--text-dim);
+  background: rgba(255,255,255,.025);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 8px;
+  font-weight: 800;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.lbv-parlay-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 12px;
+  padding-top: 11px;
+  border-top: 1px solid var(--border-soft);
+}
+.lbv-parlay-sizes,
+.lbv-parlay-actions { display: flex; align-items: center; gap: 5px; }
+.lbv-parlay-sizes {
+  padding: 2px;
+  background: rgba(255,255,255,.02);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+}
+.lbv-parlay-sizes button,
+.lbv-parlay-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 34px;
+  padding: 6px 10px;
+  color: var(--text-faint);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  font-size: 9px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.lbv-parlay-sizes button:hover:not(:disabled),
+.lbv-parlay-sizes button.on {
+  color: #fff;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 32%, var(--border));
+}
+.lbv-parlay-sizes button:disabled { opacity: .28; cursor: not-allowed; }
+.lbv-parlay-actions button {
+  color: var(--text-dim);
+  background: rgba(255,255,255,.025);
+  border-color: var(--border);
+}
+.lbv-parlay-actions button:hover:not(:disabled),
+.lbv-parlay-actions button.on {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
+}
+.lbv-parlay-evidence {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 9px;
+  padding: 8px 9px;
+  color: var(--text-faint);
+  background: rgba(0,0,0,.12);
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  font-size: 8.5px;
+  line-height: 1.45;
+}
+.lbv-parlay-evidence svg { flex: 0 0 auto; margin-top: 1px; }
+.lbv-parlay-evidence b { color: var(--text-dim); }
+.lbv-parlay-evidence strong { color: #fff; }
+.lbv-parlay-evidence.valid { color: color-mix(in srgb, var(--strong) 72%, var(--text-dim)); border-color: color-mix(in srgb, var(--strong) 20%, var(--border)); }
+.lbv-parlay-evidence.valid svg { color: var(--strong); }
+.lbv-parlay-evidence.collecting svg { color: var(--warn); }
+.lbv-parlay-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 9px;
+}
+.lbv-parlay-card {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  padding: 10px;
+  background: rgba(0,0,0,.16);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.lbv-parlay-card.featured { border-color: color-mix(in srgb, var(--accent) 38%, var(--border)); box-shadow: inset 0 1px 0 color-mix(in srgb, var(--accent) 10%, transparent); }
+.lbv-parlay-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 7px; }
+.lbv-parlay-card-head span {
+  padding: 3px 6px;
+  color: var(--text-dim);
+  background: rgba(255,255,255,.035);
+  border-radius: 999px;
+  font-size: 7.5px;
+  font-weight: 850;
+  text-transform: uppercase;
+  letter-spacing: .035em;
+}
+.lbv-parlay-card.featured .lbv-parlay-card-head span { color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.lbv-parlay-card-head b { color: var(--text-faint); font-size: 8px; }
+.lbv-parlay-legs { display: flex; flex-direction: column; gap: 4px; }
+.lbv-parlay-leg {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+  min-height: 42px;
+  padding: 5px 6px;
+  background: rgba(255,255,255,.022);
+  border: 1px solid transparent;
+  border-radius: 7px;
+}
+.lbv-parlay-leg.weakest { border-color: color-mix(in srgb, var(--warn) 22%, transparent); }
+.lbv-parlay-leg .grade-chip { font-size: 7.5px; padding: 3px 5px; }
+.lbv-parlay-leg-copy { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
+.lbv-parlay-leg-copy strong { color: #fff; font-size: 10px; line-height: 1.2; overflow-wrap: anywhere; }
+.lbv-parlay-leg-copy small { color: var(--text-faint); font-size: 7.5px; line-height: 1.25; }
+.lbv-parlay-leg > b { color: var(--accent); font-size: 10px; }
+.lbv-parlay-model {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-soft);
+}
+.lbv-parlay-model span { display: flex; flex-direction: column; gap: 2px; }
+.lbv-parlay-model small { color: var(--text-faint); font-size: 7px; text-transform: uppercase; letter-spacing: .045em; }
+.lbv-parlay-model strong { color: #fff; font-size: 14px; }
+.lbv-parlay-reason { display: flex; align-items: flex-start; gap: 5px; margin: 7px 0 0; color: var(--text-dim); font-size: 8px; line-height: 1.35; }
+.lbv-parlay-reason svg { flex: 0 0 auto; color: var(--accent); }
+.lbv-parlay-math { margin: 4px 0 0; color: var(--text-faint); font-size: 7px; font-style: italic; }
+.lbv-parlay-use {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+  margin-top: 9px;
+  color: #111118;
+  background: var(--accent);
+  border: 0;
+  border-radius: 8px;
+  font-size: 9px;
+  font-weight: 850;
+}
+.lbv-parlay-card:not(.featured) .lbv-parlay-use { color: var(--accent); background: color-mix(in srgb, var(--accent) 9%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border)); }
+.lbv-parlay-empty { display: flex; align-items: center; gap: 9px; min-height: 76px; margin-top: 9px; padding: 10px; color: var(--text-faint); background: rgba(0,0,0,.11); border: 1px dashed var(--border); border-radius: 8px; }
+.lbv-parlay-empty > svg { flex: 0 0 auto; color: var(--warn); }
+.lbv-parlay-empty strong { color: var(--text-dim); font-size: 10px; }
+.lbv-parlay-empty p { margin: 2px 0 0; font-size: 8px; line-height: 1.4; }
+.lbv-parlay-cap { display: flex; align-items: flex-start; gap: 5px; margin: 7px 0 0; color: var(--text-faint); font-size: 7.5px; line-height: 1.4; }
+.lbv-parlay-cap svg { flex: 0 0 auto; }
+
+@media (max-width: 900px) {
+  .lbv-parlay-cards { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 700px) {
+  .lbv-parlay-engine { padding: 12px; }
+  .lbv-parlay-head { grid-template-columns: auto minmax(0, 1fr); }
+  .lbv-parlay-eligible { grid-column: 1 / -1; justify-self: stretch; text-align: center; }
+  .lbv-parlay-controls { align-items: stretch; flex-direction: column; }
+  .lbv-parlay-sizes,
+  .lbv-parlay-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .lbv-parlay-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .lbv-parlay-sizes button,
+  .lbv-parlay-actions button { min-height: 44px; }
+  .lbv-parlay-card { display: flex; }
+  .lbv-parlay-use { min-height: 44px; }
+}
+
+@media (max-width: 390px) {
+  .lbv-parlay-actions { grid-template-columns: 1fr; }
+  .lbv-parlay-leg { grid-template-columns: auto minmax(0, 1fr); }
+  .lbv-parlay-leg > b { grid-column: 2; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lbv-parlay-sizes button,
+  .lbv-parlay-actions button,
+  .lbv-parlay-use { transition: none !important; }
+}

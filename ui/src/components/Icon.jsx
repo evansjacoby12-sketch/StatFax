@@ -111,6 +111,7 @@ import {
   LineChart,
   Database,
   ShieldAlert,
+  Dice5,
 } from 'lucide-react'
 
 const REGISTRY = {
@@ -226,6 +227,7 @@ const REGISTRY = {
   LineChart,
   Database,
   ShieldAlert,
+  Dice5,
 }
 
 export default function Icon({ name, size = 16, ...rest }) {

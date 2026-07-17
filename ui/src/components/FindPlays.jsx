@@ -12,7 +12,7 @@ const TABS = [
 
 export default function FindPlays({
   initialTab = 'weather', onClose, batters, slateDate, selectedId, onSelect, onOpenPitcher,
-  watchlist, slip, onToggleWatch, onToggleSlip,
+  watchlist, slip, onToggleWatch, onToggleSlip, onUseParlay,
 }) {
   const [tab, setTab] = useState(initialTab)
   return (
@@ -41,6 +41,7 @@ export default function FindPlays({
           slip={slip}
           onToggleWatch={onToggleWatch}
           onToggleSlip={onToggleSlip}
+          onUseParlay={onUseParlay}
         />
       )}
     </WorkspaceShell>
