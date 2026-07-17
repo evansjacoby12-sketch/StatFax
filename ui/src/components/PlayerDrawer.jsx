@@ -1419,19 +1419,31 @@ function PaCurve({ b, color }) {
   if (!Array.isArray(pa) || !pa.length) return null
   const max = Math.max(0.02, ...pa.map(x => x.p || 0))
   return (
-    <Section title="Per plate appearance" icon="BarChart3">
-      <div style={{ display: 'flex', gap: '8px', justifyContent: 'space-between', height: '80px', alignItems: 'flex-end', padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+    <Section title="Opportunity path" icon="BarChart3" className="scout-report-section scout-pa-section">
+      <div className="scout-story-lead">
+        <div>
+          <small>Plate appearance model</small>
+          <strong>Each trip adds another chance</strong>
+          <p>Projected home-run opportunity across tonight&apos;s expected plate appearances.</p>
+        </div>
+        <div className="scout-story-metric" style={{ color }}>
+          <b>{num(b.expectedHRs, 3)}</b>
+          <span>xHR tonight</span>
+        </div>
+      </div>
+      <div className="scout-pa-curve">
         {pa.map((x, i) => (
-          <div key={i} title={`PA ${x.pa}: ${pct(x.p, 1)} HR chance`} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, height: '100%', justifyContent: 'flex-end' }}>
-            <div style={{ background: 'rgba(255,255,255,0.03)', width: '100%', flex: 1, borderRadius: '4px', display: 'flex', alignItems: 'flex-end', overflow: 'hidden' }}>
-              <div style={{ height: `${Math.max(4, (x.p / max) * 100)}%`, background: color, opacity: x.partial ? 0.4 : 1, width: '100%', borderRadius: '4px', boxShadow: `0 0 8px ${hexA(color, 0.4)}` }} />
+          <div key={i} className={`scout-pa-step${x.partial ? ' partial' : ''}`} title={`PA ${x.pa}: ${pct(x.p, 1)} HR chance`}>
+            <span className="scout-pa-rate mono">{pct(x.p, 1)}</span>
+            <div className="scout-pa-track">
+              <div className="scout-pa-fill" style={{ height: `${Math.max(4, (x.p / max) * 100)}%`, background: color, boxShadow: `0 0 10px ${hexA(color, 0.28)}` }} />
             </div>
-            <span style={{ fontSize: '10px', marginTop: '4px', color: 'var(--text-faint)', fontFamily: 'var(--mono)' }}>{x.pa}</span>
+            <span className="scout-pa-label">PA {x.pa}</span>
           </div>
         ))}
       </div>
-      <div style={{ fontSize: '11px', marginTop: '8px', color: 'var(--text-dim)' }}>
-        HR chance per PA. Sum = <b style={{ fontFamily: 'var(--mono)', color: '#fff' }}>{num(b.expectedHRs, 3)}</b> xHR over {num(b.expectedPAs, 1)} PA.
+      <div className="scout-section-foot">
+        <Icon name="Info" size={12} /> The model expects <b className="mono">{num(b.expectedPAs, 1)} PA</b>; faded steps represent partial appearance probability.
       </div>
     </Section>
   )
@@ -1546,6 +1558,7 @@ function ballTone(goAo) {
 }
 
 function PitcherSection({ b, batters, onOpenPitcher }) {
+  const [showStarts, setShowStarts] = useState(false)
   const p = b.pitcher
   if (!p) return null
   const s = p.season || {}
@@ -1555,40 +1568,48 @@ function PitcherSection({ b, batters, onOpenPitcher }) {
   const split = b.batSide === 'L' ? p.splits?.vl : p.splits?.vr
   const rf = p.recentForm
   const canOpen = !!onOpenPitcher && p.id != null
-  const idBlock = (
-    <div>
-      <div style={{ fontSize: '15px', fontWeight: '800', color: '#fff' }}>{p.name}</div>
-      <div style={{ fontSize: '11px', color: 'var(--text-faint)' }}>{p.hand}HP{split ? ` · vs ${b.batSide}HB` : ''}</div>
-    </div>
-  )
+  const attackScore = [s.hrPer9 >= 1.3, b.flyBallMatchup, b.hrPlatoonEdge].filter(Boolean).length
+  const attackLabel = attackScore >= 2 ? 'Attack window' : attackScore === 1 ? 'Mixed matchup' : 'Respect the arm'
+  const attackTone = attackScore >= 2 ? 'good' : attackScore === 1 ? 'warn' : 'neutral'
   return (
-    <Section title="Opposing pitcher" icon="Shield" id="sec-pitcher">
-      <div style={{ marginBottom: '12px', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: '10px' }}>
-        {canOpen ? (
-          <button className="pitcher-link" onClick={() => onOpenPitcher(p.id, b.gamePk)} title={`Open ${p.name}'s pitcher card`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', color: 'var(--accent)' }}>
-            {idBlock}
-            <span style={{ fontSize: '11px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '2px' }}>Pitcher card <Icon name="ChevronRight" size={12} /></span>
+    <Section title="Pitcher attack plan" icon="Shield" id="sec-pitcher" className="scout-report-section scout-pitcher-section">
+      <div className={`scout-pitcher-hero tone-${attackTone}`}>
+        <div className="scout-pitcher-verdict">
+          <small>Matchup verdict</small>
+          <strong>{attackLabel}</strong>
+          <span>{attackScore}/3 attack markers active</span>
+        </div>
+        <div className="scout-pitcher-identity">
+          <span className="scout-pitcher-monogram" aria-hidden="true">{p.name?.split(/\s+/).map(x => x[0]).slice(0, 2).join('')}</span>
+          <div>
+            <strong>{p.name}</strong>
+            <span>{p.hand}HP{split ? ` · facing ${b.batSide}HB` : ''}</span>
+          </div>
+        </div>
+        {canOpen && (
+          <button className="scout-pitcher-cta" onClick={() => onOpenPitcher(p.id, b.gamePk)} title={`Open ${p.name}'s pitcher card`}>
+            Full pitcher card <Icon name="ChevronRight" size={13} />
           </button>
-        ) : idBlock}
+        )}
       </div>
-      <div className="stat-grid" style={{ marginBottom: '12px' }}>
+      <div className="scout-stat-strip scout-pitcher-stats">
         <Cell k="ERA" v={num(s.era, 2)} />
         <Cell k="HR/9" v={num(s.hrPer9, 2)} tone={s.hrPer9 >= 1.3 ? 'good' : s.hrPer9 <= 0.9 ? 'bad' : null} />
         <Cell k="K/9" v={num(s.kPer9, 1)} />
-        <Cell
-          k="Projected K"
-          v={Number.isFinite(kProjection) ? kProjection.toFixed(1) : '—'}
-          title={Number.isFinite(kProjection) ? `Projected strikeouts: ${kProjection.toFixed(1)} K. 80% uncertainty interval: ${estK.lo}–${estK.hi} K.` : 'Need a season K sample.'}
-        />
+        <Cell k="Projected K" v={Number.isFinite(kProjection) ? kProjection.toFixed(1) : '—'} title={Number.isFinite(kProjection) ? `Projected strikeouts: ${kProjection.toFixed(1)} K. 80% uncertainty interval: ${estK.lo}–${estK.hi} K.` : 'Need a season K sample.'} />
         <Cell k="WHIP" v={num(s.whip, 2)} />
         <Cell k="IP" v={num(s.ip, 1)} />
         <Cell k="GB/FB" v={battedBallLabel(s.goAo)} tone={ballTone(s.goAo)} title="League ~1.15." />
       </div>
-      {b.flyBallMatchup && <div className="note good" style={{ fontSize: '11px', display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(105,185,158,0.06)', padding: '6px 10px', borderRadius: '6px', marginBottom: '8px', border: '1px solid rgba(105,185,158,0.1)' }}><Icon name="Wind" size={12} style={{ color: 'var(--strong)' }} /> <span>Fly-ball arm matchup (GB/FB {num(s.goAo, 2)})</span></div>}
-      {b.hrPlatoonEdge && <div className="note good" style={{ fontSize: '11px', display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(105,185,158,0.06)', padding: '6px 10px', borderRadius: '6px', marginBottom: '8px', border: '1px solid rgba(105,185,158,0.1)' }}><Icon name="Target" size={12} style={{ color: 'var(--strong)' }} /> <span>Gives up more HRs vs {b.batSide === 'S' ? 'this side' : `${b.batSide}HB`}</span></div>}
+      {(b.flyBallMatchup || b.hrPlatoonEdge) && (
+        <div className="scout-callout-list">
+          {b.flyBallMatchup && <div><Icon name="Wind" size={13} /><span><b>Fly-ball attack lane</b> · GB/FB {num(s.goAo, 2)}</span></div>}
+          {b.hrPlatoonEdge && <div><Icon name="Target" size={13} /><span><b>Platoon exposure</b> · More HRs allowed vs {b.batSide === 'S' ? 'this side' : `${b.batSide}HB`}</span></div>}
+        </div>
+      )}
       {split && (
-        <div style={{ display: 'flex', gap: '10px', padding: '8px 10px', background: 'rgba(255,255,255,0.02)', borderRadius: '6px', fontSize: '11px', marginBottom: '8px', border: '1px solid rgba(255,255,255,0.04)' }}>
-          <span style={{ fontWeight: '700', color: 'var(--text-dim)' }}>vs {b.batSide}HB</span>
+        <div className="scout-split-band">
+          <strong>vs {b.batSide}HB</strong>
           <Mini k="HR/9" v={num(split.hrPer9, 2)} />
           <Mini k="AVG" v={rate(split.avg)} />
           {split.slg != null && split.slg > 0 && <Mini k="SLG" v={rate(split.slg)} />}
@@ -1598,8 +1619,8 @@ function PitcherSection({ b, batters, onOpenPitcher }) {
         </div>
       )}
       {b.h2h && b.h2h.ab > 0 && (
-        <div style={{ display: 'flex', gap: '10px', padding: '8px 10px', background: 'rgba(99,102,241,0.04)', borderRadius: '6px', fontSize: '11px', marginBottom: '12px', border: '1px solid rgba(99,102,241,0.1)' }}>
-          <span style={{ fontWeight: '700', color: 'var(--accent)', display: 'inline-flex', alignItems: 'center', gap: '3px' }}><Icon name="Crosshair" size={11} /> Career H2H</span>
+        <div className="scout-split-band accent">
+          <strong><Icon name="Crosshair" size={11} /> Career H2H</strong>
           <Mini k="" v={`${b.h2h.h}-for-${b.h2h.ab}`} />
           <Mini k="HR" v={num(b.h2h.hr)} />
           <Mini k="AVG" v={rate(b.h2h.avg)} />
@@ -1607,24 +1628,27 @@ function PitcherSection({ b, batters, onOpenPitcher }) {
         </div>
       )}
       {rf?.recentStarts?.length ? (
-        <div style={{ marginTop: '12px' }}>
-          <div style={{ fontSize: '12px', fontWeight: '700', color: '#fff', display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-            <span>Recent Starts</span>
-            <span style={{ fontSize: '11px', color: 'var(--text-faint)', fontWeight: '400' }}>{num(rf.hrPer9, 2)} HR/9 · {num(rf.era, 2)} ERA (L{rf.games})</span>
+        <div className="scout-starts">
+          <div className="scout-starts-head">
+            <div><small>Recent starts</small><strong>L{rf.games} workload and damage</strong></div>
+            <span className="mono">{num(rf.hrPer9, 2)} HR/9 · {num(rf.era, 2)} ERA</span>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '8px', overflow: 'hidden' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', padding: '6px 10px', background: 'rgba(255,255,255,0.03)', fontSize: '10px', fontWeight: '700', color: 'var(--text-faint)', textTransform: 'uppercase' }}>
+          <button className="scout-mobile-disclosure" onClick={() => setShowStarts(v => !v)} aria-expanded={showStarts}>
+            {showStarts ? 'Hide recent starts' : 'Show recent starts'} <Icon name="ChevronDown" size={14} />
+          </button>
+          <div className={`scout-starts-table${showStarts ? ' open' : ''}`}>
+            <div className="scout-start-row scout-start-head">
               {['Date','Opp','IP','H','ER','K','HR'].map(h => <span key={h}>{h}</span>)}
             </div>
             {rf.recentStarts.slice(0, 5).map((st, i) => (
-              <div key={i} style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', padding: '6px 10px', borderBottom: '1px solid rgba(255,255,255,0.02)', fontSize: '11px', color: 'var(--text-dim)' }}>
-                <span style={{ fontFamily: 'var(--mono)' }}>{st.date?.slice(5)}</span>
-                <span>{st.isHome ? 'vs' : '@'} {st.opp}</span>
-                <span style={{ fontFamily: 'var(--mono)' }}>{num(st.ip, 1)}</span>
-                <span style={{ fontFamily: 'var(--mono)' }}>{st.h}</span>
-                <span style={{ fontFamily: 'var(--mono)' }}>{st.er}</span>
-                <span style={{ fontFamily: 'var(--mono)' }}>{st.k}</span>
-                <span style={{ fontFamily: 'var(--mono)', color: st.hr > 0 ? 'var(--b-hot)' : undefined, fontWeight: st.hr > 0 ? '700' : undefined }}>{st.hr}</span>
+              <div key={i} className="scout-start-row">
+                <span className="mono" data-label="Date">{st.date?.slice(5)}</span>
+                <span data-label="Opp">{st.isHome ? 'vs' : '@'} {st.opp}</span>
+                <span className="mono" data-label="IP">{num(st.ip, 1)}</span>
+                <span className="mono" data-label="H">{st.h}</span>
+                <span className="mono" data-label="ER">{st.er}</span>
+                <span className="mono" data-label="K">{st.k}</span>
+                <span className={`mono${st.hr > 0 ? ' damage' : ''}`} data-label="HR">{st.hr}</span>
               </div>
             ))}
           </div>
@@ -1706,22 +1730,29 @@ function HrSetupSection({ b }) {
   const { checks, n } = hrSetup(b)
   const heat = b.heatIndex != null ? b.heatIndex : heatBreakdown(b).total
   const tone = heat >= 70 ? 'good' : heat >= 50 ? 'warn' : 'bad'
-  const tag = heat >= 70 ? 'On fire 🔥' : heat >= 58 ? 'Hot' : heat >= 45 ? 'Warm' : 'Cool'
+  const tag = heat >= 70 ? 'On fire' : heat >= 58 ? 'Hot' : heat >= 45 ? 'Warm' : 'Cool'
+  const drivers = checks.slice().sort((a, c) => Number(c.pass) - Number(a.pass)).slice(0, 3)
   return (
-    <Section title="Setup & form" icon="Flame">
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginBottom: '14px', paddingBottom: '12px', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-        <span style={{ fontSize: '28px', fontWeight: '800', fontFamily: 'var(--mono)', color: tone === 'good' ? 'var(--strong)' : tone === 'warn' ? 'var(--prime)' : 'var(--bad)', lineHeight: 1 }}>{heat}</span>
-        <span style={{ fontSize: '11px', color: 'var(--text-faint)' }}>/ 100</span>
-        <span style={{ fontSize: '11px', fontWeight: '700', color: tone === 'good' ? 'var(--strong)' : tone === 'warn' ? 'var(--prime)' : 'var(--bad)', background: tone === 'good' ? 'rgba(105,185,158,0.08)' : tone === 'warn' ? 'rgba(214,181,111,0.08)' : 'rgba(239,68,68,0.08)', padding: '2px 8px', borderRadius: '4px', marginLeft: '8px' }}>{tag}</span>
-        <span style={{ fontSize: '11px', color: 'var(--text-faint)', marginLeft: 'auto' }}>setup {n}/6</span>
+    <Section title="Current-state readiness" icon="Flame" className="scout-report-section scout-setup-section">
+      <div className={`scout-readiness-hero tone-${tone}`}>
+        <div className="scout-readiness-score">
+          <small>Heat index</small>
+          <strong className="mono">{heat}<span>/100</span></strong>
+          <b>{tag}</b>
+        </div>
+        <div className="scout-readiness-copy">
+          <small>Today&apos;s form story</small>
+          <strong>{n >= 5 ? 'The setup is fully live.' : n >= 3 ? 'There is enough form to stay interested.' : 'The supporting form is still thin.'}</strong>
+          <p>{n} of {checks.length} setup markers are active. Full validation lives in the gate matrix below.</p>
+        </div>
       </div>
-      <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-        {checks.map(c => (
-          <li key={c.label} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', fontSize: '12px', color: c.pass ? 'var(--text)' : 'var(--text-faint)' }}>
-            <Icon name={c.pass ? 'Check' : 'X'} size={12} style={{ color: c.pass ? 'var(--strong)' : 'var(--text-faint)', marginTop: '2px' }} />
+      <ul className="scout-driver-list">
+        {drivers.map(c => (
+          <li key={c.label} className={c.pass ? 'pass' : 'miss'}>
+            <Icon name={c.pass ? 'Check' : 'X'} size={13} />
             <div>
-              <span style={{ fontWeight: c.pass ? '600' : '400' }}>{c.label}</span>
-              <span style={{ fontSize: '10px', color: 'var(--text-faint)', display: 'block', marginTop: '1px' }}>{c.detail}</span>
+              <strong>{c.label}</strong>
+              <span>{c.detail}</span>
             </div>
           </li>
         ))}
@@ -1744,16 +1775,21 @@ function HrFormSection({ b }) {
   })
   if (!windows.some(x => x.ab)) return null
   return (
-    <Section title="Recent form" icon="Activity">
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '14px' }}>
+    <Section title="Time-window performance" icon="Activity" className="scout-report-section scout-form-section">
+      <div className="scout-story-lead compact">
+        <div>
+          <small>Recent form</small>
+          <strong>Short-term pace versus the season</strong>
+          <p>Home-run output normalized by at-bats across three useful samples.</p>
+        </div>
+      </div>
+      <div className="scout-form-rails">
         {windows.map(({ k, hr, ab, rate }) => (
-          <div key={k} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '12px' }}>
-            <span style={{ width: '50px', color: 'var(--text-dim)', fontWeight: '600' }}>{k}</span>
-            <span style={{ flex: 1, height: '8px', background: 'rgba(255,255,255,0.03)', borderRadius: '99px', overflow: 'hidden' }}>
-              <span style={{ display: 'block', height: '100%', borderRadius: '99px', width: rate == null ? '0%' : `${Math.min(100, (rate / HRF_MAX) * 100)}%`, background: rate == null ? 'rgba(255,255,255,0.1)' : hrfTone(rate) === 'good' ? 'var(--strong)' : hrfTone(rate) === 'warn' ? 'var(--prime)' : 'rgba(255,255,255,0.1)' }} />
-            </span>
-            <span style={{ width: '45px', textAlign: 'right', fontWeight: '700', fontFamily: 'var(--mono)' }}>{rate == null ? '—' : pct(rate, 1)}</span>
-            <span style={{ width: '90px', fontSize: '10px', color: 'var(--text-faint)' }}>{ab ? `${hr} HR · ${ab} AB` : 'no sample'}</span>
+          <div key={k} className={`scout-form-rail tone-${rate == null ? 'none' : hrfTone(rate)}`}>
+            <span className="scout-form-window">{k}</span>
+            <span className="scout-form-track"><i style={{ width: rate == null ? '0%' : `${Math.min(100, (rate / HRF_MAX) * 100)}%` }} /></span>
+            <strong className="mono">{rate == null ? '—' : pct(rate, 1)}</strong>
+            <small>{ab ? `${hr} HR · ${ab} AB` : 'no sample'}</small>
           </div>
         ))}
       </div>
@@ -2151,22 +2187,27 @@ function DueIndicatorSection({ b }) {
   if (!total) return null
   const heat = b.heatIndex != null ? b.heatIndex : heatBreakdown(b).total
   const dueLabel = n >= 5 ? 'Hot' : n >= 3 ? 'Warm' : 'Cool'
-  const dueColor = n >= 5 ? 'var(--strong)' : n >= 3 ? 'var(--prime)' : 'var(--text-faint)'
+  const dueTone = n >= 5 ? 'good' : n >= 3 ? 'warn' : 'neutral'
   return (
-    <Section title="HR Due Indicator" icon="Target">
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '14px', paddingBottom: '12px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-        <span style={{ fontSize: '26px', fontWeight: '800', fontFamily: 'var(--mono)', color: dueColor, lineHeight: 1 }}>{n}</span>
-        <span style={{ fontSize: '13px', color: 'var(--text-faint)' }}>/ {total}</span>
-        <span style={{ fontSize: '12px', fontWeight: '700', color: dueColor, background: n >= 5 ? 'rgba(105,185,158,0.08)' : n >= 3 ? 'rgba(214,181,111,0.08)' : 'rgba(255,255,255,0.04)', padding: '2px 10px', borderRadius: '6px', marginLeft: '6px' }}>{dueLabel}</span>
-        <span style={{ marginLeft: 'auto', fontSize: '11px', color: 'var(--text-faint)' }}>heat {heat}/100</span>
+    <Section title="Gate validation" icon="Target" className="scout-report-section scout-due-section">
+      <div className={`scout-gate-summary tone-${dueTone}`}>
+        <div>
+          <small>HR due indicator</small>
+          <strong className="mono">{n}<span>/{total}</span></strong>
+        </div>
+        <div>
+          <b>{dueLabel} validation</b>
+          <p>{n >= 5 ? 'Most independent power and matchup gates agree.' : n >= 3 ? 'The case is mixed; verify the missing gates.' : 'Too few underlying gates support a due signal.'}</p>
+        </div>
+        <span className="scout-heat-tag">Heat <b className="mono">{heat}</b></span>
       </div>
-      <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      <ul className="scout-gate-grid">
         {checks.map(c => (
-          <li key={c.label} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', padding: '10px 12px', borderRadius: '8px', background: c.pass ? 'rgba(105,185,158,0.04)' : 'rgba(255,255,255,0.02)', border: `1px solid ${c.pass ? 'rgba(105,185,158,0.12)' : 'rgba(255,255,255,0.04)'}` }}>
-            <Icon name={c.pass ? 'Check' : 'X'} size={13} style={{ color: c.pass ? 'var(--strong)' : 'var(--text-faint)', marginTop: '1px', flexShrink: 0 }} />
+          <li key={c.label} className={c.pass ? 'pass' : 'miss'}>
+            <Icon name={c.pass ? 'Check' : 'X'} size={14} />
             <div>
-              <div style={{ fontSize: '12px', fontWeight: c.pass ? '600' : '400', color: c.pass ? '#fff' : 'var(--text-faint)' }}>{c.label}</div>
-              <div style={{ fontSize: '10px', color: 'var(--text-faint)', marginTop: '2px' }}>{c.detail}</div>
+              <strong>{c.label}</strong>
+              <span>{c.detail}</span>
             </div>
           </li>
         ))}
@@ -2212,27 +2253,30 @@ function EnvSection({ b }) {
   if (!w && !hasFactors) return null
   const sky = skyLabel(w)
   const wind = interpretWind(w, b.game?.homeTeam?.abbr, { roofClosed: w?.roofClosed })
+  const airDelta = b.parkWeatherHandFactor != null ? b.parkWeatherHandFactor - 1 : null
+  const carryLabel = wind?.verdict || (airDelta == null ? 'Conditions pending' : airDelta >= 0.03 ? 'Carry boost' : airDelta <= -0.03 ? 'Carry suppressed' : 'Near neutral')
   return (
-    <Section title="Park & weather" icon="Wind" id="sec-env">
-      {wind && (
-        <div style={{ color: wind.tint, display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: '700', background: hexA(wind.tint, 0.08), padding: '8px 12px', borderRadius: '8px', border: `1px solid ${hexA(wind.tint, 0.25)}`, marginBottom: '12px' }}>
-          <Icon name="Wind" size={13} /><b>{wind.verdict}</b><span>{wind.caption}</span>
+    <Section title="Environmental carry" icon="Wind" id="sec-env" className="scout-report-section scout-env-section">
+      <div className="scout-env-hero" style={{ '--env-tone': wind?.tint || 'var(--accent)' }}>
+        {w && <WindDial deg={w.windDirDeg} speed={w.windSpeedMph} />}
+        <div className="scout-env-verdict">
+          <small>Park and weather story</small>
+          <strong>{carryLabel}</strong>
+          <p>{wind?.caption || sky || 'Weather context is limited; park factors still apply.'}</p>
         </div>
-      )}
+        {airDelta != null && <div className="scout-env-impact"><small>Air vs neutral</small><strong className="mono">{signedPct(airDelta, 1)}</strong></div>}
+      </div>
       {w && (
-        <div style={{ display: 'flex', gap: '14px', alignItems: 'center', marginBottom: '12px' }}>
-          <WindDial deg={w.windDirDeg} speed={w.windSpeedMph} />
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', flex: 1 }}>
-            <Wx icon="Thermometer" k="Temp" v={w.tempF != null ? `${Math.round(w.tempF)}°F` : '—'} />
-            <Wx icon="Wind" k="Wind" v={w.windSpeedMph != null ? `${Math.round(w.windSpeedMph)} ${compass(w.windDirDeg) || ''}` : '—'} sub={Number.isFinite(w.windGustMph) && w.windGustMph <= 90 && w.windGustMph >= (w.windSpeedMph || 0) ? `G${Math.round(w.windGustMph)}` : null} />
-            <Wx icon="Droplet" k="Humidity" v={w.humidity != null ? `${w.humidity}%` : '—'} />
-            <Wx icon="Cloud" k="Precip" v={w.precipProbPct != null ? `${w.precipProbPct}%` : '—'} />
-          </div>
+        <div className="scout-weather-strip">
+          <Wx icon="Thermometer" k="Temp" v={w.tempF != null ? `${Math.round(w.tempF)}°F` : '—'} />
+          <Wx icon="Wind" k="Wind" v={w.windSpeedMph != null ? `${Math.round(w.windSpeedMph)} ${compass(w.windDirDeg) || ''}` : '—'} sub={Number.isFinite(w.windGustMph) && w.windGustMph <= 90 && w.windGustMph >= (w.windSpeedMph || 0) ? `G${Math.round(w.windGustMph)}` : null} />
+          <Wx icon="Droplet" k="Humidity" v={w.humidity != null ? `${w.humidity}%` : '—'} />
+          <Wx icon="Cloud" k="Precip" v={w.precipProbPct != null ? `${w.precipProbPct}%` : '—'} />
         </div>
       )}
-      {sky && <div style={{ fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--text-dim)', background: 'rgba(255,255,255,0.02)', padding: '6px 10px', borderRadius: '6px', marginBottom: '12px' }}><Icon name={w?.roofClosed ? 'House' : 'Cloud'} size={12} style={{ color: 'var(--accent)' }} /> <span>{sky}{w?.source ? ` (${w.source.toUpperCase()})` : ''}</span></div>}
+      {sky && <div className="scout-sky-line"><Icon name={w?.roofClosed ? 'House' : 'Cloud'} size={12} /> <span>{sky}{w?.source ? ` (${w.source.toUpperCase()})` : ''}</span></div>}
       {hasFactors && (
-        <div className="stat-grid" style={{ marginTop: w ? 12 : 0 }}>
+        <div className="scout-stat-strip scout-factor-strip">
           <Cell k="Park HR factor" v={b.gameParkHRFactor != null ? `${num(b.gameParkHRFactor, 3)}×` : '—'} title="Park-only HR multiplier (1.00 = average)" />
           <Cell k="Air factor" v={b.parkWeatherHandFactor != null ? `${num(b.parkWeatherHandFactor, 3)}×` : '—'} title="Combined conditions factor" />
           {b.parkWeatherHandFactor != null && <Cell k="Air vs neutral" v={signedPct(b.parkWeatherHandFactor - 1, 1)} title="Condition change vs standard" />}
