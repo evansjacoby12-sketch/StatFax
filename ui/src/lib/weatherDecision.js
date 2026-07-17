@@ -48,7 +48,7 @@ export function classifyWeatherGame(g = {}) {
 
   if ((parkBias === 'boost' && airBias === 'drag') || (parkBias === 'drag' && airBias === 'boost')) {
     const air = airBias === 'boost' ? 'out wind' : 'in wind'
-    return { key: 'offset', label: 'Offsetting', icon: 'ArrowLeftRight', note: `${air} vs ${parkText(g.parkHR)}`, favorable: false }
+    return { key: 'offset', label: 'Mixed signals', icon: 'ArrowLeftRight', note: `${air} vs ${parkText(g.parkHR)}`, favorable: false }
   }
 
   if (parkBias === 'boost' && airBias === 'boost') {

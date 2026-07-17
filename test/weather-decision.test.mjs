@@ -12,7 +12,9 @@ const game = ({ parkHR = 1, envFactor = null, verdict = 'CROSS', windOutMph = 0,
 })
 
 test('supported mild out wind offsets a suppressive park instead of reading neutral', () => {
-  assert.equal(classifyWeatherGame(game({ parkHR: 0.915, envFactor: 1.02, verdict: 'OUT', windOutMph: 3 })).key, 'offset')
+  const state = classifyWeatherGame(game({ parkHR: 0.915, envFactor: 1.02, verdict: 'OUT', windOutMph: 3 }))
+  assert.equal(state.key, 'offset')
+  assert.equal(state.label, 'Mixed signals')
 })
 
 test('unmapped strong out wind becomes a directional wind boost', () => {
