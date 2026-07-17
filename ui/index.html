@@ -39,22 +39,56 @@
   <body>
     <div id="root"></div>
     <script>
-      // Self-heal a stale-cached index.html: if a content-hashed asset fails to
-      // load (deleted by a newer deploy), reload once bypassing cache instead of
-      // sitting on a blank page.
-      window.addEventListener(
-        'error',
-        function (e) {
-          var t = e && e.target
-          if (t && (t.tagName === 'SCRIPT' || t.tagName === 'LINK') && /\/assets\//.test(t.src || t.href || '')) {
-            if (!sessionStorage.getItem('sfStaleReload')) {
-              sessionStorage.setItem('sfStaleReload', '1')
-              location.replace(location.pathname + '?_r=' + Date.now())
-            }
-          }
-        },
-        true,
-      )
+      // Self-heal stale hashed assets after a deploy. Entry script/link errors,
+      // Vite preload failures, and React.lazy dynamic imports travel through
+      // different browser paths, so cover all three. The timestamp guard stops
+      // a broken deployment from creating a reload loop while allowing a later
+      // deployment in the same browser session to recover normally.
+      ;(function () {
+        var RELOAD_KEY = 'sfStaleReloadAt'
+        var COOLDOWN_MS = 30000
+        var reloading = false
+        var chunkError = /failed to fetch dynamically imported module|error loading dynamically imported module|importing a module script failed|unable to preload css|loading css chunk|loading chunk .* failed|chunkloaderror/i
+
+        function messageOf(value) {
+          if (typeof value === 'string') return value
+          if (value && typeof value.message === 'string') return value.message
+          if (value && value.reason && typeof value.reason.message === 'string') return value.reason.message
+          return String(value || '')
+        }
+
+        function recover(force) {
+          if (reloading) return false
+          var now = Date.now()
+          var url = new URL(location.href)
+          var last = Number(url.searchParams.get('_r')) || 0
+          try { last = Math.max(last, Number(sessionStorage.getItem(RELOAD_KEY)) || 0) } catch (_) {}
+          if (!force && last && now - last < COOLDOWN_MS) return false
+          reloading = true
+          try { sessionStorage.setItem(RELOAD_KEY, String(now)) } catch (_) {}
+          url.searchParams.set('_r', String(now))
+          location.replace(url.href)
+          return true
+        }
+
+        window.__STATFAX_RECOVER_STALE_ASSET__ = recover
+
+        window.addEventListener('error', function (event) {
+          var target = event && event.target
+          if (target && (target.tagName === 'SCRIPT' || target.tagName === 'LINK') && /\/assets\//.test(target.src || target.href || '')) recover(false)
+        }, true)
+
+        window.addEventListener('vite:preloadError', function (event) {
+          event.preventDefault()
+          recover(false)
+        })
+
+        window.addEventListener('unhandledrejection', function (event) {
+          if (!chunkError.test(messageOf(event))) return
+          event.preventDefault()
+          recover(false)
+        })
+      })()
     </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>

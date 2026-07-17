@@ -46,7 +46,10 @@ async function trim(name, limit) {
 
 async function networkFirstNav(req) {
   try {
-    const res = await fetch(req)
+    // Do not let the browser HTTP cache pair an older index.html with a newer
+    // deployment's hashed assets. The service-worker cache remains the explicit
+    // offline fallback below.
+    const res = await fetch(req, { cache: 'no-store' })
     if (res.ok) {
       const cache = await caches.open(SHELL)
       cache.put(scoped(''), res.clone())
