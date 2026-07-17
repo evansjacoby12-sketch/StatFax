@@ -229,7 +229,7 @@ function deterministicIssues(slate, generatedAt) {
         source: 'deterministic', severity: 'warning', code: 'listed-starter-missing',
         scope: 'game', gamePk, playerId: null, teamId: finite(side.battingTeam?.id) ? Number(side.battingTeam.id) : null,
         affectedPlayerIds,
-        message: `${gameLabel(game)}: ${teamLabel(side.starterTeam)} have no probable starter listed; ${impact} until MLB lists one.`,
+        message: `${gameLabel(game)}: ${teamLabel(side.starterTeam)} pitcher is TBD; ${impact} until MLB lists one.`,
         blocksPublish: false,
       })
     }

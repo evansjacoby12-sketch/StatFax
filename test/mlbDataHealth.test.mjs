@@ -122,6 +122,7 @@ test('an unlisted probable starter produces one side-level check and scopes trus
   assert.equal(starterIssues.length, 1)
   assert.equal(starterIssues[0].teamId, 2)
   assert.deepEqual(starterIssues[0].affectedPlayerIds, [10, 11, 12])
+  assert.match(starterIssues[0].message, /NYY pitcher is TBD/)
   assert.match(starterIssues[0].message, /3 BOS hitters use pitcher-neutral inputs/)
   assert.equal(result.report.counts.warnings, 1)
   assert.equal(result.report.counts.affectedBatters, 3)
