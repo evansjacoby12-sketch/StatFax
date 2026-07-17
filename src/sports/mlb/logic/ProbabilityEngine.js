@@ -2316,6 +2316,7 @@ export {
   parkSilhouette,
   relativeWindDirection,
   sideFromRelativeDeg,
+  hasParkWeatherHandCoverage,
   parkWeatherHandFactor,
 } from './parkWeatherHand.js';
 export {

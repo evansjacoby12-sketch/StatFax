@@ -6,6 +6,7 @@ import { compass, skyLabel } from '../lib/weather.js'
 import { num, signedPct, gameTime } from '../lib/format.js'
 import { teamColor, teamLogo, hexToRgba } from '../lib/teams.js'
 import { useLiveMode } from '../lib/liveMode.js'
+import { airSortValue, classifyWeatherGame, isFavorableWeatherGame } from '../lib/weatherDecision.js'
 
 const WX_SORTS = [
   { key: 'air', label: 'Best air', icon: 'CloudSun' },
@@ -16,7 +17,7 @@ const WX_SORTS = [
 ]
 
 function sortGames(games, sort) {
-  const byAir = (a, b) => (b.envFactor ?? 0) - (a.envFactor ?? 0) || (a.gamePk ?? 0) - (b.gamePk ?? 0)
+  const byAir = (a, b) => airSortValue(b) - airSortValue(a) || (a.gamePk ?? 0) - (b.gamePk ?? 0)
   const arr = games.slice()
   const startOf = (g) => (g.game?.gameDate ? Date.parse(g.game.gameDate) : Infinity)
   if (sort === 'park') arr.sort((a, b) => (b.parkHR ?? 0) - (a.parkHR ?? 0) || byAir(a, b))
@@ -36,13 +37,13 @@ export default function WeatherView({ batters, onSelect, selectedId }) {
   const games = useMemo(() => {
     let list = allGames
     if (outdoorOnly) list = list.filter((g) => !g.closed)
-    if (favorableOnly) list = list.filter((g) => (g.envFactor ?? 0) >= 1.03)
+    if (favorableOnly) list = list.filter(isFavorableWeatherGame)
     return sortGames(list, sort)
   }, [allGames, sort, outdoorOnly, favorableOnly])
 
   const summary = useMemo(() => {
     const outdoor = allGames.filter((g) => !g.closed)
-    const favorable = allGames.filter((g) => (g.envFactor ?? 0) >= 1.03)
+    const favorable = allGames.filter(isFavorableWeatherGame)
     const rainRisk = outdoor.filter((g) => (g.weather?.precipProbPct ?? 0) >= 50)
     const bestCarry = sortGames(allGames, 'air')[0] || null
     const warmest = sortGames(outdoor, 'warm')[0] || null
@@ -55,8 +56,8 @@ export default function WeatherView({ batters, onSelect, selectedId }) {
   const alertTitle = summary.rainRisk.length
     ? `${summary.rainRisk.length} ${summary.rainRisk.length === 1 ? 'game needs' : 'games need'} a weather check`
     : summary.favorable.length
-      ? `${summary.favorable.length} ${summary.favorable.length === 1 ? 'game has' : 'games have'} HR-friendly air`
-      : 'No major weather edges on this slate'
+      ? `${summary.favorable.length} ${summary.favorable.length === 1 ? 'game has' : 'games have'} HR-friendly conditions`
+      : 'No major HR-environment boosts on this slate'
   const alertCopy = summary.rainRisk.length
     ? 'Rain risk is elevated. Recheck conditions closer to first pitch.'
     : summary.favorable.length
@@ -83,7 +84,7 @@ export default function WeatherView({ batters, onSelect, selectedId }) {
           <SummaryStat
             label="Best air"
             value={gameLabel(summary.bestCarry)}
-            detail={summary.bestCarry?.envFactor != null ? signedPct(summary.bestCarry.envFactor - 1, 0) : '—'}
+            detail={bestAirDetail(summary.bestCarry)}
           />
           <SummaryStat
             label="Rain watch"
@@ -138,7 +139,7 @@ export default function WeatherView({ batters, onSelect, selectedId }) {
         {games.length ? (
           <div className="wxboard-list">
             <div className="wxboard-columns" aria-hidden="true">
-              <span>Rank</span><span>Matchup</span><span>Weather state</span><span>Carry</span><span>Park HR</span><span>Rain</span><span>Affected hitters</span><span />
+              <span>Rank</span><span>Matchup</span><span>HR environment</span><span>Carry</span><span>Park HR</span><span>Rain</span><span>Affected hitters</span><span />
             </div>
             {games.map((game, index) => (
               <WeatherRow key={game.gamePk} g={game} rank={index + 1} onSelect={onSelect} selectedId={selectedId} />
@@ -176,16 +177,18 @@ function groupWeather(batters) {
   for (const b of batters || []) {
     let entry = map.get(b.gamePk)
     if (!entry) {
-      entry = { gamePk: b.gamePk, game: b.game || null, weather: b.weather || null, parkHR: b.gameParkHRFactor, batters: [] }
+      entry = { gamePk: b.gamePk, game: b.game || null, weather: b.weather || null, parkHR: null, batters: [] }
       map.set(b.gamePk, entry)
     }
     if (entry.weather == null && b.weather) entry.weather = b.weather
-    if (entry.parkHR == null && b.gameParkHRFactor != null) entry.parkHR = b.gameParkHRFactor
     entry.batters.push(b)
   }
   return [...map.values()].map((entry) => {
     const factors = entry.batters.map((b) => b.parkWeatherHandFactor).filter((value) => Number.isFinite(value))
+    const parkFactors = entry.batters.map((b) => b.gameParkHRFactor).filter((value) => Number.isFinite(value))
     entry.envFactor = factors.length ? factors.reduce((sum, value) => sum + value, 0) / factors.length : null
+    entry.parkHR = parkFactors.length ? parkFactors.reduce((sum, value) => sum + value, 0) / parkFactors.length : null
+    entry.interactionCovered = factors.length > 0 || entry.batters.some((b) => b.parkWeatherHandCovered === true)
     const home = entry.game?.homeTeam?.abbr
     entry.wind = interpretWind(entry.weather, home, { roofClosed: entry.weather?.roofClosed })
     entry.stadium = stadiumFor(home)
@@ -204,14 +207,14 @@ function gameLabel(g) {
   return `${g.game.awayTeam?.abbr || 'Away'} @ ${g.game.homeTeam?.abbr || 'Home'}`
 }
 
-function weatherState(g) {
-  const precip = g.weather?.precipProbPct ?? 0
-  const isDome = g.stadium?.type === 'Fixed Dome'
-  if (g.closed) return { key: 'dome', label: isDome ? 'Dome' : 'Roof closed', icon: 'House', note: 'Air neutralized' }
-  if (precip >= 50) return { key: 'rain', label: 'Rain watch', icon: 'CloudRain', note: `${Math.round(precip)}% precipitation` }
-  if (g.envFactor != null && g.envFactor >= 1.03) return { key: 'favorable', label: 'Favorable', icon: 'TrendingUp', note: 'HR carry boosted' }
-  if (g.envFactor != null && g.envFactor <= 0.95) return { key: 'suppressed', label: 'Suppressed', icon: 'TrendingDown', note: 'HR carry reduced' }
-  return { key: 'neutral', label: 'Neutral', icon: 'Minus', note: 'No major air edge' }
+function bestAirDetail(g) {
+  if (!g) return '—'
+  if (Number.isFinite(g.envFactor)) return signedPct(g.envFactor - 1, 0)
+  if (Number.isFinite(g.windOutMph)) {
+    const direction = g.windOutMph >= 2 ? 'out' : g.windOutMph <= -2 ? 'in' : 'cross'
+    return `${Math.round(Math.abs(g.windOutMph))} mph ${direction}`
+  }
+  return 'unrated'
 }
 
 function carryLabel(g) {
@@ -223,7 +226,7 @@ function carryLabel(g) {
 function WeatherRow({ g, rank, onSelect, selectedId }) {
   const [expanded, setExpanded] = useState(false)
   const liveMode = useLiveMode()
-  const state = weatherState(g)
+  const state = classifyWeatherGame(g)
   const { game, weather, wind, envFactor, parkHR } = g
   const awayColor = teamColor(game?.awayTeam?.id)
   const homeColor = teamColor(game?.homeTeam?.id)
@@ -255,7 +258,12 @@ function WeatherRow({ g, rank, onSelect, selectedId }) {
         </div>
 
         <BoardMetric label="Carry" value={carryLabel(g)} detail={g.closed ? 'No wind effect' : (wind?.caption || 'Light wind')} icon={g.closed ? 'House' : 'Wind'} />
-        <BoardMetric label="Park HR" value={parkHR != null ? `${num(parkHR, 2)}×` : '—'} detail={envFactor != null ? `${signedPct(envFactor - 1, 0)} total air` : 'No factor'} icon="Gauge" />
+        <BoardMetric
+          label="Park HR"
+          value={parkHR != null ? `${num(parkHR, 2)}×` : '—'}
+          detail={envFactor != null ? `${signedPct(envFactor - 1, 0)} mapped interaction` : (wind ? (g.interactionCovered ? 'Weather input incomplete' : 'Interaction unrated') : 'No wind input')}
+          icon="Gauge"
+        />
         <BoardMetric label="Rain" value={weather?.precipProbPct != null ? `${Math.round(weather.precipProbPct)}%` : '—'} detail={skyLabel(weather) || 'No forecast'} icon="CloudRain" tone={(weather?.precipProbPct ?? 0) >= 50 ? 'bad' : (weather?.precipProbPct ?? 100) <= 20 ? 'good' : ''} />
 
         <div className="wxboard-hitters" aria-label="Top affected hitters">

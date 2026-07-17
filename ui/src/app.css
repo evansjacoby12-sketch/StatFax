@@ -23160,7 +23160,11 @@ button.th:focus-visible {
   content: '';
 }
 .wxboard-row.state-favorable::before { background: var(--good); opacity: 1; }
+.wxboard-row.state-wind-boost::before,
+.wxboard-row.state-park-boost::before { background: var(--good); opacity: 1; }
 .wxboard-row.state-rain::before { background: var(--warn); opacity: 1; }
+.wxboard-row.state-offset::before,
+.wxboard-row.state-wind-drag::before { background: var(--warn); opacity: 1; }
 .wxboard-row.state-suppressed::before { background: var(--bad); opacity: 1; }
 .wxboard-row-main {
   min-height: 84px;
@@ -23200,9 +23204,14 @@ button.th:focus-visible {
 .wxboard-state b { color: inherit; font-size: 9px; }
 .wxboard-state small { overflow: hidden; font-size: 7.5px; text-overflow: ellipsis; white-space: nowrap; }
 .wxboard-state.tone-favorable { color: var(--good); background: color-mix(in srgb, var(--good) 7%, transparent); border-color: color-mix(in srgb, var(--good) 18%, transparent); }
+.wxboard-state.tone-wind-boost,
+.wxboard-state.tone-park-boost { color: var(--good); background: color-mix(in srgb, var(--good) 7%, transparent); border-color: color-mix(in srgb, var(--good) 18%, transparent); }
 .wxboard-state.tone-rain { color: var(--warn); background: color-mix(in srgb, var(--warn) 7%, transparent); border-color: color-mix(in srgb, var(--warn) 18%, transparent); }
+.wxboard-state.tone-offset,
+.wxboard-state.tone-wind-drag { color: var(--warn); background: color-mix(in srgb, var(--warn) 7%, transparent); border-color: color-mix(in srgb, var(--warn) 18%, transparent); }
 .wxboard-state.tone-suppressed { color: var(--bad); background: color-mix(in srgb, var(--bad) 7%, transparent); border-color: color-mix(in srgb, var(--bad) 18%, transparent); }
 .wxboard-state.tone-dome { color: var(--accent); }
+.wxboard-state.tone-unrated { color: var(--text-dim); border-style: dashed; }
 .wxboard-metric { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
 .wxboard-metric small { display: flex; align-items: center; gap: 3px; font-size: 7.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
 .wxboard-metric b { overflow: hidden; color: #fff; font-size: 11px; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }

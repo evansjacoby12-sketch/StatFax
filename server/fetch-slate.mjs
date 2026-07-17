@@ -233,6 +233,7 @@ const {
   detectReverseSplit,
   computeHotnessPosterior,
   hotnessMultiplier,
+  hasParkWeatherHandCoverage,
   parkWeatherHandFactor,
   estimateRemainingPAs,
   applyPADecay,
@@ -3470,6 +3471,7 @@ async function main() {
     try {
       const game = games.find(g => g.gamePk === gpk);
       const w    = weatherByGame[gpk];
+      row.parkWeatherHandCovered = !!(game && hasParkWeatherHandCoverage(game.venueName));
       if (game && w && Number.isFinite(w.windSpeedMph) && Number.isFinite(w.windDirDeg) && !w.roofClosed) {
         const factor = parkWeatherHandFactor(
           game.venueName,
@@ -3477,11 +3479,16 @@ async function main() {
           w.windSpeedMph,
           row.batSide,
         );
-        if (Number.isFinite(factor) && factor !== 1.0) {
+        // Persist a genuine 1.00 for covered parks. Unsupported venues keep
+        // the explicit coverage=false flag and no factor, so the UI can say
+        // "Unrated" instead of silently turning missing coverage into Neutral.
+        if (row.parkWeatherHandCovered && Number.isFinite(factor)) {
+          row.parkWeatherHandFactor = factor;
+        }
+        if (row.parkWeatherHandCovered && Number.isFinite(factor) && factor !== 1.0) {
           const beforePW = row.score;
           const rawDelta = Math.round(beforePW * (factor - 1));
           const capped   = Math.max(-PARK_WEATHER_MAX_DELTA, Math.min(PARK_WEATHER_MAX_DELTA, rawDelta));
-          row.parkWeatherHandFactor = factor;
           row.parkWeatherHandDelta  = capped;
           row.score = Math.max(0, Math.min(100, beforePW + capped));
           row.grade = gradeFromScore(row.score);

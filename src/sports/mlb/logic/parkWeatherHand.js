@@ -399,6 +399,18 @@ export function sideFromRelativeDeg(relDeg) {
 // ---------------------------------------------------------------------------
 
 /**
+ * True when the venue has a hand-resolved park/wind interaction table and a
+ * usable field bearing. Keeping coverage explicit prevents an unsupported
+ * park's 1.0 fallback from being mistaken for a measured neutral result.
+ */
+export function hasParkWeatherHandCoverage(stadiumId) {
+  const entry = _lookupEntry(stadiumId);
+  if (!entry) return false;
+  if (entry.indoor) return true;
+  return Number.isFinite(_PARK_BEARINGS[entry.name]);
+}
+
+/**
  * Primary export. Returns the 3-way park × weather × handedness HR multiplier.
  *
  * This value REPLACES independent park-factor, wind-carry, and handedness-split
