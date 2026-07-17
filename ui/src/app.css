@@ -23211,6 +23211,7 @@ button.th:focus-visible {
 .wxboard-state.tone-wind-drag { color: var(--warn); background: color-mix(in srgb, var(--warn) 7%, transparent); border-color: color-mix(in srgb, var(--warn) 18%, transparent); }
 .wxboard-state.tone-suppressed { color: var(--bad); background: color-mix(in srgb, var(--bad) 7%, transparent); border-color: color-mix(in srgb, var(--bad) 18%, transparent); }
 .wxboard-state.tone-dome { color: var(--accent); }
+.wxboard-state.tone-roof-pending { color: var(--text-dim); border-style: dashed; }
 .wxboard-state.tone-unrated { color: var(--text-dim); border-style: dashed; }
 .wxboard-metric { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
 .wxboard-metric small { display: flex; align-items: center; gap: 3px; font-size: 7.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }

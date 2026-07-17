@@ -6,7 +6,7 @@ import { compass, skyLabel } from '../lib/weather.js'
 import { num, signedPct, gameTime } from '../lib/format.js'
 import { teamColor, teamLogo, hexToRgba } from '../lib/teams.js'
 import { useLiveMode } from '../lib/liveMode.js'
-import { airSortValue, classifyWeatherGame, isFavorableWeatherGame } from '../lib/weatherDecision.js'
+import { airSortValue, classifyWeatherGame, isFavorableWeatherGame, roofStatusForGame } from '../lib/weatherDecision.js'
 
 const WX_SORTS = [
   { key: 'air', label: 'Best air', icon: 'CloudSun' },
@@ -36,13 +36,13 @@ export default function WeatherView({ batters, onSelect, selectedId }) {
   const allGames = useMemo(() => groupWeather(batters), [batters])
   const games = useMemo(() => {
     let list = allGames
-    if (outdoorOnly) list = list.filter((g) => !g.closed)
+    if (outdoorOnly) list = list.filter((g) => !g.closed && g.roofStatus !== 'pending')
     if (favorableOnly) list = list.filter(isFavorableWeatherGame)
     return sortGames(list, sort)
   }, [allGames, sort, outdoorOnly, favorableOnly])
 
   const summary = useMemo(() => {
-    const outdoor = allGames.filter((g) => !g.closed)
+    const outdoor = allGames.filter((g) => !g.closed && g.roofStatus !== 'pending')
     const favorable = allGames.filter(isFavorableWeatherGame)
     const rainRisk = outdoor.filter((g) => (g.weather?.precipProbPct ?? 0) >= 50)
     const bestCarry = sortGames(allGames, 'air')[0] || null
@@ -190,9 +190,12 @@ function groupWeather(batters) {
     entry.parkHR = parkFactors.length ? parkFactors.reduce((sum, value) => sum + value, 0) / parkFactors.length : null
     entry.interactionCovered = factors.length > 0 || entry.batters.some((b) => b.parkWeatherHandCovered === true)
     const home = entry.game?.homeTeam?.abbr
-    entry.wind = interpretWind(entry.weather, home, { roofClosed: entry.weather?.roofClosed })
     entry.stadium = stadiumFor(home)
-    entry.closed = !!(entry.weather?.roofClosed || entry.stadium?.type === 'Fixed Dome')
+    entry.roofStatus = roofStatusForGame(entry)
+    entry.closed = entry.roofStatus === 'closed'
+    entry.wind = entry.roofStatus === 'closed' || entry.roofStatus === 'pending'
+      ? null
+      : interpretWind(entry.weather, home, { roofClosed: false })
     entry.tempF = entry.weather?.tempF ?? null
     entry.windOutMph = entry.closed ? null : (entry.wind?.windOutMph ?? null)
     entry.helped = entry.batters
@@ -209,6 +212,7 @@ function gameLabel(g) {
 
 function bestAirDetail(g) {
   if (!g) return '—'
+  if (g.roofStatus === 'pending') return 'roof pending'
   if (Number.isFinite(g.envFactor)) return signedPct(g.envFactor - 1, 0)
   if (Number.isFinite(g.windOutMph)) {
     const direction = g.windOutMph >= 2 ? 'out' : g.windOutMph <= -2 ? 'in' : 'cross'
@@ -218,7 +222,8 @@ function bestAirDetail(g) {
 }
 
 function carryLabel(g) {
-  if (g.closed) return g.stadium?.type === 'Fixed Dome' ? 'Dome' : 'Closed'
+  if (g.roofStatus === 'closed') return 'Dome · Closed'
+  if (g.roofStatus === 'pending') return 'Dome · Pending'
   if (!g.wind) return 'Calm'
   return `${g.weather?.windSpeedMph != null ? Math.round(g.weather.windSpeedMph) : '—'} mph ${g.wind.verdict}`
 }
@@ -257,7 +262,7 @@ function WeatherRow({ g, rank, onSelect, selectedId }) {
           <span><b>{state.label}</b><small>{state.note}</small></span>
         </div>
 
-        <BoardMetric label="Carry" value={carryLabel(g)} detail={g.closed ? 'No wind effect' : (wind?.caption || 'Light wind')} icon={g.closed ? 'House' : 'Wind'} />
+        <BoardMetric label="Carry" value={carryLabel(g)} detail={g.closed ? 'No wind effect' : g.roofStatus === 'pending' ? 'Roof status not confirmed' : (wind?.caption || 'Light wind')} icon={g.closed || g.roofStatus === 'pending' ? 'House' : 'Wind'} />
         <BoardMetric
           label="Park HR"
           value={parkHR != null ? `${num(parkHR, 2)}×` : '—'}
@@ -293,7 +298,7 @@ function WeatherRow({ g, rank, onSelect, selectedId }) {
             <Detail label="Gust" value={Number.isFinite(weather?.windGustMph) && weather.windGustMph <= 90 ? `${Math.round(weather.windGustMph)} mph` : '—'} icon="TrendingUp" />
             <Detail label="Humidity" value={weather?.humidity != null ? `${Math.round(weather.humidity)}%` : '—'} icon="Droplet" />
             <Detail label="Sky" value={skyLabel(weather) || '—'} icon="Cloud" />
-            <Detail label="Roof" value={g.closed ? (g.stadium?.type === 'Fixed Dome' ? 'Fixed dome' : 'Closed') : 'Open air'} icon="House" />
+            <Detail label="Roof" value={g.roofStatus ? `Dome game · ${g.roofStatus[0].toUpperCase()}${g.roofStatus.slice(1)}` : 'Open air'} icon="House" />
           </div>
           {g.helped.length > 3 && (
             <div className="wxboard-more-hitters">

@@ -36,7 +36,7 @@ const STEPS = [
     title: '4 · Let the air help (Weather tab)',
     points: [
       'Open the Weather tab — games are ranked by how much tonight’s park + air boosts HR. Favor “Bandbox” / “Favorable”.',
-      'Wind is the swing factor: look for the real OUT verdict (“12 mph out to LF”). Wind blowing OUT adds carry; wind IN kills it. Domes/closed roofs = neutral.',
+      'Wind is the swing factor: look for the real OUT verdict (“12 mph out to LF”). Wind blowing OUT adds carry; wind IN kills it. Fixed domes and confirmed closed roofs remove wind; confirmed open roofs use outdoor conditions.',
       'Heat helps — warm, humid air carries the ball farther. Cold, heavy air suppresses.',
       'Park HR factor: >1.05 is a launching pad (Coors, GABP, Yankee Stadium short porch); <0.95 suppresses (Oracle, T-Mobile, Petco). The WX Edge signal flags batters this all adds up for.',
     ],

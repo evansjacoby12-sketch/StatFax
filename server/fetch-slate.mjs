@@ -2761,8 +2761,7 @@ async function main() {
     }
   }
 
-  // 8a) Roof state for retractable parks. Only ~5 retractable stadiums
-  // in MLB (ARI, MIA, MIL, TOR, SEA), and on any given day usually 1-3
+  // 8a) Roof state for retractable parks. On any given day usually 1-3
   // are in the slate. Cheap to check, and lets the air-density model
   // skip the "force indoor defaults" path when the roof is actually open.
   const retractables = games.filter(g => findStadium(g.venueName)?.type === 'Retractable');
@@ -2773,8 +2772,8 @@ async function main() {
       6,
     );
     for (const r of roofResults) {
-      if (r?.gamePk && weatherByGame[r.gamePk]) {
-        weatherByGame[r.gamePk].roofClosed = r.roofClosed;
+      if (r?.gamePk && r.roofClosed != null) {
+        weatherByGame[r.gamePk] = { ...(weatherByGame[r.gamePk] || {}), roofClosed: r.roofClosed };
       }
     }
   }

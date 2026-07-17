@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { classifyWeatherGame, isFavorableWeatherGame, airSortValue } from '../ui/src/lib/weatherDecision.js'
+import { classifyWeatherGame, isFavorableWeatherGame, airSortValue, roofStatusForGame } from '../ui/src/lib/weatherDecision.js'
 
 const game = ({ parkHR = 1, envFactor = null, verdict = 'CROSS', windOutMph = 0, windSpeedMph = 5, windDirDeg = 180, precipProbPct = 0 } = {}) => ({
   parkHR,
@@ -41,7 +41,30 @@ test('mapped near-neutral interaction remains truly neutral', () => {
 
 test('rain and roof states take precedence', () => {
   assert.equal(classifyWeatherGame(game({ precipProbPct: 65 })).key, 'rain')
-  assert.equal(classifyWeatherGame({ ...game(), closed: true, stadium: { type: 'Fixed Dome' } }).key, 'dome')
+  const closed = classifyWeatherGame({ ...game(), stadium: { type: 'Fixed Dome' } })
+  assert.equal(closed.key, 'dome')
+  assert.equal(closed.label, 'Dome game · Closed')
+})
+
+test('retractable roofs show confirmed open, closed, and pending states honestly', () => {
+  const retractable = { ...game({ parkHR: 1.05, verdict: 'OUT', windOutMph: 5 }), stadium: { type: 'Retractable' } }
+
+  const openGame = { ...retractable, weather: { ...retractable.weather, roofClosed: false } }
+  const open = classifyWeatherGame(openGame)
+  assert.equal(roofStatusForGame(openGame), 'open')
+  assert.equal(open.label, 'Dome game · Open')
+  assert.equal(open.key, 'favorable')
+  assert.equal(open.favorable, true)
+
+  const closed = classifyWeatherGame({ ...retractable, weather: { ...retractable.weather, roofClosed: true } })
+  assert.equal(closed.label, 'Dome game · Closed')
+  assert.equal(closed.key, 'dome')
+
+  const pending = classifyWeatherGame(retractable)
+  assert.equal(pending.label, 'Dome game · Pending')
+  assert.equal(pending.key, 'roof-pending')
+  assert.equal(pending.favorable, false)
+  assert.ok(airSortValue(retractable) < airSortValue(game()))
 })
 
 test('uncovered parks get a directional air sort value instead of zero coverage penalty', () => {
