@@ -706,8 +706,8 @@ function GroupCard({ g, idx = 0, onSelect, selectedId, comboConf = 'off', slipSe
           <Icon name={g.icon} size={13} /> {g.label}
         </span>
         {g.strategy === 'core' && (
-          <span className="grp-core-tag" title="Two guarded HR legs instead of adding a third ceiling leg. Home-run parlays remain high variance.">
-            <Icon name="TrendingDown" size={10} /> LOWER VARIANCE
+          <span className="grp-core-tag" title={g.size === 3 ? 'The guarded Core Pair plus one clearly labeled lower-probability ceiling leg.' : 'Two guarded HR legs without the volatile ceiling leg. Home-run parlays remain high variance.'}>
+            <Icon name={g.size === 3 ? 'TriangleAlert' : 'TrendingDown'} size={10} /> {g.size === 3 ? 'CORE + VOLATILE' : 'LOWER VARIANCE'}
           </span>
         )}
         {live.started ? (
@@ -923,7 +923,7 @@ function GroupLeg({ b, idx, onSelect, selected, bad, weakest, volatile = false, 
           <span className={`grp-leg-name ${hrToday ? 'hr-glow' : ''}`}>{lastFirst(b.name)}</span>
           <span className="grp-team">{b.team}</span>
           <span className="grp-leg-signals">
-          {role && (
+          {role && role !== 'volatile' && (
             <span className={`grp-chip core-role ${role}`} title={role === 'anchor' ? "Anchor: the pair's highest-confidence PRIME power bat." : 'Support: the strongest separate-game PRIME or STRONG bat with an 18%+ model HR chance.'}>
               {role.toUpperCase()}
             </span>

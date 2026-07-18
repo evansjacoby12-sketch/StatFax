@@ -141,7 +141,7 @@ export const blastMixOf = (b) => {
 // Display metadata per strategy key — the label/icon/desc the engine doesn't
 // carry (it only needs key/rank/require). Keys match combo-engine.js STRATEGIES.
 const STRAT_META = {
-  core:      { label: 'Core Pair',     icon: 'Target',     desc: 'one PRIME anchor + one strong model support bat · no prices or volatile ceiling leg' },
+  core:      { label: 'Core Pair',     icon: 'Target',     desc: 'one PRIME anchor + one strong model support bat · no prices required' },
   precision: { label: 'Precision',    icon: 'ScanSearch', desc: 'hottest elite-barrel bats — power surge + barrel ≥12% · 2.3× HR lift' },
   hot:       { label: 'Hot Hand',     icon: 'Flame',      desc: 'heat-led bats on live power — best audited leg hit rate (42.9%)' },
   matchup:   { label: 'Soft Matchup', icon: 'Radar',      desc: 'facing HR-prone pitchers (HR/9 ≥1.3)' },
@@ -218,6 +218,7 @@ function toComboRow(b, applyLock = false) {
 function makeGroup({ strategy, size, legs: rows, roles = null }) {
   const legs = rows.map((r) => r.ref)
   const meta = STRAT_META[strategy] || { label: strategy, icon: 'Layers', desc: '' }
+  const coreThree = strategy === 'core' && size === 3
   // How many legs sit on an unconfirmed (projected/roster) lineup — those bats
   // could still be benched or hit out of a run-producing slot before first pitch.
   const projectedLegs = legs.filter((b) => b.lineupConfirmed !== true).length
@@ -234,9 +235,9 @@ function makeGroup({ strategy, size, legs: rows, roles = null }) {
     id: `${strategy}-${size}`,
     size,
     strategy,
-    label: meta.label,
+    label: coreThree ? 'Core Pair + Volatile' : meta.label,
     icon: meta.icon,
-    desc: meta.desc,
+    desc: coreThree ? 'the guarded anchor + support core, plus one explicitly volatile power leg' : meta.desc,
     grade: gradeFor(avgScore),
     avgScore,
     allHit,

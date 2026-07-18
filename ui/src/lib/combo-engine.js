@@ -129,12 +129,14 @@ export const isBenched = (b) => b.lineupConfirmed === true && !Number.isFinite(b
 const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x))
 const norm01 = (v, hi) => clamp((v ?? 0) / hi, 0, 1)
 
-// Core Pair is a model-only two-leg construction with deliberately asymmetric
-// jobs. The anchor must be a PRIME, high-probability, lower-K bat; the support
-// leg must still carry an 18%+ HR chance and the same contact-consistency floor.
-// It intentionally ignores book prices so it is available before odds post.
+// Core Pair is a model-only construction with deliberately asymmetric jobs. The
+// anchor must be a PRIME, high-probability, lower-K bat; the support leg must
+// still carry an 18%+ HR chance and the same consistency floor. Its optional
+// 3-leg form adds one explicitly volatile ceiling bat below the support leg's HR
+// probability. It intentionally ignores book prices so it is available early.
 export const CORE_ANCHOR_MIN_HR_PROB = 0.20
 export const CORE_SUPPORT_MIN_HR_PROB = 0.18
+export const CORE_VOLATILE_MIN_HR_PROB = 0.12
 export const CORE_MIN_CONSISTENCY = 0.85
 
 const coreAnchorRank = (b) =>
@@ -142,6 +144,15 @@ const coreAnchorRank = (b) =>
 
 const coreSupportRank = (b) =>
   1000 * (b.hrProb ?? 0) * (b.consistency ?? 1) + (b.score ?? 0)
+
+// The third leg is selected for ceiling, not safety: calibrated HR probability
+// leads, then barrel quality and overall model score break out the best power
+// longshot. It must remain below the support leg's probability, so the added
+// bat—not either guarded core leg—is always the visible volatile stress point.
+const coreVolatileRank = (b) =>
+  0.55 * norm01(b.hrProb, 0.30) +
+  0.25 * norm01(b.barrel, 25) +
+  0.20 * norm01(b.score, 100)
 
 // Best Mix — a cross-metric blend so a great-overall bat and an elite-barrel bat
 // can land in the SAME combo (the single-metric strategies silo them). Weights:
@@ -178,11 +189,11 @@ export const powerRank = (b) =>
 // the top slot it used to hold; edge is last pending a re-tune.
 export const STRATEGIES = [
   // Core Pair: one PRIME anchor + one strong support bat, both protected by
-  // probability and contact-consistency floors. It intentionally exists only at
-  // two legs; there is no third ceiling slot and book prices are never required.
+  // probability and contact-consistency floors. Its 3-leg form adds exactly one
+  // lower-probability volatile ceiling bat; it never extends to four legs.
   // This is a supplemental recommendation: it does not consume or replace the
   // audited strategy slots below when the same bats happen to qualify twice.
-  { key: 'core',      sizes: [2], custom: 'corePair', rank: coreAnchorRank, require: null },
+  { key: 'core',      sizes: [2, 3], custom: 'corePair', rank: coreAnchorRank, require: null },
   // Hot Hand — heat × recent-form multiplier. Best in the graded record:
   // 14.9% all-hit, 45% legs. Ranks on heat, not score, so it surfaces different
   // bats than mix/matchup.
@@ -305,10 +316,10 @@ function eligible(rows, require) {
   return out
 }
 
-// Select the asymmetric Core Pair in role order: [anchor, support]. Ranking is
-// deterministic and quantized through the same comparator as every other
-// strategy. The first anchor with a qualifying cross-game support partner wins.
-function selectCorePair(rows) {
+// Select the asymmetric Core Pair in role order. The 2-leg version returns
+// [anchor, support]. The 3-leg version preserves that exact pair and appends a
+// lower-probability [volatile] bat from a third game.
+function selectCorePair(rows, size = 2) {
   const qualified = eligible(rows, null).filter((b) =>
     Number.isFinite(b.hrProb) &&
     (b.consistency ?? 1) >= CORE_MIN_CONSISTENCY,
@@ -320,13 +331,31 @@ function selectCorePair(rows) {
     .filter((b) => b.hrProb >= CORE_SUPPORT_MIN_HR_PROB)
     .sort(makeLegCmp(coreSupportRank, qualified))
 
+  let pair = null
   for (const anchor of anchors) {
     for (const support of supports) {
       if (support.playerId === anchor.playerId || support.gamePk === anchor.gamePk) continue
-      return [anchor, support]
+      pair = [anchor, support]
+      break
     }
+    if (pair) break
   }
-  return []
+  if (!pair || size === 2) return pair || []
+  if (size !== 3) return []
+
+  const [anchor, support] = pair
+  const volatile = eligible(rows, null)
+    .filter((b) =>
+      Number.isFinite(b.hrProb) &&
+      b.hrProb >= CORE_VOLATILE_MIN_HR_PROB &&
+      b.hrProb < Math.min(anchor.hrProb, support.hrProb) &&
+      b.playerId !== anchor.playerId &&
+      b.playerId !== support.playerId &&
+      b.gamePk !== anchor.gamePk &&
+      b.gamePk !== support.gamePk,
+    )
+    .sort(makeLegCmp(coreVolatileRank, rows))[0]
+  return volatile ? [...pair, volatile] : []
 }
 
 // Best eligible leg per game by a metric.
@@ -406,11 +435,11 @@ export function buildCombos(rows, {
     for (const { strat, pool } of pools) {
       if (strat.sizes && !strat.sizes.includes(size)) continue
       if (strat.custom === 'corePair') {
-        const legs = selectCorePair(usable)
+        const legs = selectCorePair(usable, size)
         if (legs.length !== size) continue
         // Supplemental: keep the existing strategy selection and exposure caps
         // unchanged. The UI labels repeated-bat exposure across every shown card.
-        out.push({ strategy: strat.key, size, legs, roles: ['anchor', 'support'] })
+        out.push({ strategy: strat.key, size, legs, roles: size === 3 ? ['anchor', 'support', 'volatile'] : ['anchor', 'support'] })
         continue
       }
       if (pool.length < size) continue

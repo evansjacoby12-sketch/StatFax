@@ -77,21 +77,28 @@ test('mixRank blends score (0.5) + barrel (0.25) + heat (0.25)', () => {
   assert.ok(Math.abs(mixRank(row({ score: 100, barrel: 25, heat: 100 })) - 1) < 1e-9)
 })
 
-test('Core Pair builds only a guarded, price-independent 2-leg anchor + support pair', () => {
+test('Core Pair builds a guarded 2-leg core and a 3-leg version with one volatile ceiling bat', () => {
   const rows = [
     row({ playerId: 1, gamePk: 1, score: 90, grade: 'PRIME', hrProb: 0.23, consistency: 0.95 }),
     row({ playerId: 2, gamePk: 2, score: 75, grade: 'STRONG', hrProb: 0.20, consistency: 0.90 }),
-    // Too low-probability to be the non-volatile support leg.
-    row({ playerId: 3, gamePk: 3, score: 76, grade: 'PRIME', hrProb: 0.17, consistency: 0.95 }),
+    // Too low-probability for support; eligible as a volatile leg.
+    row({ playerId: 3, gamePk: 3, score: 76, grade: 'PRIME', hrProb: 0.17, consistency: 0.95, barrel: 12 }),
     // Strong probability, but the high-K consistency guard rejects it.
     row({ playerId: 4, gamePk: 4, score: 84, grade: 'PRIME', hrProb: 0.22, consistency: 0.80 }),
+    // A slightly lower-probability but higher-ceiling bat wins the volatile role.
+    row({ playerId: 5, gamePk: 5, score: 72, grade: 'STRONG', hrProb: 0.16, consistency: 0.75, barrel: 18 }),
   ]
   const core = buildCombos(rows).filter((combo) => combo.strategy === 'core')
-  assert.equal(core.length, 1)
-  assert.equal(core[0].size, 2)
-  assert.deepEqual(core[0].legs.map((leg) => leg.playerId), [1, 2])
-  assert.deepEqual(core[0].roles, ['anchor', 'support'])
-  assert.ok(!buildCombos(rows, { sizes: [3, 4] }).some((combo) => combo.strategy === 'core'))
+  assert.equal(core.length, 2)
+  const pair = core.find((combo) => combo.size === 2)
+  const trio = core.find((combo) => combo.size === 3)
+  assert.deepEqual(pair.legs.map((leg) => leg.playerId), [1, 2])
+  assert.deepEqual(pair.roles, ['anchor', 'support'])
+  assert.deepEqual(trio.legs.map((leg) => leg.playerId), [1, 2, 5])
+  assert.deepEqual(trio.roles, ['anchor', 'support', 'volatile'])
+  assert.ok(trio.legs[2].hrProb < trio.legs[1].hrProb)
+  assert.equal(new Set(trio.legs.map((leg) => leg.gamePk)).size, 3)
+  assert.ok(!buildCombos(rows, { sizes: [4] }).some((combo) => combo.strategy === 'core'))
 })
 
 test('Core Pair does not require posted market edges', () => {
