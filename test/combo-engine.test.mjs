@@ -7,7 +7,6 @@ import {
   gradeFor,
   allHitProb,
   mixRank,
-  corePairEdge,
   edgeCount,
   barrelOf,
   recentBarrelOf,
@@ -78,40 +77,29 @@ test('mixRank blends score (0.5) + barrel (0.25) + heat (0.25)', () => {
   assert.ok(Math.abs(mixRank(row({ score: 100, barrel: 25, heat: 100 })) - 1) < 1e-9)
 })
 
-test('Core Pair builds only a guarded 2-leg anchor + value pair', () => {
+test('Core Pair builds only a guarded, price-independent 2-leg anchor + support pair', () => {
   const rows = [
-    row({ playerId: 1, gamePk: 1, score: 90, grade: 'PRIME', hrProb: 0.23, edge: -0.005, consistency: 0.95 }),
-    row({ playerId: 2, gamePk: 2, score: 75, grade: 'STRONG', hrProb: 0.20, edge: 0.03, consistency: 0.90 }),
-    // Bigger edge, but too low-probability to be the non-volatile value leg.
-    row({ playerId: 3, gamePk: 3, score: 76, grade: 'PRIME', hrProb: 0.17, edge: 0.06, consistency: 0.95 }),
-    // Strong probability/edge, but the high-K consistency guard rejects it.
-    row({ playerId: 4, gamePk: 4, score: 84, grade: 'PRIME', hrProb: 0.22, edge: 0.05, consistency: 0.80 }),
+    row({ playerId: 1, gamePk: 1, score: 90, grade: 'PRIME', hrProb: 0.23, consistency: 0.95 }),
+    row({ playerId: 2, gamePk: 2, score: 75, grade: 'STRONG', hrProb: 0.20, consistency: 0.90 }),
+    // Too low-probability to be the non-volatile support leg.
+    row({ playerId: 3, gamePk: 3, score: 76, grade: 'PRIME', hrProb: 0.17, consistency: 0.95 }),
+    // Strong probability, but the high-K consistency guard rejects it.
+    row({ playerId: 4, gamePk: 4, score: 84, grade: 'PRIME', hrProb: 0.22, consistency: 0.80 }),
   ]
   const core = buildCombos(rows).filter((combo) => combo.strategy === 'core')
   assert.equal(core.length, 1)
   assert.equal(core[0].size, 2)
   assert.deepEqual(core[0].legs.map((leg) => leg.playerId), [1, 2])
-  assert.deepEqual(core[0].roles, ['anchor', 'value'])
-  assert.ok(corePairEdge(core[0].legs[0], core[0].legs[1]) >= 0.001)
+  assert.deepEqual(core[0].roles, ['anchor', 'support'])
   assert.ok(!buildCombos(rows, { sizes: [3, 4] }).some((combo) => combo.strategy === 'core'))
 })
 
-test('Core Pair stays hidden without posted market edges', () => {
+test('Core Pair does not require posted market edges', () => {
   const rows = [
     row({ playerId: 1, gamePk: 1, score: 90, grade: 'PRIME', hrProb: 0.23, edge: null }),
     row({ playerId: 2, gamePk: 2, score: 80, grade: 'PRIME', hrProb: 0.21, edge: null }),
   ]
-  assert.equal(buildCombos(rows).filter((combo) => combo.strategy === 'core').length, 0)
-})
-
-test('Core Pair rechecks edge after lineup probability weighting', () => {
-  const rows = [
-    row({ playerId: 1, gamePk: 1, score: 90, grade: 'PRIME', hrProb: 0.23, marketFairProb: 0.235, edge: -0.005 }),
-    // The raw board had an edge, but the lineup-adjusted 18% model is now below
-    // the preserved 19% market baseline and must not qualify as value.
-    row({ playerId: 2, gamePk: 2, score: 80, grade: 'STRONG', hrProb: 0.18, marketFairProb: 0.19, edge: 0.03 }),
-  ]
-  assert.equal(buildCombos(rows).filter((combo) => combo.strategy === 'core').length, 0)
+  assert.equal(buildCombos(rows).filter((combo) => combo.strategy === 'core').length, 1)
 })
 
 // ─── field-derivation helpers ─────────────────────────────────────────────────
@@ -188,6 +176,7 @@ test('exposure caps: no bat anchors more than maxPerBat combos per size', () => 
   const combos = buildCombos(slateRows(), { maxPerBat: 2, globalMaxPerBat: 4 })
   const perSize = {}
   for (const c of combos) {
+    if (c.strategy === 'core') continue // supplemental recommendation, not an audited strategy slot
     for (const l of c.legs) {
       const key = `${c.size}:${l.playerId}`
       perSize[key] = (perSize[key] || 0) + 1
@@ -203,8 +192,8 @@ test('SKIP grades and scoreless rows are ineligible', () => {
     row({ playerId: 3, gamePk: 3, score: NaN, grade: 'PRIME' }),
     row({ playerId: 4, gamePk: 4, score: 68, grade: 'PRIME' }), // 2nd valid game so a 2-leg combo can form
   ]
-  const mix = buildCombos(rows).filter((c) => c.strategy === 'mix')
-  const seen = new Set(mix.flatMap((c) => c.legs.map((l) => l.playerId)))
+  const combos = buildCombos(rows)
+  const seen = new Set(combos.flatMap((c) => c.legs.map((l) => l.playerId)))
   assert.ok(seen.has(1))
   assert.ok(seen.has(4))
   assert.ok(!seen.has(2)) // SKIP grade
@@ -224,6 +213,16 @@ test('identical leg sets from different strategies dedupe within a size', () => 
   // Several strategies qualify, but the unique leg-set is just {1,2}.
   assert.equal(legSets.size, 1)
   assert.ok(sigs.length >= 1)
+})
+
+test('Core Pair is supplemental and does not suppress an existing strategy', () => {
+  const rows = [
+    row({ playerId: 1, gamePk: 1, score: 80, grade: 'PRIME', hrProb: 0.24, hot: true, heat: 70 }),
+    row({ playerId: 2, gamePk: 2, score: 78, grade: 'PRIME', hrProb: 0.21, hot: true, heat: 68 }),
+  ]
+  const strategies = buildCombos(rows, { sizes: [2] }).map((combo) => combo.strategy)
+  assert.ok(strategies.includes('core'))
+  assert.ok(strategies.includes('hot'))
 })
 
 // ─── client ≡ server equivalence (the anti-drift guarantee) ───────────────────

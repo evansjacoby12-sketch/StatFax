@@ -924,7 +924,7 @@ function GroupLeg({ b, idx, onSelect, selected, bad, weakest, volatile = false, 
           <span className="grp-team">{b.team}</span>
           <span className="grp-leg-signals">
           {role && (
-            <span className={`grp-chip core-role ${role}`} title={role === 'anchor' ? "Anchor: the pair's highest-confidence PRIME power bat." : 'Value: an 18%+ HR bat the de-vigged market prices below the model.'}>
+            <span className={`grp-chip core-role ${role}`} title={role === 'anchor' ? "Anchor: the pair's highest-confidence PRIME power bat." : 'Support: the strongest separate-game PRIME or STRONG bat with an 18%+ model HR chance.'}>
               {role.toUpperCase()}
             </span>
           )}

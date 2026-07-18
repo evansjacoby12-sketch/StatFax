@@ -10248,7 +10248,7 @@ button.th:focus-visible {
   border-color: color-mix(in srgb, var(--accent) 32%, transparent);
   background: color-mix(in srgb, var(--accent) 9%, transparent);
 }
-.grp-chip.core-role.value {
+.grp-chip.core-role.support {
   color: var(--prime);
   border-color: color-mix(in srgb, var(--prime) 32%, transparent);
   background: color-mix(in srgb, var(--prime) 9%, transparent);

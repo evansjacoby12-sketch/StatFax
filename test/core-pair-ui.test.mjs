@@ -8,6 +8,7 @@ test('Bet Lab exposes Core Pair roles and longer-parlay volatility', async () =>
   assert.match(source, /LOWER VARIANCE/)
   assert.match(source, /const coreFirst/)
   assert.match(source, /role\.toUpperCase\(\)/)
+  assert.match(source, /Support: the strongest separate-game/)
   assert.match(source, /g\.size >= 3 && i === weakestIdx/)
   assert.match(source, /> VOLATILE/)
 })
