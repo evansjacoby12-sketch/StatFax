@@ -129,6 +129,41 @@ export const isBenched = (b) => b.lineupConfirmed === true && !Number.isFinite(b
 const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x))
 const norm01 = (v, hi) => clamp((v ?? 0) / hi, 0, 1)
 
+// Core Pair is a price-aware two-leg construction with deliberately asymmetric
+// jobs. The anchor must be a PRIME, high-probability, lower-K bat; the value leg
+// must still carry an 18%+ HR chance and a real positive market edge. Requiring
+// the finished pair to beat the product of both de-vigged fair prices prevents a
+// mildly overpriced anchor from swallowing the value leg's edge.
+export const CORE_ANCHOR_MIN_HR_PROB = 0.20
+export const CORE_VALUE_MIN_HR_PROB = 0.18
+export const CORE_MIN_CONSISTENCY = 0.85
+export const CORE_MIN_VALUE_EDGE = 0.005
+export const CORE_MIN_PAIR_EDGE = 0.001
+
+const coreAnchorRank = (b) =>
+  1000 * (b.hrProb ?? 0) * (b.consistency ?? 1) + (b.score ?? 0)
+
+const coreMarketFair = (b) => {
+  if (Number.isFinite(b?.marketFairProb)) return clamp(b.marketFairProb, 0, 1)
+  if (Number.isFinite(b?.hrProb) && Number.isFinite(b?.edge)) return clamp(b.hrProb - b.edge, 0, 1)
+  return null
+}
+
+const corePriceEdge = (b) => {
+  const fair = coreMarketFair(b)
+  return Number.isFinite(b?.hrProb) && Number.isFinite(fair) ? b.hrProb - fair : null
+}
+
+const coreValueRank = (b) =>
+  1000 * (corePriceEdge(b) ?? -1) + 100 * (b.hrProb ?? 0) * (b.consistency ?? 1) + (b.score ?? 0) / 100
+
+export function corePairEdge(anchor, value) {
+  const anchorFair = coreMarketFair(anchor)
+  const valueFair = coreMarketFair(value)
+  if (![anchor?.hrProb, value?.hrProb, anchorFair, valueFair].every(Number.isFinite)) return null
+  return anchor.hrProb * value.hrProb - anchorFair * valueFair
+}
+
 // Best Mix — a cross-metric blend so a great-overall bat and an elite-barrel bat
 // can land in the SAME combo (the single-metric strategies silo them). Weights:
 // score 0.5 (grade is the dominant HR signal — PRIME 2.29× in the audit), barrel
@@ -163,6 +198,12 @@ export const powerRank = (b) =>
 // 0/18, precision 0/12) trail. Precision keeps its tight gate but is demoted off
 // the top slot it used to hold; edge is last pending a re-tune.
 export const STRATEGIES = [
+  // Core Pair: LIVE/PRICED ONLY. One PRIME anchor + one positive-edge value bat,
+  // both protected by probability and contact-consistency floors. It intentionally
+  // exists only at two legs; there is no third ceiling slot. The frozen server
+  // board carries edge:null, so this stays out of the odds-free scorecard and is
+  // evaluated through tracked tickets instead.
+  { key: 'core',      sizes: [2], custom: 'corePair', rank: coreAnchorRank, require: null },
   // Hot Hand — heat × recent-form multiplier. Best in the graded record:
   // 14.9% all-hit, 45% legs. Ranks on heat, not score, so it surfaces different
   // bats than mix/matchup.
@@ -285,6 +326,32 @@ function eligible(rows, require) {
   return out
 }
 
+// Select the asymmetric Core Pair in role order: [anchor, value]. Ranking is
+// deterministic and quantized through the same comparator as every other
+// strategy. The first anchor with a qualifying cross-game value partner wins.
+function selectCorePair(rows) {
+  const priced = eligible(rows, null).filter((b) =>
+    Number.isFinite(b.hrProb) &&
+    Number.isFinite(corePriceEdge(b)) &&
+    (b.consistency ?? 1) >= CORE_MIN_CONSISTENCY,
+  )
+  const anchors = priced
+    .filter((b) => b.grade === 'PRIME' && b.hrProb >= CORE_ANCHOR_MIN_HR_PROB)
+    .sort(makeLegCmp(coreAnchorRank, priced))
+  const values = priced
+    .filter((b) => b.hrProb >= CORE_VALUE_MIN_HR_PROB && corePriceEdge(b) >= CORE_MIN_VALUE_EDGE)
+    .sort(makeLegCmp(coreValueRank, priced))
+
+  for (const anchor of anchors) {
+    for (const value of values) {
+      if (value.playerId === anchor.playerId || value.gamePk === anchor.gamePk) continue
+      if ((corePairEdge(anchor, value) ?? -Infinity) < CORE_MIN_PAIR_EDGE) continue
+      return [anchor, value]
+    }
+  }
+  return []
+}
+
 // Best eligible leg per game by a metric.
 function topPerGame(elig, rank) {
   const cmp = makeLegCmp(rank, elig)
@@ -339,6 +406,7 @@ export function buildCombos(rows, {
   const usable = (rows || []).filter((r) => !r.benched)
   // Each strategy's ranked pool is size-independent — compute once, slice per size.
   const pools = activeStrategies.map((strat) => {
+    if (strat.custom === 'corePair') return { strat, pool: null }
     // Tilt every strategy's rank by the leg's expected-PA weight (lineup slot),
     // so a hot 8-hole bat doesn't beat a comparable top-of-order bat who gets an
     // extra cut. Neutral (×1) until the order posts. Consistency lean still opt-in.
@@ -359,6 +427,20 @@ export function buildCombos(rows, {
     const seen = new Set() // dedupe identical leg sets across strategies, per size
     const used = {} // per-size diversity cap
     for (const { strat, pool } of pools) {
+      if (strat.sizes && !strat.sizes.includes(size)) continue
+      if (strat.custom === 'corePair') {
+        const legs = selectCorePair(usable)
+        if (legs.length !== size) continue
+        const sig = legs.map((l) => l.playerId).slice().sort((a, b) => a - b).join('-')
+        if (seen.has(sig)) continue
+        seen.add(sig)
+        for (const l of legs) {
+          used[l.playerId] = (used[l.playerId] || 0) + 1
+          usedGlobal[l.playerId] = (usedGlobal[l.playerId] || 0) + 1
+        }
+        out.push({ strategy: strat.key, size, legs, roles: ['anchor', 'value'] })
+        continue
+      }
       if (pool.length < size) continue
       const take = (globalCapped) => {
         const legs = []

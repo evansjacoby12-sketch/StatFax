@@ -7,6 +7,7 @@ import {
   gradeFor,
   allHitProb,
   mixRank,
+  corePairEdge,
   edgeCount,
   barrelOf,
   recentBarrelOf,
@@ -33,6 +34,7 @@ const row = (over = {}) => ({
   pitcherHr9: 1.0, air: 1.0,
   hot: false, homeEdge: false, awayEdge: false, bullpenLegend: false, barrelKing: false,
   positiveReasons: 0, negativeReasons: 0, hrDueScore: 0,
+  edge: null, consistency: 1,
   ...over,
 })
 
@@ -74,6 +76,42 @@ test('park gate at air >= 1.08; rank = score × air', () => {
 test('mixRank blends score (0.5) + barrel (0.25) + heat (0.25)', () => {
   // score 100, barrel 25, heat 100 → 0.5 + 0.25 + 0.25 = 1.0
   assert.ok(Math.abs(mixRank(row({ score: 100, barrel: 25, heat: 100 })) - 1) < 1e-9)
+})
+
+test('Core Pair builds only a guarded 2-leg anchor + value pair', () => {
+  const rows = [
+    row({ playerId: 1, gamePk: 1, score: 90, grade: 'PRIME', hrProb: 0.23, edge: -0.005, consistency: 0.95 }),
+    row({ playerId: 2, gamePk: 2, score: 75, grade: 'STRONG', hrProb: 0.20, edge: 0.03, consistency: 0.90 }),
+    // Bigger edge, but too low-probability to be the non-volatile value leg.
+    row({ playerId: 3, gamePk: 3, score: 76, grade: 'PRIME', hrProb: 0.17, edge: 0.06, consistency: 0.95 }),
+    // Strong probability/edge, but the high-K consistency guard rejects it.
+    row({ playerId: 4, gamePk: 4, score: 84, grade: 'PRIME', hrProb: 0.22, edge: 0.05, consistency: 0.80 }),
+  ]
+  const core = buildCombos(rows).filter((combo) => combo.strategy === 'core')
+  assert.equal(core.length, 1)
+  assert.equal(core[0].size, 2)
+  assert.deepEqual(core[0].legs.map((leg) => leg.playerId), [1, 2])
+  assert.deepEqual(core[0].roles, ['anchor', 'value'])
+  assert.ok(corePairEdge(core[0].legs[0], core[0].legs[1]) >= 0.001)
+  assert.ok(!buildCombos(rows, { sizes: [3, 4] }).some((combo) => combo.strategy === 'core'))
+})
+
+test('Core Pair stays hidden without posted market edges', () => {
+  const rows = [
+    row({ playerId: 1, gamePk: 1, score: 90, grade: 'PRIME', hrProb: 0.23, edge: null }),
+    row({ playerId: 2, gamePk: 2, score: 80, grade: 'PRIME', hrProb: 0.21, edge: null }),
+  ]
+  assert.equal(buildCombos(rows).filter((combo) => combo.strategy === 'core').length, 0)
+})
+
+test('Core Pair rechecks edge after lineup probability weighting', () => {
+  const rows = [
+    row({ playerId: 1, gamePk: 1, score: 90, grade: 'PRIME', hrProb: 0.23, marketFairProb: 0.235, edge: -0.005 }),
+    // The raw board had an edge, but the lineup-adjusted 18% model is now below
+    // the preserved 19% market baseline and must not qualify as value.
+    row({ playerId: 2, gamePk: 2, score: 80, grade: 'STRONG', hrProb: 0.18, marketFairProb: 0.19, edge: 0.03 }),
+  ]
+  assert.equal(buildCombos(rows).filter((combo) => combo.strategy === 'core').length, 0)
 })
 
 // ─── field-derivation helpers ─────────────────────────────────────────────────

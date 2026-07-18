@@ -10224,6 +10224,43 @@ button.th:focus-visible {
   filter: drop-shadow(0 0 4px color-mix(in srgb, var(--gc) 70%, transparent));
   animation: precisionPing 3s ease-in-out infinite;
 }
+.grp-core-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  padding: 2px 6px;
+  border: 1px solid color-mix(in srgb, var(--accent) 32%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
+  color: var(--accent);
+  font-size: 8.5px;
+  font-weight: 850;
+  letter-spacing: .045em;
+  white-space: nowrap;
+}
+.grp-chip.core-role {
+  letter-spacing: .04em;
+  font-weight: 850;
+}
+.grp-chip.core-role.anchor {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 32%, transparent);
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
+}
+.grp-chip.core-role.value {
+  color: var(--prime);
+  border-color: color-mix(in srgb, var(--prime) 32%, transparent);
+  background: color-mix(in srgb, var(--prime) 9%, transparent);
+}
+.grp-chip.volatile {
+  color: var(--warn);
+  border-color: color-mix(in srgb, var(--warn) 35%, transparent);
+  background: color-mix(in srgb, var(--warn) 10%, transparent);
+}
+@media (max-width: 560px) {
+  .grp-core-tag { order: 3; }
+}
 @keyframes precisionPing {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.55; }

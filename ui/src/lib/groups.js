@@ -141,6 +141,7 @@ export const blastMixOf = (b) => {
 // Display metadata per strategy key — the label/icon/desc the engine doesn't
 // carry (it only needs key/rank/require). Keys match combo-engine.js STRATEGIES.
 const STRAT_META = {
+  core:      { label: 'Core Pair',     icon: 'Target',     desc: 'one PRIME anchor + one positive-edge value bat · no volatile ceiling leg' },
   precision: { label: 'Precision',    icon: 'ScanSearch', desc: 'hottest elite-barrel bats — power surge + barrel ≥12% · 2.3× HR lift' },
   hot:       { label: 'Hot Hand',     icon: 'Flame',      desc: 'heat-led bats on live power — best audited leg hit rate (42.9%)' },
   matchup:   { label: 'Soft Matchup', icon: 'Radar',      desc: 'facing HR-prone pitchers (HR/9 ≥1.3)' },
@@ -184,6 +185,10 @@ function toComboRow(b, applyLock = false) {
     // Market edge (model HR prob − de-vigged fair line) — the Value strategy
     // ranks on this to pair the bats the market most underprices. Null pre-odds.
     edge: Number.isFinite(b.edge) ? b.edge : null,
+    // Preserve the raw market baseline before batting-order PA weighting. Core
+    // Pair re-evaluates edge against its adjusted HR probability, so a lower
+    // lineup slot can correctly erase what looked like value before lineups.
+    marketFairProb: rawProb != null && Number.isFinite(b.edge) ? rawProb - b.edge : null,
     hot: b.hot === true,
     powerReady: b.powerReady === true,
     barrelReady: b.barrelReady === true,
@@ -214,7 +219,7 @@ function toComboRow(b, applyLock = false) {
 // Wrap one engine combo (legs = canonical rows) into a display group: letter
 // grade from the legs' avg score, parlay all-hit %, and combined market price /
 // edge (only meaningful when every leg has a priced book).
-function makeGroup({ strategy, size, legs: rows }) {
+function makeGroup({ strategy, size, legs: rows, roles = null }) {
   const legs = rows.map((r) => r.ref)
   const meta = STRAT_META[strategy] || { label: strategy, icon: 'Layers', desc: '' }
   // How many legs sit on an unconfirmed (projected/roster) lineup — those bats
@@ -240,6 +245,7 @@ function makeGroup({ strategy, size, legs: rows }) {
     avgScore,
     allHit,
     projectedLegs,
+    legRoles: Array.isArray(roles) ? roles : null,
     legs,
     american: market.american,
     ev: market.ev, // betting EV per $1 (modelAllHit × decimal − 1) — the value sort key

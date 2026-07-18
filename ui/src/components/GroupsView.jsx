@@ -13,7 +13,7 @@ import { useTickets, makeTicket } from '../lib/tickets.js'
 import { useComboExplain } from '../lib/explain.js'
 
 const GROUP_GRADE_COLOR = { S: '#d6b56f', A: '#69b99e', B: '#8587b7', C: '#9aa6b6', D: '#676673' }
-const LOCK_STRAT_LABEL = { precision: 'Precision', matchup: 'Soft Matchup', mix: 'Best Mix', park: 'Park & Air', edge: 'Edge Stack' }
+const LOCK_STRAT_LABEL = { core: 'Core Pair', precision: 'Precision', matchup: 'Soft Matchup', mix: 'Best Mix', park: 'Park & Air', edge: 'Edge Stack' }
 
 // The server-frozen bettable board, shown only AFTER the slate has started
 // (final: true). Pregame it's redundant — the morning score lock already keeps
@@ -97,7 +97,7 @@ function assessCombo(g) {
   return { legs, weakestIdx, tone: anyBad ? 'risk' : anyFlag ? 'caution' : 'tail' }
 }
 
-const STRAT_LABEL = { precision: 'Precision', mix: 'Best Mix', edge: 'Edge Stack', matchup: 'Soft Matchup', park: 'Park & Air', top: 'Top Picks', stack: 'Signal Stack', hot: 'Hot Hand', power: 'Power Bats' }
+const STRAT_LABEL = { core: 'Core Pair', precision: 'Precision', mix: 'Best Mix', edge: 'Edge Stack', matchup: 'Soft Matchup', park: 'Park & Air', top: 'Top Picks', stack: 'Signal Stack', hot: 'Hot Hand', power: 'Power Bats' }
 
 // Rolling combo scorecard — the real "have our combos hit?" record, graded
 // server-side off frozen pregame combos vs actual HRs (server/parlay-combos.mjs).
@@ -406,14 +406,19 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard, g
   // Whether any shown combo is fully priced — only then is a Value/EV sort useful.
   const anyPriced = groups.some((g) => g.ev != null)
   const activeFilterCount = Number(hideStarted) + Number(confirmedOnly) + Number(spread) + Number(anyPriced && valueSort)
+  // A qualifying Core Pair is the board's deliberate two-leg recommendation,
+  // so keep it inside the default three-card view regardless of the chosen sort.
+  const coreFirst = (a, b) => Number(b.strategy === 'core') - Number(a.strategy === 'core')
   // EV-desc: priced combos first (best EV on top); unpriced fall back to all-hit.
   const byValue = (a, b) => {
+    const coreOrder = coreFirst(a, b)
+    if (coreOrder) return coreOrder
     if (a.ev != null && b.ev != null) return b.ev - a.ev
     if (a.ev != null) return -1
     if (b.ev != null) return 1
     return (b.allHit ?? 0) - (a.allHit ?? 0)
   }
-  const byProb = (a, b) => (b.allHit ?? 0) - (a.allHit ?? 0)
+  const byProb = (a, b) => coreFirst(a, b) || (b.allHit ?? 0) - (a.allHit ?? 0)
   // Spread mode: show a de-correlated subset instead of the full (overlapping) list.
   const shownGroups = spread
     ? spreadPick(groups, 4)
@@ -700,6 +705,11 @@ function GroupCard({ g, idx = 0, onSelect, selectedId, comboConf = 'off', slipSe
         <span className="grp-strategy">
           <Icon name={g.icon} size={13} /> {g.label}
         </span>
+        {g.strategy === 'core' && (
+          <span className="grp-core-tag" title="Two guarded HR legs instead of adding a third ceiling leg. Home-run parlays remain high variance.">
+            <Icon name="TrendingDown" size={10} /> LOWER VARIANCE
+          </span>
+        )}
         {live.started ? (
           <span className="grp-live-tag" title={`Live: ${live.hits}/${live.n} legs homered`} style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '10px', fontWeight: '800', color: lv.color, background: `color-mix(in srgb, ${lv.color} 12%, transparent)`, border: `1px solid color-mix(in srgb, ${lv.color} 35%, transparent)`, borderRadius: '5px', padding: '1px 6px' }}>
             <Icon name={lv.icon} size={10} className={live.code === 'live' ? 'spin-pulse' : ''} /> {lv.label} {live.hits}/{live.n}
@@ -800,8 +810,10 @@ function GroupCard({ g, idx = 0, onSelect, selectedId, comboConf = 'off', slipSe
             selected={selectedId === b.id}
             bad={legInfo[i].bad}
             weakest={i === weakestIdx && legInfo[i].bad}
+            volatile={g.size >= 3 && i === weakestIdx}
             reasons={legInfo[i].flags}
             unconfirmed={b.lineupConfirmed !== true}
+            role={g.legRoles?.[i] || null}
             dupCount={legCount?.get(b.playerId) || 0}
             sameBat={hoverPid != null && b.playerId === hoverPid}
             onHoverPid={onHoverPid}
@@ -869,7 +881,7 @@ function GroupCard({ g, idx = 0, onSelect, selectedId, comboConf = 'off', slipSe
   )
 }
 
-function GroupLeg({ b, idx, onSelect, selected, bad, weakest, reasons, unconfirmed, dupCount = 0, sameBat = false, onHoverPid = null }) {
+function GroupLeg({ b, idx, onSelect, selected, bad, weakest, volatile = false, reasons, unconfirmed, role = null, dupCount = 0, sameBat = false, onHoverPid = null }) {
   const hm = b.hotnessMultiplier
   const hotTone = hm > 1.02 ? 'good' : hm < 0.98 ? 'bad' : ''
   const hotLabel = hm > 1.02 ? 'HOT' : hm < 0.98 ? 'COLD' : 'NEU'
@@ -911,6 +923,11 @@ function GroupLeg({ b, idx, onSelect, selected, bad, weakest, reasons, unconfirm
           <span className={`grp-leg-name ${hrToday ? 'hr-glow' : ''}`}>{lastFirst(b.name)}</span>
           <span className="grp-team">{b.team}</span>
           <span className="grp-leg-signals">
+          {role && (
+            <span className={`grp-chip core-role ${role}`} title={role === 'anchor' ? "Anchor: the pair's highest-confidence PRIME power bat." : 'Value: an 18%+ HR bat the de-vigged market prices below the model.'}>
+              {role.toUpperCase()}
+            </span>
+          )}
           {dupCount >= 2 && (
             <span className="grp-chip dup" title={`In ${dupCount} of the shown combos — tailing several tickets is re-betting this bat, not diversifying. Hover to light him up across cards.`}>
               ×{dupCount}
@@ -934,7 +951,12 @@ function GroupLeg({ b, idx, onSelect, selected, bad, weakest, reasons, unconfirm
           )}
           {bad && (
             <span className="grp-chip weak" title={`Weak leg — ${reasons?.length ? reasons.join(' · ') : 'long-shot HR%'} — most likely to sink this parlay`}>
-              <Icon name="TriangleAlert" size={10} /> {weakest ? 'WEAKEST' : 'WEAK'}
+              <Icon name="TriangleAlert" size={10} /> {volatile ? 'VOLATILE' : weakest ? 'WEAKEST' : 'WEAK'}
+            </span>
+          )}
+          {volatile && !bad && (
+            <span className="grp-chip volatile" title="Lowest-probability leg in this longer parlay. It adds payout, but it is the first stress point if you want to shorten the ticket.">
+              <Icon name="TriangleAlert" size={10} /> VOLATILE
             </span>
           )}
           {b.hot && <Icon name="Flame" size={12} className="grp-fire" />}
