@@ -65,7 +65,7 @@ cd ui && npm install && npm run dev   # React board at localhost:5173
 - Zone matchup enrichment (batter SLG vs pitch types the starter throws)
 - ML ensemble stacker (blended with rule model when out-of-sample AUC > rule model)
 
-**Grades:** PRIME (top 12% of playable batters) · STRONG · LEAN · SKIP
+**Grades:** PRIME (score 72+ and top 1.5 bats per scheduled game, minimum 2) · STRONG · LEAN · SKIP
 
 **Day Rating (1–5★):** Pitching 45% + Environment 30% + Supply 25%, computed from pre-cap PRIME count to correctly reflect raw slate quality.
 
