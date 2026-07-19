@@ -11,6 +11,7 @@ import MyTickets from './MyTickets.jsx'
 import { useTickets } from '../lib/tickets.js'
 import { gradeTicket, summarizeTickets } from '../lib/ticketMath.js'
 import { loadBacktestLog } from '../lib/backtestLog.js'
+import { GRADE_FORM_WINDOWS, summarizeGradeForm } from '../lib/gradeForm.js'
 
 function computeAuc(rows) {
   const y = rows.map((r) => (r.homered ? 1 : 0))
@@ -248,6 +249,8 @@ function ModelResults({ meta }) {
         {m && <Kpi label="Brier vs baseline" value={m.brier.toFixed(4)} sub={`${pct((m.baselineBrier - m.brier) / m.baselineBrier, 0)} better`} accent="var(--accent)" />}
       </div>
 
+      <GradeForm records={log.records || {}} />
+
       <CommandTabs
         className="results-chart-tabs"
         label="Results analysis"
@@ -440,6 +443,81 @@ function ModelResults({ meta }) {
         </div>
       </section>
     </div>
+  )
+}
+
+function GradeForm({ records }) {
+  const [window, setWindow] = useState(14)
+  const summary = useMemo(() => summarizeGradeForm(records, window), [records, window])
+  const gradeRows = ['PRIME', 'STRONG'].map((grade) => summary.grades[grade])
+  const maxRate = Math.max(0.3, ...gradeRows.map((row) => row.rate || 0))
+  const pLabel = summary.pValue == null
+    ? 'p unavailable'
+    : summary.pValue < 0.001
+      ? 'p<.001'
+      : `p=${summary.pValue.toFixed(3).replace(/^0/, '')}`
+  const gapLabel = summary.gapPoints == null
+    ? 'No comparison yet'
+    : summary.leader === 'EVEN'
+      ? 'Rates are even'
+      : `${summary.leader} +${summary.gapPoints.toFixed(1)} pts`
+
+  return (
+    <section className={`results-card grade-form-card grade-form-${summary.verdict.tone}`}>
+      <div className="grade-form-head">
+        <div className="grade-form-heading">
+          <span><Icon name="TrendingUp" size={14} /> Grade form</span>
+          <small>Recent PRIME vs STRONG hit rates</small>
+        </div>
+        <CommandTabs
+          className="grade-form-window-tabs"
+          label="Grade form settled slate window"
+          value={String(window)}
+          onChange={(value) => setWindow(Number(value))}
+          tabs={GRADE_FORM_WINDOWS.map((days) => ({ id: String(days), label: `${days}` }))}
+        />
+      </div>
+
+      <div className="grade-form-window-copy">
+        <b>{summary.dateCount} settled {summary.dateCount === 1 ? 'slate' : 'slates'}</b>
+        {summary.oldestDate && summary.newestDate && <span className="mono">{summary.oldestDate.slice(5)}–{summary.newestDate.slice(5)}</span>}
+      </div>
+
+      <div className="grade-form-grid">
+        {gradeRows.map((row) => (
+          <div className="grade-form-row" key={row.grade}>
+            <div className="grade-form-row-head">
+              <span className="grade-form-grade" style={{ color: gradeColor(row.grade) }}>{row.grade}</span>
+              <b className="grade-form-rate mono">{row.rate == null ? '—' : pct(row.rate, 1)}</b>
+            </div>
+            <div className="grade-form-track" aria-hidden="true">
+              <span
+                className="grade-form-fill"
+                style={{ width: `${row.rate == null ? 0 : Math.min(100, (row.rate / maxRate) * 100)}%`, background: gradeColor(row.grade), boxShadow: `0 0 9px ${hexA(gradeColor(row.grade), 0.32)}` }}
+              />
+            </div>
+            <div className="grade-form-meta">
+              <span><b className="mono">{row.hits}</b> HR / <b className="mono">{row.n}</b> eligible</span>
+              <span>{row.ciLow == null ? '95% range unavailable' : `95% range ${pct(row.ciLow, 1)}–${pct(row.ciHigh, 1)}`}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className={`grade-form-verdict ${summary.verdict.tone}`} aria-live="polite">
+        <span className="grade-form-verdict-icon"><Icon name={summary.verdict.tone === 'warning' ? 'TriangleAlert' : summary.verdict.tone === 'positive' ? 'Check' : 'Info'} size={14} /></span>
+        <div>
+          <span className="grade-form-verdict-top">
+            <b>{summary.verdict.label}</b>
+            <strong className="mono">{gapLabel}</strong>
+            <small className="mono" title="Two-sided two-proportion comparison">{pLabel}</small>
+          </span>
+          <p>{summary.verdict.detail}</p>
+        </div>
+      </div>
+
+      <p className="grade-form-note">Rates use reconciled players who actually appeared. Compare rates—not winner totals—because STRONG contains a larger player pool.</p>
+    </section>
   )
 }
 
