@@ -162,6 +162,19 @@ export const LIST_BUILDER_PRESETS = Object.freeze([
     },
   }),
   preset({
+    id: 'pitcher-contact-leak',
+    tier: 'advanced',
+    icon: 'Gauge',
+    title: 'Pitcher Contact Leak',
+    description: 'Score 52+ bats with 40%+ hard-hit contact, two verified attack zones and an 8–32° launch window against a 55+ starter leak.',
+    criteria: { minScore: 52, minHardHit: 40, minLaunchAngle: 8, maxLaunchAngle: 32, minPitcherContactLeak: 55, minZoneAttacks: 2 },
+    evidence: { hits: null, sample: null, hitRate: null, lift: null },
+    readiness: {
+      fallbackStatus: 'collecting',
+      features: ['starter Contact Leak score', 'verified zone attacks', 'hard-hit rate', 'launch angle', 'model score'],
+    },
+  }),
+  preset({
     id: 'low-k-power',
     tier: 'advanced',
     icon: 'TrendingDown',

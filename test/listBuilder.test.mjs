@@ -12,9 +12,15 @@ import {
 
 function batter(overrides = {}) {
   return {
-    id: '7-101', playerId: 7, gamePk: 101, name: 'Test Slugger',
+    id: '7-101', playerId: 7, gamePk: 101, name: 'Test Slugger', batSide: 'L',
     game: { isLive: false, isFinal: false, status: 'Scheduled' },
-    pitcher: { season: { hrPer9: 1.1, kPer9: 7.5 }, recentForm: { hrPer9: 1.8 } }, effectiveHR9: 1.5,
+    pitcher: {
+      hand: 'R',
+      season: { ip: 100, hrPer9: 1.1, kPer9: 7.5, goAo: 0.75 },
+      recentForm: { hrPer9: 1.8 },
+      savant: { hardHitPctAllowed: 44, barrelPctAllowed: 10, exitVeloAgainst: 91 },
+      splits: { vl: { bf: 180, iso: 0.22, hrPer9: 1.7 } },
+    }, effectiveHR9: 1.5,
     season: { iso: 0.24 },
     matchupSignals: { contactFactor: 3 },
     score: 80, hrProbability: 0.2, heatIndex: 70,
@@ -60,6 +66,9 @@ test('advanced matchup gates pair hitter power with pitcher weakness', () => {
   assert.equal(evaluateListBuilderBatter(row, { minISO: 0.2, maxPitcherK9: 8 }).matches, true)
   assert.equal(evaluateListBuilderBatter(row, { minISO: 0.2, minRecentPitcherHr9: 1.5 }).matches, true)
   assert.equal(evaluateListBuilderBatter(row, { minBarrel: 10, minContactCollision: 2 }).matches, true)
+  const leakEvaluation = evaluateListBuilderBatter(row, { minPitcherContactLeak: 55 })
+  assert.equal(leakEvaluation.matches, true)
+  assert.match(leakEvaluation.passed.find((gate) => gate.key === 'minPitcherContactLeak').detail, /contact .* hand .* air .* opportunity/)
   assert.equal(evaluateListBuilderBatter(row, { minZoneAttacks: 3 }).matches, true)
   assert.equal(evaluateListBuilderBatter(batter({ zoneMatchup: { ...row.zoneMatchup, attackZones: [0, 1] } }), { minZoneAttacks: 3 }).matches, false)
   assert.equal(evaluateListBuilderBatter(row, { minISO: 0.2, maxBattingOrder: 4 }).matches, true)

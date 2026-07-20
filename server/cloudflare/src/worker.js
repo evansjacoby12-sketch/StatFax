@@ -271,6 +271,7 @@ const LIST_BUILDER_FIELDS = Object.freeze({
   minRecentPitcherHr9: [0, 6, 'minimum opposing starter HR/9 over the last five starts'],
   maxPitcherK9: [0, 20, 'maximum opposing starter season K/9; use for low-strikeout contact matchups'],
   minContactCollision: [-10, 10, 'minimum batter-contact versus pitcher-contact-allowed matchup edge'],
+  minPitcherContactLeak: [0, 100, 'minimum transparent opposing-starter Contact Leak score; 55 or higher is a qualified leak'],
   minZoneAttacks: [0, 3, 'minimum reliable verified strike-zone attack cells; 3 is the most selective'],
   maxBattingOrder: [1, 9, 'latest allowed lineup spot; 4 means spots one through four'],
   minISO: [0, 0.6, 'minimum season isolated power; 0.200 is strong power'],
@@ -291,7 +292,7 @@ const LIST_BUILDER_FIELDS = Object.freeze({
 });
 const LIST_BUILDER_SIGNALS = Object.freeze([
   'precision', 'sleeper', 'hot', 'barrelKing', 'blast', 'pitchEdge',
-  'pitchMixEdge', 'zoneEdge', 'hrPlatoonEdge', 'wxEdge', 'homeEdge', 'awayEdge',
+  'pitchMixEdge', 'zoneEdge', 'contactLeak', 'hrPlatoonEdge', 'wxEdge', 'homeEdge', 'awayEdge',
 ]);
 const LIST_BUILDER_SORTS = Object.freeze(['hrProbability', 'score', 'barrel', 'matchup', 'heat']);
 
@@ -361,6 +362,7 @@ async function handleListBuilder(request, env) {
     `This is configuration, not prediction. Use null for every numeric gate the request does not support. Never infer player names, results, odds, or new probabilities.\n` +
     `Keep pregameOnly true unless the person explicitly requests otherwise. Confirmed means confirmedOnly. Reliable/clean/trusted data means trustedOnly.\n` +
     `When the request gives a count of green, verified, or attack zones, use minZoneAttacks; do not substitute the Zone Match signal.\n` +
+    `When the person explicitly asks for a Pitcher Contact Leak score, use minPitcherContactLeak; 55 is the qualified threshold. Batter hard-hit percentage still maps to minHardHit.\n` +
     `For a range such as launch angle 8 to 32, set both minLaunchAngle and maxLaunchAngle. For selected signals, use signalMode "all" only when every signal is required; otherwise use "any".\n` +
     `Prefer a few faithful filters over aggressive assumptions. Explain the translation in one short summary without promises.\n\n` +
     `Numeric fields:\n${fieldGuide}\n\n` +

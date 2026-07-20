@@ -41,6 +41,10 @@ import {
   normalizeHistoricalFeatureVector,
 } from './lib/historicalFeatureArchive.mjs';
 import { buildZoneEvidenceArchive } from './lib/zoneEvaluation.mjs';
+import {
+  buildPitcherContactLeak,
+  compactPitcherContactLeakEvidence,
+} from '../src/sports/mlb/logic/pitcherContactLeak.js';
 
 const MLB_BASE = 'https://statsapi.mlb.com/api/v1';
 const ROLLING_DAYS = 30;
@@ -217,6 +221,9 @@ export function extractPredictionRecord(row) {
   });
   const simHRProb = Number.isFinite(row.simHRProb) ? +Number(row.simHRProb).toFixed(4) : null;
   const zoneEvidence = buildZoneEvidenceArchive(row.zoneMatchup, simHRProb);
+  const contactLeakEvidence = compactPitcherContactLeakEvidence(
+    row.pitcherContactLeak || buildPitcherContactLeak(row),
+  );
   return {
     feat,
     featureVersion: HISTORICAL_FEATURE_VERSION,
@@ -252,6 +259,9 @@ export function extractPredictionRecord(row) {
     // Prospective, outcome-blind location evidence. The fixed shadow value is
     // evaluated after settlement and is never read by production scoring.
     zoneEvidence,
+    // Prospective, outcome-blind opposing-starter contact environment. Like
+    // zoneEvidence, this is advisory and is archived for forward validation.
+    contactLeakEvidence,
   };
 }
 
@@ -344,6 +354,7 @@ export function compactModelRecord(record) {
     zoneEvidence:   record?.zoneEvidence && typeof record.zoneEvidence === 'object'
       ? { ...record.zoneEvidence }
       : null,
+    contactLeakEvidence: compactPitcherContactLeakEvidence(record?.contactLeakEvidence),
     featureVersion: featureVersion || null,
     feat:           featureVersion >= HISTORICAL_FEATURE_VERSION && validFeat ? normalizeHistoricalFeatureVector(rawFeat) : rawFeat,
     pitchTypes:     compactHistoricalPitchTypes(record?.pitchTypes),

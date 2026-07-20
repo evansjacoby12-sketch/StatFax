@@ -102,6 +102,7 @@ test('advanced evidence distinguishes evaluable legacy recipes from schema-v2 co
   const recentLeak = artifact.recipes['recent-pitcher-leak'].windows.d14
   const collision = artifact.recipes['contact-collision'].windows.d14
   const zoneFocus = artifact.recipes['zone-contact-focus'].windows.d14
+  const contactLeak = artifact.recipes['pitcher-contact-leak'].windows.d14
   assert.equal(lowK.evaluable, 4)
   assert.equal(topFour.evaluable, 4)
   assert.equal(recentLeak.evaluable, 0)
@@ -113,6 +114,9 @@ test('advanced evidence distinguishes evaluable legacy recipes from schema-v2 co
   assert.equal(collision.missingByGate.minContactCollision, 4)
   assert.equal(zoneFocus.evaluable, 4)
   assert.equal(zoneFocus.matches, 4)
+  assert.equal(contactLeak.evaluable, 0)
+  assert.equal(contactLeak.status, 'collecting')
+  assert.equal(contactLeak.missingByGate.minPitcherContactLeak, 4)
 })
 
 test('pitch-type punish reports limited coverage when the archived pitch book is sparse', () => {

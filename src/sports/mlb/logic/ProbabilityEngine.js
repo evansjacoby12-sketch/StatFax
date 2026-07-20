@@ -31,6 +31,7 @@ import { simulateBatter } from './atBatSim';
 import { shrinkSeasonStats, shrinkRecentStats } from './smallSampleShrinkage.js';
 import { estimateIPDistribution, expectedHR9ForBatter } from './starterIPDistribution.js';
 import { expectedHRMultiplierFromPitchMix } from './batterPitchTypeISO.js';
+import { pitcherContactQualityScore } from './pitcherContactLeak.js';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -58,9 +59,6 @@ const GRADE_THRESHOLDS = [
 const LEAGUE_AVG_ERA       = 4.10;
 const LEAGUE_AVG_HR9       = 1.15;
 const LEAGUE_AVG_K9        = 8.5;
-const LEAGUE_AVG_HARD_HIT  = 37.5;  // % of batted balls ≥ 95 mph EV
-const LEAGUE_AVG_BARREL    = 7.5;   // barrels per PA %
-const LEAGUE_AVG_EV        = 88.0;  // mph average exit velocity against
 const OPTIMAL_LAUNCH_MIN   = 16;    // degrees — low end of HR-productive launch angle band
 const OPTIMAL_LAUNCH_MAX   = 32;    // degrees — high end
 
@@ -1074,22 +1072,6 @@ function ttoBonus(battingOrder) {
  *   barrelPctAllowed:  barrels per PA                    (league avg ~7.5%)
  *   exitVeloAgainst:   avg exit velocity against         (league avg ~88.0 mph)
  */
-function pitcherContactScore(pitcherSavant) {
-  if (!pitcherSavant) return 50;
-
-  const hhFactor  = pitcherSavant.hardHitPctAllowed != null
-    ? (pitcherSavant.hardHitPctAllowed - LEAGUE_AVG_HARD_HIT) * 1.2
-    : 0;
-  const brlFactor = pitcherSavant.barrelPctAllowed != null
-    ? (pitcherSavant.barrelPctAllowed - LEAGUE_AVG_BARREL) * 3.0
-    : 0;
-  const evFactor  = pitcherSavant.exitVeloAgainst != null
-    ? (pitcherSavant.exitVeloAgainst - LEAGUE_AVG_EV) * 0.8
-    : 0;
-
-  return Math.min(100, Math.max(0, 50 + hhFactor + brlFactor + evFactor));
-}
-
 /**
  * Zone location factor (−8 to +8).
  *
@@ -1545,7 +1527,7 @@ export function scoreBatter(
   // Contact quality: starter Statcast outcomes blended toward league-average
   // bullpen (50) by batting order. Lower-order batters face more relievers, so
   // a hittable starter has less leverage on their overall PA mix.
-  const starterContactQ  = pitcherContactScore(pitcherSavant);
+  const starterContactQ  = pitcherContactQualityScore(pitcherSavant);
   const bullpenContactWt = battingOrder != null
     ? (battingOrder <= 3 ? 0.26 : battingOrder <= 6 ? 0.36 : 0.46)
     : 0.36;

@@ -61,7 +61,7 @@ test('legacy record without gamePk falls back to bare-playerId join', () => {
 
 test('extractPredictionRecord freezes the complete schema-v2 feature archive', () => {
   const rec = extractPredictionRecord({
-    playerId: 1, gamePk: 99, name: 'X', score: 70, preGameScore: 72,
+    playerId: 1, gamePk: 99, name: 'X', batSide: 'L', score: 70, preGameScore: 72,
     grade: { label: 'STRONG' }, hot: true, homeEdge: true, due: false,
     lineupConfirmed: true, dataTrust: { status: 'review' },
     simHRProb: 0.14,
@@ -78,8 +78,11 @@ test('extractPredictionRecord freezes the complete schema-v2 feature archive', (
       vsHandSwings: 40, vsMixBlast: 20.5, vsMixCoverage: 0.8,
     },
     pitcher: {
-      season: { hrPer9: 1.4, era: 4.2, kPer9: 8.1 },
+      hand: 'R',
+      season: { ip: 100, hrPer9: 1.4, era: 4.2, kPer9: 8.1, goAo: 0.7 },
       recentForm: { games: 5, ip: 27.1, era: 5.1, hrPer9: 2.0, k9: 7.4, pitchesL3D: 12 },
+      savant: { hardHitPctAllowed: 44, barrelPctAllowed: 10, exitVeloAgainst: 91 },
+      splits: { vl: { bf: 180, iso: 0.22, hrPer9: 1.7 } },
     },
     matchupSignals: { arsenalEdge: 3, stuffEdge: -1, zoneFactor: 2, mixFactor: 1, pitchISOAdj: 0.5, recentForm: 6, contactFactor: 4 },
     pitchTypeSplits: [
@@ -109,6 +112,8 @@ test('extractPredictionRecord freezes the complete schema-v2 feature archive', (
   assert.equal(rec.zoneEvidence.version, 1)
   assert.equal(rec.zoneEvidence.attackCount, 1)
   assert.ok(rec.zoneEvidence.shadowProbability > rec.simHRProb)
+  assert.equal(rec.contactLeakEvidence.version, 1)
+  assert.equal(rec.contactLeakEvidence.qualifies, true)
 })
 
 test('appendToLog keeps 30 operational days and a compact 180-day model archive', () => {
@@ -132,7 +137,7 @@ test('appendToLog keeps 30 operational days and a compact 180-day model archive'
   assert.equal(log.modelHistory.dates.length, 35)
   const archived = log.modelHistory.records['2026-05-01'][0]
   assert.deepEqual(Object.keys(archived).sort(), [
-    'actuallyPlayed', 'badges', 'dataTrusted', 'feat', 'featureVersion', 'gamePk', 'grade', 'homered',
+    'actuallyPlayed', 'badges', 'contactLeakEvidence', 'dataTrusted', 'feat', 'featureVersion', 'gamePk', 'grade', 'homered',
     'lineupConfirmed', 'pitchTypes', 'playerId', 'score', 'simHRProb', 'zoneEvidence',
   ])
   assert.equal(archived.name, undefined)
@@ -141,6 +146,7 @@ test('appendToLog keeps 30 operational days and a compact 180-day model archive'
   assert.deepEqual(archived.pitchTypes, [])
   assert.equal(archived.simHRProb, 0.15)
   assert.equal(archived.zoneEvidence, null)
+  assert.equal(archived.contactLeakEvidence, null)
   assert.equal(log.featureArchive.schemaVersion, 2)
   assert.equal(log.featureArchive.schemaV2Rows, 0)
   assert.equal(log.featureArchive.legacyRows, 35)

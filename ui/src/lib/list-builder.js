@@ -6,6 +6,7 @@ import {
   recentBarrelOf,
   isBenched,
 } from './combo-engine.js'
+import { buildPitcherContactLeak, pitcherContactLeakScore } from '../../../src/sports/mlb/logic/pitcherContactLeak.js'
 
 export const LIST_BUILDER_SIGNALS = Object.freeze([
   { key: 'precision', label: 'Precision' },
@@ -16,6 +17,7 @@ export const LIST_BUILDER_SIGNALS = Object.freeze([
   { key: 'pitchEdge', label: 'Pitch Edge' },
   { key: 'pitchMixEdge', label: 'Pitch Mix Edge' },
   { key: 'zoneEdge', label: 'Zone Match' },
+  { key: 'contactLeak', label: 'Contact Leak' },
   { key: 'hrPlatoonEdge', label: 'Platoon Edge' },
   { key: 'wxEdge', label: 'Weather Boost' },
   { key: 'homeEdge', label: 'Home Edge' },
@@ -32,7 +34,7 @@ export const LIST_BUILDER_SORTS = Object.freeze([
 
 export const LIST_BUILDER_LIMITS = Object.freeze({
   minOppHr9: [0, 4], minPitchMix: [0, 10], minParkFactor: [0.5, 1.6],
-  minRecentPitcherHr9: [0, 6], maxPitcherK9: [0, 20], minContactCollision: [-10, 10], minZoneAttacks: [0, 3],
+  minRecentPitcherHr9: [0, 6], maxPitcherK9: [0, 20], minContactCollision: [-10, 10], minPitcherContactLeak: [0, 100], minZoneAttacks: [0, 3],
   maxBattingOrder: [1, 9], minISO: [0, 0.6],
   minExitVelo: [70, 105], minBarrel: [0, 35], minHardHit: [0, 80], minBlast: [0, 60],
   minLaunchAngle: [-10, 45], maxLaunchAngle: [0, 55], minPullPct: [0, 100],
@@ -43,7 +45,7 @@ export const LIST_BUILDER_LIMITS = Object.freeze({
 export function createListBuilderCriteria(overrides = {}) {
   return {
     minOppHr9: '', minPitchMix: '', minParkFactor: '',
-    minRecentPitcherHr9: '', maxPitcherK9: '', minContactCollision: '', minZoneAttacks: '', maxBattingOrder: '', minISO: '',
+    minRecentPitcherHr9: '', maxPitcherK9: '', minContactCollision: '', minPitcherContactLeak: '', minZoneAttacks: '', maxBattingOrder: '', minISO: '',
     minExitVelo: '', minBarrel: '', minHardHit: '', minBlast: '',
     minLaunchAngle: '', maxLaunchAngle: '', minPullPct: '',
     minScore: '', minHeat: '', minHrProb: '', minRecBarrel: '',
@@ -62,7 +64,7 @@ const fmt = (value, digits = 1) => Number(value).toFixed(digits).replace(/\.0$/,
 const clamp01 = (value) => Math.max(0, Math.min(1, value))
 const relaxationPrecision = Object.freeze({
   minOppHr9: 2, minPitchMix: 1, minParkFactor: 2,
-  minRecentPitcherHr9: 2, maxPitcherK9: 1, minContactCollision: 1, minZoneAttacks: 0, maxBattingOrder: 0, minISO: 3,
+  minRecentPitcherHr9: 2, maxPitcherK9: 1, minContactCollision: 1, minPitcherContactLeak: 1, minZoneAttacks: 0, maxBattingOrder: 0, minISO: 3,
   minExitVelo: 1, minBarrel: 1, minHardHit: 1, minBlast: 1,
   minLaunchAngle: 1, maxLaunchAngle: 1, minPullPct: 1,
   minScore: 0, minHeat: 0, minHrProb: 1, minRecBarrel: 1,
@@ -107,6 +109,20 @@ export const pitcherK9 = (batter) => {
 export const contactCollision = (batter) => Number.isFinite(batter?.matchupSignals?.contactFactor)
   ? batter.matchupSignals.contactFactor
   : null
+export const opposingPitcherContactLeak = (batter) => pitcherContactLeakScore(batter)
+
+function pitcherContactLeakDetail(batter) {
+  const evidence = batter?.pitcherContactLeak || buildPitcherContactLeak(batter)
+  const c = evidence?.components
+  if (!c) return ''
+  const parts = [
+    ['contact', c.contactAllowed],
+    ['hand', c.handedDamage],
+    ['air', c.airBall],
+    ['opportunity', c.contactOpportunity],
+  ].filter(([, value]) => Number.isFinite(value))
+  return parts.length ? parts.map(([label, value]) => `${label} ${fmt(value, 1)}`).join(' · ') : ''
+}
 
 export const verifiedZoneAttackCount = (batter) => {
   const zone = batter?.zoneMatchup
@@ -132,6 +148,7 @@ const metricDefinitions = Object.freeze([
   { field: 'minRecentPitcherHr9', label: 'Recent pitcher HR/9', mode: 'min', get: recentPitcherHr9, fmt: (v) => fmt(v, 2) },
   { field: 'maxPitcherK9', label: 'Pitcher K/9', mode: 'max', get: pitcherK9, fmt: (v) => fmt(v, 1) },
   { field: 'minContactCollision', label: 'Contact collision', mode: 'min', get: contactCollision, fmt: (v) => fmt(v, 1) },
+  { field: 'minPitcherContactLeak', label: 'Pitcher Contact Leak', mode: 'min', get: opposingPitcherContactLeak, fmt: (v) => fmt(v, 1), explain: pitcherContactLeakDetail },
   { field: 'minZoneAttacks', label: 'Verified attack zones', mode: 'min', get: verifiedZoneAttackCount, fmt: (v) => fmt(v, 0) },
   { field: 'maxBattingOrder', label: 'Batting-order spot', mode: 'max', get: (b) => b.battingOrder, fmt: (v) => fmt(v, 0) },
   { field: 'minISO', label: 'Season ISO', mode: 'min', get: seasonIso, fmt: (v) => fmt(v, 3) },
@@ -230,7 +247,8 @@ export function evaluateListBuilderBatter(batter, rawCriteria = {}) {
     const canRelax = definition.mode === 'max' ? relaxedValue <= allowedMax : relaxedValue >= LIST_BUILDER_LIMITS[definition.field][0]
     const denominator = Math.max(Math.abs(threshold), 1)
     gateScores.push(qualifies ? 1 : clamp01(1 - (delta / denominator)))
-    const detail = `${definition.label} ${definition.fmt(value)} ${qualifies ? 'clears' : 'misses'} ${definition.mode === 'max' ? '≤' : '≥'} ${definition.fmt(threshold)}`
+    const explanation = definition.explain?.(batter)
+    const detail = `${definition.label} ${definition.fmt(value)} ${qualifies ? 'clears' : 'misses'} ${definition.mode === 'max' ? '≤' : '≥'} ${definition.fmt(threshold)}${explanation ? ` · ${explanation}` : ''}`
     const gate = {
       type: 'metric', key: definition.field, label: definition.label, detail,
       mode: definition.mode, value, threshold, delta,

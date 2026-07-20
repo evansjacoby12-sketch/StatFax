@@ -5,6 +5,7 @@ import {
   buildHistoricalFeatureCoverage,
   normalizeHistoricalFeatureVector,
 } from '../server/lib/historicalFeatureArchive.mjs'
+import { buildPitcherContactLeak } from '../src/sports/mlb/logic/pitcherContactLeak.js'
 
 const batter = (playerId = 1, gamePk = 10) => ({
   playerId,
@@ -48,6 +49,30 @@ test('daily contract rejects the retired bare alias and invalid probability', ()
   assert.equal(check.ok, false)
   assert.ok(check.errors.some((error) => error.includes('expected composite key 1-10')))
   assert.ok(check.errors.some((error) => error.includes('hrProbability')))
+})
+
+test('daily contract validates attached Pitcher Contact Leak evidence', () => {
+  const pitcherContactLeak = buildPitcherContactLeak({
+    batSide: 'L',
+    pitcher: {
+      hand: 'R',
+      season: { ip: 100, goAo: 0.7, kPer9: 7 },
+      savant: { hardHitPctAllowed: 44, barrelPctAllowed: 10, exitVeloAgainst: 91 },
+      splits: { vl: { bf: 180, iso: 0.22, hrPer9: 1.7 } },
+    },
+  })
+  const snapshot = {
+    version: 5,
+    date: '2026-07-14',
+    generatedAt: '2026-07-14T12:00:00.000Z',
+    finishedAt: '2026-07-14T12:00:01.000Z',
+    games: [{ gamePk: 10 }],
+    scoredBatters: { '1-10': { ...batter(), pitcherContactLeak } },
+    stats: { scoredBatters: 1 },
+  }
+  assert.deepEqual(validateDailySnapshot(snapshot).errors, [])
+  snapshot.scoredBatters['1-10'].pitcherContactLeak.qualifies = false
+  assert.ok(validateDailySnapshot(snapshot).errors.some((error) => error.includes('qualifies')))
 })
 
 test('daily contract rejects team, side, and opposing-starter identity contradictions', () => {

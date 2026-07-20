@@ -454,6 +454,7 @@ import { fetchHROdds } from './lib/theOddsApi.mjs';
 import { advisoryBarrel } from './lib/barrelScore.mjs';
 import { powerReadySignal, barrelReadySignal } from '../ui/src/lib/powerReady.js';
 import { pitchMixScore } from '../ui/src/lib/scout.js';
+import { buildPitcherContactLeak } from '../src/sports/mlb/logic/pitcherContactLeak.js';
 
 // ─── HTTP helpers ────────────────────────────────────────────────────────────
 
@@ -3692,6 +3693,23 @@ async function main() {
   // Day rating computed here — BEFORE the PRIME cap — so supply uses the raw
   // PRIME count. The cap is a display cap (prevents board flooding); it must not
   // reduce the supply signal used to gauge slate quality.
+  // Advisory Pitcher Contact Leak layer. This is deliberately attached after
+  // scoring and never mutates score/grade/probability. List Builder combines
+  // it with batter hard-hit shape and verified zones as visible gates.
+  let contactLeakCount = 0;
+  let contactLeakQualified = 0;
+  for (const key of Object.keys(scoredBatters)) {
+    if (!key.includes('-')) continue;
+    const row = scoredBatters[key];
+    const evidence = buildPitcherContactLeak(row);
+    if (!evidence) continue;
+    row.pitcherContactLeak = evidence;
+    row.contactLeak = evidence.qualifies === true;
+    contactLeakCount++;
+    if (row.contactLeak) contactLeakQualified++;
+  }
+  console.log(`[contact-leak] attached ${contactLeakCount} rows; ${contactLeakQualified} at 55+`);
+
   const preCapDayRating = computeDayRating(scoredBatters, games);
 
   // ─── PRIME game-normalized cap ──────────────────────────────────────────────

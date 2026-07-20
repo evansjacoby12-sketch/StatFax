@@ -4,6 +4,7 @@ import {
   validateHistoricalFeatureRecord,
 } from './historicalFeatureArchive.mjs'
 import { validateZoneEvidenceArchive } from './zoneEvaluation.mjs'
+import { validatePitcherContactLeakEvidence } from '../../src/sports/mlb/logic/pitcherContactLeak.js'
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 const GRADE_LABELS = new Set(['PRIME', 'STRONG', 'LEAN', 'SKIP'])
@@ -132,6 +133,7 @@ export function validateDailySnapshot(snapshot) {
     }
     if (row.zoneBonus != null || row.baseScore != null) errors.push(`${prefix}: retired zone score adjustment fields are forbidden`)
     if (row.zoneMatchup != null) validateZoneMatchup(`${prefix}.zoneMatchup`, row.zoneMatchup, errors)
+    if (row.pitcherContactLeak != null) errors.push(...validatePitcherContactLeakEvidence(row.pitcherContactLeak, `${prefix}.pitcherContactLeak`))
     const grade = row.grade?.label || row.grade
     if (grade != null && !GRADE_LABELS.has(grade)) errors.push(`${prefix}.grade: unsupported label ${String(grade)}`)
   }
@@ -175,6 +177,7 @@ function validateRecordRows(records, dates, prefix, errors, warnings, { compact 
       if (compact && typeof row.actuallyPlayed !== 'boolean') errors.push(`${at}.actuallyPlayed: must be boolean`)
       if (row.feat != null && !isObject(row.feat)) errors.push(`${at}.feat: must be an object or null`)
       if (row.zoneEvidence != null) errors.push(...validateZoneEvidenceArchive(row.zoneEvidence, row.simHRProb, `${at}.zoneEvidence`))
+      if (row.contactLeakEvidence != null) errors.push(...validatePitcherContactLeakEvidence(row.contactLeakEvidence, `${at}.contactLeakEvidence`))
       errors.push(...validateHistoricalFeatureRecord(row, at))
       if (compact && !row.feat) missingFeatures++
       if (row.gamePk == null) {

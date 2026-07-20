@@ -43,8 +43,9 @@ test('worker returns strict visible criteria without receiving slate data', asyn
           minBarrel: 12,
           minISO: 0.2,
           maxPitcherK9: 8,
+          minPitcherContactLeak: 999,
           minZoneAttacks: 99,
-          signals: ['hot', 'invented'],
+          signals: ['hot', 'contactLeak', 'invented'],
           signalMode: 'any',
           pregameOnly: true,
           confirmedOnly: true,
@@ -68,8 +69,9 @@ test('worker returns strict visible criteria without receiving slate data', asyn
     assert.equal(payload.criteria.minBarrel, 12)
     assert.equal(payload.criteria.minISO, 0.2)
     assert.equal(payload.criteria.maxPitcherK9, 8)
+    assert.equal(payload.criteria.minPitcherContactLeak, 100)
     assert.equal(payload.criteria.minZoneAttacks, 3)
-    assert.deepEqual(payload.criteria.signals, ['hot'])
+    assert.deepEqual(payload.criteria.signals, ['hot', 'contactLeak'])
     assert.equal(payload.criteria.minHeat, null)
     assert.equal(payload.criteria.confirmedOnly, true)
 
@@ -80,6 +82,7 @@ test('worker returns strict visible criteria without receiving slate data', asyn
     assert.equal(JSON.stringify(openAiRequest).includes('playerId'), false)
     assert.equal('slate' in openAiRequest, false)
     assert.match(openAiRequest.instructions, /count of green, verified, or attack zones.*minZoneAttacks/i)
+    assert.match(openAiRequest.instructions, /Pitcher Contact Leak score.*minPitcherContactLeak/i)
   } finally {
     globalThis.fetch = originalFetch
   }

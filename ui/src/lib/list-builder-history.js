@@ -9,6 +9,7 @@ export const LIST_BUILDER_HISTORY_GATES = Object.freeze({
   minRecentPitcherHr9: ['prhr9', 'min'],
   maxPitcherK9: ['pk9', 'max'],
   minContactCollision: ['mcf', 'min'],
+  minPitcherContactLeak: ['$pitcherContactLeak', 'min'],
   minZoneAttacks: ['$zoneAttacks', 'min'],
   maxBattingOrder: ['ord', 'max'],
   minISO: ['iso', 'min'],
@@ -33,6 +34,12 @@ const isDate = (value) => /^\d{4}-\d{2}-\d{2}$/.test(String(value || ''))
 export function listBuilderHistoricalFeature(record, key) {
   if (key === '$score') return Number.isFinite(record?.score) ? record.score : null
   if (key === '$simHrPct') return Number.isFinite(record?.simHRProb) ? record.simHRProb * 100 : null
+  if (key === '$pitcherContactLeak') {
+    const evidence = record?.contactLeakEvidence
+    return evidence?.version === 1 && evidence?.advisoryOnly === true && Number.isFinite(evidence?.score)
+      ? evidence.score
+      : null
+  }
   if (key === '$zoneAttacks') {
     const evidence = record?.zoneEvidence
     if (
@@ -50,6 +57,10 @@ export function listBuilderHistoricalFeature(record, key) {
 function signalValue(record, key) {
   if (key === 'hot') return Number.isFinite(record?.feat?.hot) ? record.feat.hot === 1 : null
   if (key === 'barrelKing') return Array.isArray(record?.badges) ? record.badges.includes('barrelKing') : null
+  if (key === 'contactLeak') {
+    const score = listBuilderHistoricalFeature(record, '$pitcherContactLeak')
+    return Number.isFinite(score) ? score >= 55 : null
+  }
   return null
 }
 

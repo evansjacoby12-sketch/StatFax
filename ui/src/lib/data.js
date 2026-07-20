@@ -2,6 +2,7 @@
 
 import { heatIndex, pitchMixScore } from './scout.js'
 import { powerReadySignal, barrelReadySignal } from './powerReady.js'
+import { buildPitcherContactLeak } from '../../../src/sports/mlb/logic/pitcherContactLeak.js'
 
 // Relative to the app's base URL so it works at any deploy path (root host or
 // a GitHub Pages project subpath) as well as the dev server. Guarded so the
@@ -210,6 +211,7 @@ export async function loadSlate() {
     const odds = oddsIndex ? attachOdds(b, oddsIndex) : null
     const opp = game ? (b.isHome ? game.awayTeam : game.homeTeam) : null
     const pitcherId = b.pitcher?.id
+    const pitcherContactLeak = b.pitcherContactLeak || buildPitcherContactLeak(b)
     return {
       ...b,
       id,
@@ -226,6 +228,10 @@ export async function loadSlate() {
       // signal users saw before first pitch.
       powerReady: b.powerReady === true || powerReadySignal(b),
       barrelReady: b.barrelReady === true || barrelReadySignal(b),
+      // Advisory-only starter contact environment. New server snapshots freeze
+      // it; this fallback keeps older cached snapshots deterministic.
+      pitcherContactLeak,
+      contactLeak: pitcherContactLeak?.qualifies === true,
       // Opposing team's bullpen HR/9 — the pen this batter attacks once the
       // starter exits. Drives the Cheat Sheet "Bullpen Targets" board.
       opposingBullpenHR9: d.bullpenHR9?.[opp?.id] ?? null,
