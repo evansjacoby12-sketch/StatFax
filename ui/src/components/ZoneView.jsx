@@ -467,7 +467,9 @@ export default function ZoneView({ batter: b, onClose }) {
               <div className="zone-blueprint-head">
                 <h3 className="zone-h3" style={{ fontSize: '13px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px', color: '#fff' }}>
                   <Icon name="Focus" size={14} style={{ color: 'var(--accent)' }} /> Attack Blueprint
-                  <span className="zone-advisory-chip">Advisory only</span>
+                  <span className="zone-advisory-chip">
+                    {b?.zonePowerCollision?.applied ? 'Included in HR%' : 'Evidence only'}
+                  </span>
                 </h3>
                 <div className="zone-blueprint-controls">
                   <CommandTabs

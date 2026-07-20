@@ -40,7 +40,7 @@ test('player explainer builds engine-owned case, caution, and variance candidate
 
   const payload = playerExplainPayload(batter)
   assert.equal(payload.kind, 'player')
-  assert.equal(payload.version, 3)
+  assert.equal(payload.version, 4)
   assert.equal(payload.hrProb, 0.237)
   assert.equal(payload.pitcher, 'Aaron Nola')
   assert.deepEqual(Object.keys(payload).sort(), ['grade', 'hrProb', 'kind', 'name', 'park', 'pitcher', 'signals', 'version'])
@@ -48,7 +48,7 @@ test('player explainer builds engine-owned case, caution, and variance candidate
 
 test('browser normalization rejects invented IDs, duplicate evidence, and numeric AI claims', () => {
   const result = normalizePlayerExplain(batter, {
-    version: 3,
+    version: 4,
     caseIds: ['signal:1', 'signal:1', 'invented'],
     cautionId: 'invented-caution',
     bottomLine: 'This is a 99% lock and the best value on the slate.',
@@ -66,7 +66,7 @@ test('browser normalization rejects invented IDs, duplicate evidence, and numeri
 test('fallback caution avoids repeating the model probability disclaimer', () => {
   const positiveOnly = { ...batter, eli5Reasons: batter.eli5Reasons.slice(0, 2) }
   const result = normalizePlayerExplain(positiveOnly, {
-    version: 3,
+    version: 4,
     caseIds: ['signal:0', 'signal:1'],
     cautionId: 'variance',
     bottomLine: 'Power and matchup evidence support the model while outcome variance remains central.',
@@ -87,7 +87,7 @@ test('player-specific matchup context replaces generic variance without treating
   assert.equal(signals.some((signal) => signal.id === 'context:lineup'), false)
   assert.ok(signals.some((signal) => signal.id === 'context:pitcher-k'))
   const result = normalizePlayerExplain(projected, {
-    version: 3,
+    version: 4,
     caseIds: ['signal:0', 'signal:1'],
     cautionId: 'variance',
     bottomLine: 'Power and matchup evidence lead, while the opposing starter can still limit contact.',
@@ -107,6 +107,18 @@ test('variance survives the candidate cap on a large legacy evidence set', () =>
   const signals = buildPlayerExplainSignals(legacy)
   assert.equal(signals.length, 18)
   assert.equal(signals.at(-1).id, 'variance')
+})
+
+test('production zone inflation becomes engine-owned player case evidence', () => {
+  const inflated = {
+    ...batter,
+    zonePowerCollision: { applied: true, attackCount: 2, hardHitPct: 47.3 },
+  }
+  const signals = buildPlayerExplainSignals(inflated)
+  assert.equal(signals[0].id, 'context:zone-power')
+  assert.equal(signals[0].tone, 'case')
+  assert.match(signals[0].text, /2 verified attack zones.*47\.3% hard-hit.*capped location-contact boost/i)
+  assert.equal(playerExplainPayload(inflated).signals[0].id, 'context:zone-power')
 })
 
 test('worker schema permits only supplied evidence IDs and repairs a hostile response', async () => {
@@ -134,7 +146,7 @@ test('worker schema permits only supplied evidence IDs and repairs a hostile res
     }), { OPENAI_API_KEY: 'test-key' }, {})
     assert.equal(response.status, 200)
     const payload = await response.json()
-    assert.equal(payload.version, 3)
+    assert.equal(payload.version, 4)
     assert.deepEqual(payload.caseIds, ['signal:1', 'signal:0'])
     assert.equal(payload.cautionId, 'signal:2')
     assert.equal(payload.bottomLine, 'The engine sees a favorable combination, but the home-run outcome remains high variance.')

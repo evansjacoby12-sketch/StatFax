@@ -123,12 +123,13 @@ test('warm-cache league baseline pools pitch counts by effective batter side', (
   assert.ok(baseline.frequencies[0] > 0.19)
 })
 
-test('zone enrichment is advisory-only and fetch-slate no longer mutates projection scores', () => {
+test('zone power can inflate probability without mutating projection scores or grades', () => {
   const source = readFileSync(new URL('../server/fetch-slate.mjs', import.meta.url), 'utf8')
   assert.doesNotMatch(source, /row\.zoneBonus\s*=/)
   assert.doesNotMatch(source, /row\.baseScore\s*=/)
   assert.doesNotMatch(source, /zone bonus applied/i)
-  assert.match(source, /advisory-only/i)
+  assert.match(source, /applyZonePowerProbabilityInflation\(row\)/)
+  assert.match(source, /score\/grade unchanged/)
 })
 
 test('frontend edge helpers reject legacy relative matches and require reliable v2 evidence', () => {

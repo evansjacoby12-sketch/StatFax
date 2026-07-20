@@ -2,7 +2,7 @@
 // the root Node test suite can validate the browser boundary without loading
 // UI dependencies before the UI install step runs in CI.
 
-export const PLAYER_EXPLAIN_VERSION = 3
+export const PLAYER_EXPLAIN_VERSION = 4
 
 function compact(value, max = 220) {
   return String(value || '').replace(/\s+/g, ' ').trim().slice(0, max).trim()
@@ -30,6 +30,16 @@ export function buildPlayerExplainSignals(batter) {
     if (!clean || seen.has(key)) return
     seen.add(key)
     signals.push({ id, tone, text: clean, icon: compact(icon, 30) || null })
+  }
+
+  const zonePower = batter?.zonePowerCollision
+  if (zonePower?.applied === true) {
+    add(
+      'context:zone-power',
+      'case',
+      `${Math.max(1, Math.trunc(Number(zonePower.attackCount) || 1))} verified attack zone${Number(zonePower.attackCount) === 1 ? '' : 's'} agree with ${Number(zonePower.hardHitPct).toFixed(1)}% hard-hit contact, so the calibrated HR estimate received a capped location-contact boost.`,
+      'grid3x3',
+    )
   }
 
   ;(Array.isArray(batter?.eli5Reasons) ? batter.eli5Reasons : [])

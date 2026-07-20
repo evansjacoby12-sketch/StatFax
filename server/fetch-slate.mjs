@@ -106,9 +106,10 @@
  * @property {string[]} reasons        Human-readable "why this score".
  * @property {string[]} [eli5Reasons]  Friendlier wording for ELI5 mode.
  * @property {Object}   [flags]        hot/due/cold/bullpenLegend/dayEdge etc.
- * @property {?ZoneMatchup} [zoneMatchup]  Advisory-only 13-cell location
+ * @property {?ZoneMatchup} [zoneMatchup]  Advisory 13-cell location
  *   evidence. Only present for the top ~25 batters per game (cron capacity).
- *   Resolves opener → bulk pitcher automatically and never changes score.
+ *   Resolves opener → bulk pitcher automatically and never changes score or
+ *   grade. A reliable attack-zone + hard-hit collision can raise HR probability.
  *
  * @typedef {Object} ZoneMatchup
  * @property {number} modelVersion   Version of the advisory evidence logic.
@@ -448,6 +449,7 @@ import { fetchCatcherFraming } from './catcherFraming.mjs';
 import { fetchRecentBatterBarrelsMultiWindow, fetchRecentPitcherVelo } from './statcastRecent.mjs';
 import { applySimResolution } from './lib/simResolution.mjs';
 import { applyGameNormalizedPrimeCap } from './lib/primeCap.mjs';
+import { applyZonePowerProbabilityInflation } from './lib/zonePowerInflation.mjs';
 import { fetchHROdds } from './lib/theOddsApi.mjs';
 import { advisoryBarrel } from './lib/barrelScore.mjs';
 import { powerReadySignal, barrelReadySignal } from '../ui/src/lib/powerReady.js';
@@ -4009,6 +4011,33 @@ async function main() {
       }
     }
   } catch (e) { console.warn(`[lock] morning lock skipped: ${e?.message}`); }
+
+  // 8.87) Zone Power probability overlay. The morning lock above supplies the
+  // stable calibrated baseline; this deterministic production pass only raises
+  // pregame HR probability when reliable verified attack zones collide with a
+  // 40%+ hard-hit rate. Score and grade are deliberately untouched, protecting
+  // PRIME consistency while letting the promoted contact/location edge reach
+  // probability-ranked research and combo surfaces.
+  {
+    const gameByPk = new Map((games || []).map((game) => [game.gamePk, game]));
+    let applied = 0;
+    let absoluteLift = 0;
+    let maxLift = 0;
+    for (const key of Object.keys(scoredBatters)) {
+      if (!key.includes('-')) continue;
+      const row = scoredBatters[key];
+      const game = gameByPk.get(row?.gamePk);
+      if (!row || game?.isLive === true || game?.isFinal === true) continue;
+      const collision = applyZonePowerProbabilityInflation(row);
+      if (!collision.applied) continue;
+      const lift = collision.inflatedProbability - collision.baselineProbability;
+      applied++;
+      absoluteLift += lift;
+      maxLift = Math.max(maxLift, lift);
+    }
+    console.log(`[zone-power] probability inflation applied to ${applied} pregame row(s); ` +
+      `avg +${applied ? (absoluteLift / applied * 100).toFixed(2) : '0.00'}pp, max +${(maxLift * 100).toFixed(2)}pp; score/grade unchanged`);
+  }
 
   // 8.9) Pregame freeze. The Live/Pregame view toggle is display-only — it
   // hides live scores/innings but the model's recent-form stats (and Heat Index)

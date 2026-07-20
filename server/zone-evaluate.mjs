@@ -25,7 +25,7 @@ try {
   writeFileSync(OUT_PATH, JSON.stringify(report))
   for (const warning of validation.warnings) console.warn(`[zone-evaluation] warning: ${warning}`)
   const delta = validation.metrics.brierImprovement
-  console.log(`[zone-evaluation] wrote ${OUT_PATH} — ${validation.metrics.settled} settled v2 rows, ${validation.metrics.qualified} qualified, Brier Δ ${delta == null ? 'n/a' : delta.toFixed(6)} · gate=${validation.metrics.gateStatus} · production unchanged`)
+  console.log(`[zone-evaluation] wrote ${OUT_PATH} — ${validation.metrics.settled} settled v2 rows, ${validation.metrics.qualified} qualified, Brier Δ ${delta == null ? 'n/a' : delta.toFixed(6)} · gate=${validation.metrics.gateStatus} · production probability active`)
 } catch (error) {
   console.error(`[zone-evaluation] ${error.message}`)
   process.exitCode = 1

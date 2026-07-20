@@ -761,7 +761,7 @@ async function handleExplain(request, env) {
     return jsonResponse({ error: 'bad json' }, 400, env);
   }
 
-  if (body?.kind === 'player' && [2, 3].includes(Number(body?.version))) {
+  if (body?.kind === 'player' && [2, 3, 4].includes(Number(body?.version))) {
     return handleStructuredPlayerExplain(body, env);
   }
 

@@ -22,7 +22,7 @@ const matchup = ({ attacks = 1, rating = 7, reliability = 'high', chase = 0 } = 
   locationBaseline: { source: 'warm-cache', samplePitches: 25_000 },
 })
 
-function archivedRow({ playerId, gamePk, score, homered, attacks, baseline = 0.1, reliability = 'high' }) {
+function archivedRow({ playerId, gamePk, score, homered, attacks, baseline = 0.1, reliability = 'high', hardHitPct = 45 }) {
   return {
     playerId,
     gamePk,
@@ -30,6 +30,7 @@ function archivedRow({ playerId, gamePk, score, homered, attacks, baseline = 0.1
     homered,
     actuallyPlayed: true,
     simHRProb: baseline,
+    feat: { hh: hardHitPct },
     zoneEvidence: buildZoneEvidenceArchive(matchup({ attacks, reliability }), baseline),
     badges: [],
   }
@@ -51,7 +52,7 @@ test('fixed zone shadow hypothesis is capped, neutral when unqualified, and arch
   assert.equal(limited.shadowProbability, 0.12)
 })
 
-test('prospective evaluator keeps legacy Zone Master history descriptive only', () => {
+test('production monitor keeps legacy Zone Master history descriptive only', () => {
   const backtestLog = {
     modelHistory: {
       records: {
@@ -65,7 +66,7 @@ test('prospective evaluator keeps legacy Zone Master history descriptive only', 
   assert.equal(report.legacyReference.promotionEligible, false)
   assert.equal(report.gate.status, 'collecting')
   assert.equal(report.scoreImpact, false)
-  assert.equal(report.probabilityImpact, false)
+  assert.equal(report.probabilityImpact, true)
   assert.equal(validateZoneEvaluation(report, backtestLog).ok, true)
 })
 
@@ -101,7 +102,7 @@ test('evaluation reports shadow accuracy and same-score attack controls', () => 
   assert.equal(validateZoneEvaluation(tampered, backtestLog).ok, false)
 })
 
-test('passing statistics can only become eligible for review, never auto-promote', () => {
+test('evidence gate stays diagnostic after manual probability promotion', () => {
   const requirements = {
     minSettledRecords: 1,
     minQualifiedRecords: 1,
@@ -122,7 +123,7 @@ test('passing statistics can only become eligible for review, never auto-promote
   assert.equal(gate.status, 'eligible-for-review')
   assert.equal(gate.passed, true)
   assert.equal(gate.autoPromotion, false)
-  assert.equal(gate.productionImpact, false)
+  assert.equal(gate.productionImpact, true)
 })
 
 test('deployment derives, validates, publishes, and bundles the zone evaluation artifact', () => {

@@ -18,7 +18,7 @@ try {
   const validation = assertValidZoneEvaluation(report, backtestLog)
   for (const warning of validation.warnings) console.warn(`[zone-evaluation] warning: ${warning}`)
   const delta = validation.metrics.brierImprovement
-  console.log(`[zone-evaluation] valid v${report.version}: ${validation.metrics.settled} settled, ${validation.metrics.qualified} qualified, Brier Δ ${delta == null ? 'n/a' : delta.toFixed(6)} · gate=${validation.metrics.gateStatus} · scoreImpact=false`)
+  console.log(`[zone-evaluation] valid v${report.version}: ${validation.metrics.settled} settled, ${validation.metrics.qualified} qualified, Brier Δ ${delta == null ? 'n/a' : delta.toFixed(6)} · gate=${validation.metrics.gateStatus} · scoreImpact=false · probabilityImpact=true`)
 } catch (error) {
   console.error(`[zone-evaluation] ${error.message}`)
   process.exitCode = 1

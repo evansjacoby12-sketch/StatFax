@@ -1,6 +1,13 @@
+import {
+  ZONE_POWER_MAX_LOGIT_DELTA,
+  ZONE_POWER_MIN_HARD_HIT_PCT,
+  ZONE_POWER_VERSION,
+  zonePowerQualification,
+} from './zonePowerInflation.mjs'
+
 export const ZONE_EVIDENCE_ARCHIVE_VERSION = 1
 export const ZONE_SHADOW_VERSION = 1
-export const ZONE_EVALUATION_VERSION = 1
+export const ZONE_EVALUATION_VERSION = 2
 
 export const ZONE_PROMOTION_REQUIREMENTS = Object.freeze({
   minSettledRecords: 400,
@@ -29,7 +36,7 @@ export function applyZoneShadowDelta(probability, logitDelta) {
   return round(1 / (1 + Math.exp(-(logit + Number(logitDelta)))), 6)
 }
 
-/** Fixed, pre-registered shadow hypothesis. It is never a production input. */
+/** Fixed, pre-registered location delta; production also requires hard-hit contact. */
 export function zoneShadowLogitDelta(zoneMatchup) {
   if (
     (zoneMatchup?.modelVersion ?? 0) < 2 ||
@@ -198,6 +205,8 @@ export function scoreMatchedZoneLift(items) {
   const bands = new Map()
   for (const item of items) {
     if (item.evidence.reliability === 'limited') continue
+    const hardHitPct = Number(item.row?.hardHitPct ?? item.row?.feat?.hh)
+    if (!Number.isFinite(hardHitPct) || hardHitPct < ZONE_POWER_MIN_HARD_HIT_PCT) continue
     const band = scoreBand(item.row)
     if (!bands.has(band)) bands.set(band, { qualified: [], controls: [] })
     bands.get(band)[item.evidence.attackCount > 0 ? 'qualified' : 'controls'].push(item)
@@ -257,7 +266,7 @@ export function evaluateZonePromotionGate(performance, coverage, scoreMatched, r
   if (!checks.settledGames) reasons.push(`need ${requirements.minSettledGames} settled games; have ${coverage.settledGames}`)
   if (!checks.settledDates) reasons.push(`need ${requirements.minSettledDates} settled dates; have ${coverage.settledDates}`)
   if (!checks.scoreMatchedRecords) reasons.push(`need ${requirements.minScoreMatchedRecords} score-matched attack rows; have ${scoreMatched?.qualifiedRecords || 0}`)
-  if (mature && !checks.matchedLift) reasons.push('qualified attacks do not beat same-score no-attack controls')
+  if (checks.scoreMatchedRecords && !checks.matchedLift) reasons.push('current qualified attacks do not beat same-score no-attack controls')
   if (mature && !checks.brierConfidence) reasons.push('shadow Brier improvement is not positive at the 95% confidence bound')
   if (mature && !checks.logLoss) reasons.push('shadow log loss does not beat baseline')
   if (mature && !checks.calibration) reasons.push(`shadow ECE regresses by more than ${requirements.maxEceRegression}`)
@@ -265,7 +274,7 @@ export function evaluateZonePromotionGate(performance, coverage, scoreMatched, r
     status: passed ? 'eligible-for-review' : mature ? 'hold' : 'collecting',
     passed,
     autoPromotion: false,
-    productionImpact: false,
+    productionImpact: true,
     requirements: { ...requirements },
     checks,
     reasons,
@@ -293,7 +302,7 @@ export function buildZoneEvaluation({ backtestLog = {}, generatedAt = new Date()
       shadow: Number(item.row.zoneEvidence.shadowProbability),
       gamePk: item.row.gamePk,
     }))
-  const qualified = scorable.filter((item) => item.evidence.reliability !== 'limited' && item.evidence.attackCount > 0)
+  const qualified = scorable.filter((item) => zonePowerQualification(item.row).qualified)
   const dates = [...new Set(settled.map((item) => item.date))].sort()
   const coverage = {
     archivedRecords: archived.length,
@@ -314,16 +323,18 @@ export function buildZoneEvaluation({ backtestLog = {}, generatedAt = new Date()
   const scoreMatched = scoreMatchedZoneLift(scorable)
   return {
     version: ZONE_EVALUATION_VERSION,
-    mode: 'prospective-shadow-evaluation',
+    mode: 'production-monitoring',
     scoreImpact: false,
-    probabilityImpact: false,
+    probabilityImpact: true,
     autoPromotion: false,
     generatedAt: new Date(generatedAt).toISOString(),
     hypothesis: {
       shadowVersion: ZONE_SHADOW_VERSION,
-      description: 'Reliable verified attacks receive a fixed capped log-odds shadow adjustment; chase zones receive none.',
-      maxLogitDelta: 0.2,
-      productionApplied: false,
+      productionVersion: ZONE_POWER_VERSION,
+      description: `Reliable verified attacks combined with at least ${ZONE_POWER_MIN_HARD_HIT_PCT}% hard-hit contact receive a fixed capped log-odds probability adjustment; score and grade remain unchanged.`,
+      minHardHitPct: ZONE_POWER_MIN_HARD_HIT_PCT,
+      maxLogitDelta: ZONE_POWER_MAX_LOGIT_DELTA,
+      productionApplied: true,
     },
     coverage,
     performance,
@@ -371,19 +382,25 @@ export function validateZoneEvaluation(report, backtestLog = null) {
   const warnings = []
   if (!isObject(report)) return { ok: false, errors: ['report: expected an object'], warnings, metrics: {} }
   if (report.version !== ZONE_EVALUATION_VERSION) errors.push(`version: expected ${ZONE_EVALUATION_VERSION}`)
-  if (report.mode !== 'prospective-shadow-evaluation') errors.push('mode: unsupported')
-  if (report.scoreImpact !== false || report.probabilityImpact !== false || report.autoPromotion !== false) errors.push('production controls: all impact and auto-promotion fields must be false')
+  if (report.mode !== 'production-monitoring') errors.push('mode: unsupported')
+  if (report.scoreImpact !== false || report.probabilityImpact !== true || report.autoPromotion !== false) errors.push('production controls: probability impact must be active while score impact and auto-promotion remain false')
   if (!validIso(report.generatedAt)) errors.push('generatedAt: expected an ISO timestamp')
-  if (report.hypothesis?.productionApplied !== false || report.hypothesis?.shadowVersion !== ZONE_SHADOW_VERSION) errors.push('hypothesis: invalid production controls or version')
+  if (
+    report.hypothesis?.productionApplied !== true ||
+    report.hypothesis?.productionVersion !== ZONE_POWER_VERSION ||
+    report.hypothesis?.shadowVersion !== ZONE_SHADOW_VERSION ||
+    report.hypothesis?.minHardHitPct !== ZONE_POWER_MIN_HARD_HIT_PCT ||
+    report.hypothesis?.maxLogitDelta !== ZONE_POWER_MAX_LOGIT_DELTA
+  ) errors.push('hypothesis: invalid production controls or version')
   if (!isObject(report.coverage) || !Number.isInteger(report.coverage.settledRecords) || report.coverage.settledRecords < 0) errors.push('coverage: invalid')
-  if (!isObject(report.gate) || report.gate.autoPromotion !== false || report.gate.productionImpact !== false || typeof report.gate.passed !== 'boolean') errors.push('gate: invalid production control')
+  if (!isObject(report.gate) || report.gate.autoPromotion !== false || report.gate.productionImpact !== true || typeof report.gate.passed !== 'boolean') errors.push('gate: invalid production control')
   if (report.legacyReference?.promotionEligible !== false) errors.push('legacyReference: legacy evidence cannot be promotion eligible')
   if (backtestLog && validIso(report.generatedAt)) {
     const expected = buildZoneEvaluation({ backtestLog, generatedAt: report.generatedAt })
     if (JSON.stringify(report) !== JSON.stringify(expected)) errors.push('report: does not reconcile with backtest log and versioned requirements')
   }
   if (report.coverage?.settledRecords === 0) warnings.push('coverage: no settled v2 zone evidence yet')
-  if (report.gate?.passed) warnings.push('gate: eligible for human review; automatic production promotion remains disabled')
+  if (!report.gate?.passed) warnings.push(`gate: manual production probability override is active while evidence status is ${report.gate?.status || 'unknown'}`)
   return {
     ok: errors.length === 0,
     errors,

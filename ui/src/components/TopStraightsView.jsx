@@ -47,8 +47,8 @@ function buildCase(batter) {
     batter.hrPlatoonEdge || signalKeys.has('hrPlatoonEdge'),
     batter.flyBallMatchup || signalKeys.has('flyBallMatchup'),
   ].filter(Boolean).length
-  // Location remains visible evidence but stays out of this ranking until its
-  // independent forward value clears the promotion gate.
+  // Raw location evidence adds no direct case-score points. A qualified
+  // location + hard-hit collision can already be present in hrProbability.
   const matchup = clamp(34 + matchupCount * 13)
   const pitcher = vulnerability?.score ?? 50
   const barrelScore = Number.isFinite(barrel) ? clamp(((barrel - 5) / 13) * 100) : 45
@@ -80,7 +80,13 @@ function buildCase(batter) {
   const caseScore = Math.round(clamp(rawScore - penaltyTotal))
 
   const evidence = []
-  if (verifiedZone) addEvidence(evidence, 'zone', 'Verified location', 'Grid3x3', `${verifiedAttackCount(batter.zoneMatchup)} qualified strike-zone attacks; advisory only.`, 12)
+  if (verifiedZone) {
+    const collision = batter.zonePowerCollision
+    const detail = collision?.applied
+      ? `${verifiedAttackCount(batter.zoneMatchup)} qualified strike-zone attacks plus ${num(collision.hardHitPct, 1)}% hard-hit contact; included in HR probability.`
+      : `${verifiedAttackCount(batter.zoneMatchup)} qualified strike-zone attacks; evidence only.`
+    addEvidence(evidence, 'zone', 'Verified location', 'Grid3x3', detail, 12)
+  }
   if (batter.primaryPitchEdge?.passes) addEvidence(evidence, 'pitch', 'Pitch edge', 'Crosshair', `Strong result against ${batter.primaryPitchEdge.pitchName || 'the primary pitch'} (${pct(batter.primaryPitchEdge.pitcherFreq, 0)} usage).`, 17)
   if (batter.pitchMixEdge || signalKeys.has('pitchMixEdge') || (batter.pmScore ?? 0) >= 7) addEvidence(evidence, 'mix', 'Pitch mix', 'BarChart2', 'The batter’s damage profile fits the starter’s full arsenal.', 16)
   if ((vulnerability?.score ?? 0) >= 58) addEvidence(evidence, 'vulnerability', 'Pitcher outlook', 'Shield', `${vulnerability.score}/100 pitcher vulnerability favors contact damage.`, Math.round((vulnerability.score - 35) / 2))
