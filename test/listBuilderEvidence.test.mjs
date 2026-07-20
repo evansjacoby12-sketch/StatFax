@@ -21,6 +21,10 @@ const row = ({
   dataTrusted,
   simHRProb,
   badges: ['barrelKing'],
+  zoneEvidence: {
+    version: 1, modelVersion: 2, advisoryOnly: true,
+    attackCount: 3, reliability: 'high',
+  },
   feat: {
     hot, iso: 0.24, brl: 14, rbrl: 14, rbbe: 12, la: 20, phr9: 1.5, pk9: 7.5, pm: 7, ord: 3,
     park: 1.05, ev: 91, hh: 45, heat: 70, setup: 4, pos: 6, neg: 1,
@@ -97,6 +101,7 @@ test('advanced evidence distinguishes evaluable legacy recipes from schema-v2 co
   const topFour = artifact.recipes['top-four-power'].windows.d14
   const recentLeak = artifact.recipes['recent-pitcher-leak'].windows.d14
   const collision = artifact.recipes['contact-collision'].windows.d14
+  const zoneFocus = artifact.recipes['zone-contact-focus'].windows.d14
   assert.equal(lowK.evaluable, 4)
   assert.equal(topFour.evaluable, 4)
   assert.equal(recentLeak.evaluable, 0)
@@ -106,6 +111,8 @@ test('advanced evidence distinguishes evaluable legacy recipes from schema-v2 co
   assert.equal(collision.evaluable, 0)
   assert.equal(collision.status, 'collecting')
   assert.equal(collision.missingByGate.minContactCollision, 4)
+  assert.equal(zoneFocus.evaluable, 4)
+  assert.equal(zoneFocus.matches, 4)
 })
 
 test('pitch-type punish reports limited coverage when the archived pitch book is sparse', () => {

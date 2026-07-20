@@ -65,6 +65,7 @@ const FIELD_GROUPS = Object.freeze([
       { key: 'minRecentPitcherHr9', label: 'Min recent pitcher HR/9', hint: 'Last five starts', min: 0, max: 6, step: 0.1 },
       { key: 'maxPitcherK9', label: 'Max pitcher K/9', hint: 'Lower means more contact', min: 0, max: 20, step: 0.5 },
       { key: 'minContactCollision', label: 'Min contact collision', hint: '-10 to +10 matchup edge', min: -10, max: 10, step: 0.5 },
+      { key: 'minZoneAttacks', label: 'Min verified attack zones', hint: '0–3 reliable strike-zone cells', min: 0, max: 3, step: 1 },
       { key: 'maxBattingOrder', label: 'Latest lineup spot', hint: '4 means spots 1–4', min: 1, max: 9, step: 1 },
     ],
   },

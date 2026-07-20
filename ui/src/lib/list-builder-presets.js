@@ -149,6 +149,19 @@ export const LIST_BUILDER_PRESETS = Object.freeze([
     },
   }),
   preset({
+    id: 'zone-contact-focus',
+    tier: 'advanced',
+    icon: 'Grid3x3',
+    title: 'Zone Contact Focus',
+    description: 'Three verified strike-zone attacks backed by 40%+ hard-hit contact and an 8–32° launch window.',
+    criteria: { minZoneAttacks: 3, minHardHit: 40, minLaunchAngle: 8, maxLaunchAngle: 32 },
+    evidence: { hits: null, sample: null, hitRate: null, lift: null },
+    readiness: {
+      fallbackStatus: 'limited-coverage',
+      features: ['verified zone attack count', 'zone reliability', 'hard-hit rate', 'launch angle'],
+    },
+  }),
+  preset({
     id: 'low-k-power',
     tier: 'advanced',
     icon: 'TrendingDown',

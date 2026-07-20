@@ -32,7 +32,7 @@ export const LIST_BUILDER_SORTS = Object.freeze([
 
 export const LIST_BUILDER_LIMITS = Object.freeze({
   minOppHr9: [0, 4], minPitchMix: [0, 10], minParkFactor: [0.5, 1.6],
-  minRecentPitcherHr9: [0, 6], maxPitcherK9: [0, 20], minContactCollision: [-10, 10],
+  minRecentPitcherHr9: [0, 6], maxPitcherK9: [0, 20], minContactCollision: [-10, 10], minZoneAttacks: [0, 3],
   maxBattingOrder: [1, 9], minISO: [0, 0.6],
   minExitVelo: [70, 105], minBarrel: [0, 35], minHardHit: [0, 80], minBlast: [0, 60],
   minLaunchAngle: [-10, 45], maxLaunchAngle: [0, 55], minPullPct: [0, 100],
@@ -43,7 +43,7 @@ export const LIST_BUILDER_LIMITS = Object.freeze({
 export function createListBuilderCriteria(overrides = {}) {
   return {
     minOppHr9: '', minPitchMix: '', minParkFactor: '',
-    minRecentPitcherHr9: '', maxPitcherK9: '', minContactCollision: '', maxBattingOrder: '', minISO: '',
+    minRecentPitcherHr9: '', maxPitcherK9: '', minContactCollision: '', minZoneAttacks: '', maxBattingOrder: '', minISO: '',
     minExitVelo: '', minBarrel: '', minHardHit: '', minBlast: '',
     minLaunchAngle: '', maxLaunchAngle: '', minPullPct: '',
     minScore: '', minHeat: '', minHrProb: '', minRecBarrel: '',
@@ -62,7 +62,7 @@ const fmt = (value, digits = 1) => Number(value).toFixed(digits).replace(/\.0$/,
 const clamp01 = (value) => Math.max(0, Math.min(1, value))
 const relaxationPrecision = Object.freeze({
   minOppHr9: 2, minPitchMix: 1, minParkFactor: 2,
-  minRecentPitcherHr9: 2, maxPitcherK9: 1, minContactCollision: 1, maxBattingOrder: 0, minISO: 3,
+  minRecentPitcherHr9: 2, maxPitcherK9: 1, minContactCollision: 1, minZoneAttacks: 0, maxBattingOrder: 0, minISO: 3,
   minExitVelo: 1, minBarrel: 1, minHardHit: 1, minBlast: 1,
   minLaunchAngle: 1, maxLaunchAngle: 1, minPullPct: 1,
   minScore: 0, minHeat: 0, minHrProb: 1, minRecBarrel: 1,
@@ -108,6 +108,17 @@ export const contactCollision = (batter) => Number.isFinite(batter?.matchupSigna
   ? batter.matchupSignals.contactFactor
   : null
 
+export const verifiedZoneAttackCount = (batter) => {
+  const zone = batter?.zoneMatchup
+  if (
+    (zone?.modelVersion ?? 0) < 2 ||
+    zone?.advisoryOnly !== true ||
+    !['high', 'medium'].includes(zone?.reliability?.status) ||
+    !Array.isArray(zone?.attackZones)
+  ) return null
+  return Math.max(0, Math.min(3, zone.attackZones.length))
+}
+
 export function isPregameListCandidate(batter) {
   const game = batter?.game
   if (!game || game.isLive === true || game.isFinal === true) return false
@@ -121,6 +132,7 @@ const metricDefinitions = Object.freeze([
   { field: 'minRecentPitcherHr9', label: 'Recent pitcher HR/9', mode: 'min', get: recentPitcherHr9, fmt: (v) => fmt(v, 2) },
   { field: 'maxPitcherK9', label: 'Pitcher K/9', mode: 'max', get: pitcherK9, fmt: (v) => fmt(v, 1) },
   { field: 'minContactCollision', label: 'Contact collision', mode: 'min', get: contactCollision, fmt: (v) => fmt(v, 1) },
+  { field: 'minZoneAttacks', label: 'Verified attack zones', mode: 'min', get: verifiedZoneAttackCount, fmt: (v) => fmt(v, 0) },
   { field: 'maxBattingOrder', label: 'Batting-order spot', mode: 'max', get: (b) => b.battingOrder, fmt: (v) => fmt(v, 0) },
   { field: 'minISO', label: 'Season ISO', mode: 'min', get: seasonIso, fmt: (v) => fmt(v, 3) },
   { field: 'minExitVelo', label: 'Exit velocity', mode: 'min', get: (b) => b.exitVelo, fmt: (v) => `${fmt(v, 1)} mph` },

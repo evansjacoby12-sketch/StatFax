@@ -9,6 +9,7 @@ export const LIST_BUILDER_HISTORY_GATES = Object.freeze({
   minRecentPitcherHr9: ['prhr9', 'min'],
   maxPitcherK9: ['pk9', 'max'],
   minContactCollision: ['mcf', 'min'],
+  minZoneAttacks: ['$zoneAttacks', 'min'],
   maxBattingOrder: ['ord', 'max'],
   minISO: ['iso', 'min'],
   minExitVelo: ['ev', 'min'],
@@ -32,6 +33,16 @@ const isDate = (value) => /^\d{4}-\d{2}-\d{2}$/.test(String(value || ''))
 export function listBuilderHistoricalFeature(record, key) {
   if (key === '$score') return Number.isFinite(record?.score) ? record.score : null
   if (key === '$simHrPct') return Number.isFinite(record?.simHRProb) ? record.simHRProb * 100 : null
+  if (key === '$zoneAttacks') {
+    const evidence = record?.zoneEvidence
+    if (
+      (evidence?.modelVersion ?? 0) < 2 ||
+      evidence?.advisoryOnly !== true ||
+      !['high', 'medium'].includes(evidence?.reliability) ||
+      !Number.isInteger(evidence?.attackCount)
+    ) return null
+    return Math.max(0, Math.min(3, evidence.attackCount))
+  }
   const value = record?.feat?.[key]
   return Number.isFinite(value) ? value : null
 }

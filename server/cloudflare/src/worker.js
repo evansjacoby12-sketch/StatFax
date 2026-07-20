@@ -271,6 +271,7 @@ const LIST_BUILDER_FIELDS = Object.freeze({
   minRecentPitcherHr9: [0, 6, 'minimum opposing starter HR/9 over the last five starts'],
   maxPitcherK9: [0, 20, 'maximum opposing starter season K/9; use for low-strikeout contact matchups'],
   minContactCollision: [-10, 10, 'minimum batter-contact versus pitcher-contact-allowed matchup edge'],
+  minZoneAttacks: [0, 3, 'minimum reliable verified strike-zone attack cells; 3 is the most selective'],
   maxBattingOrder: [1, 9, 'latest allowed lineup spot; 4 means spots one through four'],
   minISO: [0, 0.6, 'minimum season isolated power; 0.200 is strong power'],
   minExitVelo: [70, 105, 'minimum average exit velocity in mph'],
@@ -359,6 +360,7 @@ async function handleListBuilder(request, env) {
     `Translate one plain-English MLB home-run candidate-list request into the closest StatFax List Builder criteria.\n` +
     `This is configuration, not prediction. Use null for every numeric gate the request does not support. Never infer player names, results, odds, or new probabilities.\n` +
     `Keep pregameOnly true unless the person explicitly requests otherwise. Confirmed means confirmedOnly. Reliable/clean/trusted data means trustedOnly.\n` +
+    `When the request gives a count of green, verified, or attack zones, use minZoneAttacks; do not substitute the Zone Match signal.\n` +
     `For a range such as launch angle 8 to 32, set both minLaunchAngle and maxLaunchAngle. For selected signals, use signalMode "all" only when every signal is required; otherwise use "any".\n` +
     `Prefer a few faithful filters over aggressive assumptions. Explain the translation in one short summary without promises.\n\n` +
     `Numeric fields:\n${fieldGuide}\n\n` +

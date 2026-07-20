@@ -43,6 +43,7 @@ test('worker returns strict visible criteria without receiving slate data', asyn
           minBarrel: 12,
           minISO: 0.2,
           maxPitcherK9: 8,
+          minZoneAttacks: 99,
           signals: ['hot', 'invented'],
           signalMode: 'any',
           pregameOnly: true,
@@ -67,6 +68,7 @@ test('worker returns strict visible criteria without receiving slate data', asyn
     assert.equal(payload.criteria.minBarrel, 12)
     assert.equal(payload.criteria.minISO, 0.2)
     assert.equal(payload.criteria.maxPitcherK9, 8)
+    assert.equal(payload.criteria.minZoneAttacks, 3)
     assert.deepEqual(payload.criteria.signals, ['hot'])
     assert.equal(payload.criteria.minHeat, null)
     assert.equal(payload.criteria.confirmedOnly, true)
@@ -77,6 +79,7 @@ test('worker returns strict visible criteria without receiving slate data', asyn
     assert.equal(openAiRequest.input, 'confirmed hot power bats against HR-prone pitching')
     assert.equal(JSON.stringify(openAiRequest).includes('playerId'), false)
     assert.equal('slate' in openAiRequest, false)
+    assert.match(openAiRequest.instructions, /count of green, verified, or attack zones.*minZoneAttacks/i)
   } finally {
     globalThis.fetch = originalFetch
   }

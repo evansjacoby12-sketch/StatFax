@@ -21,6 +21,12 @@ function batter(overrides = {}) {
     exitVelo: 92, barrelPctBBE: 13, hardHitPct: 48,
     launchAngle: 20, pullPct: 45, gameParkHRFactor: 1.1,
     recentBarrel: { recentBarrelPct: 15, recentBBE: 8 },
+    zoneMatchup: {
+      modelVersion: 2,
+      advisoryOnly: true,
+      attackZones: [0, 1, 2],
+      reliability: { status: 'high' },
+    },
     lineupConfirmed: true, battingOrder: 3,
     eli5Reasons: [{ tone: 'good' }, { tone: 'bad' }],
     hot: true, barrelKing: true,
@@ -54,16 +60,22 @@ test('advanced matchup gates pair hitter power with pitcher weakness', () => {
   assert.equal(evaluateListBuilderBatter(row, { minISO: 0.2, maxPitcherK9: 8 }).matches, true)
   assert.equal(evaluateListBuilderBatter(row, { minISO: 0.2, minRecentPitcherHr9: 1.5 }).matches, true)
   assert.equal(evaluateListBuilderBatter(row, { minBarrel: 10, minContactCollision: 2 }).matches, true)
+  assert.equal(evaluateListBuilderBatter(row, { minZoneAttacks: 3 }).matches, true)
+  assert.equal(evaluateListBuilderBatter(batter({ zoneMatchup: { ...row.zoneMatchup, attackZones: [0, 1] } }), { minZoneAttacks: 3 }).matches, false)
   assert.equal(evaluateListBuilderBatter(row, { minISO: 0.2, maxBattingOrder: 4 }).matches, true)
   assert.equal(evaluateListBuilderBatter(batter({ battingOrder: 5 }), { maxBattingOrder: 4 }).matches, false)
   assert.equal(evaluateListBuilderBatter(batter({ pitcher: { season: { kPer9: 9 }, recentForm: { hrPer9: 1.8 } } }), { maxPitcherK9: 8 }).matches, false)
 })
 
 test('new advanced gates report missing live features instead of assuming a pass', () => {
-  const row = batter({ pitcher: { season: { kPer9: 7.5 }, recentForm: null }, matchupSignals: null })
-  const evaluation = evaluateListBuilderBatter(row, { minRecentPitcherHr9: 1.5, minContactCollision: 2 })
+  const row = batter({
+    pitcher: { season: { kPer9: 7.5 }, recentForm: null },
+    matchupSignals: null,
+    zoneMatchup: { modelVersion: 2, advisoryOnly: true, attackZones: [0, 1, 2], reliability: { status: 'limited' } },
+  })
+  const evaluation = evaluateListBuilderBatter(row, { minRecentPitcherHr9: 1.5, minContactCollision: 2, minZoneAttacks: 3 })
   assert.equal(evaluation.matches, false)
-  assert.deepEqual(evaluation.missing.map((item) => item.key), ['minRecentPitcherHr9', 'minContactCollision'])
+  assert.deepEqual(evaluation.missing.map((item) => item.key), ['minRecentPitcherHr9', 'minContactCollision', 'minZoneAttacks'])
 })
 
 test('pregame, confirmed-lineup, and trust gates reject unactionable rows', () => {
@@ -149,6 +161,7 @@ test('state-gate near misses disclose and apply an explicit relaxation', () => {
 test('external criteria are allow-listed, bounded, and safe to restore', () => {
   const criteria = sanitizeListBuilderCriteria({
     minOppHr9: 99,
+    minZoneAttacks: 99,
     minLaunchAngle: -50,
     minBarrel: '12',
     signals: ['hot', 'invented', 'hot'],
@@ -159,6 +172,7 @@ test('external criteria are allow-listed, bounded, and safe to restore', () => {
     hiddenScoringBoost: 100,
   })
   assert.equal(criteria.minOppHr9, 4)
+  assert.equal(criteria.minZoneAttacks, 3)
   assert.equal(criteria.minLaunchAngle, -10)
   assert.equal(criteria.minBarrel, 12)
   assert.deepEqual(criteria.signals, ['hot'])
