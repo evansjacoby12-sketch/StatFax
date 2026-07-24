@@ -39,6 +39,23 @@ function validateKDistribution(key, dist, errors) {
   if (!Number.isInteger(dist.modelVersion) || dist.modelVersion < 2) {
     errors.push(`${prefix}.modelVersion: expected version 2 or newer`)
   }
+  if (dist.modelVersion >= 4) {
+    for (const field of [
+      'oppK', 'oppRecentK', 'recentKCoverage', 'pitchWhiffCoverage',
+      'pitchWhiffAdj', 'h2hKAdj', 'h2hSample', 'matchupAdj',
+    ]) {
+      if (!Number.isFinite(dist[field])) errors.push(`${prefix}.${field}: required for K model v4+`)
+    }
+    if (Number.isFinite(dist.recentKCoverage) && (dist.recentKCoverage < 0 || dist.recentKCoverage > 1)) {
+      errors.push(`${prefix}.recentKCoverage: expected probability in [0,1]`)
+    }
+    if (Number.isFinite(dist.pitchWhiffCoverage) && (dist.pitchWhiffCoverage < 0 || dist.pitchWhiffCoverage > 1)) {
+      errors.push(`${prefix}.pitchWhiffCoverage: expected probability in [0,1]`)
+    }
+    if (Number.isFinite(dist.matchupAdj) && (dist.matchupAdj < 0.94 || dist.matchupAdj > 1.06)) {
+      errors.push(`${prefix}.matchupAdj: expected capped adjustment in [0.94,1.06]`)
+    }
+  }
   if (!isObject(dist.probs) || !Object.keys(dist.probs).length) {
     errors.push(`${prefix}.probs: expected at least one strikeout line`)
   } else {

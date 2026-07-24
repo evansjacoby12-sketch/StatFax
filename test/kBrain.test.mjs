@@ -6,9 +6,11 @@ import {
   K_CALIBRATION,
   K_CALIBRATION_SCALE,
   K_LINES,
+  buildKMatchupInputs,
   kBrain,
   orderPitcherGameLogs,
   selectKBrainTargets,
+  stabilizedBatterKRate,
 } from '../src/sports/mlb/logic/kBrain.js'
 import {
   groupPitchers,
@@ -58,6 +60,9 @@ test('canonical K Brain emits the complete server/UI contract', () => {
   assert.ok(result)
   for (const field of [
     'k', 'lo', 'hi', 'lambda', 'probs', 'expIP', 'expBF', 'ipSD', 'volumeSource', 'oppK',
+    'oppRecentK', 'recentKCoverage', 'pitchWhiffMatchup', 'pitchWhiffCoverage',
+    'pitchWhiffBatters', 'pitchWhiffAdj', 'h2hKRate', 'h2hKAdj', 'h2hSample',
+    'h2hBatters', 'matchupAdj',
     'trend', 'conf', 'boost', 'splitKRate', 'swStrPct', 'whiffPct',
     'tempAdj', 'umpireAdj', 'parkKAdj', 'tttoPenalty', 'vegasTrim',
     'adjustedKRate', 'calibration', 'calibrationScale', 'calibrationBasis', 'modelVersion', 'tempF',
@@ -129,6 +134,67 @@ test('K Brain full-roster fallback takes the deterministic top nine by season PA
     selection.targets.map((row) => row.playerId),
     [...roster].sort((a, b) => (b.season.ab + b.season.bb) - (a.season.ab + a.season.bb)).slice(0, 9).map((row) => row.playerId),
   )
+})
+
+test('recent batter K form is strongly shrunk toward the season baseline', () => {
+  const profile = stabilizedBatterKRate({
+    season: { ab: 360, bb: 40, k: 80 },
+    recent: { ab: 45, bb: 5, k: 25 },
+  })
+  assert.equal(profile.seasonRate, 0.20)
+  assert.equal(profile.recentRate, 0.50)
+  assert.ok(profile.recentWeight > 0 && profile.recentWeight <= 0.35)
+  assert.ok(profile.rate > 0.20 && profile.rate < 0.30)
+})
+
+test('pitch-type whiff collision is coverage-gated and capped at four percent', () => {
+  const highWhiff = Array.from({ length: 9 }, (_, index) => ({
+    playerId: 500 + index,
+    season: { ab: 300, bb: 30, k: 75 },
+    recent: { ab: 50, bb: 5, k: 13 },
+    pitchTypeSplits: [
+      { key: 'ff', usage: 55, whiff: 42 },
+      { key: 'sl', usage: 35, whiff: 48 },
+    ],
+  }))
+  const rich = buildKMatchupInputs(highWhiff)
+  assert.equal(rich.pitchWhiffBatters, 9)
+  assert.ok(rich.pitchWhiffCoverage >= 0.80)
+  assert.equal(rich.pitchWhiffAdj, 1.04)
+  assert.equal(rich.matchupAdj, 1.04)
+
+  const sparse = buildKMatchupInputs(highWhiff.slice(0, 4))
+  assert.equal(sparse.pitchWhiffAdj, 1)
+  assert.equal(sparse.matchupAdj, 1)
+})
+
+test('H2H K history ignores thin samples and only supplies a capped nudge', () => {
+  const base = Array.from({ length: 9 }, (_, index) => ({
+    playerId: 600 + index,
+    season: { ab: 360, bb: 40, k: 80 },
+    recent: { ab: 45, bb: 5, k: 10 },
+    h2h: index < 2 ? { ab: 9, k: 8 } : null,
+  }))
+  assert.equal(buildKMatchupInputs(base).h2hKAdj, 1)
+
+  const qualified = base.map((batter, index) => (
+    index < 3 ? { ...batter, h2h: { ab: 20, k: 18 } } : batter
+  ))
+  const matchup = buildKMatchupInputs(qualified)
+  assert.equal(matchup.h2hSample, 60)
+  assert.equal(matchup.h2hBatters, 3)
+  assert.ok(matchup.h2hKAdj > 1)
+  assert.ok(matchup.h2hKAdj <= 1.02)
+})
+
+test('uncertain full-roster lineups lower confidence without changing small test fixtures', () => {
+  const roster = Array.from({ length: 12 }, (_, index) => ({
+    playerId: 700 + index,
+    batSide: index % 2 ? 'L' : 'R',
+    season: { ab: 300 - index, bb: 30, k: 70 },
+  }))
+  assert.equal(kBrain(PITCHER, roster).conf, 'med')
+  assert.equal(kBrain(PITCHER, TARGETS).conf, 'high')
 })
 
 test('K volume falls back to recent innings when actual batters faced are absent', () => {

@@ -7,6 +7,14 @@ const BF_PER_IP = 4.3
 const LEAGUE_WHIFF_PCT = 24.5
 const LEAGUE_SWSTR_PCT = 11.0
 const STAB_BF = 150
+const RECENT_BATTER_K_PRIOR_PA = 60
+const MAX_RECENT_BATTER_K_WEIGHT = 0.35
+const MIN_PITCH_WHIFF_BATTERS = 5
+const MIN_PITCH_WHIFF_COVERAGE = 0.50
+const H2H_PRIOR_AB = 40
+const MIN_H2H_AB = 10
+const MIN_H2H_BATTERS = 2
+const MIN_H2H_TOTAL_AB = 25
 
 // Rechecked 2026-07-24 on 72 held-out v2 starts across four dates. v2 ran
 // 0.446 K low and both Brier/RMSE selected a +8.5% scale. Apply only the
@@ -16,8 +24,12 @@ const STAB_BF = 150
 export const K_CALIBRATION_PARENT = 0.86
 export const K_CALIBRATION_SCALE = 1.05
 export const K_CALIBRATION = 0.903
-export const K_MODEL_VERSION = 3
+export const K_MODEL_VERSION = 4
 export const K_LINES = [3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5, 10.5]
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value))
+}
 
 export function effSide(batSide, pitcherHand) {
   if (batSide === 'S') return pitcherHand === 'L' ? 'R' : 'L'
@@ -148,6 +160,142 @@ export function selectKBrainTargets(targets, { maxTargets = 9 } = {}) {
   }
 }
 
+function kRateFromLine(line) {
+  const ab = Number(line?.ab) || 0
+  const bb = Number(line?.bb) || 0
+  const pa = ab + bb
+  const k = Number(line?.k)
+  return {
+    pa,
+    rate: pa > 0 && Number.isFinite(k) ? clamp(k / pa, 0.01, 0.60) : null,
+  }
+}
+
+/**
+ * Stabilize a batter's recent strikeout rate toward his season baseline.
+ * The recent window can receive at most 35% of the weight, which keeps a hot
+ * or cold two-week stretch from overpowering the larger season sample.
+ */
+export function stabilizedBatterKRate(batter) {
+  const season = kRateFromLine(batter?.season)
+  const recent = kRateFromLine(batter?.recent)
+  const seasonRate = season.rate ?? LEAGUE_K_PCT
+  if (recent.rate == null) {
+    return {
+      seasonRate,
+      recentRate: null,
+      recentPA: recent.pa,
+      recentWeight: 0,
+      rate: seasonRate,
+    }
+  }
+  const recentWeight = Math.min(
+    MAX_RECENT_BATTER_K_WEIGHT,
+    (recent.pa / (recent.pa + RECENT_BATTER_K_PRIOR_PA)) * 0.50,
+  )
+  return {
+    seasonRate,
+    recentRate: recent.rate,
+    recentPA: recent.pa,
+    recentWeight,
+    rate: seasonRate * (1 - recentWeight) + recent.rate * recentWeight,
+  }
+}
+
+function batterPitchWhiffProfile(batter) {
+  const rows = Array.isArray(batter?.pitchTypeSplits) ? batter.pitchTypeSplits : []
+  let coveredUsage = 0
+  let weightedWhiff = 0
+  for (const row of rows) {
+    const usage = Number(row?.usage)
+    const whiff = Number(row?.whiff)
+    if (!Number.isFinite(usage) || usage <= 0 || !Number.isFinite(whiff)) continue
+    coveredUsage += usage
+    weightedWhiff += whiff * usage
+  }
+  if (coveredUsage <= 0) return null
+  return {
+    whiffPct: weightedWhiff / coveredUsage,
+    coverage: clamp(coveredUsage / 100, 0, 1),
+  }
+}
+
+/**
+ * Build lineup-specific K matchup inputs. Every adjustment is coverage-gated,
+ * shrunk, and capped so it behaves as context around the core pitcher model.
+ */
+export function buildKMatchupInputs(targets) {
+  const batters = (targets || []).filter(Boolean)
+  const profiles = batters.map(stabilizedBatterKRate)
+  const seasonRates = profiles.map((profile) => profile.seasonRate)
+  const recentProfiles = profiles.filter((profile) => profile.recentRate != null && profile.recentPA >= 10)
+  const oppSeasonK = seasonRates.length
+    ? seasonRates.reduce((sum, rate) => sum + rate, 0) / seasonRates.length
+    : LEAGUE_K_PCT
+  const oppRecentK = profiles.length
+    ? profiles.reduce((sum, profile) => sum + profile.rate, 0) / profiles.length
+    : oppSeasonK
+  const recentKCoverage = batters.length ? recentProfiles.length / batters.length : 0
+
+  const pitchProfiles = batters.map(batterPitchWhiffProfile).filter(Boolean)
+  const pitchWhiffCoverage = batters.length
+    ? pitchProfiles.reduce((sum, profile) => sum + profile.coverage, 0) / batters.length
+    : 0
+  const pitchWhiffWeight = pitchProfiles.reduce((sum, profile) => sum + profile.coverage, 0)
+  const pitchWhiffMatchup = pitchWhiffWeight > 0
+    ? pitchProfiles.reduce((sum, profile) => sum + profile.whiffPct * profile.coverage, 0) / pitchWhiffWeight
+    : null
+  const pitchWhiffQualified = pitchProfiles.length >= MIN_PITCH_WHIFF_BATTERS
+    && pitchWhiffCoverage >= MIN_PITCH_WHIFF_COVERAGE
+    && Number.isFinite(pitchWhiffMatchup)
+  const pitchWhiffAdj = pitchWhiffQualified
+    ? clamp(1 + ((pitchWhiffMatchup - LEAGUE_WHIFF_PCT) / LEAGUE_WHIFF_PCT) * 0.15, 0.96, 1.04)
+    : 1
+
+  const h2hProfiles = batters.map((batter, index) => {
+    const ab = Number(batter?.h2h?.ab)
+    const k = Number(batter?.h2h?.k)
+    if (!Number.isFinite(ab) || ab < MIN_H2H_AB || !Number.isFinite(k)) return null
+    const priorRate = profiles[index]?.rate ?? LEAGUE_K_PCT
+    return {
+      ab,
+      rate: (clamp(k / ab, 0, 1) * ab + priorRate * H2H_PRIOR_AB) / (ab + H2H_PRIOR_AB),
+      priorRate,
+    }
+  }).filter(Boolean)
+  const h2hSample = h2hProfiles.reduce((sum, profile) => sum + profile.ab, 0)
+  const h2hKRate = h2hProfiles.length
+    ? h2hProfiles.reduce((sum, profile) => sum + profile.rate * profile.ab, 0) / h2hSample
+    : null
+  const h2hPriorRate = h2hProfiles.length
+    ? h2hProfiles.reduce((sum, profile) => sum + profile.priorRate * profile.ab, 0) / h2hSample
+    : null
+  const h2hQualified = h2hProfiles.length >= MIN_H2H_BATTERS
+    && h2hSample >= MIN_H2H_TOTAL_AB
+    && Number.isFinite(h2hKRate)
+    && Number.isFinite(h2hPriorRate)
+  const h2hCoverage = batters.length ? h2hProfiles.length / batters.length : 0
+  const h2hKAdj = h2hQualified
+    ? clamp(1 + ((h2hKRate - h2hPriorRate) / LEAGUE_K_PCT) * 0.20 * h2hCoverage, 0.98, 1.02)
+    : 1
+  const matchupAdj = clamp(pitchWhiffAdj * h2hKAdj, 0.94, 1.06)
+
+  return {
+    oppSeasonK,
+    oppRecentK,
+    recentKCoverage,
+    pitchWhiffMatchup,
+    pitchWhiffCoverage,
+    pitchWhiffBatters: pitchProfiles.length,
+    pitchWhiffAdj,
+    h2hKRate,
+    h2hKAdj,
+    h2hSample,
+    h2hBatters: h2hProfiles.length,
+    matchupAdj,
+  }
+}
+
 function poissonCDF(k, lambda) {
   if (lambda <= 0) return 1
   let sum = 0
@@ -204,7 +352,10 @@ function umpireKAdjustment(umpire) {
  * @returns {null|{
  *   k:number, lo:number, hi:number, lambda:number, probs:Object,
  *   expIP:number, expBF:number, ipSD:number, volumeSource:string,
- *   oppK:number, trend:string, conf:string,
+ *   oppK:number, oppRecentK:number, recentKCoverage:number,
+ *   pitchWhiffMatchup:number|null, pitchWhiffCoverage:number,
+ *   pitchWhiffAdj:number, h2hKRate:number|null, h2hKAdj:number,
+ *   h2hSample:number, matchupAdj:number, trend:string, conf:string,
  *   boost:number, splitKRate:number|null, swStrPct:number|null,
  *   whiffPct:number|null, tempAdj:number, umpireAdj:number,
  *   parkKAdj:number, tttoPenalty:number, vegasTrim:number,
@@ -217,6 +368,7 @@ export function kBrain(pitcher, targets, { weather, umpire, parkFactorK } = {}) 
   const season = pitcher?.season || {}
   const lineup = selectKBrainTargets(targets)
   const selectedTargets = lineup.targets
+  const matchup = buildKMatchupInputs(selectedTargets)
 
   let seasonKRate = season.bf > 0 && Number.isFinite(season.k)
     ? season.k / season.bf
@@ -246,9 +398,7 @@ export function kBrain(pitcher, targets, { weather, umpire, parkFactorK } = {}) 
     const perBatterK = selectedTargets.map((batter) => {
       const side = effSide(batter.batSide, pitcher?.hand)
       const pitcherK = Math.min(0.99, side === 'L' ? stabVl : stabVr)
-      const batterSeason = batter.season
-      const pa = (batterSeason?.ab || 0) + (batterSeason?.bb || 0)
-      const batterK = Math.min(0.99, pa > 0 ? (batterSeason?.k || 0) / pa : LEAGUE_K_PCT)
+      const batterK = clamp(stabilizedBatterKRate(batter).rate, 0.01, 0.60)
       const matchupOdds = (pitcherK / (1 - pitcherK)) * (batterK / (1 - batterK)) / leagueOdds
       return matchupOdds / (1 + matchupOdds)
     })
@@ -296,18 +446,10 @@ export function kBrain(pitcher, targets, { weather, umpire, parkFactorK } = {}) 
   const boost = hasMissMetric ? 0 : pitchMixKBoost(pitcher?.pitchMix)
   const adjustedKRate = kRate + boost
 
-  const opponentRates = selectedTargets.map((batter) => {
-    const batterSeason = batter.season
-    if (!batterSeason || !(batterSeason.ab > 0)) return null
-    const pa = (batterSeason.ab || 0) + (batterSeason.bb || 0)
-    return pa > 0 ? (batterSeason.k || 0) / pa : null
-  }).filter((rate) => rate != null)
-  const oppK = opponentRates.length
-    ? opponentRates.reduce((sum, rate) => sum + rate, 0) / opponentRates.length
-    : LEAGUE_K_PCT
-  const oppAdj = Math.max(0.82, Math.min(1.22, oppK / LEAGUE_K_PCT))
+  const oppK = matchup.oppSeasonK
+  const oppAdj = clamp(matchup.oppRecentK / LEAGUE_K_PCT, 0.82, 1.22)
 
-  const vegasTrim = oppK < 0.185 ? 0.95 : 1.0
+  const vegasTrim = matchup.oppRecentK < 0.185 ? 0.95 : 1.0
   const recentSix = recentStarts.slice(0, 6)
   const pitchVolumeStarts = recentSix.filter((start) => (
     Number.isFinite(start.pitches) && start.pitches > 50 && Number.isFinite(start.bf) && start.bf > 0
@@ -367,7 +509,8 @@ export function kBrain(pitcher, targets, { weather, umpire, parkFactorK } = {}) 
 
   const rawParkFactor = Number.isFinite(parkFactorK) ? parkFactorK : pitcher?.gameParkKFactor
   const parkKAdj = Number.isFinite(rawParkFactor) && rawParkFactor > 0 ? rawParkFactor : 1
-  const lambda = expBF * adjustedKRate * oppAdj * tempAdj * umpireAdj * parkKAdj * tttoPenalty * K_CALIBRATION
+  const lambda = expBF * adjustedKRate * oppAdj * matchup.matchupAdj
+    * tempAdj * umpireAdj * parkKAdj * tttoPenalty * K_CALIBRATION
 
   const probs = {}
   for (const line of K_LINES) probs[line] = kOverProb(lambda, line)
@@ -387,11 +530,17 @@ export function kBrain(pitcher, targets, { weather, umpire, parkFactorK } = {}) 
     }
   }
 
-  const conf = recentStarts.length >= 4 && season.bf >= 100
+  let conf = recentStarts.length >= 4 && season.bf >= 100
     ? 'high'
     : recentStarts.length >= 2 || season.bf >= 50
       ? 'med'
       : 'low'
+  const lineupUncertain = lineup.candidates >= 9 && (
+    lineup.mode === 'roster-fallback'
+    || lineup.selected < 8
+    || (lineup.mode === 'projected' && lineup.coverage < (2 / 3))
+  )
+  if (lineupUncertain) conf = conf === 'high' ? 'med' : 'low'
 
   return {
     k: lambda,
@@ -404,6 +553,17 @@ export function kBrain(pitcher, targets, { weather, umpire, parkFactorK } = {}) 
     ipSD,
     volumeSource,
     oppK,
+    oppRecentK: matchup.oppRecentK,
+    recentKCoverage: matchup.recentKCoverage,
+    pitchWhiffMatchup: matchup.pitchWhiffMatchup,
+    pitchWhiffCoverage: matchup.pitchWhiffCoverage,
+    pitchWhiffBatters: matchup.pitchWhiffBatters,
+    pitchWhiffAdj: matchup.pitchWhiffAdj,
+    h2hKRate: matchup.h2hKRate,
+    h2hKAdj: matchup.h2hKAdj,
+    h2hSample: matchup.h2hSample,
+    h2hBatters: matchup.h2hBatters,
+    matchupAdj: matchup.matchupAdj,
     trend,
     conf,
     boost,
@@ -418,7 +578,7 @@ export function kBrain(pitcher, targets, { weather, umpire, parkFactorK } = {}) 
     adjustedKRate,
     calibration: K_CALIBRATION,
     calibrationScale: K_CALIBRATION_SCALE,
-    calibrationBasis: 'v2-heldout-72-guarded-step',
+    calibrationBasis: 'v2-heldout-72-guarded-step-plus-v4-matchup',
     modelVersion: K_MODEL_VERSION,
     tempF: weather?.tempF ?? null,
     lineupMode: lineup.mode,

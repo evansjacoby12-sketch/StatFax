@@ -449,6 +449,22 @@ function KBrainView({ pitchers, liveKsByPitcher = {} }) {
                     Lineup pressure −{((1 - ek.vegasTrim) * 100).toFixed(0)}%
                   </span>
                 )}
+                {ek.pitchWhiffAdj != null && ek.pitchWhiffAdj !== 1 && (
+                  <span
+                    style={{ color: ek.pitchWhiffAdj > 1 ? 'var(--strong)' : 'var(--bad)' }}
+                    title={`${Math.round((ek.pitchWhiffCoverage || 0) * 100)}% of the opposing lineup's pitch-mix usage is covered`}
+                  >
+                    Pitch-mix whiff {ek.pitchWhiffAdj > 1 ? '+' : ''}{((ek.pitchWhiffAdj - 1) * 100).toFixed(0)}%
+                  </span>
+                )}
+                {ek.h2hKAdj != null && ek.h2hKAdj !== 1 && (
+                  <span
+                    style={{ color: ek.h2hKAdj > 1 ? 'var(--strong)' : 'var(--bad)' }}
+                    title={`${ek.h2hSample || 0} qualified career plate appearances`}
+                  >
+                    Batter history {ek.h2hKAdj > 1 ? '+' : ''}{((ek.h2hKAdj - 1) * 100).toFixed(0)}%
+                  </span>
+                )}
               </div>
               <KBrainH2H
                 targets={e.targets}
@@ -544,7 +560,7 @@ function KBrainView({ pitchers, liveKsByPitcher = {} }) {
 
 // ─── H2H K matchup table for K Brain ─────────────────────────────────────────
 // Shows each opposing batter's career K rate vs this specific pitcher,
-// relative to their season average. Requires h2h.ab >= 5 for a meaningful
+// relative to their season average. Requires h2h.ab >= 10 for a meaningful
 // sample. Sorted by H2H K% so the most K-prone matchups surface first.
 function KBrainH2H({ targets, open, onToggle }) {
   const rows = useMemo(() => {
@@ -553,7 +569,7 @@ function KBrainH2H({ targets, open, onToggle }) {
       .filter((b) => {
         if (!b.playerId || seen.has(b.playerId)) return false
         seen.add(b.playerId)
-        return b.h2h && b.h2h.ab >= 5 && Number.isFinite(b.h2h.k)
+        return b.h2h && b.h2h.ab >= 10 && Number.isFinite(b.h2h.k)
       })
       .map((b) => {
         const h2hKPct  = b.h2h.k / b.h2h.ab
