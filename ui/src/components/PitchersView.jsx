@@ -13,6 +13,7 @@ import {
   summarizeKProjectionResults,
 } from '../lib/pitchers.js'
 import { pct, num, rate, gameTime } from '../lib/format.js'
+import { evaluateKMarket } from '../lib/kMarket.js'
 import { teamColor, teamLogo, playerHeadshot, hexToRgba } from '../lib/teams.js'
 import { useLiveMode } from '../lib/liveMode.js'
 import { gradeColor } from '../lib/badges.js'
@@ -129,7 +130,8 @@ const TREND_COLOR = { up: 'var(--strong)', down: 'var(--bad)', flat: 'var(--text
 const CONF_COLOR = { high: 'var(--strong)', med: 'var(--accent)', low: 'var(--text-faint)' }
 
 function KBrainView({ pitchers, liveKsByPitcher = {} }) {
-  const [lines, setLines] = useState({})
+  const [markets, setMarkets] = useState({})
+  const [marketOpen, setMarketOpen] = useState({})
   const [search, setSearch] = useState('')
   const [minK, setMinK] = useState(0)
   const [confFilter, setConfFilter] = useState('all')
@@ -166,6 +168,20 @@ function KBrainView({ pitchers, liveKsByPitcher = {} }) {
     background: active ? 'rgba(99,102,241,0.18)' : 'rgba(255,255,255,0.04)',
     color: active ? '#fff' : 'var(--text-faint)', fontWeight: active ? '700' : '400',
   })
+
+  const setMarketField = (key, field, value) => {
+    setMarkets((current) => ({
+      ...current,
+      [key]: {
+        line: '',
+        overOdds: '',
+        underOdds: '',
+        side: 'over',
+        ...current[key],
+        [field]: value,
+      },
+    }))
+  }
 
   if (!pitchers.filter(e => e.estK).length) {
     return <div className="empty-note" style={{ padding: '48px', textAlign: 'center', color: 'var(--text-faint)' }}>No K estimates available — missing recent start data.</div>
@@ -219,11 +235,33 @@ function KBrainView({ pitchers, liveKsByPitcher = {} }) {
       {arms.map((e) => {
         const ek = e.estK
         const oppTeam = e.targets[0]?.team || '?'
-        const myLine = lines[e.key]
+        const market = {
+          line: '',
+          overOdds: '',
+          underOdds: '',
+          side: 'over',
+          ...markets[e.key],
+        }
+        const myLine = market.line
         const myLineNum = myLine !== undefined && myLine !== '' ? parseFloat(myLine) : null
         const myProb = myLineNum != null && Number.isFinite(myLineNum) && myLineNum >= 0 && myLineNum <= 15
           ? kOverProb(ek.lambda, myLineNum)
           : null
+        const underProb = myLineNum != null && Number.isFinite(myLineNum) && myLineNum >= 0 && myLineNum <= 15
+          ? 1 - kOverProb(ek.lambda, Math.ceil(myLineNum) - 1)
+          : null
+        const decision = evaluateKMarket({
+          overProbability: myProb,
+          underProbability: underProb,
+          overOdds: market.overOdds,
+          underOdds: market.underOdds,
+          side: market.side,
+        })
+        const marketMetric = (value, digits = 1, signed = false) => {
+          if (!Number.isFinite(value)) return '—'
+          const amount = value * 100
+          return `${signed && amount > 0 ? '+' : ''}${amount.toFixed(digits)}%`
+        }
         const liveK = liveKsByPitcher[e.key]
         const projection = projectedK(ek)
 
@@ -257,27 +295,102 @@ function KBrainView({ pitchers, liveKsByPitcher = {} }) {
               </div>
             </header>
 
-            <section className="kbrain-book" aria-label="Sportsbook strikeout line evaluator">
-              <div className="kbrain-book-field">
-                <label htmlFor={`k-line-${e.key}`}>
-                  <span>Sportsbook line</span>
-                  <small>Enter the listed strikeout total</small>
-                </label>
-                <input
-                  id={`k-line-${e.key}`}
-                  type="number"
-                  step="0.5"
-                  min="0"
-                  max="15"
-                  inputMode="decimal"
-                  placeholder="6.5"
-                  value={lines[e.key] ?? ''}
-                  onChange={(ev) => setLines((prev) => ({ ...prev, [e.key]: ev.target.value }))}
-                />
+            <section className={`kbrain-market ${marketOpen[e.key] ? 'is-open' : ''}`} aria-label="Sportsbook strikeout market evaluator">
+              <div className="kbrain-market-summary" aria-live="polite">
+                <div className="kbrain-market-summary-action">
+                  <span className={`kbrain-market-verdict tone-${decision.status}`}>{decision.label}</span>
+                  <small>
+                    {myProb != null
+                      ? `${marketMetric(myProb, 0)} model chance to go over ${myLineNum}`
+                      : 'Add the sportsbook line to evaluate this market'}
+                  </small>
+                </div>
+                <div className="kbrain-market-summary-metrics">
+                  <span><small>Fair {decision.side === 'over' ? 'O' : 'U'}</small><b className="mono">{marketMetric(decision.fairProbability)}</b></span>
+                  <span><small>Edge</small><b className={`mono ${decision.edge >= 0.03 ? 'pos' : ''}`}>{marketMetric(decision.edge, 1, true)}</b></span>
+                  <span><small>EV</small><b className={`mono ${decision.expectedRoi >= 0.05 ? 'pos' : ''}`}>{marketMetric(decision.expectedRoi, 1, true)}</b></span>
+                </div>
+                <button
+                  type="button"
+                  className="kbrain-market-disclosure"
+                  onClick={() => setMarketOpen((current) => ({ ...current, [e.key]: !current[e.key] }))}
+                  aria-expanded={!!marketOpen[e.key]}
+                >
+                  {marketOpen[e.key] ? 'Hide market' : 'Market details'}
+                  <Icon name={marketOpen[e.key] ? 'ChevronUp' : 'ChevronDown'} size={14} />
+                </button>
               </div>
-              <div className="kbrain-book-result" aria-live="polite">
-                <strong>{myProb != null && Number.isFinite(myProb) ? `${(myProb * 100).toFixed(0)}%` : '—'}</strong>
-                <span>{myProb != null && Number.isFinite(myProb) ? `chance to go over ${myLineNum}` : 'Enter a line to calculate over probability'}</span>
+
+              <div className="kbrain-market-body">
+                <div className="kbrain-market-inputs">
+                  <label htmlFor={`k-line-${e.key}`}>
+                    <span>K line</span>
+                    <input
+                      id={`k-line-${e.key}`}
+                      type="number"
+                      step="0.5"
+                      min="0"
+                      max="15"
+                      inputMode="decimal"
+                      placeholder="6.5"
+                      value={market.line}
+                      onChange={(event) => setMarketField(e.key, 'line', event.target.value)}
+                    />
+                  </label>
+                  <label htmlFor={`k-over-${e.key}`}>
+                    <span>Over</span>
+                    <input
+                      id={`k-over-${e.key}`}
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="-110"
+                      value={market.overOdds}
+                      onChange={(event) => setMarketField(e.key, 'overOdds', event.target.value)}
+                    />
+                  </label>
+                  <label htmlFor={`k-under-${e.key}`}>
+                    <span>Under</span>
+                    <input
+                      id={`k-under-${e.key}`}
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="-110"
+                      value={market.underOdds}
+                      onChange={(event) => setMarketField(e.key, 'underOdds', event.target.value)}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    className="kbrain-market-side"
+                    onClick={() => setMarketField(e.key, 'side', market.side === 'over' ? 'under' : 'over')}
+                    aria-label={`Selected side: ${market.side}. Switch to ${market.side === 'over' ? 'under' : 'over'}.`}
+                  >
+                    Side: {market.side === 'over' ? 'O' : 'U'}
+                  </button>
+                </div>
+
+                <div className="kbrain-market-comparison" aria-live="polite">
+                  <span><b className="mono">{marketMetric(decision.fairProbability)}</b><small>Fair model</small></span>
+                  <span><b className="mono">{marketMetric(decision.impliedProbability)}</b><small>Implied</small></span>
+                  <span title={decision.noVigProbability == null ? 'Enter both Over and Under prices to remove the vig.' : 'Both sides normalized to remove sportsbook hold.'}>
+                    <b className="mono">{marketMetric(decision.noVigProbability)}</b><small>No-vig</small>
+                  </span>
+                  <span><b className={`mono ${decision.edge >= 0.03 ? 'pos' : decision.edge < 0 ? 'neg' : ''}`}>{marketMetric(decision.edge, 1, true)}</b><small>Edge</small></span>
+                  <span><b className={`mono ${decision.expectedRoi >= 0.05 ? 'pos' : decision.expectedRoi < 0 ? 'neg' : ''}`}>{marketMetric(decision.expectedRoi, 1, true)}</b><small>EV / ROI</small></span>
+                </div>
+
+                <div className="kbrain-market-action">
+                  <span className={`kbrain-market-verdict tone-${decision.status}`}>{decision.label}</span>
+                  <p>{decision.detail}</p>
+                  <button
+                    type="button"
+                    className="kbrain-market-info"
+                    aria-label="Explain market metrics"
+                    title="Fair: model win chance. Implied: probability in the selected price. No-vig: both prices normalized to remove hold. Edge: model minus market probability. EV: expected return per dollar."
+                  >
+                    <Icon name="Info" size={14} />
+                  </button>
+                </div>
               </div>
             </section>
 
