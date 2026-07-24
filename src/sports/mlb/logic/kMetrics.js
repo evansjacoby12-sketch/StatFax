@@ -76,7 +76,7 @@ export function summarizeKRows(rows, { scale = 1 } = {}) {
 
 export function findBestKScale(rows, {
   min = 0.75,
-  max = 1.05,
+  max = 1.15,
   step = 0.005,
   objective = 'brier',
 } = {}) {
@@ -89,4 +89,95 @@ export function findBestKScale(rows, {
     if (!best || value < best.value) best = { scale: roundedScale, value, metrics }
   }
   return best
+}
+
+function scaleDirection(scale) {
+  if (!Number.isFinite(scale) || Math.abs(scale - 1) < 1e-9) return 0
+  return scale > 1 ? 1 : -1
+}
+
+/**
+ * Produce a code-reviewable calibration recommendation, never an automatic
+ * production mutation. It requires multiple dates, Brier/RMSE agreement, a
+ * material mean bias, and improvement on both objectives. Even then, one
+ * promotion can move the deployed constant by at most maxRelativeStep.
+ */
+export function recommendKCalibration(rows, currentCalibration, {
+  modelVersion = null,
+  minSamples = 60,
+  minDates = 3,
+  minAbsBias = 0.15,
+  minBrierImprovement = 0.0005,
+  minRmseImprovement = 0.005,
+  maxRelativeStep = 0.05,
+  searchMin = 0.85,
+  searchMax = 1.15,
+  searchStep = 0.005,
+} = {}) {
+  const eligible = (rows || []).filter((row) => (
+    Number.isFinite(row?.estK)
+    && Number.isFinite(row?.actualK)
+    && (modelVersion == null || row.modelVersion === modelVersion)
+  ))
+  const dates = new Set(eligible.map((row) => row.date).filter(Boolean))
+  const current = summarizeKRows(eligible)
+  const base = {
+    n: eligible.length,
+    dates: dates.size,
+    modelVersion,
+    currentCalibration,
+    current,
+  }
+  if (eligible.length < minSamples || dates.size < minDates) {
+    return {
+      ...base,
+      status: 'collecting',
+      proposedCalibration: currentCalibration,
+      proposedScale: 1,
+      checks: {
+        samples: eligible.length >= minSamples,
+        dates: dates.size >= minDates,
+      },
+    }
+  }
+
+  const bestBrier = findBestKScale(eligible, {
+    min: searchMin, max: searchMax, step: searchStep, objective: 'brier',
+  })
+  const bestRmse = findBestKScale(eligible, {
+    min: searchMin, max: searchMax, step: searchStep, objective: 'rmse',
+  })
+  const agrees = (
+    scaleDirection(bestBrier?.scale) !== 0
+    && scaleDirection(bestBrier?.scale) === scaleDirection(bestRmse?.scale)
+  )
+  const rawScale = agrees ? (bestBrier.scale + bestRmse.scale) / 2 : 1
+  const proposedScale = Math.max(1 - maxRelativeStep, Math.min(1 + maxRelativeStep, rawScale))
+  const candidate = summarizeKRows(eligible, { scale: proposedScale })
+  const brierImprovement = current.brier - candidate.brier
+  const rmseImprovement = current.rmse - candidate.rmse
+  const checks = {
+    samples: true,
+    dates: true,
+    objectiveAgreement: agrees,
+    materialBias: Math.abs(current.bias) >= minAbsBias,
+    brierImproves: brierImprovement >= minBrierImprovement,
+    rmseImproves: rmseImprovement >= minRmseImprovement,
+  }
+  const promote = Object.values(checks).every(Boolean)
+  return {
+    ...base,
+    status: promote ? 'promote' : 'hold',
+    proposedCalibration: promote
+      ? +(currentCalibration * proposedScale).toFixed(6)
+      : currentCalibration,
+    proposedScale: promote ? proposedScale : 1,
+    rawScale,
+    candidate,
+    bestBrier,
+    bestRmse,
+    brierImprovement,
+    rmseImprovement,
+    checks,
+  }
 }

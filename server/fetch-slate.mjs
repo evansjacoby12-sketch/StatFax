@@ -4619,6 +4619,8 @@ async function main() {
           volumeSource: kd.volumeSource || null,
           adjustedKRate: Number.isFinite(kd.adjustedKRate) ? kd.adjustedKRate : null,
           calibration: Number.isFinite(kd.calibration) ? kd.calibration : null,
+          calibrationScale: Number.isFinite(kd.calibrationScale) ? kd.calibrationScale : null,
+          calibrationBasis: kd.calibrationBasis || null,
           modelVersion: kd.modelVersion ?? null,
           oppK: Number.isFinite(kd.oppK) ? +kd.oppK.toFixed(3) : null,
           lineupMode: kd.lineupMode || null,

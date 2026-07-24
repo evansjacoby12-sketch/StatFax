@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs'
 
 import {
   K_CALIBRATION,
+  K_CALIBRATION_SCALE,
   K_LINES,
   kBrain,
   orderPitcherGameLogs,
@@ -59,7 +60,7 @@ test('canonical K Brain emits the complete server/UI contract', () => {
     'k', 'lo', 'hi', 'lambda', 'probs', 'expIP', 'expBF', 'ipSD', 'volumeSource', 'oppK',
     'trend', 'conf', 'boost', 'splitKRate', 'swStrPct', 'whiffPct',
     'tempAdj', 'umpireAdj', 'parkKAdj', 'tttoPenalty', 'vegasTrim',
-    'adjustedKRate', 'calibration', 'modelVersion', 'tempF',
+    'adjustedKRate', 'calibration', 'calibrationScale', 'calibrationBasis', 'modelVersion', 'tempF',
     'lineupMode', 'lineupSize', 'lineupCandidates', 'lineupCoverage',
     'lineupSourceGamePk', 'lineupAsOf',
   ]) {
@@ -74,6 +75,7 @@ test('canonical K Brain emits the complete server/UI contract', () => {
   assert.equal(result.volumeSource, 'recent-pitches-bf')
   assert.equal(result.expBF, 22.5)
   assert.equal(result.calibration, K_CALIBRATION)
+  assert.equal(result.calibrationScale, K_CALIBRATION_SCALE)
   assert.ok(result.lo <= result.lambda && result.lambda <= result.hi)
 
   let previous = 1

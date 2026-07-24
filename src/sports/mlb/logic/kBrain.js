@@ -8,11 +8,15 @@ const LEAGUE_WHIFF_PCT = 24.5
 const LEAGUE_SWSTR_PCT = 11.0
 const STAB_BF = 150
 
-// Rechecked 2026-07-14: the 211-start tracker remained +0.53 K high, including
-// +0.50 across 56 starts after the prior 0.92 recenter. A 0.86 factor removes
-// most of that persistent bias without applying the small-sample optimum (~0.83).
-export const K_CALIBRATION = 0.86
-export const K_MODEL_VERSION = 2
+// Rechecked 2026-07-24 on 72 held-out v2 starts across four dates. v2 ran
+// 0.446 K low and both Brier/RMSE selected a +8.5% scale. Apply only the
+// guarded +5% step (0.86 × 1.05 = 0.903) because v3 also introduces
+// lineup-aware opponent selection. The remaining gap must earn promotion on
+// v3's final-pregame sample instead of being assumed from the v2 roster proxy.
+export const K_CALIBRATION_PARENT = 0.86
+export const K_CALIBRATION_SCALE = 1.05
+export const K_CALIBRATION = 0.903
+export const K_MODEL_VERSION = 3
 export const K_LINES = [3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5, 10.5]
 
 export function effSide(batSide, pitcherHand) {
@@ -204,7 +208,8 @@ function umpireKAdjustment(umpire) {
  *   boost:number, splitKRate:number|null, swStrPct:number|null,
  *   whiffPct:number|null, tempAdj:number, umpireAdj:number,
  *   parkKAdj:number, tttoPenalty:number, vegasTrim:number,
- *   adjustedKRate:number, calibration:number, modelVersion:number,
+ *   adjustedKRate:number, calibration:number, calibrationScale:number,
+ *   calibrationBasis:string, modelVersion:number,
  *   tempF:number|null
  * }}
  */
@@ -412,6 +417,8 @@ export function kBrain(pitcher, targets, { weather, umpire, parkFactorK } = {}) 
     vegasTrim,
     adjustedKRate,
     calibration: K_CALIBRATION,
+    calibrationScale: K_CALIBRATION_SCALE,
+    calibrationBasis: 'v2-heldout-72-guarded-step',
     modelVersion: K_MODEL_VERSION,
     tempF: weather?.tempF ?? null,
     lineupMode: lineup.mode,

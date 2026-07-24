@@ -4,6 +4,7 @@ import assert from 'node:assert/strict'
 import {
   findBestKScale,
   flattenKResults,
+  recommendKCalibration,
   summarizeKRows,
 } from '../src/sports/mlb/logic/kMetrics.js'
 
@@ -40,4 +41,44 @@ test('K result flattener respects the temporal cutoff and valid outcomes', () =>
     },
   }, { fromDate: '2026-07-11' })
   assert.deepEqual(values, [{ estK: 6, actualK: 5, date: '2026-07-11' }])
+})
+
+test('guarded K calibration requires enough starts across multiple dates', () => {
+  const rows = Array.from({ length: 20 }, (_, index) => ({
+    estK: 4 + (index % 3),
+    actualK: 5 + (index % 3),
+    modelVersion: 2,
+    date: '2026-07-20',
+  }))
+  const recommendation = recommendKCalibration(rows, 0.86, { modelVersion: 2 })
+  assert.equal(recommendation.status, 'collecting')
+  assert.equal(recommendation.proposedCalibration, 0.86)
+  assert.equal(recommendation.proposedScale, 1)
+})
+
+test('guarded K calibration caps an agreed improvement to one five-percent step', () => {
+  const rows = Array.from({ length: 72 }, (_, index) => {
+    const estK = 3.5 + (index % 6) * 0.6
+    return {
+      estK,
+      actualK: Math.round(estK * 1.12),
+      modelVersion: 2,
+      date: `2026-07-${20 + (index % 4)}`,
+    }
+  })
+  const recommendation = recommendKCalibration(rows, 0.86, { modelVersion: 2 })
+  assert.equal(recommendation.status, 'promote')
+  assert.equal(recommendation.proposedScale, 1.05)
+  assert.equal(recommendation.proposedCalibration, 0.903)
+  assert.ok(recommendation.rawScale > recommendation.proposedScale)
+  assert.ok(recommendation.candidate.brier < recommendation.current.brier)
+  assert.ok(recommendation.candidate.rmse < recommendation.current.rmse)
+  assert.deepEqual(recommendation.checks, {
+    samples: true,
+    dates: true,
+    objectiveAgreement: true,
+    materialBias: true,
+    brierImproves: true,
+    rmseImproves: true,
+  })
 })
