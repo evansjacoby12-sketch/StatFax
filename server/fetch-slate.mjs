@@ -4623,6 +4623,8 @@ async function main() {
           calibrationScale: Number.isFinite(kd.calibrationScale) ? kd.calibrationScale : null,
           calibrationBasis: kd.calibrationBasis || null,
           modelVersion: kd.modelVersion ?? null,
+          conf: kd.conf || null,
+          trend: kd.trend || null,
           oppK: Number.isFinite(kd.oppK) ? +kd.oppK.toFixed(3) : null,
           oppRecentK: Number.isFinite(kd.oppRecentK) ? +kd.oppRecentK.toFixed(3) : null,
           recentKCoverage: Number.isFinite(kd.recentKCoverage) ? +kd.recentKCoverage.toFixed(3) : null,
