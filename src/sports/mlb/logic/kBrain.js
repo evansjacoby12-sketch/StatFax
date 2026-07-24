@@ -30,6 +30,120 @@ export function orderPitcherGameLogs(splits) {
   }
 }
 
+function seasonPA(target) {
+  const season = target?.season || {}
+  return (Number(season.ab) || 0) + (Number(season.bb) || 0)
+}
+
+function stableTargetKey(target, index) {
+  if (target?.playerId != null) return `player-${target.playerId}`
+  if (target?.id != null) return `player-${target.id}`
+  return `row-${index}`
+}
+
+function hasBattingOrder(target, field) {
+  const value = Number(target?.[field])
+  return Number.isInteger(value) && value >= 1 && value <= 9
+}
+
+function byOrderThenPA(a, b, field) {
+  const aHasOrder = hasBattingOrder(a, field)
+  const bHasOrder = hasBattingOrder(b, field)
+  const aOrder = aHasOrder ? Number(a[field]) : null
+  const bOrder = bHasOrder ? Number(b[field]) : null
+  if (aHasOrder !== bHasOrder) return aHasOrder ? -1 : 1
+  if (aHasOrder && aOrder !== bOrder) return aOrder - bOrder
+  const paDiff = seasonPA(b) - seasonPA(a)
+  if (paDiff) return paDiff
+  return String(a?.playerId ?? a?.id ?? a?.name ?? '').localeCompare(
+    String(b?.playerId ?? b?.id ?? b?.name ?? ''),
+  )
+}
+
+/**
+ * Select the nine batters a starter is actually expected to face.
+ *
+ * Confirmed batting orders win. Before lineups post, the most recent team
+ * lineup is used and any missing/inactive slots are filled deterministically
+ * from the current roster by season PA. The full-roster PA fallback is kept
+ * intentionally deterministic so cron refreshes cannot shuffle a matchup.
+ */
+export function selectKBrainTargets(targets, { maxTargets = 9 } = {}) {
+  const unique = []
+  const seen = new Set()
+  for (const [index, target] of (targets || []).entries()) {
+    if (!target) continue
+    const key = stableTargetKey(target, index)
+    if (seen.has(key)) continue
+    seen.add(key)
+    unique.push(target)
+  }
+
+  const limit = Math.max(1, Math.floor(maxTargets))
+  const confirmed = unique
+    .filter((target) => target.lineupConfirmed === true && hasBattingOrder(target, 'battingOrder'))
+    .sort((a, b) => byOrderThenPA(a, b, 'battingOrder'))
+
+  if (confirmed.length) {
+    const selected = confirmed.slice(0, limit)
+    return {
+      targets: selected,
+      mode: 'confirmed',
+      selected: selected.length,
+      candidates: unique.length,
+      coverage: Math.min(1, selected.length / limit),
+      sourceGamePk: null,
+      asOf: null,
+    }
+  }
+
+  const projected = unique
+    .filter((target) => hasBattingOrder(target, 'projectedBattingOrder'))
+    .sort((a, b) => byOrderThenPA(a, b, 'projectedBattingOrder'))
+  const selected = projected.slice(0, limit)
+  const selectedKeys = new Set(selected.map((target, index) => stableTargetKey(target, index)))
+  if (selected.length < limit) {
+    const fallback = [...unique]
+      .sort((a, b) => byOrderThenPA(a, b, 'projectedBattingOrder'))
+      .filter((target, index) => !selectedKeys.has(stableTargetKey(target, index)))
+    for (const target of fallback) {
+      if (selected.length >= limit) break
+      selected.push(target)
+    }
+  }
+
+  if (projected.length) {
+    return {
+      targets: selected,
+      mode: 'projected',
+      selected: selected.length,
+      candidates: unique.length,
+      coverage: Math.min(1, projected.length / limit),
+      sourceGamePk: projected.find((target) => target.lineupSourceGamePk != null)?.lineupSourceGamePk ?? null,
+      asOf: projected.find((target) => target.lineupAsOf)?.lineupAsOf ?? null,
+    }
+  }
+
+  const fallback = [...unique]
+    .sort((a, b) => {
+      const paDiff = seasonPA(b) - seasonPA(a)
+      if (paDiff) return paDiff
+      return String(a?.playerId ?? a?.id ?? a?.name ?? '').localeCompare(
+        String(b?.playerId ?? b?.id ?? b?.name ?? ''),
+      )
+    })
+    .slice(0, limit)
+  return {
+    targets: fallback,
+    mode: 'roster-fallback',
+    selected: fallback.length,
+    candidates: unique.length,
+    coverage: 0,
+    sourceGamePk: null,
+    asOf: null,
+  }
+}
+
 function poissonCDF(k, lambda) {
   if (lambda <= 0) return 1
   let sum = 0
@@ -96,6 +210,8 @@ function umpireKAdjustment(umpire) {
  */
 export function kBrain(pitcher, targets, { weather, umpire, parkFactorK } = {}) {
   const season = pitcher?.season || {}
+  const lineup = selectKBrainTargets(targets)
+  const selectedTargets = lineup.targets
 
   let seasonKRate = season.bf > 0 && Number.isFinite(season.k)
     ? season.k / season.bf
@@ -122,7 +238,7 @@ export function kBrain(pitcher, targets, { weather, umpire, parkFactorK } = {}) 
       : seasonKRate
 
     const leagueOdds = LEAGUE_K_PCT / (1 - LEAGUE_K_PCT)
-    const perBatterK = (targets || []).map((batter) => {
+    const perBatterK = selectedTargets.map((batter) => {
       const side = effSide(batter.batSide, pitcher?.hand)
       const pitcherK = Math.min(0.99, side === 'L' ? stabVl : stabVr)
       const batterSeason = batter.season
@@ -175,7 +291,7 @@ export function kBrain(pitcher, targets, { weather, umpire, parkFactorK } = {}) 
   const boost = hasMissMetric ? 0 : pitchMixKBoost(pitcher?.pitchMix)
   const adjustedKRate = kRate + boost
 
-  const opponentRates = (targets || []).map((batter) => {
+  const opponentRates = selectedTargets.map((batter) => {
     const batterSeason = batter.season
     if (!batterSeason || !(batterSeason.ab > 0)) return null
     const pa = (batterSeason.ab || 0) + (batterSeason.bb || 0)
@@ -298,6 +414,12 @@ export function kBrain(pitcher, targets, { weather, umpire, parkFactorK } = {}) 
     calibration: K_CALIBRATION,
     modelVersion: K_MODEL_VERSION,
     tempF: weather?.tempF ?? null,
+    lineupMode: lineup.mode,
+    lineupSize: lineup.selected,
+    lineupCandidates: lineup.candidates,
+    lineupCoverage: lineup.coverage,
+    lineupSourceGamePk: lineup.sourceGamePk,
+    lineupAsOf: lineup.asOf,
   }
 }
 

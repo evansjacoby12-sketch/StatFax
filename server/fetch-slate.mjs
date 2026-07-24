@@ -269,6 +269,7 @@ import {
   kBrain as computeKDist,
   orderPitcherGameLogs,
 } from '../src/sports/mlb/logic/kBrain.js';
+import { mergeKEstimateRows } from '../src/sports/mlb/logic/kTracking.js';
 
 // Intraday board history — append a compact snapshot of TODAY's canonical combos
 // (one per strategy/size) + lineup-confirmation state on every run, so we can
@@ -743,6 +744,39 @@ async function fetchActiveBatters(teamId) {
 }
 
 // ─── Stats batch fetches ─────────────────────────────────────────────────────
+
+function isoDateMinusDays(date, daysBack) {
+  const value = new Date(`${date}T12:00:00Z`);
+  value.setUTCDate(value.getUTCDate() - daysBack);
+  return value.toISOString().slice(0, 10);
+}
+
+async function fetchRecentStartingLineup(teamId, date) {
+  try {
+    const startDate = isoDateMinusDays(date, 8);
+    const endDate = isoDateMinusDays(date, 1);
+    const data = await mlbGet(
+      `/schedule?sportId=1&teamId=${teamId}&startDate=${startDate}&endDate=${endDate}&gameType=R&hydrate=lineups`,
+    );
+    const games = (data.dates || [])
+      .flatMap((day) => day.games || [])
+      .sort((a, b) => String(b.gameDate || '').localeCompare(String(a.gameDate || '')));
+    for (const game of games) {
+      const isAway = Number(game.teams?.away?.team?.id) === Number(teamId);
+      const isHome = Number(game.teams?.home?.team?.id) === Number(teamId);
+      if (!isAway && !isHome) continue;
+      const raw = isAway ? game.lineups?.awayPlayers : game.lineups?.homePlayers;
+      const ids = (raw || []).map((player) => player?.id ?? player).filter(Number.isInteger);
+      if (ids.length < 7) continue;
+      return {
+        ids: ids.slice(0, 9),
+        sourceGamePk: game.gamePk ?? null,
+        asOf: game.gameDate ?? null,
+      };
+    }
+  } catch {}
+  return null;
+}
 
 async function fetchBatterStatsBatch(playerIds) {
   if (!playerIds.length) return {};
@@ -2531,6 +2565,25 @@ async function main() {
   // `confirmed` flag, so partial-confirmation games had whichever side
   // happened to be empty miss out on the roster ID list (and thus all
   // downstream stats fetches + scoring).
+  // K Brain needs a nine-man opponent before today's batting order posts.
+  // Use each team's latest real starting lineup as the deterministic
+  // projection, while retaining the full active roster for the HR board.
+  const projectedLineupByTeam = {};
+  const projectedResults = await pMap([...teamIdsNeedingRoster], async (id) => ({
+    id,
+    lineup: await fetchRecentStartingLineup(id, date),
+  }), 8);
+  for (const result of projectedResults) {
+    if (result?.id && result.lineup) projectedLineupByTeam[result.id] = result.lineup;
+  }
+  for (const game of games) {
+    const lineup = lineupsByGame[game.gamePk];
+    if (!lineup) continue;
+    if (!lineup.awayConfirmed) lineup.awayProjected = projectedLineupByTeam[game.awayTeam.id] || null;
+    if (!lineup.homeConfirmed) lineup.homeProjected = projectedLineupByTeam[game.homeTeam.id] || null;
+  }
+  console.log(`[kbrain] recent-lineup projections ${Object.keys(projectedLineupByTeam).length}/${teamIdsNeedingRoster.size} teams`);
+
   const allBatterIds = new Set();
   for (const g of games) {
     const l = lineupsByGame[g.gamePk];
@@ -2844,6 +2897,12 @@ async function main() {
     const homeOrder = new Map();
     if (lineup.awayConfirmed) awayIds.forEach((id, i) => awayOrder.set(id, i + 1));
     if (lineup.homeConfirmed) homeIds.forEach((id, i) => homeOrder.set(id, i + 1));
+    const awayProjectedOrder = new Map(
+      (lineup.awayProjected?.ids || []).map((id, index) => [id, index + 1]),
+    );
+    const homeProjectedOrder = new Map(
+      (lineup.homeProjected?.ids || []).map((id, index) => [id, index + 1]),
+    );
 
     // Per-game home-plate umpire + its HR-friendliness factor. The factor
     // is 1.0 (neutral) for any umpire not in the data table; only applies
@@ -2853,7 +2912,7 @@ async function main() {
     const umpFactor       = umpireHrFactor(homePlateUmpire?.name);
     const umpKFactor      = umpireKFactor(homePlateUmpire?.name);
 
-    const scoreSide = (ids, opposingPitcher, orderMap, batterTeamAbbr, isHome, opposingTeamId) => {
+    const scoreSide = (ids, opposingPitcher, orderMap, projectedOrderMap, batterTeamAbbr, isHome, opposingTeamId) => {
       const pd          = opposingPitcher ? pitcherStats[opposingPitcher.id] : null;
       const stadium     = venueStadium;
       const homeStadium = findStadiumByTeam(batterTeamAbbr);
@@ -2905,6 +2964,8 @@ async function main() {
         const recent30      = batter30Game[id] ?? null;
         const recent7       = batter7Game[id]  ?? null;
         const battingOrder  = orderMap.get(id) ?? null;
+        const projectedBattingOrder = projectedOrderMap.get(id) ?? null;
+        const projectedLineup = isHome ? lineup.homeProjected : lineup.awayProjected;
         const bSplits       = bullpenSplits[id] ?? null;
         const dnSplits      = dayNightSplits[id] ?? null;
         const haSplits      = homeAwaySplits[id] ?? null;
@@ -3176,6 +3237,7 @@ async function main() {
           teamId:     isHome ? game.homeTeam.id : game.awayTeam.id,
           isHome,
           battingOrder,
+          projectedBattingOrder,
           currentInning: game.currentInning ?? null,
           // Per-side lineup confirmation flag piped onto the batter row so
           // PlayerDetailModal can render "Lineup: Confirmed / Projected"
@@ -3184,6 +3246,13 @@ async function main() {
           // partial-confirmation games (one team posted, other hasn't)
           // honestly reflect each side's state instead of all-or-nothing.
           lineupConfirmed: isHome ? !!lineup.homeConfirmed : !!lineup.awayConfirmed,
+          lineupSource: battingOrder != null
+            ? 'confirmed'
+            : projectedBattingOrder != null
+              ? 'recent-lineup'
+              : 'roster-fallback',
+          lineupSourceGamePk: projectedBattingOrder != null ? projectedLineup?.sourceGamePk ?? null : null,
+          lineupAsOf: projectedBattingOrder != null ? projectedLineup?.asOf ?? null : null,
           season,
           recent:     batter.recent || null,
           // Statcast contact-quality fields lifted onto the row so the app
@@ -3318,8 +3387,8 @@ async function main() {
       }
     };
 
-    scoreSide(awayIds, game.homePitcher, awayOrder, game.awayTeam.abbr, false, game.homeTeam?.id ?? null);
-    scoreSide(homeIds, game.awayPitcher, homeOrder, game.homeTeam.abbr, true,  game.awayTeam?.id ?? null);
+    scoreSide(awayIds, game.homePitcher, awayOrder, awayProjectedOrder, game.awayTeam.abbr, false, game.homeTeam?.id ?? null);
+    scoreSide(homeIds, game.awayPitcher, homeOrder, homeProjectedOrder, game.homeTeam.abbr, true,  game.awayTeam?.id ?? null);
   }
   const uniqueScored = Object.keys(scoredBatters).length;
   console.log(`[slate] scored ${uniqueScored} batter-game pairs in ${((Date.now() - scoreStart) / 1000).toFixed(2)}s`);
@@ -4519,43 +4588,57 @@ async function main() {
     for (const d of sk.slice(0, -14)) delete backtestLog.combos.sgpByDate[d]; // keep ~2 weeks
   } catch (e) { console.warn(`[sgp] freeze skipped (non-fatal): ${e?.message}`); }
 
-  // K-prop scorecard: freeze today's K estimates so we can grade them tomorrow
+  // K-prop scorecard: refresh each estimate while its individual game remains
+  // bettable, then freeze the last pregame version at first pitch.
   try {
     if (payload.kDistByPitcher && Object.keys(payload.kDistByPitcher).length) {
       backtestLog.kProps = backtestLog.kProps || {};
       backtestLog.kProps.estByDate = backtestLog.kProps.estByDate || {};
-      if (!backtestLog.kProps.estByDate[date]) {
-        backtestLog.kProps.estByDate[date] = Object.entries(payload.kDistByPitcher)
-          .map(([key, kd]) => {
-            const [pitcherIdStr, gamePkStr] = key.split('-');
-            const sample = Object.values(payload.scoredBatters || {}).find(
-              r => String(r.pitcher?.id) === pitcherIdStr && String(r.gamePk) === gamePkStr
-            );
-            return {
-              key,
-              pitcherId: Number(pitcherIdStr),
-              gamePk: Number(gamePkStr),
-              name: sample?.pitcher?.name || '',
-              estK: kd.k,
-              lo: kd.lo,
-              hi: kd.hi,
-              lambda: kd.lambda,
-              probs: kd.probs,
-              // Preserve workload and rate components so the K audit can
-              // diagnose bias at the mechanism instead of only at final lambda.
-              expIP: Number.isFinite(kd.expIP) ? kd.expIP : null,
-              expBF: Number.isFinite(kd.expBF) ? kd.expBF : null,
-              volumeSource: kd.volumeSource || null,
-              adjustedKRate: Number.isFinite(kd.adjustedKRate) ? kd.adjustedKRate : null,
-              calibration: Number.isFinite(kd.calibration) ? kd.calibration : null,
-              modelVersion: kd.modelVersion ?? null,
-              oppK:  Number.isFinite(kd.oppK) ? +kd.oppK.toFixed(3) : null,
-            };
-          });
-        const dk = Object.keys(backtestLog.kProps.estByDate).sort();
-        for (const d of dk.slice(0, -14)) delete backtestLog.kProps.estByDate[d];
-        console.log(`[kbrain] ${date}: froze ${backtestLog.kProps.estByDate[date].length} K estimates`);
-      }
+      const capturedAt = new Date().toISOString();
+      const currentRows = Object.entries(payload.kDistByPitcher).map(([key, kd]) => {
+        const [pitcherIdStr, gamePkStr] = key.split('-');
+        const sample = Object.values(payload.scoredBatters || {}).find(
+          r => String(r.pitcher?.id) === pitcherIdStr && String(r.gamePk) === gamePkStr
+        );
+        const game = payload.games?.find((candidate) => String(candidate.gamePk) === gamePkStr);
+        return {
+          key,
+          pitcherId: Number(pitcherIdStr),
+          gamePk: Number(gamePkStr),
+          gameDate: game?.gameDate ?? null,
+          name: sample?.pitcher?.name || '',
+          estK: kd.k,
+          lo: kd.lo,
+          hi: kd.hi,
+          lambda: kd.lambda,
+          probs: kd.probs,
+          // Preserve workload and rate components so the K audit can
+          // diagnose bias at the mechanism instead of only at final lambda.
+          expIP: Number.isFinite(kd.expIP) ? kd.expIP : null,
+          expBF: Number.isFinite(kd.expBF) ? kd.expBF : null,
+          volumeSource: kd.volumeSource || null,
+          adjustedKRate: Number.isFinite(kd.adjustedKRate) ? kd.adjustedKRate : null,
+          calibration: Number.isFinite(kd.calibration) ? kd.calibration : null,
+          modelVersion: kd.modelVersion ?? null,
+          oppK: Number.isFinite(kd.oppK) ? +kd.oppK.toFixed(3) : null,
+          lineupMode: kd.lineupMode || null,
+          lineupSize: kd.lineupSize ?? null,
+          lineupCandidates: kd.lineupCandidates ?? null,
+          lineupCoverage: Number.isFinite(kd.lineupCoverage) ? kd.lineupCoverage : null,
+          lineupSourceGamePk: kd.lineupSourceGamePk ?? null,
+          lineupAsOf: kd.lineupAsOf ?? null,
+        };
+      });
+      backtestLog.kProps.estByDate[date] = mergeKEstimateRows(
+        backtestLog.kProps.estByDate[date],
+        currentRows,
+        payload.games,
+        { capturedAt },
+      );
+      const dk = Object.keys(backtestLog.kProps.estByDate).sort();
+      for (const d of dk.slice(0, -14)) delete backtestLog.kProps.estByDate[d];
+      const finalCount = backtestLog.kProps.estByDate[date].filter((row) => row.finalPregame).length;
+      console.log(`[kbrain] ${date}: refreshed ${currentRows.length} estimates; ${finalCount} final-pregame`);
     }
   } catch (e) { console.warn(`[kbrain] freeze skipped: ${e?.message}`); }
 
@@ -4566,7 +4649,7 @@ async function main() {
       if (!backtestLog.kProps.resultsByDate) backtestLog.kProps.resultsByDate = {};
       if (!backtestLog.kProps.resultsByDate[yesterdayCT]) {
         const { outcomes: kOutcomes } = await fetchPitcherKsForDate(yesterdayCT);
-        const graded = kEsts.map((e) => {
+        const graded = kEsts.filter((e) => !e.lateCapture).map((e) => {
           const actual = kOutcomes.get(e.key);
           return {
             ...e,

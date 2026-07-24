@@ -7,6 +7,7 @@ import {
   K_LINES,
   kBrain,
   orderPitcherGameLogs,
+  selectKBrainTargets,
 } from '../src/sports/mlb/logic/kBrain.js'
 import {
   groupPitchers,
@@ -59,6 +60,8 @@ test('canonical K Brain emits the complete server/UI contract', () => {
     'trend', 'conf', 'boost', 'splitKRate', 'swStrPct', 'whiffPct',
     'tempAdj', 'umpireAdj', 'parkKAdj', 'tttoPenalty', 'vegasTrim',
     'adjustedKRate', 'calibration', 'modelVersion', 'tempF',
+    'lineupMode', 'lineupSize', 'lineupCandidates', 'lineupCoverage',
+    'lineupSourceGamePk', 'lineupAsOf',
   ]) {
     assert.ok(Object.hasOwn(result, field), `missing K snapshot field: ${field}`)
   }
@@ -80,6 +83,50 @@ test('canonical K Brain emits the complete server/UI contract', () => {
     assert.ok(result.probs[line] <= previous, 'over probability must fall as the line rises')
     previous = result.probs[line]
   }
+})
+
+test('K Brain uses a confirmed batting order instead of the full active roster', () => {
+  const roster = Array.from({ length: 13 }, (_, index) => ({
+    playerId: 100 + index,
+    lineupConfirmed: index < 9,
+    battingOrder: index < 9 ? index + 1 : null,
+    season: { ab: 500 - index, bb: 30, k: index < 9 ? 60 : 220 },
+  }))
+  const selection = selectKBrainTargets(roster)
+  assert.equal(selection.mode, 'confirmed')
+  assert.equal(selection.selected, 9)
+  assert.deepEqual(selection.targets.map((row) => row.playerId), roster.slice(0, 9).map((row) => row.playerId))
+})
+
+test('K Brain uses the recent projected nine and fills missing slots without shuffling', () => {
+  const roster = Array.from({ length: 12 }, (_, index) => ({
+    playerId: 200 + index,
+    projectedBattingOrder: index < 8 ? index + 1 : null,
+    lineupSourceGamePk: index < 8 ? 991 : null,
+    lineupAsOf: index < 8 ? '2026-07-23T23:00:00Z' : null,
+    season: { ab: index < 8 ? 300 : 600 - index, bb: 20, k: 80 },
+  }))
+  const first = selectKBrainTargets(roster)
+  const second = selectKBrainTargets([...roster].reverse())
+  assert.equal(first.mode, 'projected')
+  assert.equal(first.selected, 9)
+  assert.equal(first.sourceGamePk, 991)
+  assert.equal(first.coverage, 8 / 9)
+  assert.deepEqual(first.targets.map((row) => row.playerId), second.targets.map((row) => row.playerId))
+})
+
+test('K Brain full-roster fallback takes the deterministic top nine by season PA', () => {
+  const roster = Array.from({ length: 12 }, (_, index) => ({
+    playerId: 300 + index,
+    season: { ab: 100 + index * 20, bb: index, k: 50 },
+  }))
+  const selection = selectKBrainTargets(roster)
+  assert.equal(selection.mode, 'roster-fallback')
+  assert.equal(selection.selected, 9)
+  assert.deepEqual(
+    selection.targets.map((row) => row.playerId),
+    [...roster].sort((a, b) => (b.season.ab + b.season.bb) - (a.season.ab + a.season.bb)).slice(0, 9).map((row) => row.playerId),
+  )
 })
 
 test('K volume falls back to recent innings when actual batters faced are absent', () => {
