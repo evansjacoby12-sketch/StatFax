@@ -34,6 +34,8 @@
 import { heatIndex, hrSetup, pitchMixScore } from '../ui/src/lib/scout.js';
 import { blastRate, positiveReasonCount, negativeReasonCount } from '../ui/src/lib/combo-engine.js';
 import {
+  CLEAN_PREGAME_FEATURE_CAPTURE,
+  CLEAN_PREGAME_FEATURE_GENERATION,
   HISTORICAL_FEATURE_VERSION,
   buildHistoricalFeatureCoverage,
   compactHistoricalPitchTypes,
@@ -135,7 +137,8 @@ export function extractPredictionRecord(row) {
   // published row. This keeps the model archive outcome-blind while the live
   // row remains free to carry current display and settlement state.
   const frozen = row?.preGamePredictionRecord;
-  const frozenIdentityMatches = frozen?.featureCapture === 'pregame-freeze'
+  const frozenIdentityMatches = frozen?.featureCapture === CLEAN_PREGAME_FEATURE_CAPTURE
+    && frozen?.featureGeneration === CLEAN_PREGAME_FEATURE_GENERATION
     && String(frozen?.playerId) === String(row?.playerId)
     && String(frozen?.gamePk) === String(row?.gamePk);
   if (frozenIdentityMatches) return structuredClone(frozen);
@@ -366,6 +369,13 @@ export function compactModelRecord(record) {
       ? { ...record.zoneEvidence }
       : null,
     contactLeakEvidence: compactPitcherContactLeakEvidence(record?.contactLeakEvidence),
+    ...(record?.featureCapture === CLEAN_PREGAME_FEATURE_CAPTURE
+      && record?.featureGeneration === CLEAN_PREGAME_FEATURE_GENERATION
+      ? {
+          featureCapture: CLEAN_PREGAME_FEATURE_CAPTURE,
+          featureGeneration: CLEAN_PREGAME_FEATURE_GENERATION,
+        }
+      : {}),
     featureVersion: featureVersion || null,
     feat:           featureVersion >= HISTORICAL_FEATURE_VERSION && validFeat ? normalizeHistoricalFeatureVector(rawFeat) : rawFeat,
     pitchTypes:     compactHistoricalPitchTypes(record?.pitchTypes),

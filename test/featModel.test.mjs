@@ -1,6 +1,16 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { trainFeatModel, scoreFeatProb, probToScore, FEAT_KEYS } from '../server/models/featModel.mjs'
+import {
+  CLEAN_PREGAME_FEATURE_CAPTURE,
+  CLEAN_PREGAME_FEATURE_GENERATION,
+} from '../server/lib/historicalFeatureArchive.mjs'
+
+const clean = (row) => ({
+  ...row,
+  featureCapture: CLEAN_PREGAME_FEATURE_CAPTURE,
+  featureGeneration: CLEAN_PREGAME_FEATURE_GENERATION,
+})
 
 const TABLE = [
   { scoreLo: 0, scoreHi: 20, observedProb: 0.05 },
@@ -30,11 +40,30 @@ test('probToScore guards bad input', () => {
   assert.equal(probToScore(NaN, TABLE), null)
 })
 
-test('trainFeatModel: not ready below the minimum sample', () => {
-  const tiny = { records: { '2026-06-01': [{ feat: Object.fromEntries(FEAT_KEYS.map((k) => [k, 1])), homered: true, score: 80 }] } }
+test('trainFeatModel: not ready below the minimum clean sample', () => {
+  const tiny = { records: { '2026-06-01': [clean({ feat: Object.fromEntries(FEAT_KEYS.map((k) => [k, 1])), homered: true, score: 80 })] } }
   const m = trainFeatModel(tiny)
   assert.equal(m.ready, false)
-  assert.ok(m.n < 300)
+  assert.equal(m.n, 1)
+  assert.equal(m.reason, 'clean-sample-too-small')
+})
+
+test('trainFeatModel waits for seven clean slate dates even with enough rows', () => {
+  const records = Object.fromEntries(
+    Array.from({ length: 6 }, (_, day) => [
+      `2026-06-${String(day + 1).padStart(2, '0')}`,
+      Array.from({ length: 60 }, (_, index) => clean({
+        feat: Object.fromEntries(FEAT_KEYS.map((key) => [key, index])),
+        homered: index % 8 === 0,
+        score: index,
+      })),
+    ]),
+  )
+  const m = trainFeatModel({ dates: Object.keys(records), records })
+  assert.equal(m.ready, false)
+  assert.equal(m.n, 360)
+  assert.equal(m.dates, 6)
+  assert.equal(m.reason, 'clean-history-too-young')
 })
 
 test('trainFeatModel: trains + ranks better than noise on a separable synthetic set', () => {
@@ -47,17 +76,22 @@ test('trainFeatModel: trains + ranks better than noise on a separable synthetic 
     const high = i % 2 === 0
     const feat = Object.fromEntries(FEAT_KEYS.map((k) => [k, 0]))
     feat.bs = high ? 80 : 20
-    records[dates[Math.floor(i / 40)]].push({
+    records[dates[Math.floor(i / 40)]].push(clean({
       feat,
       homered: high ? i % 3 === 0 : i % 9 === 0,
       score: feat.bs,
-    })
+    }))
   }
-  records[dates[0]].push({
+  records[dates[0]].push(clean({
     feat: Object.fromEntries(FEAT_KEYS.map((key) => [key, 999])),
     homered: false,
     score: 100,
     actuallyPlayed: false,
+  }))
+  records[dates[0]].push({
+    feat: Object.fromEntries(FEAT_KEYS.map((key) => [key, 999])),
+    homered: true,
+    score: 100,
   })
   const m = trainFeatModel({
     records: { '2026-07-01': [{ feat: null, homered: false, score: 1 }] },
@@ -65,6 +99,7 @@ test('trainFeatModel: trains + ranks better than noise on a separable synthetic 
   })
   assert.equal(m.ready, true)
   assert.equal(m.n, 400)
+  assert.equal(m.generation, CLEAN_PREGAME_FEATURE_GENERATION)
   assert.equal(m.evaluation, 'temporal-holdout')
   assert.deepEqual(m.holdoutDates, dates.slice(-2))
   assert.equal(m.trainN, 320)

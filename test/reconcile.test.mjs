@@ -7,6 +7,10 @@ import {
   reconcileOutcomes,
   syncModelHistory,
 } from '../server/reconcile.mjs'
+import {
+  CLEAN_PREGAME_FEATURE_CAPTURE,
+  CLEAN_PREGAME_FEATURE_GENERATION,
+} from '../server/lib/historicalFeatureArchive.mjs'
 
 // Outcome sets shaped the way fetchHomerersForDate now returns them: bare
 // playerId sets (combo scorecard) + composite `playerId-gamePk` sets (per-batter).
@@ -115,7 +119,11 @@ test('extractPredictionRecord freezes the complete schema-v2 feature archive', (
   assert.equal(rec.contactLeakEvidence.version, 1)
   assert.equal(rec.contactLeakEvidence.qualifies, true)
 
-  const archived = { ...rec, featureCapture: 'pregame-freeze' }
+  const archived = {
+    ...rec,
+    featureCapture: CLEAN_PREGAME_FEATURE_CAPTURE,
+    featureGeneration: CLEAN_PREGAME_FEATURE_GENERATION,
+  }
   const finalRecord = extractPredictionRecord({
     playerId: 1,
     gamePk: 99,

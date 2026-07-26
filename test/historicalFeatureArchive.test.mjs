@@ -3,6 +3,8 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
 import {
+  CLEAN_PREGAME_FEATURE_CAPTURE,
+  CLEAN_PREGAME_FEATURE_GENERATION,
   HISTORICAL_FEATURE_KEYS,
   buildHistoricalFeatureCoverage,
   compactHistoricalPitchTypes,
@@ -48,7 +50,14 @@ test('coverage distinguishes prospective schema-v2 rows from honest legacy histo
         { actuallyPlayed: true, feat: null },
       ],
       '2026-07-15': [
-        { actuallyPlayed: true, featureVersion: 2, feat: complete, pitchTypes: [['ff', 50, 0.5, 20]] },
+        {
+          actuallyPlayed: true,
+          featureVersion: 2,
+          featureCapture: CLEAN_PREGAME_FEATURE_CAPTURE,
+          featureGeneration: CLEAN_PREGAME_FEATURE_GENERATION,
+          feat: complete,
+          pitchTypes: [['ff', 50, 0.5, 20]],
+        },
         { actuallyPlayed: false, featureVersion: 2, feat: complete, pitchTypes: [['ff', 50, 0.5, 20]] },
       ],
     },
@@ -56,6 +65,9 @@ test('coverage distinguishes prospective schema-v2 rows from honest legacy histo
   const coverage = buildHistoricalFeatureCoverage(history)
   assert.equal(coverage.population, 3, 'scratches are excluded from readiness coverage')
   assert.equal(coverage.schemaV2Rows, 1)
+  assert.equal(coverage.cleanPregameRows, 1)
+  assert.equal(coverage.firstCleanPregameDate, '2026-07-15')
+  assert.equal(coverage.lastCleanPregameDate, '2026-07-15')
   assert.equal(coverage.legacyRows, 1)
   assert.equal(coverage.missingFeatureRows, 1)
   assert.equal(coverage.firstSchemaV2Date, '2026-07-15')
@@ -87,6 +99,31 @@ test('schema-v2 validator rejects incomplete vectors and malformed pitch rows', 
   }, 'row')
   assert.ok(errors.some((error) => error.includes('feat.xslg: missing')))
   assert.ok(errors.some((error) => error.includes('sorted by usage descending')))
+})
+
+test('clean feature generation requires explicit pregame capture provenance', () => {
+  const errors = validateHistoricalFeatureRecord({
+    featureVersion: 2,
+    featureGeneration: CLEAN_PREGAME_FEATURE_GENERATION,
+    feat: normalizeHistoricalFeatureVector({}),
+    pitchTypes: [],
+  }, 'row')
+  assert.ok(errors.some((error) => error.includes('featureCapture')))
+
+  const compact = compactModelRecord({
+    playerId: 7,
+    gamePk: 70,
+    score: 75,
+    homered: false,
+    actuallyPlayed: true,
+    featureVersion: 2,
+    featureCapture: CLEAN_PREGAME_FEATURE_CAPTURE,
+    featureGeneration: CLEAN_PREGAME_FEATURE_GENERATION,
+    feat: normalizeHistoricalFeatureVector({}),
+    pitchTypes: [],
+  })
+  assert.equal(compact.featureCapture, CLEAN_PREGAME_FEATURE_CAPTURE)
+  assert.equal(compact.featureGeneration, CLEAN_PREGAME_FEATURE_GENERATION)
 })
 
 test('slate persistence refreshes feature coverage even when no game settles', () => {

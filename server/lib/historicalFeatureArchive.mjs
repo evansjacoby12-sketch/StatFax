@@ -1,5 +1,7 @@
 export const HISTORICAL_FEATURE_VERSION = 2
-export const HISTORICAL_FEATURE_SUMMARY_VERSION = 1
+export const HISTORICAL_FEATURE_SUMMARY_VERSION = 2
+export const CLEAN_PREGAME_FEATURE_GENERATION = 3
+export const CLEAN_PREGAME_FEATURE_CAPTURE = 'pregame-freeze'
 
 // Frozen, pregame-only inputs. These short keys keep the 180-day archive
 // practical to restore on every stateless slate run. Version 2 adds the raw
@@ -112,6 +114,17 @@ export function validateHistoricalFeatureRecord(record, at = 'record') {
       }
     }
   }
+  if (record?.featureGeneration != null) {
+    if (record.featureGeneration !== CLEAN_PREGAME_FEATURE_GENERATION) {
+      errors.push(`${at}.featureGeneration: expected ${CLEAN_PREGAME_FEATURE_GENERATION}`)
+    }
+    if (record.featureCapture !== CLEAN_PREGAME_FEATURE_CAPTURE) {
+      errors.push(`${at}.featureCapture: expected ${CLEAN_PREGAME_FEATURE_CAPTURE}`)
+    }
+    if (version < HISTORICAL_FEATURE_VERSION) {
+      errors.push(`${at}.featureVersion: clean generation requires schema-v${HISTORICAL_FEATURE_VERSION}`)
+    }
+  }
   return errors
 }
 
@@ -122,10 +135,13 @@ export function buildHistoricalFeatureCoverage(history = {}) {
   const fieldCounts = Object.fromEntries([...HISTORICAL_FEATURE_KEYS, 'pitchTypes'].map((key) => [key, 0]))
   let population = 0
   let schemaV2Rows = 0
+  let cleanPregameRows = 0
   let legacyRows = 0
   let missingFeatureRows = 0
   let firstSchemaV2Date = null
   let lastSchemaV2Date = null
+  let firstCleanPregameDate = null
+  let lastCleanPregameDate = null
 
   for (const date of dates) {
     for (const record of records[date] || []) {
@@ -140,6 +156,15 @@ export function buildHistoricalFeatureCoverage(history = {}) {
         legacyRows++
       } else {
         missingFeatureRows++
+      }
+      if (
+        record?.featureGeneration === CLEAN_PREGAME_FEATURE_GENERATION
+        && record?.featureCapture === CLEAN_PREGAME_FEATURE_CAPTURE
+        && version >= HISTORICAL_FEATURE_VERSION
+      ) {
+        cleanPregameRows++
+        firstCleanPregameDate ||= date
+        lastCleanPregameDate = date
       }
       for (const key of HISTORICAL_FEATURE_KEYS) if (Number.isFinite(record?.feat?.[key])) fieldCounts[key]++
       if (Array.isArray(record?.pitchTypes) && record.pitchTypes.length > 0) fieldCounts.pitchTypes++
@@ -164,10 +189,13 @@ export function buildHistoricalFeatureCoverage(history = {}) {
     schemaVersion: HISTORICAL_FEATURE_VERSION,
     population,
     schemaV2Rows,
+    cleanPregameRows,
     legacyRows,
     missingFeatureRows,
     firstSchemaV2Date,
     lastSchemaV2Date,
+    firstCleanPregameDate,
+    lastCleanPregameDate,
     groups,
     fields,
   }

@@ -17,7 +17,7 @@ const coverage = buildHistoricalFeatureCoverage(history)
 if (process.argv.includes('--json')) {
   console.log(JSON.stringify(coverage, null, 2))
 } else {
-  console.log(`[feature-archive] schema v${coverage.schemaVersion}: ${coverage.schemaV2Rows}/${coverage.population} settled hitter-games · ${coverage.legacyRows} legacy · ${coverage.missingFeatureRows} without features`)
+  console.log(`[feature-archive] schema v${coverage.schemaVersion}: ${coverage.schemaV2Rows}/${coverage.population} settled hitter-games · ${coverage.cleanPregameRows} clean pregame · ${coverage.legacyRows} legacy · ${coverage.missingFeatureRows} without features`)
   console.log(`[feature-archive] v2 range: ${coverage.firstSchemaV2Date || 'collecting'} to ${coverage.lastSchemaV2Date || 'collecting'}`)
   for (const [group, result] of Object.entries(coverage.groups)) {
     const percent = result.coverage == null ? '—' : `${(result.coverage * 100).toFixed(1)}%`

@@ -256,6 +256,10 @@ import {
   fetchHomerersForDate,
   fetchPitcherKsForDate,
 } from './reconcile.mjs';
+import {
+  CLEAN_PREGAME_FEATURE_CAPTURE,
+  CLEAN_PREGAME_FEATURE_GENERATION,
+} from './lib/historicalFeatureArchive.mjs';
 import { buildListBuilderEvidence, validateListBuilderEvidence } from './lib/listBuilderEvidence.mjs';
 import {
   comboRowFromSnapshot,
@@ -2472,6 +2476,7 @@ async function main() {
     reason: EXPERIMENTAL_ML_RANK
       ? (featRankWeight > 0 ? 'validated-edge' : 'no-validated-edge')
       : ML_FEATURE_ARCHIVE_STATUS,
+    requiredGeneration: CLEAN_PREGAME_FEATURE_GENERATION,
     n: featModel.n || 0,
     trainN: featModel.trainN || 0,
     holdoutN: featModel.holdoutN || 0,
@@ -4173,7 +4178,8 @@ async function main() {
         // otherwise contain the outcome inside recent/season feature fields.
         row.preGamePredictionRecord = {
           ...extractPredictionRecord(row),
-          featureCapture: 'pregame-freeze',
+          featureCapture: CLEAN_PREGAME_FEATURE_CAPTURE,
+          featureGeneration: CLEAN_PREGAME_FEATURE_GENERATION,
         };
         const { liveContext, ...rest } = row; // pregame: snapshot pre-first-pitch values
         nextByKey[key] = rest;
@@ -4205,8 +4211,16 @@ async function main() {
         // carried one, so never-live (e.g. postponed) rows keep their own value.
         if (Number.isFinite(snap.simHRProb)) row.simHRProb = snap.simHRProb;
         if (Number.isFinite(snap.pmScore)) row.pmScore = snap.pmScore; // pitch-mix scalar survives to the post-Final snapshot reconcile reads
-        if (snap.preGamePredictionRecord?.featureCapture === 'pregame-freeze') {
-          row.preGamePredictionRecord = snap.preGamePredictionRecord;
+        if (snap.preGamePredictionRecord?.featureCapture === CLEAN_PREGAME_FEATURE_CAPTURE) {
+          // Phase 2 began trustworthy pregame capture before the clean-model
+          // generation marker existed. Promote that exact identity-bound
+          // snapshot in place; never promote a record without capture proof.
+          const cleanRecord = {
+            ...snap.preGamePredictionRecord,
+            featureGeneration: CLEAN_PREGAME_FEATURE_GENERATION,
+          };
+          snap.preGamePredictionRecord = cleanRecord;
+          row.preGamePredictionRecord = cleanRecord;
         }
         nextByKey[key] = snap; // carry forward through final too, so it survives to the post-Final snapshot reconcile reads
         frozen++;

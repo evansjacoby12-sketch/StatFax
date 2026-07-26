@@ -2,6 +2,8 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { validateBacktestLog, validateDailySnapshot } from '../server/lib/mlbDataContracts.mjs'
 import {
+  CLEAN_PREGAME_FEATURE_CAPTURE,
+  CLEAN_PREGAME_FEATURE_GENERATION,
   buildHistoricalFeatureCoverage,
   normalizeHistoricalFeatureVector,
 } from '../server/lib/historicalFeatureArchive.mjs'
@@ -159,7 +161,8 @@ test('daily contract identity-binds a frozen pregame prediction record', () => {
       '1-10': {
         ...batter(),
         preGamePredictionRecord: {
-          featureCapture: 'pregame-freeze',
+          featureCapture: CLEAN_PREGAME_FEATURE_CAPTURE,
+          featureGeneration: CLEAN_PREGAME_FEATURE_GENERATION,
           featureVersion: 2,
           feat: normalizeHistoricalFeatureVector({}),
           pitchTypes: [],

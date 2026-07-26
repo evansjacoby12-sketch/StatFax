@@ -5,9 +5,9 @@
  * OUTPUTS (score + badges + grade one-hots), so it can't out-rank the rule
  * score — it's essentially a re-calibration of it. This model instead fits an
  * L2-regularized logistic regression directly on the FEATURE vector that
- * reconcile.mjs logs (`feat`), which empirically separates HR/no-HR better
- * (temporal holdout AUC ~0.77 vs the rule score's ~0.65 on the current
- * reconciled feature history).
+ * reconcile.mjs logs (`feat`). Historical rows assembled after games ended
+ * are intentionally ineligible; only generation-3 records captured before
+ * first pitch can enter training or temporal validation.
  *
  * Train/inference feature parity is guaranteed because both sides use the SAME
  * extractor: training reads `record.feat`, inference calls
@@ -114,8 +114,14 @@ function predictLogistic(row, model) {
  * older dates, preventing future information from leaking into the promotion
  * gate. The final inference model is then refit on the full resolved window.
  */
+
+import {
+  CLEAN_PREGAME_FEATURE_CAPTURE,
+  CLEAN_PREGAME_FEATURE_GENERATION,
+} from '../lib/historicalFeatureArchive.mjs'
 export function trainFeatModel(backtestLog, {
   minN = MIN_N,
+  minDates = 7,
   holdoutDays = 5,
   minHoldoutN = 50,
   historyDays = 90,
@@ -135,6 +141,8 @@ export function trainFeatModel(backtestLog, {
     for (const row of records[date] || []) {
       if (
         row?.actuallyPlayed !== false
+        && row?.featureGeneration === CLEAN_PREGAME_FEATURE_GENERATION
+        && row?.featureCapture === CLEAN_PREGAME_FEATURE_CAPTURE
         && row?.feat
         && (row.homered === true || row.homered === false)
         && Number.isFinite(row.score)
@@ -145,10 +153,21 @@ export function trainFeatModel(backtestLog, {
   }
 
   const n = samples.length
-  if (n < minN) return { ready: false, n, reason: 'sample-too-small' }
+  if (n < minN) return {
+    ready: false,
+    n,
+    generation: CLEAN_PREGAME_FEATURE_GENERATION,
+    reason: 'clean-sample-too-small',
+  }
 
   const populatedDates = [...new Set(samples.map((sample) => sample.date))]
-  if (populatedDates.length < 2) return { ready: false, n, reason: 'need-multiple-dates' }
+  if (populatedDates.length < minDates) return {
+    ready: false,
+    n,
+    dates: populatedDates.length,
+    generation: CLEAN_PREGAME_FEATURE_GENERATION,
+    reason: 'clean-history-too-young',
+  }
   const testDayCount = Math.min(
     holdoutDays,
     Math.max(1, Math.ceil(populatedDates.length * 0.20)),
@@ -165,6 +184,7 @@ export function trainFeatModel(backtestLog, {
       trainN: trainSamples.length,
       holdoutN: testSamples.length,
       holdoutDates,
+      generation: CLEAN_PREGAME_FEATURE_GENERATION,
       reason: 'temporal-split-too-small',
     }
   }
@@ -209,6 +229,7 @@ export function trainFeatModel(backtestLog, {
     evaluation: 'temporal-holdout',
     historySource: useArchive ? 'modelHistory' : 'records',
     historyDays: dates.length,
+    generation: CLEAN_PREGAME_FEATURE_GENERATION,
   }
 }
 

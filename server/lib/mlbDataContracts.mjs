@@ -1,4 +1,6 @@
 import {
+  CLEAN_PREGAME_FEATURE_CAPTURE,
+  CLEAN_PREGAME_FEATURE_GENERATION,
   HISTORICAL_FEATURE_VERSION,
   buildHistoricalFeatureCoverage,
   validateHistoricalFeatureRecord,
@@ -160,7 +162,8 @@ export function validateDailySnapshot(snapshot) {
       if (!isObject(frozen)) {
         errors.push(`${at}: expected an object`)
       } else {
-        if (frozen.featureCapture !== 'pregame-freeze') errors.push(`${at}.featureCapture: expected pregame-freeze`)
+        if (frozen.featureCapture !== CLEAN_PREGAME_FEATURE_CAPTURE) errors.push(`${at}.featureCapture: expected ${CLEAN_PREGAME_FEATURE_CAPTURE}`)
+        if (frozen.featureGeneration !== CLEAN_PREGAME_FEATURE_GENERATION) errors.push(`${at}.featureGeneration: expected ${CLEAN_PREGAME_FEATURE_GENERATION}`)
         if (String(frozen.playerId) !== String(row.playerId)) errors.push(`${at}.playerId: must match row playerId`)
         if (String(frozen.gamePk) !== String(row.gamePk)) errors.push(`${at}.gamePk: must match row gamePk`)
         if (!Number.isFinite(frozen.score) || frozen.score < 0 || frozen.score > 100) errors.push(`${at}.score: expected finite value in [0,100]`)
