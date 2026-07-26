@@ -63,3 +63,10 @@ test('walk-forward report labels the deployed feature-blend cap', () => {
   assert.equal(Number.isFinite(deployed), true)
   assert.equal(reported, deployed)
 })
+
+test('production feature ranking stays quarantined until clean pregame history exists', () => {
+  const slateSource = readFileSync(new URL('../server/fetch-slate.mjs', import.meta.url), 'utf8')
+  assert.match(slateSource, /const EXPERIMENTAL_ML_RANK = false;/)
+  assert.match(slateSource, /ML_FEATURE_ARCHIVE_STATUS = 'quarantined-postgame-feature-leak'/)
+  assert.match(slateSource, /reason: EXPERIMENTAL_ML_RANK/)
+})

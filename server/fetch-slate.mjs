@@ -438,10 +438,12 @@ import { trainEnsembleWeights, extractFeatures } from './models/trainEnsembleWei
 import { trainFeatModel, scoreFeatProb, probToScore } from './models/featModel.mjs';
 
 // EXPERIMENTAL: blend a feature-based ML model into the SCORE/ranking (not just
-// the probability). Gated on enough logged feature rows + a measured CV-AUC
-// edge over the rule score; weight is sized by that edge and capped. Set to
-// false for instant rollback to pure-rule ranking.
-const EXPERIMENTAL_ML_RANK = true;
+// the probability). Keep this disabled until the historical archive contains a
+// clean run of versioned, pre-first-pitch feature vectors. Older vectors were
+// assembled from post-Final rows and therefore can include the outcome they are
+// meant to predict; their validation metrics must not influence production.
+const EXPERIMENTAL_ML_RANK = false;
+const ML_FEATURE_ARCHIVE_STATUS = 'quarantined-postgame-feature-leak';
 // Blend cap for the rich featModel into the score. RAISED 0.25 → 0.60 after a
 // walk-forward blend sweep (model-lab/wf-eval.mjs): held-out Brier improves
 // MONOTONICALLY with featModel weight (0.1051 pure-rule → 0.1008 pure-feat) and
@@ -2467,6 +2469,9 @@ async function main() {
   ensembleMeta.featRank = {
     enabled: featRankWeight > 0,
     weight: +featRankWeight.toFixed(3),
+    reason: EXPERIMENTAL_ML_RANK
+      ? (featRankWeight > 0 ? 'validated-edge' : 'no-validated-edge')
+      : ML_FEATURE_ARCHIVE_STATUS,
     n: featModel.n || 0,
     trainN: featModel.trainN || 0,
     holdoutN: featModel.holdoutN || 0,
