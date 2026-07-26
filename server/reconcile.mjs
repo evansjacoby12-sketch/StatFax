@@ -129,6 +129,17 @@ async function getJson(url) {
  * by confirmation state (confirmed-then-scratched vs. unconfirmed-then-scratched).
  */
 export function extractPredictionRecord(row) {
+  // Started/final snapshots can contain refreshed season and recent-form
+  // fields that already include this game's result. Prefer the compact record
+  // captured before first pitch when its composite identity still matches the
+  // published row. This keeps the model archive outcome-blind while the live
+  // row remains free to carry current display and settlement state.
+  const frozen = row?.preGamePredictionRecord;
+  const frozenIdentityMatches = frozen?.featureCapture === 'pregame-freeze'
+    && String(frozen?.playerId) === String(row?.playerId)
+    && String(frozen?.gamePk) === String(row?.gamePk);
+  if (frozenIdentityMatches) return structuredClone(frozen);
+
   // Curated numeric FEATURE VECTOR — the model's ingredients at prediction
   // time. Logged so that once a few weeks of reconciled outcomes accrue we can
   // LEARN the core weights from data (a proper re-weighting of the currently

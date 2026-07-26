@@ -154,6 +154,20 @@ export function validateDailySnapshot(snapshot) {
     if (row.zoneBonus != null || row.baseScore != null) errors.push(`${prefix}: retired zone score adjustment fields are forbidden`)
     if (row.zoneMatchup != null) validateZoneMatchup(`${prefix}.zoneMatchup`, row.zoneMatchup, errors)
     if (row.pitcherContactLeak != null) errors.push(...validatePitcherContactLeakEvidence(row.pitcherContactLeak, `${prefix}.pitcherContactLeak`))
+    if (row.preGamePredictionRecord != null) {
+      const frozen = row.preGamePredictionRecord
+      const at = `${prefix}.preGamePredictionRecord`
+      if (!isObject(frozen)) {
+        errors.push(`${at}: expected an object`)
+      } else {
+        if (frozen.featureCapture !== 'pregame-freeze') errors.push(`${at}.featureCapture: expected pregame-freeze`)
+        if (String(frozen.playerId) !== String(row.playerId)) errors.push(`${at}.playerId: must match row playerId`)
+        if (String(frozen.gamePk) !== String(row.gamePk)) errors.push(`${at}.gamePk: must match row gamePk`)
+        if (!Number.isFinite(frozen.score) || frozen.score < 0 || frozen.score > 100) errors.push(`${at}.score: expected finite value in [0,100]`)
+        if (!GRADE_LABELS.has(frozen.grade)) errors.push(`${at}.grade: unsupported label ${String(frozen.grade)}`)
+        errors.push(...validateHistoricalFeatureRecord(frozen, at))
+      }
+    }
     const grade = row.grade?.label || row.grade
     if (grade != null && !GRADE_LABELS.has(grade)) errors.push(`${prefix}.grade: unsupported label ${String(grade)}`)
   }

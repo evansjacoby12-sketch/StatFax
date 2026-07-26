@@ -114,6 +114,23 @@ test('extractPredictionRecord freezes the complete schema-v2 feature archive', (
   assert.ok(rec.zoneEvidence.shadowProbability > rec.simHRProb)
   assert.equal(rec.contactLeakEvidence.version, 1)
   assert.equal(rec.contactLeakEvidence.qualifies, true)
+
+  const archived = { ...rec, featureCapture: 'pregame-freeze' }
+  const finalRecord = extractPredictionRecord({
+    playerId: 1,
+    gamePk: 99,
+    name: 'X',
+    score: 0,
+    preGameScore: 72,
+    batterScore: 99,
+    matchupScore: 99,
+    envScore: 99,
+    preGamePredictionRecord: archived,
+  })
+  assert.notEqual(finalRecord, archived, 'returns an isolated copy of the frozen record')
+  assert.equal(finalRecord.featureCapture, 'pregame-freeze')
+  assert.deepEqual(finalRecord.feat, rec.feat, 'postgame row fields cannot replace frozen features')
+  assert.equal(finalRecord.score, 72)
 })
 
 test('appendToLog keeps 30 operational days and a compact 180-day model archive', () => {

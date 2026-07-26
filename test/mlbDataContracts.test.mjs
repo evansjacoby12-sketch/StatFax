@@ -148,6 +148,45 @@ test('daily contract permits only explicit live pregame-freeze pitcher correctio
   assert.ok(validateDailySnapshot(wrongCorrection).errors.some((error) => error.includes('expected opposing starter 60')))
 })
 
+test('daily contract identity-binds a frozen pregame prediction record', () => {
+  const snapshot = {
+    version: 5,
+    date: '2026-07-25',
+    generatedAt: '2026-07-25T23:50:00.000Z',
+    finishedAt: '2026-07-25T23:50:01.000Z',
+    games: [{ gamePk: 10 }],
+    scoredBatters: {
+      '1-10': {
+        ...batter(),
+        preGamePredictionRecord: {
+          featureCapture: 'pregame-freeze',
+          featureVersion: 2,
+          feat: normalizeHistoricalFeatureVector({}),
+          pitchTypes: [],
+          playerId: 1,
+          gamePk: 10,
+          name: 'Batter',
+          score: 72,
+          grade: 'PRIME',
+          badges: [],
+          lineupConfirmed: true,
+          dataTrusted: true,
+          simHRProb: 0.12,
+          zoneEvidence: null,
+          contactLeakEvidence: null,
+        },
+      },
+    },
+    stats: { scoredBatters: 1 },
+  }
+  assert.deepEqual(validateDailySnapshot(snapshot).errors, [])
+
+  snapshot.scoredBatters['1-10'].preGamePredictionRecord.gamePk = 11
+  const invalid = validateDailySnapshot(snapshot)
+  assert.equal(invalid.ok, false)
+  assert.ok(invalid.errors.some((error) => error.includes('preGamePredictionRecord.gamePk')))
+})
+
 test('backtest contract enforces operational/archive caps and synchronization', () => {
   const row = {
     playerId: 1, gamePk: 10, score: 70, homered: false, actuallyPlayed: true,

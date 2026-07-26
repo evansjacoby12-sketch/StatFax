@@ -4168,6 +4168,13 @@ async function main() {
           const s = pitchMixScore(row);
           if (Number.isFinite(s)) row.pmScore = +s.toFixed(3);
         }
+        // Archive the complete prediction now, while every feature is still
+        // pre-first-pitch. Final rows are rebuilt from refreshed stats and can
+        // otherwise contain the outcome inside recent/season feature fields.
+        row.preGamePredictionRecord = {
+          ...extractPredictionRecord(row),
+          featureCapture: 'pregame-freeze',
+        };
         const { liveContext, ...rest } = row; // pregame: snapshot pre-first-pitch values
         nextByKey[key] = rest;
         stored++;
@@ -4198,6 +4205,9 @@ async function main() {
         // carried one, so never-live (e.g. postponed) rows keep their own value.
         if (Number.isFinite(snap.simHRProb)) row.simHRProb = snap.simHRProb;
         if (Number.isFinite(snap.pmScore)) row.pmScore = snap.pmScore; // pitch-mix scalar survives to the post-Final snapshot reconcile reads
+        if (snap.preGamePredictionRecord?.featureCapture === 'pregame-freeze') {
+          row.preGamePredictionRecord = snap.preGamePredictionRecord;
+        }
         nextByKey[key] = snap; // carry forward through final too, so it survives to the post-Final snapshot reconcile reads
         frozen++;
       }
