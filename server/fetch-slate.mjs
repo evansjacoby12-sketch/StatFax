@@ -98,6 +98,10 @@
  * @property {?number}  exitVelo
  * @property {?number}  hardHitPct
  * @property {?PitcherBlock} pitcher
+ * @property {?PitcherBlock} [currentPitcher] Corrected live starter when
+ *   `pitcher` remains the prediction-time opponent from the pregame freeze.
+ * @property {boolean} [pitcherChanged]
+ * @property {'pregame-freeze'} [pitcherProvenance]
  * @property {number}   score          0-100 composite.
  * @property {number}   batterScore
  * @property {number}   matchupScore
@@ -138,6 +142,7 @@
  */
 
 import { writeFileSync, mkdirSync, existsSync, readFileSync } from 'node:fs';
+import { restoreFrozenLiveRow } from './lib/pitcherProvenance.mjs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -4164,9 +4169,11 @@ async function main() {
       } else if (priorByKey[key]) {
         const snap = priorByKey[key];
         if (live) {
-          const lc = row.liveContext;
-          Object.assign(row, snap); // live: restore frozen model/form fields for display
-          if (lc !== undefined) row.liveContext = lc; // keep live context fresh
+          // Keep the prediction-time pitcher with the frozen model output, but
+          // retain an explicitly-provenanced current starter when MLB corrects
+          // the feed after the snapshot. The contract permits this mismatch
+          // only when the corrected pitcher matches games[].
+          restoreFrozenLiveRow(row, snap);
         }
         // Pin the LOGGED prediction (preGameScore/Grade — what reconcile + the
         // Results view read) to the TRUE pre-first-pitch snapshot, for BOTH live

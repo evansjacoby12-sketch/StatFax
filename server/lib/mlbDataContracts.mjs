@@ -5,6 +5,7 @@ import {
 } from './historicalFeatureArchive.mjs'
 import { validateZoneEvidenceArchive } from './zoneEvaluation.mjs'
 import { validatePitcherContactLeakEvidence } from '../../src/sports/mlb/logic/pitcherContactLeak.js'
+import { isValidFrozenPitcherCorrection } from './pitcherProvenance.mjs'
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 const GRADE_LABELS = new Set(['PRIME', 'STRONG', 'LEAN', 'SKIP'])
@@ -141,7 +142,9 @@ export function validateDailySnapshot(snapshot) {
       }
       const expectedPitcherId = matchesAway ? game.homePitcher?.id : matchesHome ? game.awayPitcher?.id : null
       if (Number.isFinite(expectedPitcherId) && Number.isFinite(row.pitcher?.id) && row.pitcher.id !== expectedPitcherId) {
-        errors.push(`${prefix}.pitcher.id: expected opposing starter ${expectedPitcherId}`)
+        if (!isValidFrozenPitcherCorrection(row, game, expectedPitcherId)) {
+          errors.push(`${prefix}.pitcher.id: expected opposing starter ${expectedPitcherId}`)
+        }
       }
     }
     if (!Number.isFinite(row.score) || row.score < 0 || row.score > 100) errors.push(`${prefix}.score: expected finite value in [0,100]`)

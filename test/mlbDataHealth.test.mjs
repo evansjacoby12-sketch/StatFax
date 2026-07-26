@@ -97,6 +97,24 @@ test('feed identity contradictions block publishing', () => {
   assert.throws(() => assertPublishableMlbDataHealth(result.report), /blocked publish/)
 })
 
+test('watchdog accepts an explicitly corrected starter on frozen live predictions', () => {
+  const slate = makeSlate()
+  slate.games[0].status = 'In Progress'
+  slate.games[0].isLive = true
+  for (const row of Object.values(slate.scoredBatters)) {
+    if (row.teamId !== 1) continue
+    row.pitcher = { id: 55, name: 'Prediction Starter' }
+    row.currentPitcher = { id: 60, name: 'Home Arm' }
+    row.pitcherChanged = true
+    row.pitcherProvenance = 'pregame-freeze'
+  }
+
+  const result = applyMlbDataHealth({ slate, context: contextFor(slate, []), generatedAt })
+
+  assert.equal(result.report.issues.some((issue) => issue.code === 'opposing-pitcher-mismatch'), false)
+  assert.doesNotThrow(() => assertPublishableMlbDataHealth(result.report))
+})
+
 test('missing supporting feeds produce visible warnings without blocking', () => {
   const slate = makeSlate()
   slate.scoredBatters = Object.fromEntries(Object.entries(slate.scoredBatters).slice(0, 2))

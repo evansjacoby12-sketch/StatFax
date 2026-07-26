@@ -105,6 +105,49 @@ test('daily contract rejects team, side, and opposing-starter identity contradic
   assert.ok(check.errors.some((error) => error.includes('teamId: does not belong to game')))
 })
 
+test('daily contract permits only explicit live pregame-freeze pitcher corrections', () => {
+  const snapshot = {
+    version: 5,
+    date: '2026-07-25',
+    generatedAt: '2026-07-25T23:50:00.000Z',
+    finishedAt: '2026-07-25T23:50:01.000Z',
+    games: [{
+      gamePk: 10,
+      isLive: true,
+      awayTeam: { id: 1 },
+      homeTeam: { id: 2 },
+      awayPitcher: { id: 50, name: 'Away Arm' },
+      homePitcher: { id: 60, name: 'Corrected Starter' },
+    }],
+    scoredBatters: {
+      '1-10': {
+        ...batter(),
+        teamId: 1,
+        isHome: false,
+        pitcher: { id: 55, name: 'Prediction Starter' },
+        currentPitcher: { id: 60, name: 'Corrected Starter' },
+        pitcherChanged: true,
+        pitcherProvenance: 'pregame-freeze',
+      },
+    },
+    stats: { scoredBatters: 1 },
+  }
+
+  assert.deepEqual(validateDailySnapshot(snapshot).errors, [])
+
+  const unmarked = structuredClone(snapshot)
+  delete unmarked.scoredBatters['1-10'].pitcherProvenance
+  assert.ok(validateDailySnapshot(unmarked).errors.some((error) => error.includes('expected opposing starter 60')))
+
+  const pregame = structuredClone(snapshot)
+  pregame.games[0].isLive = false
+  assert.ok(validateDailySnapshot(pregame).errors.some((error) => error.includes('expected opposing starter 60')))
+
+  const wrongCorrection = structuredClone(snapshot)
+  wrongCorrection.scoredBatters['1-10'].currentPitcher.id = 61
+  assert.ok(validateDailySnapshot(wrongCorrection).errors.some((error) => error.includes('expected opposing starter 60')))
+})
+
 test('backtest contract enforces operational/archive caps and synchronization', () => {
   const row = {
     playerId: 1, gamePk: 10, score: 70, homered: false, actuallyPlayed: true,

@@ -5,6 +5,7 @@ import {
   isPregameMlbGame,
   validateAiHrContext,
 } from './aiHrContext.mjs'
+import { isValidFrozenPitcherCorrection } from './pitcherProvenance.mjs'
 
 export const MLB_DATA_HEALTH_VERSION = 2
 export const MLB_DATA_HEALTH_MODE = 'watchdog'
@@ -186,12 +187,14 @@ function deterministicIssues(slate, generatedAt) {
 
     const expectedPitcher = side === 'away' ? game?.homePitcher : side === 'home' ? game?.awayPitcher : null
     if (finite(expectedPitcher?.id) && finite(row?.pitcher?.id) && !same(expectedPitcher.id, row.pitcher.id)) {
-      addIssue(issues, seen, {
-        id: issueId('opposing-pitcher-mismatch', gamePk, playerId), source: 'deterministic', severity: 'critical',
-        code: 'opposing-pitcher-mismatch', scope: 'batter', gamePk, playerId,
-        message: `${clean(row?.name, 80) || `Batter ${playerId}`} is scored against ${clean(row?.pitcher?.name, 80) || row.pitcher.id}, not listed opponent ${clean(expectedPitcher?.name, 80) || expectedPitcher.id}.`,
-        blocksPublish: true,
-      })
+      if (!isValidFrozenPitcherCorrection(row, game, expectedPitcher.id)) {
+        addIssue(issues, seen, {
+          id: issueId('opposing-pitcher-mismatch', gamePk, playerId), source: 'deterministic', severity: 'critical',
+          code: 'opposing-pitcher-mismatch', scope: 'batter', gamePk, playerId,
+          message: `${clean(row?.name, 80) || `Batter ${playerId}`} is scored against ${clean(row?.pitcher?.name, 80) || row.pitcher.id}, not listed opponent ${clean(expectedPitcher?.name, 80) || expectedPitcher.id}.`,
+          blocksPublish: true,
+        })
+      }
     } else if (finite(expectedPitcher?.id) && !finite(row?.pitcher?.id) && isPregameMlbGame(game)) {
       addIssue(issues, seen, {
         id: issueId('opposing-pitcher-attachment-missing', gamePk, playerId), source: 'deterministic', severity: 'critical',
