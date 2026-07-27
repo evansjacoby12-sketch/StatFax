@@ -6,7 +6,7 @@ test('Games workspace receives and labels advisory game forecasts and validation
   const [app, games, css] = await Promise.all([
     readFile(new URL('../ui/src/App.jsx', import.meta.url), 'utf8'),
     readFile(new URL('../ui/src/components/GamesView.jsx', import.meta.url), 'utf8'),
-    readFile(new URL('../ui/src/App.css', import.meta.url), 'utf8'),
+    readFile(new URL('../ui/src/app.css', import.meta.url), 'utf8'),
   ])
 
   assert.match(app, /gameProjections=\{data\.raw\?\.gameProjections \|\| \{\}\}/)
