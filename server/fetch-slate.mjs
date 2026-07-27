@@ -2297,7 +2297,6 @@ async function main() {
   writeFileSync(MLB_GAME_RESULTS_OUT_PATH, JSON.stringify(mlbGameResults));
   const teamScoringProfiles = buildTeamScoringProfiles(mlbGameResults, date);
   const teamScoringEvaluation = evaluateTeamScoringForm(mlbGameResults);
-  const gameScheduleContexts = buildGameScheduleContexts(games, mlbGameResults, date);
   console.log(
     `[game-results] scoring profiles: ${teamScoringProfiles.games} prior games · `
     + `${Object.keys(teamScoringProfiles.teams).length} teams · `
@@ -2652,6 +2651,7 @@ async function main() {
   // "Cancelled" — match both.
   const POSTPONED_STATES = new Set(['Postponed', 'Cancelled', 'Suspended']);
   const games = rawGames.filter(g => !POSTPONED_STATES.has(g.status));
+  const gameScheduleContexts = buildGameScheduleContexts(games, mlbGameResults, date);
   const dropped = rawGames.length - games.length;
   console.log(`[slate] ${games.length} games (dropped ${dropped} postponed/cancelled)`);
 

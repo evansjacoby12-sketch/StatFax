@@ -29,6 +29,14 @@ test('slate writer publishes schema v5 without a bare-player alias', () => {
   assert.doesNotMatch(source, /scoredBatters\[id\]\s*=\s*row/)
 })
 
+test('slate builds schedule context only after games are initialized', () => {
+  const source = readFileSync(new URL('../server/fetch-slate.mjs', import.meta.url), 'utf8')
+  const gamesInitialized = source.indexOf('const games = rawGames.filter')
+  const scheduleContextBuilt = source.indexOf('const gameScheduleContexts = buildGameScheduleContexts')
+  assert.ok(gamesInitialized >= 0, 'games initialization must remain present')
+  assert.ok(scheduleContextBuilt > gamesInitialized, 'schedule context cannot read games before initialization')
+})
+
 test('day rating and persisted combo boards retain both doubleheader games', () => {
   const source = readFileSync(new URL('../server/fetch-slate.mjs', import.meta.url), 'utf8')
   const rating = source.slice(source.indexOf('function computeDayRating'), source.indexOf('// below', source.indexOf('function computeDayRating')))
