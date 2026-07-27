@@ -153,7 +153,7 @@ function validateGameProjectionRecord(prefix, projection, errors, gameIds = null
     errors.push(`${prefix}: expected an object`)
     return
   }
-  if (![1, 2].includes(projection.modelVersion)) errors.push(`${prefix}.modelVersion: expected 1 or 2`)
+  if (![1, 2, 3].includes(projection.modelVersion)) errors.push(`${prefix}.modelVersion: expected 1, 2, or 3`)
   if (projection.advisoryOnly !== true) errors.push(`${prefix}.advisoryOnly: must be true`)
   if (projection.captureState !== 'pregame') errors.push(`${prefix}.captureState: expected pregame`)
   if (!Number.isFinite(projection.gamePk)) errors.push(`${prefix}.gamePk: must be finite`)
@@ -227,6 +227,68 @@ function validateGameProjectionRecord(prefix, projection, errors, gameIds = null
       ]) {
         validateOptionalMetric(`${at}.teamScoring.${field}`, scoring[field], errors, { min: 0, max: 20 })
       }
+    }
+  }
+  if (projection.modelVersion >= 3) {
+    for (const side of ['away', 'home']) {
+      const input = projection.inputs?.[side]
+      const at = `${prefix}.inputs.${side}`
+      if (!isObject(input)) continue
+      for (const [field, min, max] of [
+        ['starterFactor', 0.72, 1.35],
+        ['bullpenFactor', 0.78, 1.28],
+        ['bullpenAvailabilityFactor', 1, 1.07],
+        ['pitchingFactor', 0.82, 1.24],
+        ['expectedStarterIP', 1, 8],
+        ['starterWorkloadCoverage', 0, 1],
+        ['starterShare', 0.12, 0.89],
+        ['bullpenShare', 0.11, 0.88],
+      ]) {
+        if (!Number.isFinite(input[field])) errors.push(`${at}.${field}: required for model v3`)
+        else validateOptionalMetric(`${at}.${field}`, input[field], errors, { min, max })
+      }
+      if (!['opener', 'recent-starts', 'season-starts', 'league-average'].includes(input.starterWorkloadSource)) {
+        errors.push(`${at}.starterWorkloadSource: unsupported`)
+      }
+      if (
+        Number.isFinite(input.starterShare)
+        && Number.isFinite(input.bullpenShare)
+        && Math.abs(input.starterShare + input.bullpenShare - 1) > 0.001
+      ) errors.push(`${at}: starterShare and bullpenShare must sum to 1`)
+      validateOptionalMetric(
+        `${at}.bullpenEstimatedRunsAllowed9`,
+        input.bullpenEstimatedRunsAllowed9,
+        errors,
+        { min: 0, max: 20 },
+      )
+      for (const field of ['bullpenUnavailable', 'bullpenTaxed']) {
+        if (!Number.isInteger(input[field]) || input[field] < 0) {
+          errors.push(`${at}.${field}: expected a non-negative integer`)
+        }
+      }
+      const bullpen = input.bullpenContext
+      if (!isObject(bullpen)) {
+        errors.push(`${at}.bullpenContext: expected an object for model v3`)
+        continue
+      }
+      validateOptionalMetric(`${at}.bullpenContext.qualityFactor`, bullpen.qualityFactor, errors, { min: 0.78, max: 1.28 })
+      validateOptionalMetric(`${at}.bullpenContext.availabilityFactor`, bullpen.availabilityFactor, errors, { min: 1, max: 1.07 })
+      validateProbability(`${at}.bullpenContext.unavailableShare`, bullpen.unavailableShare, errors)
+      validateProbability(`${at}.bullpenContext.taxedShare`, bullpen.taxedShare, errors)
+      validateProbability(`${at}.bullpenContext.coverage`, bullpen.coverage, errors)
+      if (!Array.isArray(bullpen.unavailableNames) || bullpen.unavailableNames.some((name) => typeof name !== 'string')) {
+        errors.push(`${at}.bullpenContext.unavailableNames: expected an array of strings`)
+      }
+      if (
+        Number.isFinite(input.bullpenFactor)
+        && Number.isFinite(bullpen.qualityFactor)
+        && Math.abs(input.bullpenFactor - bullpen.qualityFactor) > 0.001
+      ) errors.push(`${at}.bullpenFactor: must match bullpenContext.qualityFactor`)
+      if (
+        Number.isFinite(input.bullpenAvailabilityFactor)
+        && Number.isFinite(bullpen.availabilityFactor)
+        && Math.abs(input.bullpenAvailabilityFactor - bullpen.availabilityFactor) > 0.001
+      ) errors.push(`${at}.bullpenAvailabilityFactor: must match bullpenContext.availabilityFactor`)
     }
   }
   if (projection.freezeState != null && !['refreshing-pregame', 'final-pregame'].includes(projection.freezeState)) {

@@ -469,6 +469,10 @@ import { powerReadySignal, barrelReadySignal } from '../ui/src/lib/powerReady.js
 import { pitchMixScore } from '../ui/src/lib/scout.js';
 import { buildPitcherContactLeak } from '../src/sports/mlb/logic/pitcherContactLeak.js';
 import {
+  buildBullpenAvailability,
+  buildBullpenRunProfile,
+} from '../src/sports/mlb/logic/bullpenRunEnvironment.js';
+import {
   buildSlateGameProjections,
   evaluateGameForecasts,
   settleGameForecasts,
@@ -888,6 +892,7 @@ async function fetchPitcherStatsBatch(playerIds) {
                 k,
                 bb:    +s.baseOnBalls || 0,
                 bf:    +s.battersFaced || 0,
+                gs:    +s.gamesStarted || 0,
                 groundOuts,
                 airOuts,
                 goAo:  Number.isFinite(goAo) && goAo > 0 ? +goAo.toFixed(3) : null,
@@ -977,20 +982,35 @@ function parseStat(stat = {}) {
 
 // ─── Bullpen HR/9 per team ───────────────────────────────────────────────────
 
-async function fetchBullpenHR9Map(teamIds) {
-  const map = {};
+async function fetchBullpenData(teamIds, {
+  date,
+  probablePitcherIdsByTeam = {},
+} = {}) {
+  const hr9 = {};
+  const runProfiles = {};
+  const availability = {};
   await pMap(teamIds, async (teamId) => {
     try {
-      const data = await mlbGet(`/teams/${teamId}/stats?stats=statSplits&group=pitching&sitCodes=rp&season=${SEASON}`);
-      const split = data.stats?.[0]?.splits?.find(s => s.split?.code === 'rp');
-      if (!split?.stat) return;
-      const ip = parseIP(split.stat.inningsPitched);
-      const hr = +split.stat.homeRuns || 0;
-      if (ip < 30) return;   // <30 IP is too noisy
-      map[teamId] = (hr * 9) / ip;
+      const [statsData, rosterData] = await Promise.all([
+        mlbGet(`/teams/${teamId}/stats?stats=statSplits&group=pitching&sitCodes=rp&season=${SEASON}`),
+        mlbGet(
+          `/teams/${teamId}/roster?rosterType=active`
+          + `&hydrate=person(stats(group=[pitching],type=[gameLog],season=${SEASON},gameType=R))`,
+        ),
+      ]);
+      const split = statsData.stats?.[0]?.splits?.find(s => s.split?.code === 'rp');
+      const profile = buildBullpenRunProfile(split?.stat);
+      if (profile) {
+        runProfiles[teamId] = profile;
+        if (Number.isFinite(profile.hr9)) hr9[teamId] = profile.hr9;
+      }
+      availability[teamId] = buildBullpenAvailability(rosterData?.roster || [], {
+        targetDate: date,
+        excludedPitcherIds: probablePitcherIdsByTeam[teamId] || [],
+      });
     } catch {}
   }, 8);
-  return map;
+  return { hr9, runProfiles, availability };
 }
 
 // ─── Pitcher recent form / hands ─────────────────────────────────────────────
@@ -2713,13 +2733,26 @@ async function main() {
 
   const batterIdArr  = [...allBatterIds];
   const pitcherIdArr = [...allPitcherIds];
+  const probablePitcherIdsByTeam = {};
+  for (const game of games) {
+    for (const [teamId, pitcherId] of [
+      [game.awayTeam?.id, game.awayPitcher?.id],
+      [game.homeTeam?.id, game.homePitcher?.id],
+    ]) {
+      if (!Number.isFinite(teamId) || !Number.isFinite(pitcherId)) continue;
+      if (!probablePitcherIdsByTeam[teamId]) probablePitcherIdsByTeam[teamId] = [];
+      if (!probablePitcherIdsByTeam[teamId].includes(pitcherId)) {
+        probablePitcherIdsByTeam[teamId].push(pitcherId);
+      }
+    }
+  }
 
   // 6) Stats fetches — parallel. League-wide Savant leaderboards are single
   //    cached calls regardless of slate size, so we lump them in here too.
   const [
     batterStats,
     pitcherStats,
-    bullpenHR9,
+    bullpenData,
     pitcherHands,
     savantBatter,
     savantPitcher,
@@ -2742,7 +2775,10 @@ async function main() {
   ] = await Promise.all([
     fetchBatterStatsBatch(batterIdArr),
     fetchPitcherStatsBatch(pitcherIdArr),
-    fetchBullpenHR9Map([...new Set(games.flatMap(g => [g.awayTeam.id, g.homeTeam.id]))]),
+    fetchBullpenData([...new Set(games.flatMap(g => [g.awayTeam.id, g.homeTeam.id]))], {
+      date,
+      probablePitcherIdsByTeam,
+    }),
     fetchPitcherHands(pitcherIdArr),
     fetchSavantBatterStatsAll(),
     fetchSavantPitcherStats(),
@@ -2768,6 +2804,9 @@ async function main() {
     // Season blast per pitch type — to usage-weight "blast vs his mix" per game.
     fetchBlastByPitchType(),
   ]);
+  const bullpenHR9 = bullpenData?.hr9 || {};
+  const bullpenRunProfiles = bullpenData?.runProfiles || {};
+  const bullpenAvailability = bullpenData?.availability || {};
 
   // 6b) League-wide Statcast percentile pools. savantBatter holds every
   // qualified MLB batter, so ranking a player's value within it gives the
@@ -4394,7 +4433,7 @@ async function main() {
     }
   } catch (e) { console.warn(`[game-odds] fetch skipped: ${e?.message}`); }
 
-  // Advisory game forecast v1. It is built only while a game is pregame, then
+  // Advisory game forecast. It is built only while a game is pregame, then
   // the last capture is preserved when that exact gamePk starts. Model inputs
   // are deliberately inspectable and market prices are comparison-only.
   let gameProjectionsByGamePk = {};
@@ -4404,6 +4443,8 @@ async function main() {
       games,
       scoredBatters,
       bullpenHR9,
+      bullpenRunProfiles,
+      bullpenAvailability,
       gameOdds: gameOddsByGamePk,
       teamScoringProfiles,
       capturedAt,
@@ -4459,6 +4500,8 @@ async function main() {
     batterStats,
     pitcherStats,
     bullpenHR9,
+    bullpenRunProfiles,
+    bullpenAvailability,
     weatherByGame,
     // HR prop prices per game/book (The Odds API) — drives the board's odds
     // column, best-price display, +EV chips and parlay EV math client-side.

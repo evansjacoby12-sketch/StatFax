@@ -164,6 +164,37 @@ export function estimateIPDistribution(pitcher, opts = {}) {
   };
 }
 
+/**
+ * Convert the bucketed workload distribution into an expected innings value.
+ * Midpoints intentionally stop at 7.5 for the open-ended 7+ bucket; complete
+ * games remain possible outcomes, but should not pull a starter's mean toward
+ * nine innings.
+ */
+export function expectedStarterInnings(pitcher, opts = {}) {
+  const distribution = estimateIPDistribution(pitcher, opts)
+  const expectedIP = pitcher?.isOpener
+    ? 1.5
+    : (
+      distribution.under4 * 3.25
+      + distribution.fourToFive * 4.5
+      + distribution.fiveToSix * 5.5
+      + distribution.sixToSeven * 6.5
+      + distribution.sevenPlus * 7.5
+    )
+  const source = pitcher?.isOpener
+    ? 'opener'
+    : pitcher?.recentForm?.games > 0 && pitcher?.recentForm?.ip > 0
+      ? 'recent-starts'
+      : pitcher?.season?.gs > 0 && pitcher?.season?.ip > 0
+        ? 'season-starts'
+        : 'league-average'
+  return {
+    expectedIP: Math.max(1, Math.min(8, expectedIP)),
+    source,
+    distribution,
+  }
+}
+
 // ─── 2. probFaceStarterAtPA ───────────────────────────────────────────────────
 
 /**

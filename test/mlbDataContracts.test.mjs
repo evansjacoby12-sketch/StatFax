@@ -220,6 +220,89 @@ test('daily contract validates forecast v2 season-score provenance', () => {
   assert.ok(validateDailySnapshot(snapshot).errors.some((error) => error.includes('teamScoring: expected an object')))
 })
 
+test('daily contract validates forecast v3 workload and bullpen provenance', () => {
+  const scoring = {
+    factor: 1,
+    coverage: 1,
+    cutoffDate: '2026-07-14',
+    leagueRunsPerTeam: 4.45,
+    teamGames: 94,
+    teamRunsPerGame: 4.5,
+    teamRecent14RunsPerGame: 4.6,
+    opponentGames: 95,
+    opponentRunsAllowedPerGame: 4.4,
+    opponentRecent14RunsAllowedPerGame: 4.3,
+  }
+  const inputs = {
+    baseRunsPerTeam: 4.45,
+    teamScoringFactor: 1,
+    teamScoring: scoring,
+    starterFactor: 0.92,
+    bullpenFactor: 1.04,
+    bullpenAvailabilityFactor: 1.02,
+    pitchingFactor: 0.97,
+    expectedStarterIP: 5.4,
+    starterWorkloadSource: 'recent-starts',
+    starterWorkloadCoverage: 1,
+    starterShare: 0.6,
+    bullpenShare: 0.4,
+    bullpenEstimatedRunsAllowed9: 4.42,
+    bullpenUnavailable: 1,
+    bullpenTaxed: 2,
+    bullpenContext: {
+      qualityFactor: 1.04,
+      availabilityFactor: 1.02,
+      unavailableShare: 0.2,
+      taxedShare: 0.3,
+      unavailableNames: ['Closer A'],
+      coverage: 1,
+    },
+  }
+  const projection = {
+    modelVersion: 3,
+    advisoryOnly: true,
+    captureState: 'pregame',
+    gamePk: 10,
+    gameDate: '2026-07-14T23:00:00.000Z',
+    capturedAt: '2026-07-14T20:00:00.000Z',
+    awayExpectedRuns: 4.3,
+    homeExpectedRuns: 4.6,
+    projectedTotal: 8.9,
+    estimatedScore: { away: 4, home: 5 },
+    awayWinProbability: 0.46,
+    homeWinProbability: 0.54,
+    tieAfterNineProbability: 0.12,
+    projectedWinner: 'home',
+    projectedWinnerProbability: 0.54,
+    confidence: { status: 'medium', coverage: 0.92 },
+    inputs: {
+      away: inputs,
+      home: { ...inputs, bullpenContext: { ...inputs.bullpenContext } },
+    },
+    freezeState: 'refreshing-pregame',
+  }
+  const snapshot = {
+    version: 5,
+    date: '2026-07-14',
+    generatedAt: '2026-07-14T12:00:00.000Z',
+    finishedAt: '2026-07-14T12:00:01.000Z',
+    games: [{ gamePk: 10 }],
+    scoredBatters: { '1-10': batter() },
+    stats: { scoredBatters: 1 },
+    gameProjections: { 10: projection },
+  }
+
+  assert.deepEqual(validateDailySnapshot(snapshot).errors, [])
+
+  const tampered = structuredClone(snapshot)
+  tampered.gameProjections[10].inputs.away.bullpenShare = 0.6
+  assert.ok(validateDailySnapshot(tampered).errors.some((error) => error.includes('must sum to 1')))
+
+  const mismatched = structuredClone(snapshot)
+  mismatched.gameProjections[10].inputs.home.bullpenContext.qualityFactor = 1.2
+  assert.ok(validateDailySnapshot(mismatched).errors.some((error) => error.includes('must match bullpenContext')))
+})
+
 test('daily contract rejects the retired bare alias and invalid probability', () => {
   const snapshot = {
     version: 5,

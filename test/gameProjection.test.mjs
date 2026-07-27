@@ -25,6 +25,11 @@ const batter = (playerId, teamId, pitcherId, {
   slg = 0.440,
   era = 4.25,
   order = playerId,
+  recentIp = 25,
+  recentGames = 5,
+  seasonIp = 100,
+  seasonStarts = 18,
+  isOpener = false,
 } = {}) => ({
   playerId,
   gamePk: 10,
@@ -39,8 +44,9 @@ const batter = (playerId, teamId, pitcherId, {
   parkWeatherHandFactor: 1,
   pitcher: {
     id: pitcherId,
-    season: { ip: 100, era },
-    recentForm: { ip: 25, era },
+    isOpener,
+    season: { ip: seasonIp, gs: seasonStarts, era },
+    recentForm: { ip: recentIp, games: recentGames, era },
     xStats: { xEra: era, xwOba: 0.320 },
   },
 })
@@ -88,13 +94,95 @@ test('game projection emits expected score, transparent factors, and market comp
 
   assert.equal(output.advisoryOnly, true)
   assert.equal(output.captureState, 'pregame')
-  assert.equal(output.modelVersion, 2)
+  assert.equal(output.modelVersion, 3)
   assert.ok(output.projectedTotal > 7 && output.projectedTotal < 11)
   assert.equal(output.estimatedScore.away + output.estimatedScore.home > 0, true)
   assert.ok(Math.abs(output.awayWinProbability + output.homeWinProbability - 1) < 0.0002)
   assert.equal(output.inputs.away.lineupSource, 'confirmed')
+  assert.equal(output.inputs.away.starterWorkloadSource, 'recent-starts')
+  assert.ok(output.inputs.away.expectedStarterIP > 4)
+  assert.ok(Math.abs(output.inputs.away.starterShare + output.inputs.away.bullpenShare - 1) < 0.001)
+  assert.ok(Number.isFinite(output.inputs.away.pitchingFactor))
   assert.equal(output.marketComparison.total.line, 8.5)
   assert.ok(Number.isFinite(output.marketComparison.moneyline.homeModelEdge))
+})
+
+test('starter quality carries more weight for a long outing than an opener', () => {
+  const longAce = balancedRows().map((row) => (
+    row.teamId === 1
+      ? batter(row.playerId, 1, 60, {
+        era: 2.2,
+        order: row.battingOrder,
+        recentIp: 34,
+        recentGames: 5,
+        seasonIp: 125,
+        seasonStarts: 19,
+      })
+      : row
+  ))
+  const opener = balancedRows().map((row) => (
+    row.teamId === 1
+      ? batter(row.playerId, 1, 60, {
+        era: 2.2,
+        order: row.battingOrder,
+        recentIp: 5,
+        recentGames: 5,
+        seasonIp: 30,
+        seasonStarts: 20,
+        isOpener: true,
+      })
+      : row
+  ))
+  const longProjection = buildGameProjection({ game, rows: longAce })
+  const openerProjection = buildGameProjection({ game, rows: opener })
+
+  assert.ok(longProjection.inputs.away.expectedStarterIP > openerProjection.inputs.away.expectedStarterIP)
+  assert.ok(longProjection.inputs.away.starterShare > openerProjection.inputs.away.starterShare)
+  assert.ok(longProjection.awayExpectedRuns < openerProjection.awayExpectedRuns)
+})
+
+test('weak or depleted bullpen context raises opponent expected runs', () => {
+  const strong = buildGameProjection({
+    game,
+    rows: balancedRows(),
+    bullpenRunProfiles: {
+      2: { qualityFactor: 0.82, estimatedRunsAllowed9: 3.5, hr9: 0.9, coverage: 1 },
+    },
+    bullpenAvailability: {
+      2: {
+        factor: 1,
+        unavailable: 0,
+        taxed: 0,
+        unavailableShare: 0,
+        taxedShare: 0,
+        unavailableNames: [],
+        coverage: 1,
+      },
+    },
+  })
+  const depleted = buildGameProjection({
+    game,
+    rows: balancedRows(),
+    bullpenRunProfiles: {
+      2: { qualityFactor: 1.24, estimatedRunsAllowed9: 5.4, hr9: 1.5, coverage: 1 },
+    },
+    bullpenAvailability: {
+      2: {
+        factor: 1.07,
+        unavailable: 2,
+        taxed: 3,
+        unavailableShare: 0.4,
+        taxedShare: 0.3,
+        unavailableNames: ['Closer A', 'Setup B'],
+        coverage: 1,
+      },
+    },
+  })
+
+  assert.ok(depleted.awayExpectedRuns > strong.awayExpectedRuns)
+  assert.equal(depleted.inputs.away.bullpenUnavailable, 2)
+  assert.equal(depleted.inputs.away.bullpenTaxed, 3)
+  assert.deepEqual(depleted.inputs.away.bullpenContext.unavailableNames, ['Closer A', 'Setup B'])
 })
 
 test('stronger offense and weaker opposing starter raise a team run projection', () => {

@@ -1,6 +1,7 @@
 import { teamScoringMatchupContext } from './teamScoringForm.js'
+import { expectedStarterInnings } from './starterIPDistribution.js'
 
-export const MLB_GAME_PROJECTION_VERSION = 2
+export const MLB_GAME_PROJECTION_VERSION = 3
 export const MLB_GAME_BASE_RUNS_PER_TEAM = 4.42
 export const MLB_GAME_EVALUATION_MIN_GAMES = 100
 export const MLB_GAME_EVALUATION_MIN_DATES = 10
@@ -110,7 +111,24 @@ function opposingPitcher(lineup, probablePitcherId) {
 }
 
 function starterRunFactor(pitcher) {
-  if (!pitcher) return { factor: 1, estimatedEra: null, coverage: 0 }
+  const workload = expectedStarterInnings(pitcher)
+  const workloadCoverage = workload.source === 'recent-starts'
+    ? clamp((Number(pitcher?.recentForm?.games) || 0) / 5, 0, 1)
+    : workload.source === 'season-starts'
+      ? clamp((Number(pitcher?.season?.gs) || 0) / 15, 0, 1)
+      : workload.source === 'opener'
+        ? 0.75
+        : 0.25
+  if (!pitcher) {
+    return {
+      factor: 1,
+      estimatedEra: null,
+      coverage: 0,
+      expectedIP: workload.expectedIP,
+      workloadSource: workload.source,
+      workloadCoverage,
+    }
+  }
   const season = pitcher.season || {}
   const recent = pitcher.recentForm || {}
   const xStats = pitcher.xStats || {}
@@ -128,20 +146,47 @@ function starterRunFactor(pitcher) {
     const contact = clamp(xStats.xwOba / 0.320, 0.8, 1.22)
     quality = 0.8 * quality + 0.2 * contact
   }
-  // The starter is responsible for only part of a full game's run environment.
   return {
-    factor: clamp(1 + 0.58 * (quality - 1), 0.84, 1.20),
+    factor: clamp(quality, 0.72, 1.35),
     estimatedEra,
     coverage: components.length ? clamp(components.reduce((sum, row) => sum + row.weight, 0), 0, 1) : 0,
+    expectedIP: workload.expectedIP,
+    workloadSource: workload.source,
+    workloadCoverage,
   }
 }
 
-function bullpenPowerFactor(opponentTeamId, bullpenHR9) {
+function bullpenRunFactor(opponentTeamId, bullpenHR9, bullpenRunProfiles, bullpenAvailability) {
+  const profile = bullpenRunProfiles?.[opponentTeamId]
+  const availability = bullpenAvailability?.[opponentTeamId]
   const hr9 = Number(bullpenHR9?.[opponentTeamId])
-  if (!Number.isFinite(hr9) || hr9 <= 0) return { factor: 1, hr9: null }
+  const profileFactor = Number(profile?.qualityFactor)
+  const fallbackFactor = Number.isFinite(hr9) && hr9 > 0
+    ? clamp(1 + 0.20 * (hr9 / 1.20 - 1), 0.82, 1.18)
+    : 1
+  const factor = Number.isFinite(profileFactor)
+    ? clamp(profileFactor, 0.78, 1.28)
+    : fallbackFactor
+  const availabilityFactor = Number.isFinite(availability?.factor)
+    ? clamp(availability.factor, 1, 1.07)
+    : 1
+  const profileCoverage = Number.isFinite(profile?.coverage) ? clamp(profile.coverage, 0, 1) : 0
+  const availabilityCoverage = Number.isFinite(availability?.coverage) ? clamp(availability.coverage, 0, 1) : 0
   return {
-    factor: clamp(1 + 0.08 * (hr9 / 1.20 - 1), 0.95, 1.06),
-    hr9,
+    factor,
+    availabilityFactor,
+    hr9: Number.isFinite(profile?.hr9) ? profile.hr9 : Number.isFinite(hr9) ? hr9 : null,
+    estimatedRunsAllowed9: Number.isFinite(profile?.estimatedRunsAllowed9)
+      ? profile.estimatedRunsAllowed9
+      : null,
+    coverage: profile
+      ? 0.65 * profileCoverage + 0.35 * availabilityCoverage
+      : 0.25 * Number(Number.isFinite(hr9)) + 0.35 * availabilityCoverage,
+    unavailable: Number.isInteger(availability?.unavailable) ? availability.unavailable : 0,
+    taxed: Number.isInteger(availability?.taxed) ? availability.taxed : 0,
+    unavailableShare: Number.isFinite(availability?.unavailableShare) ? availability.unavailableShare : 0,
+    taxedShare: Number.isFinite(availability?.taxedShare) ? availability.taxedShare : 0,
+    unavailableNames: Array.isArray(availability?.unavailableNames) ? availability.unavailableNames : [],
   }
 }
 
@@ -266,12 +311,27 @@ function teamProjection({
   opponentTeamId,
   probablePitcherId,
   bullpenHR9,
+  bullpenRunProfiles,
+  bullpenAvailability,
   teamScoringProfiles,
 }) {
   const lineup = selectTeamLineup(rows, teamId)
   const offense = lineupOffense(lineup)
   const starter = starterRunFactor(opposingPitcher(lineup, probablePitcherId))
-  const bullpen = bullpenPowerFactor(opponentTeamId, bullpenHR9)
+  const bullpen = bullpenRunFactor(
+    opponentTeamId,
+    bullpenHR9,
+    bullpenRunProfiles,
+    bullpenAvailability,
+  )
+  const starterShare = clamp(starter.expectedIP / 9, 0.12, 0.89)
+  const bullpenShare = 1 - starterShare
+  const pitchingFactor = clamp(
+    starterShare * starter.factor
+      + bullpenShare * bullpen.factor * bullpen.availabilityFactor,
+    0.82,
+    1.24,
+  )
   const environment = environmentFactor(lineup)
   const teamScoring = teamScoringMatchupContext(teamScoringProfiles, teamId, opponentTeamId)
   const baseRunsPerTeam = Number.isFinite(teamScoring.leagueRunsPerTeam)
@@ -281,8 +341,7 @@ function teamProjection({
   const expectedRuns = clamp(
     baseRunsPerTeam
       * offense.factor
-      * starter.factor
-      * bullpen.factor
+      * pitchingFactor
       * environment.factor
       * teamScoring.factor
       * homeField,
@@ -291,10 +350,14 @@ function teamProjection({
   )
   const lineupCoverage = clamp(lineup.rows.length / 9, 0, 1)
   const sourceWeight = lineup.source === 'confirmed' ? 1 : lineup.source === 'recent-lineup' ? 0.82 : 0.55
+  const pitchingCoverage = (
+    starterShare * Math.min(starter.coverage, starter.workloadCoverage)
+    + bullpenShare * bullpen.coverage
+  )
   const coverage = (
     0.35 * lineupCoverage * sourceWeight
     + 0.20 * offense.coverage
-    + 0.20 * starter.coverage
+    + 0.20 * pitchingCoverage
     + 0.10 * environment.coverage
     + 0.15 * teamScoring.coverage
   )
@@ -308,6 +371,13 @@ function teamProjection({
       offenseFactor: round(offense.factor),
       starterFactor: round(starter.factor),
       bullpenFactor: round(bullpen.factor),
+      bullpenAvailabilityFactor: round(bullpen.availabilityFactor, 4),
+      pitchingFactor: round(pitchingFactor, 4),
+      expectedStarterIP: round(starter.expectedIP, 2),
+      starterWorkloadSource: starter.workloadSource,
+      starterWorkloadCoverage: round(starter.workloadCoverage, 4),
+      starterShare: round(starterShare, 4),
+      bullpenShare: round(bullpenShare, 4),
       environmentFactor: round(environment.factor),
       teamScoringFactor: round(teamScoring.factor),
       homeFieldFactor: homeField,
@@ -317,6 +387,17 @@ function teamProjection({
       lineupXwoba: Number.isFinite(offense.xwoba) ? round(offense.xwoba) : null,
       estimatedStarterEra: Number.isFinite(starter.estimatedEra) ? round(starter.estimatedEra, 2) : null,
       bullpenHr9: bullpen.hr9,
+      bullpenEstimatedRunsAllowed9: bullpen.estimatedRunsAllowed9,
+      bullpenUnavailable: bullpen.unavailable,
+      bullpenTaxed: bullpen.taxed,
+      bullpenContext: {
+        qualityFactor: round(bullpen.factor, 4),
+        availabilityFactor: round(bullpen.availabilityFactor, 4),
+        unavailableShare: round(bullpen.unavailableShare, 4),
+        taxedShare: round(bullpen.taxedShare, 4),
+        unavailableNames: bullpen.unavailableNames,
+        coverage: round(bullpen.coverage, 4),
+      },
       parkWeatherHrFactor: round(environment.hrFactor),
       teamScoring: {
         ...teamScoring,
@@ -331,6 +412,8 @@ export function buildGameProjection({
   game,
   rows = [],
   bullpenHR9 = {},
+  bullpenRunProfiles = {},
+  bullpenAvailability = {},
   gameOdds = null,
   teamScoringProfiles = null,
   capturedAt = new Date().toISOString(),
@@ -344,6 +427,8 @@ export function buildGameProjection({
     opponentTeamId: game.homeTeam?.id,
     probablePitcherId: game.homePitcher?.id,
     bullpenHR9,
+    bullpenRunProfiles,
+    bullpenAvailability,
     teamScoringProfiles,
   })
   const home = teamProjection({
@@ -354,6 +439,8 @@ export function buildGameProjection({
     opponentTeamId: game.awayTeam?.id,
     probablePitcherId: game.awayPitcher?.id,
     bullpenHR9,
+    bullpenRunProfiles,
+    bullpenAvailability,
     teamScoringProfiles,
   })
   const projectedTotal = away.expectedRuns + home.expectedRuns
@@ -394,6 +481,8 @@ export function buildSlateGameProjections({
   games = [],
   scoredBatters = {},
   bullpenHR9 = {},
+  bullpenRunProfiles = {},
+  bullpenAvailability = {},
   gameOdds = {},
   teamScoringProfiles = null,
   capturedAt = new Date().toISOString(),
@@ -410,6 +499,8 @@ export function buildSlateGameProjections({
       game,
       rows: rows.filter((row) => Number(row.gamePk) === Number(game.gamePk)),
       bullpenHR9,
+      bullpenRunProfiles,
+      bullpenAvailability,
       gameOdds: gameOdds?.[game.gamePk] || null,
       teamScoringProfiles,
       capturedAt,
