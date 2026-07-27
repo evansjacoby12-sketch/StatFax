@@ -37,6 +37,45 @@ test('daily contract accepts schema-v5 composite rows and canonical K output', (
   assert.deepEqual(validateDailySnapshot(snapshot).errors, [])
 })
 
+test('daily contract validates de-vigged MLB game markets', () => {
+  const price = (american, decimal, impliedProbability, fairProbability) => ({
+    american, decimal, impliedProbability, fairProbability,
+  })
+  const snapshot = {
+    version: 5,
+    date: '2026-07-14',
+    generatedAt: '2026-07-14T12:00:00.000Z',
+    finishedAt: '2026-07-14T12:00:01.000Z',
+    games: [{ gamePk: 10 }],
+    scoredBatters: { '1-10': batter() },
+    stats: { scoredBatters: 1 },
+    gameOdds: {
+      10: {
+        books: {
+          fanduel: {
+            moneyline: {
+              away: price(120, 2.2, 1 / 2.2),
+              home: price(-140, 1.714, 1 / 1.714),
+            },
+          },
+        },
+        consensus: {
+          moneyline: {
+            books: 1,
+            away: price(120, 2.2, 1 / 2.2, 0.438),
+            home: price(-140, 1.714, 1 / 1.714, 0.562),
+          },
+          total: null,
+        },
+      },
+    },
+  }
+  assert.deepEqual(validateDailySnapshot(snapshot).errors, [])
+
+  snapshot.gameOdds[10].consensus.moneyline.home.fairProbability = 0.8
+  assert.ok(validateDailySnapshot(snapshot).errors.some((error) => error.includes('fair probabilities must sum to 1')))
+})
+
 test('daily contract rejects the retired bare alias and invalid probability', () => {
   const snapshot = {
     version: 5,

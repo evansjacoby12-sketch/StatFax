@@ -87,6 +87,63 @@ function validateZoneMatchup(prefix, zone, errors) {
   if (zone.badge != null && zone.badge !== 'ZONE_MASTER') errors.push(`${prefix}.badge: unsupported`)
 }
 
+function validateMarketPrice(prefix, price, errors) {
+  if (!isObject(price)) {
+    errors.push(`${prefix}: expected an object`)
+    return
+  }
+  if (!Number.isFinite(price.american) || (price.american > -100 && price.american < 100)) {
+    errors.push(`${prefix}.american: expected American odds outside (-100,100)`)
+  }
+  if (!Number.isFinite(price.decimal) || price.decimal <= 1) errors.push(`${prefix}.decimal: expected value above 1`)
+  if (!Number.isFinite(price.impliedProbability) || price.impliedProbability <= 0 || price.impliedProbability >= 1) {
+    errors.push(`${prefix}.impliedProbability: expected probability in (0,1)`)
+  }
+}
+
+function validateGameOdds(gameOdds, gameIds, errors) {
+  if (gameOdds == null) return 0
+  if (!isObject(gameOdds)) {
+    errors.push('gameOdds: expected an object')
+    return 0
+  }
+  for (const [gamePk, market] of Object.entries(gameOdds)) {
+    const prefix = `gameOdds.${gamePk}`
+    if (!Number.isFinite(Number(gamePk)) || (gameIds.size && !gameIds.has(Number(gamePk)))) {
+      errors.push(`${prefix}: game is missing from games[]`)
+    }
+    if (!isObject(market?.books) || !Object.keys(market.books).length) errors.push(`${prefix}.books: expected at least one book`)
+    for (const [bookKey, book] of Object.entries(market?.books || {})) {
+      if (book.moneyline) {
+        validateMarketPrice(`${prefix}.books.${bookKey}.moneyline.away`, book.moneyline.away, errors)
+        validateMarketPrice(`${prefix}.books.${bookKey}.moneyline.home`, book.moneyline.home, errors)
+      }
+      if (book.total) {
+        if (!Number.isFinite(book.total.line) || book.total.line <= 0) errors.push(`${prefix}.books.${bookKey}.total.line: expected a positive number`)
+        validateMarketPrice(`${prefix}.books.${bookKey}.total.over`, book.total.over, errors)
+        validateMarketPrice(`${prefix}.books.${bookKey}.total.under`, book.total.under, errors)
+      }
+    }
+    for (const [marketKey, sides] of [['moneyline', ['away', 'home']], ['total', ['over', 'under']]]) {
+      const consensus = market?.consensus?.[marketKey]
+      if (!consensus) continue
+      if (!Number.isInteger(consensus.books) || consensus.books < 1) errors.push(`${prefix}.consensus.${marketKey}.books: expected a positive integer`)
+      if (marketKey === 'total' && (!Number.isFinite(consensus.line) || consensus.line <= 0)) {
+        errors.push(`${prefix}.consensus.total.line: expected a positive number`)
+      }
+      let fairSum = 0
+      for (const side of sides) {
+        validateMarketPrice(`${prefix}.consensus.${marketKey}.${side}`, consensus[side], errors)
+        const fair = consensus[side]?.fairProbability
+        if (!Number.isFinite(fair) || fair <= 0 || fair >= 1) errors.push(`${prefix}.consensus.${marketKey}.${side}.fairProbability: expected probability in (0,1)`)
+        else fairSum += fair
+      }
+      if (Math.abs(fairSum - 1) > 0.002) errors.push(`${prefix}.consensus.${marketKey}: fair probabilities must sum to 1`)
+    }
+  }
+  return Object.keys(gameOdds).length
+}
+
 export function validateDailySnapshot(snapshot) {
   const errors = []
   const warnings = []
@@ -179,10 +236,12 @@ export function validateDailySnapshot(snapshot) {
     errors.push(`stats.scoredBatters: expected ${entries.length}, received ${snapshot.stats.scoredBatters}`)
   }
   for (const [key, dist] of Object.entries(snapshot.kDistByPitcher || {})) validateKDistribution(key, dist, errors)
+  const gameMarkets = validateGameOdds(snapshot.gameOdds, gameIds, errors)
 
   if (games.length && entries.length === 0) warnings.push('scoredBatters: empty despite scheduled games')
   return result(errors, warnings, {
     games: games.length,
+    gameMarkets,
     scoredBatters: entries.length,
     kDistributions: Object.keys(snapshot.kDistByPitcher || {}).length,
   })

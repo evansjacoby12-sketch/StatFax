@@ -462,7 +462,7 @@ import { fetchRecentBatterBarrelsMultiWindow, fetchRecentPitcherVelo } from './s
 import { applySimResolution } from './lib/simResolution.mjs';
 import { applyGameNormalizedPrimeCap } from './lib/primeCap.mjs';
 import { applyZonePowerProbabilityInflation } from './lib/zonePowerInflation.mjs';
-import { fetchHROdds } from './lib/theOddsApi.mjs';
+import { fetchGameOdds, fetchHROdds } from './lib/theOddsApi.mjs';
 import { advisoryBarrel } from './lib/barrelScore.mjs';
 import { powerReadySignal, barrelReadySignal } from '../ui/src/lib/powerReady.js';
 import { pitchMixScore } from '../ui/src/lib/scout.js';
@@ -4273,6 +4273,36 @@ async function main() {
     }
   } catch (e) { console.warn(`[odds] fetch skipped: ${e?.message}`); }
 
+  // Game markets are intentionally separate from batter HR props. The main
+  // endpoint returns the full MLB slate in one request and costs two credits
+  // (US region × h2h/totals), so a shorter refresh window is affordable.
+  let gameOddsByGamePk = {};
+  try {
+    const oddsKey = process.env.ODDS_API_KEY;
+    const refreshMin = +(process.env.GAME_ODDS_REFRESH_MINUTES ?? 60);
+    const cache = backtestLog.gameOddsCache;
+    if (cache?.date === date) gameOddsByGamePk = cache.markets || {};
+    const cacheFresh = cache?.date === date
+      && Object.keys(cache.markets || {}).length > 0
+      && Date.now() - Date.parse(cache.at) < refreshMin * 60_000;
+    const anyPregame = games.some((game) => !game.isLive && !game.isFinal);
+    if (oddsKey && cacheFresh) {
+      console.log(`[game-odds] using cached snapshot from ${cache.at} (${Object.keys(gameOddsByGamePk).length} games)`);
+    } else if (oddsKey && anyPregame) {
+      const { gameOddsByGamePk: got, remaining, priced, matched } = await fetchGameOdds(oddsKey, games);
+      // Preserve the last pregame market for games that have left the board.
+      gameOddsByGamePk = { ...gameOddsByGamePk, ...got };
+      if (priced > 0) {
+        backtestLog.gameOddsCache = {
+          date,
+          at: new Date().toISOString(),
+          markets: gameOddsByGamePk,
+        };
+      }
+      console.log(`[game-odds] ${priced} games priced, ${matched} matched (${Object.keys(gameOddsByGamePk).length} cached; credits remaining: ${remaining ?? '?'})`);
+    }
+  } catch (e) { console.warn(`[game-odds] fetch skipped: ${e?.message}`); }
+
   // Attach the market's implied HR prob to each row (mean of 1/decimal across
   // books). Feeds the reconcile log's `vig` — the field whose 94-of-7197
   // coverage blocked every odds-edge validation to date. Deliberately NOT a
@@ -4318,6 +4348,9 @@ async function main() {
     // HR prop prices per game/book (The Odds API) — drives the board's odds
     // column, best-price display, +EV chips and parlay EV math client-side.
     odds: oddsByGamePk,
+    // Moneyline and game-total prices remain separate from batter props.
+    // Consensus probabilities are de-vigged across books for model comparison.
+    gameOdds: gameOddsByGamePk,
 
     // For Final games today: which players actually hit a HR.
     // Shape: { [gamePk]: [playerId, ...] }. Empty when no games are
