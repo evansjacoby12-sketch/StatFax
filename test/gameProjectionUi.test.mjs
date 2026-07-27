@@ -11,7 +11,7 @@ test('Games workspace receives and labels advisory game forecasts and validation
 
   assert.match(app, /gameProjections=\{data\.raw\?\.gameProjections \|\| \{\}\}/)
   assert.match(app, /gameProjectionEvaluation=\{data\.raw\?\.gameProjectionEvaluation \|\| null\}/)
-  assert.match(games, /Model forecast v1/i)
+  assert.match(games, /Model forecast v\{projection\.modelVersion \|\| 1\}/i)
   assert.match(games, /Estimated score/i)
   assert.match(games, /Market & validation/i)
   assert.match(games, /Frozen pregame/i)

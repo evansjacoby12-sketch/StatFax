@@ -100,6 +100,16 @@ jobs:
           key: backtest-log-${{ github.run_id }}
           restore-keys: backtest-log-
 
+      # Official MLB regular-season final scores. The slate refreshes a
+      # 14-day overlap and merges by gamePk, so the full season is downloaded
+      # only when neither this cache nor R2 has a valid archive.
+      - name: Restore MLB game results
+        uses: actions/cache@v4
+        with:
+          path: dist/mlb-game-results.json
+          key: mlb-game-results-${{ github.run_id }}
+          restore-keys: mlb-game-results-
+
       # Per-day pregame freeze (keeps started-game batters at pre-first-pitch
       # model/form values). Same unique-key-saves / restore-by-prefix pattern.
       - name: Restore pregame freeze
@@ -208,6 +218,7 @@ jobs:
       - name: Validate MLB data contracts
         run: |
           npm run validate:mlb-data
+          npm run validate:mlb-game-results
           npm run validate:list-builder-evidence
 
       - name: Build prospective MLB zone evaluation
@@ -253,7 +264,7 @@ jobs:
             exit 0
           fi
           ENDPOINT="https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com"
-          for f in calibration.json backtest-log.json list-builder-evidence.json board-history.json zone-cache.json zone-evaluation.json; do
+          for f in calibration.json backtest-log.json mlb-game-results.json list-builder-evidence.json board-history.json zone-cache.json zone-evaluation.json; do
             if [ -f "dist/$f" ]; then
               aws s3 cp "dist/$f" "s3://$R2_BUCKET/$f" --endpoint-url "$ENDPOINT" \
                 --content-type application/json --cache-control no-cache \

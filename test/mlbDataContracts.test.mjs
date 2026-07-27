@@ -141,6 +141,85 @@ test('daily and backtest contracts validate frozen game projections', () => {
   assert.ok(validateDailySnapshot(snapshot).errors.some((error) => error.includes('captureState')))
 })
 
+test('daily contract validates forecast v2 season-score provenance', () => {
+  const scoring = {
+    factor: 1.03,
+    coverage: 1,
+    cutoffDate: '2026-07-14',
+    leagueRunsPerTeam: 4.45,
+    teamGames: 94,
+    teamRunsPerGame: 4.8,
+    teamRecent14RunsPerGame: 5.1,
+    opponentGames: 95,
+    opponentRunsAllowedPerGame: 4.7,
+    opponentRecent14RunsAllowedPerGame: 5,
+  }
+  const projection = {
+    modelVersion: 2,
+    advisoryOnly: true,
+    captureState: 'pregame',
+    gamePk: 10,
+    gameDate: '2026-07-14T23:00:00.000Z',
+    capturedAt: '2026-07-14T20:00:00.000Z',
+    awayExpectedRuns: 4.3,
+    homeExpectedRuns: 4.6,
+    projectedTotal: 8.9,
+    estimatedScore: { away: 4, home: 5 },
+    awayWinProbability: 0.46,
+    homeWinProbability: 0.54,
+    tieAfterNineProbability: 0.12,
+    projectedWinner: 'home',
+    projectedWinnerProbability: 0.54,
+    confidence: { status: 'medium', coverage: 0.92 },
+    inputs: {
+      away: { baseRunsPerTeam: 4.45, teamScoringFactor: 1.03, teamScoring: scoring },
+      home: { baseRunsPerTeam: 4.45, teamScoringFactor: 0.98, teamScoring: { ...scoring, factor: 0.98 } },
+    },
+    freezeState: 'refreshing-pregame',
+  }
+  const snapshot = {
+    version: 5,
+    date: '2026-07-14',
+    generatedAt: '2026-07-14T12:00:00.000Z',
+    finishedAt: '2026-07-14T12:00:01.000Z',
+    games: [{ gamePk: 10 }],
+    scoredBatters: { '1-10': batter() },
+    stats: { scoredBatters: 1 },
+    gameProjections: { 10: projection },
+    gameScoreData: {
+      version: 1,
+      source: 'MLB season final scores',
+      season: 2026,
+      cutoffDate: '2026-07-14',
+      archivedFinals: 1400,
+      eligibleFinals: 1390,
+      teams: 30,
+      leagueRunsPerTeam: 4.45,
+      evaluation: {
+        version: 1,
+        advisoryOnly: true,
+        methodology: 'expanding-date walk-forward',
+        minimumPriorGames: 100,
+        minimumCoverage: 0.5,
+        sample: {
+          games: 1200,
+          teamRuns: 2400,
+          dates: 90,
+          fromDate: '2026-04-10',
+          throughDate: '2026-07-13',
+        },
+        baseline: { teamRunMae: 2.6, teamRunRmse: 3.3, winnerAccuracy: 0.52 },
+        seasonForm: { teamRunMae: 2.55, teamRunRmse: 3.25, winnerAccuracy: 0.55 },
+        improvement: { teamRunMae: 0.05, teamRunRmse: 0.05, winnerAccuracy: 0.03 },
+      },
+    },
+  }
+
+  assert.deepEqual(validateDailySnapshot(snapshot).errors, [])
+  delete snapshot.gameProjections[10].inputs.away.teamScoring
+  assert.ok(validateDailySnapshot(snapshot).errors.some((error) => error.includes('teamScoring: expected an object')))
+})
+
 test('daily contract rejects the retired bare alias and invalid probability', () => {
   const snapshot = {
     version: 5,

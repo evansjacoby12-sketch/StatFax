@@ -1,4 +1,6 @@
-export const MLB_GAME_PROJECTION_VERSION = 1
+import { teamScoringMatchupContext } from './teamScoringForm.js'
+
+export const MLB_GAME_PROJECTION_VERSION = 2
 export const MLB_GAME_BASE_RUNS_PER_TEAM = 4.42
 export const MLB_GAME_EVALUATION_MIN_GAMES = 100
 export const MLB_GAME_EVALUATION_MIN_DATES = 10
@@ -256,19 +258,33 @@ function estimatedScore(awayExpectedRuns, homeExpectedRuns, projectedWinner) {
   return { away, home }
 }
 
-function teamProjection({ game, rows, teamId, isHome, opponentTeamId, probablePitcherId, bullpenHR9 }) {
+function teamProjection({
+  game,
+  rows,
+  teamId,
+  isHome,
+  opponentTeamId,
+  probablePitcherId,
+  bullpenHR9,
+  teamScoringProfiles,
+}) {
   const lineup = selectTeamLineup(rows, teamId)
   const offense = lineupOffense(lineup)
   const starter = starterRunFactor(opposingPitcher(lineup, probablePitcherId))
   const bullpen = bullpenPowerFactor(opponentTeamId, bullpenHR9)
   const environment = environmentFactor(lineup)
+  const teamScoring = teamScoringMatchupContext(teamScoringProfiles, teamId, opponentTeamId)
+  const baseRunsPerTeam = Number.isFinite(teamScoring.leagueRunsPerTeam)
+    ? clamp(teamScoring.leagueRunsPerTeam, 3.80, 5.00)
+    : MLB_GAME_BASE_RUNS_PER_TEAM
   const homeField = isHome ? 1.02 : 0.98
   const expectedRuns = clamp(
-    MLB_GAME_BASE_RUNS_PER_TEAM
+    baseRunsPerTeam
       * offense.factor
       * starter.factor
       * bullpen.factor
       * environment.factor
+      * teamScoring.factor
       * homeField,
     2.35,
     7.25,
@@ -276,10 +292,11 @@ function teamProjection({ game, rows, teamId, isHome, opponentTeamId, probablePi
   const lineupCoverage = clamp(lineup.rows.length / 9, 0, 1)
   const sourceWeight = lineup.source === 'confirmed' ? 1 : lineup.source === 'recent-lineup' ? 0.82 : 0.55
   const coverage = (
-    0.40 * lineupCoverage * sourceWeight
-    + 0.25 * offense.coverage
-    + 0.25 * starter.coverage
+    0.35 * lineupCoverage * sourceWeight
+    + 0.20 * offense.coverage
+    + 0.20 * starter.coverage
     + 0.10 * environment.coverage
+    + 0.15 * teamScoring.coverage
   )
   return {
     expectedRuns,
@@ -292,18 +309,32 @@ function teamProjection({ game, rows, teamId, isHome, opponentTeamId, probablePi
       starterFactor: round(starter.factor),
       bullpenFactor: round(bullpen.factor),
       environmentFactor: round(environment.factor),
+      teamScoringFactor: round(teamScoring.factor),
       homeFieldFactor: homeField,
+      baseRunsPerTeam: round(baseRunsPerTeam, 4),
       lineupObp: round(offense.obp),
       lineupSlg: round(offense.slg),
       lineupXwoba: Number.isFinite(offense.xwoba) ? round(offense.xwoba) : null,
       estimatedStarterEra: Number.isFinite(starter.estimatedEra) ? round(starter.estimatedEra, 2) : null,
       bullpenHr9: bullpen.hr9,
       parkWeatherHrFactor: round(environment.hrFactor),
+      teamScoring: {
+        ...teamScoring,
+        factor: round(teamScoring.factor, 4),
+        coverage: round(teamScoring.coverage, 4),
+      },
     },
   }
 }
 
-export function buildGameProjection({ game, rows = [], bullpenHR9 = {}, gameOdds = null, capturedAt = new Date().toISOString() }) {
+export function buildGameProjection({
+  game,
+  rows = [],
+  bullpenHR9 = {},
+  gameOdds = null,
+  teamScoringProfiles = null,
+  capturedAt = new Date().toISOString(),
+}) {
   if (!game || game.isLive === true || game.isFinal === true) return null
   const away = teamProjection({
     game,
@@ -313,6 +344,7 @@ export function buildGameProjection({ game, rows = [], bullpenHR9 = {}, gameOdds
     opponentTeamId: game.homeTeam?.id,
     probablePitcherId: game.homePitcher?.id,
     bullpenHR9,
+    teamScoringProfiles,
   })
   const home = teamProjection({
     game,
@@ -322,6 +354,7 @@ export function buildGameProjection({ game, rows = [], bullpenHR9 = {}, gameOdds
     opponentTeamId: game.awayTeam?.id,
     probablePitcherId: game.awayPitcher?.id,
     bullpenHR9,
+    teamScoringProfiles,
   })
   const projectedTotal = away.expectedRuns + home.expectedRuns
   const win = winProbabilities(away.expectedRuns, home.expectedRuns)
@@ -362,6 +395,7 @@ export function buildSlateGameProjections({
   scoredBatters = {},
   bullpenHR9 = {},
   gameOdds = {},
+  teamScoringProfiles = null,
   capturedAt = new Date().toISOString(),
 } = {}) {
   const rows = Object.values(scoredBatters).filter((row, index, all) => (
@@ -377,6 +411,7 @@ export function buildSlateGameProjections({
       rows: rows.filter((row) => Number(row.gamePk) === Number(game.gamePk)),
       bullpenHR9,
       gameOdds: gameOdds?.[game.gamePk] || null,
+      teamScoringProfiles,
       capturedAt,
     }))
     .filter(Boolean)

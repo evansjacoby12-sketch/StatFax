@@ -177,6 +177,7 @@ const OUT_PATH  = resolve(__dirname, '../dist/daily.json');
 // The next cron run reads these back as priorCalibration + priorBacktestLog.
 const CALIBRATION_OUT_PATH = resolve(__dirname, '../dist/calibration.json');
 const BACKTEST_OUT_PATH    = resolve(__dirname, '../dist/backtest-log.json');
+const MLB_GAME_RESULTS_OUT_PATH = resolve(__dirname, '../dist/mlb-game-results.json');
 const LIST_BUILDER_EVIDENCE_OUT_PATH = resolve(__dirname, '../dist/list-builder-evidence.json');
 // Per-day "pregame freeze": once a batter's game starts we keep serving his
 // pre-first-pitch model/form values. Persisted across cron runs via the same
@@ -473,6 +474,13 @@ import {
   settleGameForecasts,
   updateGameForecastLog,
 } from '../src/sports/mlb/logic/gameProjection.js';
+import {
+  buildTeamScoringProfiles,
+  evaluateTeamScoringForm,
+  parseMlbSeasonResults,
+  validateMlbSeasonResults,
+} from '../src/sports/mlb/logic/teamScoringForm.js';
+import { refreshMlbSeasonResults } from './lib/mlbGameResults.mjs';
 
 // ─── HTTP helpers ────────────────────────────────────────────────────────────
 
@@ -2091,6 +2099,7 @@ const R2_PUBLIC_BASE  = 'https://pub-f7f0c61cfc5840ce8b07ddb42902aa48.r2.dev';
 const SNAPSHOT_URL    = `${R2_PUBLIC_BASE}/daily.json`;
 const CALIBRATION_URL = `${R2_PUBLIC_BASE}/calibration.json`;
 const BACKTEST_URL    = `${R2_PUBLIC_BASE}/backtest-log.json`;
+const MLB_GAME_RESULTS_URL = `${R2_PUBLIC_BASE}/mlb-game-results.json`;
 const ZONE_CACHE_URL  = `${R2_PUBLIC_BASE}/zone-cache.json`;
 
 /**
@@ -2187,6 +2196,56 @@ async function main() {
   } catch (e) {
     console.warn(`[combo] local backtest merge skipped: ${e?.message}`);
   }
+
+  // Official season score archive. The first run backfills the regular season;
+  // later runs refresh only a 14-day overlap and merge by gamePk. Projections
+  // consume profiles built with officialDate < slate date, so today's results
+  // and both games of a same-day doubleheader can never leak into pregame math.
+  let mlbGameResults = await fetchFromR2(MLB_GAME_RESULTS_URL);
+  try {
+    if (existsSync(MLB_GAME_RESULTS_OUT_PATH)) {
+      const local = JSON.parse(readFileSync(MLB_GAME_RESULTS_OUT_PATH, 'utf8'));
+      if (
+        validateMlbSeasonResults(local).ok
+        && (!validateMlbSeasonResults(mlbGameResults).ok || local.games.length > mlbGameResults.games.length)
+      ) mlbGameResults = local;
+    }
+  } catch (e) {
+    console.warn(`[game-results] local archive merge skipped: ${e?.message}`);
+  }
+  if (!validateMlbSeasonResults(mlbGameResults).ok || Number(mlbGameResults?.season) !== SEASON) {
+    mlbGameResults = parseMlbSeasonResults(
+      { dates: [] },
+      { season: SEASON, throughDate: date, fetchedAt: startedAt.toISOString() },
+    );
+  }
+  try {
+    const refreshed = await refreshMlbSeasonResults({
+      season: SEASON,
+      throughDate: date,
+      prior: mlbGameResults,
+    });
+    mlbGameResults = refreshed.artifact;
+    console.log(
+      `[game-results] ${refreshed.metrics.games} season finals through ${date} `
+      + `(${refreshed.metrics.incremental ? 'incremental' : 'full'} refresh from ${refreshed.metrics.refreshStartDate})`,
+    );
+  } catch (e) {
+    console.warn(`[game-results] refresh failed; using ${mlbGameResults.games.length} cached finals: ${e?.message}`);
+  }
+  writeFileSync(MLB_GAME_RESULTS_OUT_PATH, JSON.stringify(mlbGameResults));
+  const teamScoringProfiles = buildTeamScoringProfiles(mlbGameResults, date);
+  const teamScoringEvaluation = evaluateTeamScoringForm(mlbGameResults);
+  console.log(
+    `[game-results] scoring profiles: ${teamScoringProfiles.games} prior games · `
+    + `${Object.keys(teamScoringProfiles.teams).length} teams · `
+    + `${teamScoringProfiles.leagueRunsPerTeam?.toFixed?.(3) ?? '—'} R/team`,
+  );
+  console.log(
+    `[game-results] walk-forward ${teamScoringEvaluation.sample.games} games · `
+    + `form MAE ${teamScoringEvaluation.seasonForm.teamRunMae ?? '—'} `
+    + `vs ${teamScoringEvaluation.baseline.teamRunMae ?? '—'} baseline`,
+  );
 
   const yesterdayCT = ctDateMinusDays(1);
   let reconcilePredictions = null;
@@ -4346,6 +4405,7 @@ async function main() {
       scoredBatters,
       bullpenHR9,
       gameOdds: gameOddsByGamePk,
+      teamScoringProfiles,
       capturedAt,
     });
     const tracked = updateGameForecastLog(backtestLog, date, current, games, { capturedAt });
@@ -4409,6 +4469,20 @@ async function main() {
     // Expected team runs, projected total, and win probabilities. These remain
     // advisory while forward results collect and never feed the HR engine.
     gameProjections: gameProjectionsByGamePk,
+    // Compact provenance for the official score archive used by forecast v2.
+    // Full game rows live in mlb-game-results.json rather than bloating every
+    // browser snapshot.
+    gameScoreData: {
+      version: teamScoringProfiles.version,
+      source: teamScoringProfiles.source,
+      season: teamScoringProfiles.season,
+      cutoffDate: teamScoringProfiles.cutoffDate,
+      archivedFinals: mlbGameResults.games.length,
+      eligibleFinals: teamScoringProfiles.games,
+      teams: Object.keys(teamScoringProfiles.teams).length,
+      leagueRunsPerTeam: teamScoringProfiles.leagueRunsPerTeam,
+      evaluation: teamScoringEvaluation,
+    },
     // Aggregate proof layer for the frozen pregame game forecasts. No individual
     // historical rows ship to the browser, and these metrics never feed scoring.
     gameProjectionEvaluation,

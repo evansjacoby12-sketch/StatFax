@@ -9,6 +9,7 @@
     "build-model": "node server/build-model.mjs",
     "slate": "node server/fetch-slate.mjs",
     "validate:mlb-data": "node server/tools/validate-mlb-data.mjs",
+    "validate:mlb-game-results": "node server/tools/validate-mlb-game-results.mjs",
     "mlb:data-health": "node server/mlb-data-health.mjs",
     "validate:mlb-data-health": "node server/tools/validate-mlb-data-health.mjs",
     "mlb:data-health-history": "node server/mlb-data-health-history.mjs",

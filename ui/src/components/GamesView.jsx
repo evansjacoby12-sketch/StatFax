@@ -207,7 +207,9 @@ function GameForecastStrip({ game, projection, evaluation }) {
       }}
     >
       <div className="game-forecast-head">
-        <span className="game-forecast-title"><Icon name="ChartNoAxesCombined" size={12} /> Model forecast v1</span>
+        <span className="game-forecast-title">
+          <Icon name="ChartNoAxesCombined" size={12} /> Model forecast v{projection.modelVersion || 1}
+        </span>
         <span className="game-forecast-sample">{collecting ? 'Collecting' : 'Review sample'} · {sample} settled</span>
         <span className="game-forecast-state">{frozen ? 'Frozen pregame' : 'Pregame'} · advisory</span>
       </div>

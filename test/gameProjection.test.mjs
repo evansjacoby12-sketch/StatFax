@@ -88,7 +88,7 @@ test('game projection emits expected score, transparent factors, and market comp
 
   assert.equal(output.advisoryOnly, true)
   assert.equal(output.captureState, 'pregame')
-  assert.equal(output.modelVersion, 1)
+  assert.equal(output.modelVersion, 2)
   assert.ok(output.projectedTotal > 7 && output.projectedTotal < 11)
   assert.equal(output.estimatedScore.away + output.estimatedScore.home > 0, true)
   assert.ok(Math.abs(output.awayWinProbability + output.homeWinProbability - 1) < 0.0002)
@@ -106,6 +106,48 @@ test('stronger offense and weaker opposing starter raise a team run projection',
   ))
   const aggressive = buildGameProjection({ game, rows: changed })
   assert.ok(aggressive.awayExpectedRuns > baseline.awayExpectedRuns)
+})
+
+test('season scoring form changes only the intended team and discloses its cutoff', () => {
+  const baseline = buildGameProjection({ game, rows: balancedRows() })
+  const teamScoringProfiles = {
+    version: 1,
+    source: 'MLB season final scores',
+    season: 2026,
+    cutoffDate: '2026-07-27',
+    games: 100,
+    leagueRunsPerTeam: 4.4,
+    teams: {
+      1: {
+        games: 90,
+        runsPerGame: 5.1,
+        recent14: { runsPerGame: 5.4 },
+        scoringIndex: 1.25,
+        allowanceIndex: 1,
+        coverage: 1,
+      },
+      2: {
+        games: 90,
+        runsAllowedPerGame: 4.9,
+        recent14: { runsAllowedPerGame: 5.2 },
+        scoringIndex: 1,
+        allowanceIndex: 1.2,
+        coverage: 1,
+      },
+    },
+  }
+  const withSeasonScores = buildGameProjection({
+    game,
+    rows: balancedRows(),
+    teamScoringProfiles,
+  })
+
+  assert.ok(withSeasonScores.awayExpectedRuns > baseline.awayExpectedRuns)
+  assert.ok(Math.abs(withSeasonScores.homeExpectedRuns - baseline.homeExpectedRuns) < 0.05)
+  assert.equal(withSeasonScores.inputs.away.teamScoringFactor, 1.08)
+  assert.equal(withSeasonScores.inputs.away.teamScoring.cutoffDate, '2026-07-27')
+  assert.equal(withSeasonScores.inputs.away.teamScoring.teamGames, 90)
+  assert.equal(withSeasonScores.inputs.away.baseRunsPerTeam, 4.4)
 })
 
 test('forecast tracker refreshes pregame rows and freezes them when the game starts', () => {

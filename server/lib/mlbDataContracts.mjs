@@ -153,7 +153,7 @@ function validateGameProjectionRecord(prefix, projection, errors, gameIds = null
     errors.push(`${prefix}: expected an object`)
     return
   }
-  if (projection.modelVersion !== 1) errors.push(`${prefix}.modelVersion: expected 1`)
+  if (![1, 2].includes(projection.modelVersion)) errors.push(`${prefix}.modelVersion: expected 1 or 2`)
   if (projection.advisoryOnly !== true) errors.push(`${prefix}.advisoryOnly: must be true`)
   if (projection.captureState !== 'pregame') errors.push(`${prefix}.captureState: expected pregame`)
   if (!Number.isFinite(projection.gamePk)) errors.push(`${prefix}.gamePk: must be finite`)
@@ -189,6 +189,46 @@ function validateGameProjectionRecord(prefix, projection, errors, gameIds = null
   if (!['limited', 'medium'].includes(projection.confidence?.status)) errors.push(`${prefix}.confidence.status: unsupported`)
   validateProbability(`${prefix}.confidence.coverage`, projection.confidence?.coverage, errors)
   if (!isObject(projection.inputs?.away) || !isObject(projection.inputs?.home)) errors.push(`${prefix}.inputs: expected away and home factor breakdowns`)
+  if (projection.modelVersion >= 2) {
+    for (const side of ['away', 'home']) {
+      const input = projection.inputs?.[side]
+      const at = `${prefix}.inputs.${side}`
+      if (!isObject(input)) continue
+      if (!Number.isFinite(input.baseRunsPerTeam)) errors.push(`${at}.baseRunsPerTeam: required for model v2`)
+      else validateOptionalMetric(`${at}.baseRunsPerTeam`, input.baseRunsPerTeam, errors, { min: 3.8, max: 5 })
+      if (!Number.isFinite(input.teamScoringFactor)) errors.push(`${at}.teamScoringFactor: required for model v2`)
+      else validateOptionalMetric(`${at}.teamScoringFactor`, input.teamScoringFactor, errors, { min: 0.92, max: 1.08 })
+      const scoring = input.teamScoring
+      if (!isObject(scoring)) {
+        errors.push(`${at}.teamScoring: expected an object for model v2`)
+        continue
+      }
+      validateOptionalMetric(`${at}.teamScoring.factor`, scoring.factor, errors, { min: 0.92, max: 1.08 })
+      validateProbability(`${at}.teamScoring.coverage`, scoring.coverage, errors)
+      if (
+        Number.isFinite(input.teamScoringFactor)
+        && Number.isFinite(scoring.factor)
+        && Math.abs(input.teamScoringFactor - scoring.factor) > 0.001
+      ) errors.push(`${at}.teamScoringFactor: must match teamScoring.factor`)
+      if (scoring.cutoffDate != null && !isValidDate(scoring.cutoffDate)) {
+        errors.push(`${at}.teamScoring.cutoffDate: expected null or YYYY-MM-DD`)
+      }
+      validateOptionalMetric(`${at}.teamScoring.leagueRunsPerTeam`, scoring.leagueRunsPerTeam, errors, { min: 0, max: 20 })
+      for (const field of ['teamGames', 'opponentGames']) {
+        if (!Number.isInteger(scoring[field]) || scoring[field] < 0) {
+          errors.push(`${at}.teamScoring.${field}: expected a non-negative integer`)
+        }
+      }
+      for (const field of [
+        'teamRunsPerGame',
+        'teamRecent14RunsPerGame',
+        'opponentRunsAllowedPerGame',
+        'opponentRecent14RunsAllowedPerGame',
+      ]) {
+        validateOptionalMetric(`${at}.teamScoring.${field}`, scoring[field], errors, { min: 0, max: 20 })
+      }
+    }
+  }
   if (projection.freezeState != null && !['refreshing-pregame', 'final-pregame'].includes(projection.freezeState)) {
     errors.push(`${prefix}.freezeState: unsupported`)
   }
@@ -270,6 +310,68 @@ function validateGameProjectionEvaluation(evaluation, errors) {
   }
   if (typeof evaluation.note !== 'string' || !evaluation.note.trim()) errors.push(`${prefix}.note: expected non-empty text`)
   return evaluation.sample?.games || 0
+}
+
+function validateGameScoreData(data, errors, snapshotDate) {
+  if (data == null) return 0
+  const prefix = 'gameScoreData'
+  if (!isObject(data)) {
+    errors.push(`${prefix}: expected an object`)
+    return 0
+  }
+  if (data.version !== 1) errors.push(`${prefix}.version: expected 1`)
+  if (data.source !== 'MLB season final scores') errors.push(`${prefix}.source: unsupported`)
+  if (!Number.isInteger(data.season)) errors.push(`${prefix}.season: expected an integer`)
+  if (!isValidDate(data.cutoffDate)) errors.push(`${prefix}.cutoffDate: expected YYYY-MM-DD`)
+  else if (isValidDate(snapshotDate) && data.cutoffDate !== snapshotDate) {
+    errors.push(`${prefix}.cutoffDate: must match snapshot date`)
+  }
+  for (const field of ['archivedFinals', 'eligibleFinals', 'teams']) {
+    if (!Number.isInteger(data[field]) || data[field] < 0) errors.push(`${prefix}.${field}: expected a non-negative integer`)
+  }
+  validateOptionalMetric(`${prefix}.leagueRunsPerTeam`, data.leagueRunsPerTeam, errors, { min: 0, max: 20 })
+  if (
+    Number.isInteger(data.archivedFinals)
+    && Number.isInteger(data.eligibleFinals)
+    && data.eligibleFinals > data.archivedFinals
+  ) errors.push(`${prefix}.eligibleFinals: cannot exceed archivedFinals`)
+  const evaluation = data.evaluation
+  if (!isObject(evaluation)) {
+    errors.push(`${prefix}.evaluation: expected an object`)
+  } else {
+    const at = `${prefix}.evaluation`
+    if (evaluation.version !== 1) errors.push(`${at}.version: expected 1`)
+    if (evaluation.advisoryOnly !== true) errors.push(`${at}.advisoryOnly: must be true`)
+    if (evaluation.methodology !== 'expanding-date walk-forward') errors.push(`${at}.methodology: unsupported`)
+    for (const field of ['games', 'teamRuns', 'dates']) {
+      if (!Number.isInteger(evaluation.sample?.[field]) || evaluation.sample[field] < 0) {
+        errors.push(`${at}.sample.${field}: expected a non-negative integer`)
+      }
+    }
+    for (const field of ['fromDate', 'throughDate']) {
+      if (evaluation.sample?.[field] != null && !isValidDate(evaluation.sample[field])) {
+        errors.push(`${at}.sample.${field}: expected null or YYYY-MM-DD`)
+      }
+    }
+    for (const section of ['baseline', 'seasonForm']) {
+      if (!isObject(evaluation[section])) {
+        errors.push(`${at}.${section}: expected an object`)
+        continue
+      }
+      validateOptionalMetric(`${at}.${section}.teamRunMae`, evaluation[section].teamRunMae, errors, { min: 0, max: 30 })
+      validateOptionalMetric(`${at}.${section}.teamRunRmse`, evaluation[section].teamRunRmse, errors, { min: 0, max: 30 })
+      validateOptionalMetric(`${at}.${section}.winnerAccuracy`, evaluation[section].winnerAccuracy, errors, { min: 0, max: 1 })
+    }
+    if (!isObject(evaluation.improvement)) {
+      errors.push(`${at}.improvement: expected an object`)
+    } else {
+      for (const field of ['teamRunMae', 'teamRunRmse']) {
+        validateOptionalMetric(`${at}.improvement.${field}`, evaluation.improvement[field], errors, { min: -30, max: 30 })
+      }
+      validateOptionalMetric(`${at}.improvement.winnerAccuracy`, evaluation.improvement.winnerAccuracy, errors, { min: -1, max: 1 })
+    }
+  }
+  return Number.isInteger(data.eligibleFinals) ? data.eligibleFinals : 0
 }
 
 export function validateDailySnapshot(snapshot) {
@@ -367,6 +469,7 @@ export function validateDailySnapshot(snapshot) {
   const gameMarkets = validateGameOdds(snapshot.gameOdds, gameIds, errors)
   const gameProjections = validateGameProjections(snapshot.gameProjections, gameIds, errors)
   const gameProjectionResults = validateGameProjectionEvaluation(snapshot.gameProjectionEvaluation, errors)
+  const gameScoreResults = validateGameScoreData(snapshot.gameScoreData, errors, snapshot.date)
 
   if (games.length && entries.length === 0) warnings.push('scoredBatters: empty despite scheduled games')
   return result(errors, warnings, {
@@ -374,6 +477,7 @@ export function validateDailySnapshot(snapshot) {
     gameMarkets,
     gameProjections,
     gameProjectionResults,
+    gameScoreResults,
     scoredBatters: entries.length,
     kDistributions: Object.keys(snapshot.kDistByPitcher || {}).length,
   })
