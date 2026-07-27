@@ -76,6 +76,65 @@ test('daily contract validates de-vigged MLB game markets', () => {
   assert.ok(validateDailySnapshot(snapshot).errors.some((error) => error.includes('fair probabilities must sum to 1')))
 })
 
+test('daily and backtest contracts validate frozen game projections', () => {
+  const projection = {
+    modelVersion: 1,
+    advisoryOnly: true,
+    captureState: 'pregame',
+    gamePk: 10,
+    gameDate: '2026-07-14T23:00:00.000Z',
+    capturedAt: '2026-07-14T20:00:00.000Z',
+    awayExpectedRuns: 4.1,
+    homeExpectedRuns: 4.5,
+    projectedTotal: 8.6,
+    estimatedScore: { away: 4, home: 5 },
+    awayWinProbability: 0.46,
+    homeWinProbability: 0.54,
+    tieAfterNineProbability: 0.12,
+    projectedWinner: 'home',
+    projectedWinnerProbability: 0.54,
+    confidence: { status: 'medium', coverage: 0.9 },
+    inputs: { away: {}, home: {} },
+    freezeState: 'final-pregame',
+  }
+  const snapshot = {
+    version: 5,
+    date: '2026-07-14',
+    generatedAt: '2026-07-14T12:00:00.000Z',
+    finishedAt: '2026-07-14T12:00:01.000Z',
+    games: [{ gamePk: 10 }],
+    scoredBatters: { '1-10': batter() },
+    stats: { scoredBatters: 1 },
+    gameProjections: { 10: projection },
+  }
+  assert.deepEqual(validateDailySnapshot(snapshot).errors, [])
+
+  const result = {
+    ...projection,
+    actualAwayRuns: 3,
+    actualHomeRuns: 5,
+    actualTotal: 8,
+    actualWinner: 'home',
+    totalError: 0.6,
+    absoluteTotalError: 0.6,
+    winnerCorrect: true,
+    winnerBrier: 0.2116,
+  }
+  const log = {
+    dates: [],
+    records: {},
+    gameForecasts: {
+      version: 1,
+      predictionsByDate: { '2026-07-14': [projection] },
+      resultsByDate: { '2026-07-14': [result] },
+    },
+  }
+  assert.deepEqual(validateBacktestLog(log).errors, [])
+
+  snapshot.gameProjections[10].captureState = 'live'
+  assert.ok(validateDailySnapshot(snapshot).errors.some((error) => error.includes('captureState')))
+})
+
 test('daily contract rejects the retired bare alias and invalid probability', () => {
   const snapshot = {
     version: 5,

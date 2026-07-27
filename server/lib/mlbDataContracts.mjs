@@ -144,6 +144,70 @@ function validateGameOdds(gameOdds, gameIds, errors) {
   return Object.keys(gameOdds).length
 }
 
+function validateProbability(prefix, value, errors) {
+  if (!Number.isFinite(value) || value < 0 || value > 1) errors.push(`${prefix}: expected probability in [0,1]`)
+}
+
+function validateGameProjectionRecord(prefix, projection, errors, gameIds = null) {
+  if (!isObject(projection)) {
+    errors.push(`${prefix}: expected an object`)
+    return
+  }
+  if (projection.modelVersion !== 1) errors.push(`${prefix}.modelVersion: expected 1`)
+  if (projection.advisoryOnly !== true) errors.push(`${prefix}.advisoryOnly: must be true`)
+  if (projection.captureState !== 'pregame') errors.push(`${prefix}.captureState: expected pregame`)
+  if (!Number.isFinite(projection.gamePk)) errors.push(`${prefix}.gamePk: must be finite`)
+  else if (gameIds?.size && !gameIds.has(projection.gamePk)) errors.push(`${prefix}.gamePk: game is missing from games[]`)
+  for (const field of ['capturedAt', 'gameDate']) {
+    if (!projection[field] || Number.isNaN(Date.parse(projection[field]))) errors.push(`${prefix}.${field}: expected an ISO timestamp`)
+  }
+  for (const field of ['awayExpectedRuns', 'homeExpectedRuns', 'projectedTotal']) {
+    if (!Number.isFinite(projection[field]) || projection[field] < 0 || projection[field] > 20) {
+      errors.push(`${prefix}.${field}: expected finite runs in [0,20]`)
+    }
+  }
+  if (
+    Number.isFinite(projection.awayExpectedRuns)
+    && Number.isFinite(projection.homeExpectedRuns)
+    && Number.isFinite(projection.projectedTotal)
+    && Math.abs(projection.awayExpectedRuns + projection.homeExpectedRuns - projection.projectedTotal) > 0.03
+  ) {
+    errors.push(`${prefix}.projectedTotal: must equal away plus home expected runs`)
+  }
+  validateProbability(`${prefix}.awayWinProbability`, projection.awayWinProbability, errors)
+  validateProbability(`${prefix}.homeWinProbability`, projection.homeWinProbability, errors)
+  validateProbability(`${prefix}.tieAfterNineProbability`, projection.tieAfterNineProbability, errors)
+  validateProbability(`${prefix}.projectedWinnerProbability`, projection.projectedWinnerProbability, errors)
+  if (
+    Number.isFinite(projection.awayWinProbability)
+    && Number.isFinite(projection.homeWinProbability)
+    && Math.abs(projection.awayWinProbability + projection.homeWinProbability - 1) > 0.002
+  ) {
+    errors.push(`${prefix}: win probabilities must sum to 1`)
+  }
+  if (!['away', 'home'].includes(projection.projectedWinner)) errors.push(`${prefix}.projectedWinner: expected away or home`)
+  if (!['limited', 'medium'].includes(projection.confidence?.status)) errors.push(`${prefix}.confidence.status: unsupported`)
+  validateProbability(`${prefix}.confidence.coverage`, projection.confidence?.coverage, errors)
+  if (!isObject(projection.inputs?.away) || !isObject(projection.inputs?.home)) errors.push(`${prefix}.inputs: expected away and home factor breakdowns`)
+  if (projection.freezeState != null && !['refreshing-pregame', 'final-pregame'].includes(projection.freezeState)) {
+    errors.push(`${prefix}.freezeState: unsupported`)
+  }
+}
+
+function validateGameProjections(projections, gameIds, errors) {
+  if (projections == null) return 0
+  if (!isObject(projections)) {
+    errors.push('gameProjections: expected an object')
+    return 0
+  }
+  for (const [gamePk, projection] of Object.entries(projections)) {
+    const prefix = `gameProjections.${gamePk}`
+    if (String(projection?.gamePk) !== String(gamePk)) errors.push(`${prefix}.gamePk: must match map key`)
+    validateGameProjectionRecord(prefix, projection, errors, gameIds)
+  }
+  return Object.keys(projections).length
+}
+
 export function validateDailySnapshot(snapshot) {
   const errors = []
   const warnings = []
@@ -237,11 +301,13 @@ export function validateDailySnapshot(snapshot) {
   }
   for (const [key, dist] of Object.entries(snapshot.kDistByPitcher || {})) validateKDistribution(key, dist, errors)
   const gameMarkets = validateGameOdds(snapshot.gameOdds, gameIds, errors)
+  const gameProjections = validateGameProjections(snapshot.gameProjections, gameIds, errors)
 
   if (games.length && entries.length === 0) warnings.push('scoredBatters: empty despite scheduled games')
   return result(errors, warnings, {
     games: games.length,
     gameMarkets,
+    gameProjections,
     scoredBatters: entries.length,
     kDistributions: Object.keys(snapshot.kDistByPitcher || {}).length,
   })
@@ -343,6 +409,48 @@ export function validateBacktestLog(log) {
   const kEstimateDays = Object.keys(log.kProps?.estByDate || {}).length
   if (kEstimateDays > 14) errors.push(`kProps.estByDate: exceeds 14-day cap (${kEstimateDays})`)
 
+  let gameForecastDays = 0
+  let gameForecastResults = 0
+  if (log.gameForecasts != null) {
+    const forecasts = log.gameForecasts
+    if (!isObject(forecasts)) {
+      errors.push('gameForecasts: expected an object')
+    } else {
+      if (forecasts.version !== 1) errors.push(`gameForecasts.version: expected 1, received ${String(forecasts.version)}`)
+      for (const section of ['predictionsByDate', 'resultsByDate']) {
+        const records = forecasts[section]
+        const recordDates = isObject(records) ? Object.keys(records) : []
+        if (!isObject(records)) errors.push(`gameForecasts.${section}: expected an object`)
+        if (recordDates.length > 180) errors.push(`gameForecasts.${section}: exceeds 180-day cap (${recordDates.length})`)
+        if (!recordDates.every(isValidDate)) errors.push(`gameForecasts.${section}: every key must use YYYY-MM-DD`)
+        for (const date of recordDates) {
+          if (!Array.isArray(records[date])) {
+            errors.push(`gameForecasts.${section}.${date}: expected an array`)
+            continue
+          }
+          const seen = new Set()
+          for (let index = 0; index < records[date].length; index++) {
+            const projection = records[date][index]
+            const prefix = `gameForecasts.${section}.${date}[${index}]`
+            validateGameProjectionRecord(prefix, projection, errors)
+            if (seen.has(projection?.gamePk)) errors.push(`${prefix}: duplicate gamePk ${String(projection?.gamePk)}`)
+            seen.add(projection?.gamePk)
+            if (section === 'resultsByDate') {
+              for (const field of ['actualAwayRuns', 'actualHomeRuns', 'actualTotal', 'absoluteTotalError']) {
+                if (!Number.isFinite(projection?.[field]) || projection[field] < 0) errors.push(`${prefix}.${field}: expected a non-negative number`)
+              }
+              if (!['away', 'home', 'tie'].includes(projection?.actualWinner)) errors.push(`${prefix}.actualWinner: unsupported`)
+              if (projection?.winnerBrier != null) validateProbability(`${prefix}.winnerBrier`, projection.winnerBrier, errors)
+              if (projection?.winnerCorrect != null && typeof projection.winnerCorrect !== 'boolean') errors.push(`${prefix}.winnerCorrect: expected boolean or null`)
+            }
+          }
+          if (section === 'predictionsByDate') gameForecastDays++
+          else gameForecastResults += records[date].length
+        }
+      }
+    }
+  }
+
   return result(errors, warnings, {
     operationalDays: dates.length,
     operationalRows,
@@ -350,6 +458,8 @@ export function validateBacktestLog(log) {
     modelHistoryRows: historyRows,
     featureArchive,
     kResultDays,
+    gameForecastDays,
+    gameForecastResults,
   })
 }
 

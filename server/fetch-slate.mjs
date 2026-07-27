@@ -467,6 +467,11 @@ import { advisoryBarrel } from './lib/barrelScore.mjs';
 import { powerReadySignal, barrelReadySignal } from '../ui/src/lib/powerReady.js';
 import { pitchMixScore } from '../ui/src/lib/scout.js';
 import { buildPitcherContactLeak } from '../src/sports/mlb/logic/pitcherContactLeak.js';
+import {
+  buildSlateGameProjections,
+  settleGameForecasts,
+  updateGameForecastLog,
+} from '../src/sports/mlb/logic/gameProjection.js';
 
 // ─── HTTP helpers ────────────────────────────────────────────────────────────
 
@@ -2163,6 +2168,20 @@ async function main() {
           sgpByDate:     { ...(bc?.sgpByDate || {}),     ...(lc?.sgpByDate || {}) },
         };
       }
+      const lg = local?.gameForecasts, bg = backtestLog?.gameForecasts;
+      if (lg?.predictionsByDate || bg?.predictionsByDate || lg?.resultsByDate || bg?.resultsByDate) {
+        backtestLog.gameForecasts = {
+          version: 1,
+          predictionsByDate: {
+            ...(bg?.predictionsByDate || {}),
+            ...(lg?.predictionsByDate || {}),
+          },
+          resultsByDate: {
+            ...(bg?.resultsByDate || {}),
+            ...(lg?.resultsByDate || {}),
+          },
+        };
+      }
     }
   } catch (e) {
     console.warn(`[combo] local backtest merge skipped: ${e?.message}`);
@@ -2192,6 +2211,18 @@ async function main() {
     }
   } catch (e) {
     console.warn(`[calib] snapshot fetch for reconcile failed: ${e?.message}`);
+  }
+
+  // Settle only identity-bound forecasts captured before first pitch. This is
+  // independent of HR reconciliation and quietly no-ops until v1 projections
+  // have accumulated.
+  try {
+    const before = backtestLog?.gameForecasts?.resultsByDate?.[yesterdayCT]?.length || 0;
+    backtestLog = settleGameForecasts(backtestLog, yesterdayCT, calibSnapshot);
+    const after = backtestLog?.gameForecasts?.resultsByDate?.[yesterdayCT]?.length || 0;
+    if (after > before) console.log(`[game-projection] settled ${after - before} game forecast(s) for ${yesterdayCT}`);
+  } catch (e) {
+    console.warn(`[game-projection] settlement skipped: ${e?.message}`);
   }
 
   let comboRows = [];
@@ -4303,6 +4334,28 @@ async function main() {
     }
   } catch (e) { console.warn(`[game-odds] fetch skipped: ${e?.message}`); }
 
+  // Advisory game forecast v1. It is built only while a game is pregame, then
+  // the last capture is preserved when that exact gamePk starts. Model inputs
+  // are deliberately inspectable and market prices are comparison-only.
+  let gameProjectionsByGamePk = {};
+  try {
+    const capturedAt = new Date().toISOString();
+    const current = buildSlateGameProjections({
+      games,
+      scoredBatters,
+      bullpenHR9,
+      gameOdds: gameOddsByGamePk,
+      capturedAt,
+    });
+    const tracked = updateGameForecastLog(backtestLog, date, current, games, { capturedAt });
+    backtestLog = tracked.log;
+    gameProjectionsByGamePk = Object.fromEntries(tracked.projections.map((projection) => [projection.gamePk, projection]));
+    const frozen = tracked.projections.filter((projection) => projection.freezeState === 'final-pregame').length;
+    console.log(`[game-projection] ${current.length} pregame refreshed, ${frozen} final-pregame frozen`);
+  } catch (e) {
+    console.warn(`[game-projection] build skipped: ${e?.message}`);
+  }
+
   // Attach the market's implied HR prob to each row (mean of 1/decimal across
   // books). Feeds the reconcile log's `vig` — the field whose 94-of-7197
   // coverage blocked every odds-edge validation to date. Deliberately NOT a
@@ -4351,6 +4404,9 @@ async function main() {
     // Moneyline and game-total prices remain separate from batter props.
     // Consensus probabilities are de-vigged across books for model comparison.
     gameOdds: gameOddsByGamePk,
+    // Expected team runs, projected total, and win probabilities. These remain
+    // advisory while forward results collect and never feed the HR engine.
+    gameProjections: gameProjectionsByGamePk,
 
     // For Final games today: which players actually hit a HR.
     // Shape: { [gamePk]: [playerId, ...] }. Empty when no games are
