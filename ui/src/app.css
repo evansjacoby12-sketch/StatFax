@@ -24132,7 +24132,7 @@ button.th:focus-visible {
   .grade-form-fill { transition: none; }
 }
 
-/* MLB game forecast: frozen pregame score/total/win estimate with a separate
+/* MLB game forecast: frozen pregame run ranges/win estimate with a separate
    proof layer. It is informational and never changes HR grades or ranks. */
 .game-forecast {
   margin-top: 12px;
@@ -24178,7 +24178,7 @@ button.th:focus-visible {
 .game-forecast-core {
   min-width: 0;
   display: grid;
-  grid-template-columns: minmax(150px, auto) 82px minmax(150px, 1fr) minmax(95px, auto);
+  grid-template-columns: repeat(3, minmax(88px, .62fr)) minmax(150px, 1.25fr) minmax(128px, .9fr);
   align-items: center;
   gap: 0;
   border: 1px solid var(--border-soft);
@@ -24204,18 +24204,25 @@ button.th:focus-visible {
   text-transform: uppercase;
 }
 
-.game-forecast-score strong {
+.game-forecast-range strong {
   margin-top: 3px;
-  display: flex;
-  align-items: center;
-  gap: 5px;
   color: #fff;
-  font-size: 13px;
+  font-size: 15px;
+  line-height: 1;
   white-space: nowrap;
 }
 
-.game-forecast-score em { color: var(--text-faint); font-style: normal; }
-.game-forecast-total strong { margin-top: 2px; color: #fff; font-size: 16px; }
+.game-forecast-range em,
+.game-forecast-quality em {
+  margin-top: 3px;
+  color: var(--text-faint);
+  font-size: 8px;
+  font-style: normal;
+  white-space: nowrap;
+}
+.game-forecast-range.away { box-shadow: inset 2px 0 color-mix(in srgb, var(--forecast-away) 72%, transparent); }
+.game-forecast-range.home { box-shadow: inset 2px 0 color-mix(in srgb, var(--forecast-home) 72%, transparent); }
+.game-forecast-range.total strong { color: var(--accent); }
 .game-forecast-win { grid-template-columns: 1fr 1fr; gap: 5px 8px; }
 .game-forecast-win > span { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .game-forecast-win > span + span { display: flex; }
@@ -24252,6 +24259,11 @@ button.th:focus-visible {
 }
 .game-forecast-quality small { color: var(--text-dim); }
 .game-forecast-quality strong { margin-top: 3px; color: #fff; font-size: 10px; }
+.game-forecast-quality em {
+  overflow: hidden;
+  max-width: 100%;
+  text-overflow: ellipsis;
+}
 
 .game-forecast-details {
   display: grid;
@@ -24297,21 +24309,24 @@ button.th:focus-visible {
   .game-forecast-head { flex-wrap: wrap; margin-bottom: 7px; }
   .game-forecast-sample { max-width: 145px; overflow: hidden; text-overflow: ellipsis; }
   .game-forecast-state { width: 100%; margin-left: 0; }
-  .game-forecast-core { grid-template-columns: minmax(0, 1fr) 82px; }
+  .game-forecast-core { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .game-forecast-core > div { min-height: 44px; padding: 6px 8px; }
-  .game-forecast-score { grid-column: 1; }
-  .game-forecast-total { grid-column: 2; }
+  .game-forecast-range.home,
+  .game-forecast-range.total { border-left: 1px solid var(--border-soft) !important; }
   .game-forecast-win { grid-column: 1 / -1; border-top: 1px solid var(--border-soft); border-left: 0 !important; }
   .game-forecast-quality {
     grid-column: 1 / -1;
     min-height: 32px !important;
     display: flex !important;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    column-gap: 10px;
     border-top: 1px solid var(--border-soft);
     border-left: 0 !important;
   }
   .game-forecast-quality strong { margin-top: 0; }
+  .game-forecast-quality em { width: 100%; margin-top: 0; }
   .game-forecast-toggle {
     width: 100%;
     min-height: 44px;
@@ -24335,8 +24350,8 @@ button.th:focus-visible {
 }
 
 @media (max-width: 360px) {
-  .game-forecast-score strong { font-size: 11px; }
-  .game-forecast-core { grid-template-columns: minmax(0, 1fr) 68px; }
+  .game-forecast-range strong { font-size: 13px; }
+  .game-forecast-range em { font-size: 7px; }
 }
 
 /* Games filters: slate visibility only. These controls never alter model

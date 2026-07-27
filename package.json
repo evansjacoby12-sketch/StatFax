@@ -10,6 +10,7 @@
     "slate": "node server/fetch-slate.mjs",
     "validate:mlb-data": "node server/tools/validate-mlb-data.mjs",
     "validate:mlb-game-results": "node server/tools/validate-mlb-game-results.mjs",
+    "audit:mlb-game-distribution": "node server/tools/audit-game-score-distribution.mjs",
     "mlb:data-health": "node server/mlb-data-health.mjs",
     "validate:mlb-data-health": "node server/tools/validate-mlb-data-health.mjs",
     "mlb:data-health-history": "node server/mlb-data-health-history.mjs",

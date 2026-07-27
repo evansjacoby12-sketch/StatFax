@@ -4,6 +4,8 @@ import {
   buildGameProjection,
   evaluateGameForecasts,
   gameTotalProbabilities,
+  negativeBinomialDistribution,
+  scoreDistributionSummary,
   settleGameForecasts,
   updateGameForecastLog,
   winProbabilities,
@@ -60,7 +62,17 @@ const balancedRows = () => [
   ...Array.from({ length: 9 }, (_, index) => batter(index + 11, 2, 50, { order: index + 1 })),
 ]
 
-test('run and win distributions are normalized and respond to scoring strength', () => {
+test('overdispersed run and win distributions are normalized and respond to scoring strength', () => {
+  const runDistribution = negativeBinomialDistribution(4.5)
+  const runMean = runDistribution.reduce((sum, probability, runs) => sum + probability * runs, 0)
+  const runVariance = runDistribution.reduce(
+    (sum, probability, runs) => sum + probability * ((runs - runMean) ** 2),
+    0,
+  )
+  assert.ok(Math.abs(runDistribution.reduce((sum, probability) => sum + probability, 0) - 1) < 1e-12)
+  assert.ok(Math.abs(runMean - 4.5) < 0.01)
+  assert.ok(runVariance > runMean * 2)
+
   const even = winProbabilities(4.4, 4.4)
   assert.ok(even.home > 0.5)
   assert.ok(Math.abs(even.home + even.away - 1) < 1e-12)
@@ -72,7 +84,19 @@ test('run and win distributions are normalized and respond to scoring strength',
   assert.equal(totals.push, 0)
 })
 
-test('game projection emits expected score, transparent factors, and market comparison', () => {
+test('score summary exposes central 80% ranges and permits an honest tied mode', () => {
+  const summary = scoreDistributionSummary(4.5, 4.5)
+  assert.equal(summary.family, 'negative-binomial')
+  assert.equal(summary.parameterization, 'NB2')
+  assert.equal(summary.intervalLevel, 0.8)
+  assert.equal(summary.mostLikelyScore.away, summary.mostLikelyScore.home)
+  assert.ok(summary.away.low <= summary.away.mean && summary.away.high >= summary.away.mean)
+  assert.ok(summary.total.low <= summary.total.mean && summary.total.high >= summary.total.mean)
+  assert.ok(summary.away.coverage >= 0.8)
+  assert.ok(summary.total.coverage >= 0.8)
+})
+
+test('game projection emits run ranges, transparent factors, and market comparison', () => {
   const rows = balancedRows()
   const output = buildGameProjection({
     game,
@@ -98,9 +122,16 @@ test('game projection emits expected score, transparent factors, and market comp
 
   assert.equal(output.advisoryOnly, true)
   assert.equal(output.captureState, 'pregame')
-  assert.equal(output.modelVersion, 5)
+  assert.equal(output.modelVersion, 6)
   assert.ok(output.projectedTotal > 7 && output.projectedTotal < 11)
   assert.equal(output.estimatedScore.away + output.estimatedScore.home > 0, true)
+  assert.deepEqual(output.estimatedScore, {
+    away: output.scoreDistribution.mostLikelyScore.away,
+    home: output.scoreDistribution.mostLikelyScore.home,
+  })
+  assert.equal(output.scoreDistribution.family, 'negative-binomial')
+  assert.equal(output.scoreDistribution.dispersion, 3.5)
+  assert.ok(output.scoreDistribution.total.high > output.scoreDistribution.total.low)
   assert.ok(Math.abs(output.awayWinProbability + output.homeWinProbability - 1) < 0.0002)
   assert.equal(output.inputs.away.lineupSource, 'confirmed')
   assert.equal(output.inputs.away.starterWorkloadSource, 'recent-starts')

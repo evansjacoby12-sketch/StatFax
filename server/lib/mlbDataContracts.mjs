@@ -153,7 +153,7 @@ function validateGameProjectionRecord(prefix, projection, errors, gameIds = null
     errors.push(`${prefix}: expected an object`)
     return
   }
-  if (![1, 2, 3, 4, 5].includes(projection.modelVersion)) errors.push(`${prefix}.modelVersion: expected 1, 2, 3, 4, or 5`)
+  if (![1, 2, 3, 4, 5, 6].includes(projection.modelVersion)) errors.push(`${prefix}.modelVersion: expected 1 through 6`)
   if (projection.advisoryOnly !== true) errors.push(`${prefix}.advisoryOnly: must be true`)
   if (projection.captureState !== 'pregame') errors.push(`${prefix}.captureState: expected pregame`)
   if (!Number.isFinite(projection.gamePk)) errors.push(`${prefix}.gamePk: must be finite`)
@@ -454,6 +454,85 @@ function validateGameProjectionRecord(prefix, projection, errors, gameIds = null
           && Number.isFinite(schedule.factor)
           && Math.abs(input.scheduleFactor - schedule.factor) > 0.001
         ) errors.push(`${at}.scheduleFactor: must match teamRunContext.schedule.factor`)
+      }
+    }
+  }
+  if (projection.modelVersion >= 6) {
+    const distribution = projection.scoreDistribution
+    const at = `${prefix}.scoreDistribution`
+    if (!isObject(distribution)) {
+      errors.push(`${at}: expected an object for model v6`)
+    } else {
+      if (distribution.family !== 'negative-binomial') errors.push(`${at}.family: expected negative-binomial`)
+      if (distribution.parameterization !== 'NB2') errors.push(`${at}.parameterization: expected NB2`)
+      validateOptionalMetric(`${at}.dispersion`, distribution.dispersion, errors, { min: 0.5, max: 20 })
+      validateProbability(`${at}.intervalLevel`, distribution.intervalLevel, errors)
+      if (Number.isFinite(distribution.intervalLevel) && Math.abs(distribution.intervalLevel - 0.8) > 0.001) {
+        errors.push(`${at}.intervalLevel: expected the calibrated 0.8 interval`)
+      }
+
+      for (const [side, expectedMean, maxRuns] of [
+        ['away', projection.awayExpectedRuns, 30],
+        ['home', projection.homeExpectedRuns, 30],
+        ['total', projection.projectedTotal, 60],
+      ]) {
+        const summary = distribution[side]
+        const summaryAt = `${at}.${side}`
+        if (!isObject(summary)) {
+          errors.push(`${summaryAt}: expected an object`)
+          continue
+        }
+        for (const field of ['low', 'high', 'mode']) {
+          if (!Number.isInteger(summary[field]) || summary[field] < 0 || summary[field] > maxRuns) {
+            errors.push(`${summaryAt}.${field}: expected an integer in [0,${maxRuns}]`)
+          }
+        }
+        if (
+          Number.isInteger(summary.low)
+          && Number.isInteger(summary.high)
+          && summary.low > summary.high
+        ) errors.push(`${summaryAt}: low cannot exceed high`)
+        validateOptionalMetric(`${summaryAt}.mean`, summary.mean, errors, { min: 0, max: 20 })
+        validateOptionalMetric(`${summaryAt}.variance`, summary.variance, errors, { min: 0, max: 100 })
+        validateProbability(`${summaryAt}.coverage`, summary.coverage, errors)
+        if (
+          Number.isFinite(summary.mean)
+          && Number.isFinite(expectedMean)
+          && Math.abs(summary.mean - expectedMean) > 0.03
+        ) errors.push(`${summaryAt}.mean: must match its expected runs`)
+        if (
+          Number.isFinite(summary.mean)
+          && summary.mean > 0
+          && Number.isFinite(summary.variance)
+          && summary.variance <= summary.mean
+        ) errors.push(`${summaryAt}.variance: must be overdispersed above its mean`)
+        if (
+          Number.isFinite(summary.coverage)
+          && Number.isFinite(distribution.intervalLevel)
+          && summary.coverage + 0.001 < distribution.intervalLevel
+        ) errors.push(`${summaryAt}.coverage: cannot be below intervalLevel`)
+      }
+
+      const mode = distribution.mostLikelyScore
+      if (!isObject(mode)) {
+        errors.push(`${at}.mostLikelyScore: expected an object`)
+      } else {
+        for (const side of ['away', 'home']) {
+          if (!Number.isInteger(mode[side]) || mode[side] < 0 || mode[side] > 30) {
+            errors.push(`${at}.mostLikelyScore.${side}: expected an integer in [0,30]`)
+          }
+          if (
+            Number.isInteger(mode[side])
+            && Number.isInteger(distribution[side]?.mode)
+            && mode[side] !== distribution[side].mode
+          ) errors.push(`${at}.mostLikelyScore.${side}: must match ${side}.mode`)
+          if (
+            Number.isInteger(mode[side])
+            && Number.isInteger(projection.estimatedScore?.[side])
+            && mode[side] !== projection.estimatedScore[side]
+          ) errors.push(`${prefix}.estimatedScore.${side}: must match scoreDistribution.mostLikelyScore`)
+        }
+        validateProbability(`${at}.mostLikelyScore.probability`, mode.probability, errors)
       }
     }
   }
