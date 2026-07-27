@@ -98,7 +98,7 @@ test('game projection emits expected score, transparent factors, and market comp
 
   assert.equal(output.advisoryOnly, true)
   assert.equal(output.captureState, 'pregame')
-  assert.equal(output.modelVersion, 4)
+  assert.equal(output.modelVersion, 5)
   assert.ok(output.projectedTotal > 7 && output.projectedTotal < 11)
   assert.equal(output.estimatedScore.away + output.estimatedScore.home > 0, true)
   assert.ok(Math.abs(output.awayWinProbability + output.homeWinProbability - 1) < 0.0002)
@@ -175,6 +175,69 @@ test('run-specific park and weather context replaces the HR environment proxy', 
   assert.equal(boosted.inputs.away.environmentSource, 'run-specific')
   assert.equal(boosted.inputs.away.runEnvironmentFactor, 1.1)
   assert.ok(boosted.projectedTotal > neutral.projectedTotal)
+})
+
+test('opponent defense, team baserunning, and schedule fatigue move expected runs conservatively', () => {
+  const schedule = (factor) => ({
+    factor,
+    targetDate: '2026-07-27',
+    lastGameDate: '2026-07-26',
+    daysRest: 0,
+    previousDayGames: factor < 1 ? 2 : 1,
+    consecutiveDays: factor < 1 ? 8 : 2,
+    sameSeries: factor === 1,
+    travelSpot: factor < 1,
+    secondDoubleheaderGame: false,
+    historyGames: 100,
+    coverage: 1,
+  })
+  const profile = (teamId, defenseFactor, baserunningFactor) => ({
+    teamId,
+    teamName: `Team ${teamId}`,
+    games: 100,
+    errorsPerGame: 0.5,
+    doublePlaysPerGame: 0.8,
+    caughtStealingDefensePerGame: 0.15,
+    stolenBases: 80,
+    caughtStealing: 20,
+    baserunningRunsPerGame: 0.1,
+    defenseRunsAdjustment: (defenseFactor - 1) * 4.42,
+    baserunningRunsAdjustment: (baserunningFactor - 1) * 4.42,
+    defenseFactor,
+    baserunningFactor,
+    coverage: 1,
+  })
+  const favorable = buildGameProjection({
+    game,
+    rows: balancedRows(),
+    teamSeasonRunProfiles: {
+      teams: {
+        1: profile(1, 1, 1.02),
+        2: profile(2, 1.04, 1),
+      },
+    },
+    gameScheduleContexts: {
+      byGame: { 10: { 1: schedule(1), 2: schedule(1) } },
+    },
+  })
+  const fatigued = buildGameProjection({
+    game,
+    rows: balancedRows(),
+    teamSeasonRunProfiles: {
+      teams: {
+        1: profile(1, 1, 0.98),
+        2: profile(2, 0.96, 1),
+      },
+    },
+    gameScheduleContexts: {
+      byGame: { 10: { 1: schedule(0.96), 2: schedule(1) } },
+    },
+  })
+
+  assert.ok(favorable.awayExpectedRuns > fatigued.awayExpectedRuns)
+  assert.equal(favorable.inputs.away.opponentDefenseFactor, 1.04)
+  assert.equal(fatigued.inputs.away.scheduleFactor, 0.96)
+  assert.equal(fatigued.inputs.away.teamRunContext.schedule.previousDayGames, 2)
 })
 
 test('starter quality carries more weight for a long outing than an opener', () => {

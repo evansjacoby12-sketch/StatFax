@@ -336,6 +336,7 @@ test('daily contract validates forecast v4 platoon and run-environment provenanc
         },
       },
     }),
+    modelVersion: 4,
     freezeState: 'refreshing-pregame',
   }
   const snapshot = {
@@ -359,6 +360,97 @@ test('daily contract validates forecast v4 platoon and run-environment provenanc
   const mismatched = structuredClone(snapshot)
   mismatched.gameProjections[10].inputs.home.runEnvironment.factor = 0.9
   assert.ok(validateDailySnapshot(mismatched).errors.some((error) => error.includes('must match runEnvironment.factor')))
+})
+
+test('daily contract validates forecast v5 defense, baserunning, and schedule provenance', () => {
+  const runEnvironment = {
+    factor: 1,
+    rawParkFactor: 1,
+    appliedParkFactor: 1,
+    weatherFactor: 1,
+    tempFactor: 1,
+    windFactor: 1,
+    windComponent: 0,
+    tempF: 72,
+    windSpeedMph: 0,
+    parkPeriod: '2024-2026',
+    parkSource: 'Baseball Savant Statcast Park Factors',
+    weatherStatus: 'outdoor',
+    roofClosed: false,
+    roofPending: false,
+    coverage: 1,
+  }
+  const team = (teamId, defenseFactor, baserunningFactor) => ({
+    teamId,
+    teamName: `Team ${teamId}`,
+    games: 100,
+    errorsPerGame: 0.5,
+    doublePlaysPerGame: 0.8,
+    caughtStealingDefensePerGame: 0.15,
+    stolenBases: 70,
+    caughtStealing: 20,
+    baserunningRunsPerGame: 0.05,
+    defenseRunsAdjustment: (defenseFactor - 1) * 4.42,
+    baserunningRunsAdjustment: (baserunningFactor - 1) * 4.42,
+    defenseFactor,
+    baserunningFactor,
+    coverage: 1,
+  })
+  const schedule = {
+    factor: 0.995,
+    targetDate: '2026-07-14',
+    lastGameDate: '2026-07-13',
+    daysRest: 0,
+    previousDayGames: 1,
+    consecutiveDays: 3,
+    sameSeries: false,
+    travelSpot: true,
+    secondDoubleheaderGame: false,
+    historyGames: 90,
+    coverage: 1,
+  }
+  const projection = {
+    ...buildGameProjection({
+      game: {
+        gamePk: 10,
+        gameDate: '2026-07-14T23:00:00.000Z',
+        isLive: false,
+        isFinal: false,
+        awayTeam: { id: 1, name: 'Away', abbr: 'AWY' },
+        homeTeam: { id: 2, name: 'Home', abbr: 'HME' },
+      },
+      rows: [],
+      capturedAt: '2026-07-14T20:00:00.000Z',
+      gameRunEnvironments: { 10: runEnvironment },
+      teamSeasonRunProfiles: {
+        teams: {
+          1: team(1, 1.01, 0.99),
+          2: team(2, 0.98, 1.01),
+        },
+      },
+      gameScheduleContexts: {
+        byGame: { 10: { 1: schedule, 2: { ...schedule } } },
+      },
+    }),
+    freezeState: 'refreshing-pregame',
+  }
+  const snapshot = {
+    version: 5,
+    date: '2026-07-14',
+    generatedAt: '2026-07-14T12:00:00.000Z',
+    finishedAt: '2026-07-14T12:00:01.000Z',
+    games: [{ gamePk: 10 }],
+    scoredBatters: { '1-10': batter() },
+    stats: { scoredBatters: 1 },
+    gameProjections: { 10: projection },
+  }
+
+  assert.equal(projection.modelVersion, 5)
+  assert.deepEqual(validateDailySnapshot(snapshot).errors, [])
+
+  const tampered = structuredClone(snapshot)
+  tampered.gameProjections[10].inputs.away.teamRunContext.schedule.factor = 0.96
+  assert.ok(validateDailySnapshot(tampered).errors.some((error) => error.includes('must match teamRunContext.schedule.factor')))
 })
 
 test('daily contract rejects the retired bare alias and invalid probability', () => {

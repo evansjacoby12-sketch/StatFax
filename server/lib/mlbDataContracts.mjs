@@ -153,7 +153,7 @@ function validateGameProjectionRecord(prefix, projection, errors, gameIds = null
     errors.push(`${prefix}: expected an object`)
     return
   }
-  if (![1, 2, 3, 4].includes(projection.modelVersion)) errors.push(`${prefix}.modelVersion: expected 1, 2, 3, or 4`)
+  if (![1, 2, 3, 4, 5].includes(projection.modelVersion)) errors.push(`${prefix}.modelVersion: expected 1, 2, 3, 4, or 5`)
   if (projection.advisoryOnly !== true) errors.push(`${prefix}.advisoryOnly: must be true`)
   if (projection.captureState !== 'pregame') errors.push(`${prefix}.captureState: expected pregame`)
   if (!Number.isFinite(projection.gamePk)) errors.push(`${prefix}.gamePk: must be finite`)
@@ -355,6 +355,106 @@ function validateGameProjectionRecord(prefix, projection, errors, gameIds = null
         && Number.isFinite(environment.weatherFactor)
         && Math.abs(input.weatherRunFactor - environment.weatherFactor) > 0.001
       ) errors.push(`${at}.weatherRunFactor: must match runEnvironment.weatherFactor`)
+    }
+  }
+  if (projection.modelVersion >= 5) {
+    for (const side of ['away', 'home']) {
+      const input = projection.inputs?.[side]
+      const at = `${prefix}.inputs.${side}`
+      if (!isObject(input)) continue
+      for (const [field, min, max] of [
+        ['teamContextFactor', 0.92, 1.08],
+        ['opponentDefenseFactor', 0.96, 1.04],
+        ['baserunningFactor', 0.973, 1.027],
+        ['scheduleFactor', 0.96, 1.01],
+        ['teamRunContextCoverage', 0, 1],
+      ]) {
+        if (!Number.isFinite(input[field])) errors.push(`${at}.${field}: required for model v5`)
+        else validateOptionalMetric(`${at}.${field}`, input[field], errors, { min, max })
+      }
+      const context = input.teamRunContext
+      if (!isObject(context)) {
+        errors.push(`${at}.teamRunContext: expected an object for model v5`)
+        continue
+      }
+      validateOptionalMetric(`${at}.teamRunContext.factor`, context.factor, errors, { min: 0.92, max: 1.08 })
+      validateProbability(`${at}.teamRunContext.coverage`, context.coverage, errors)
+      if (
+        Number.isFinite(input.teamContextFactor)
+        && Number.isFinite(context.factor)
+        && Math.abs(input.teamContextFactor - context.factor) > 0.001
+      ) errors.push(`${at}.teamContextFactor: must match teamRunContext.factor`)
+      if (
+        Number.isFinite(input.teamRunContextCoverage)
+        && Number.isFinite(context.coverage)
+        && Math.abs(input.teamRunContextCoverage - context.coverage) > 0.001
+      ) errors.push(`${at}.teamRunContextCoverage: must match teamRunContext.coverage`)
+
+      const defense = context.defense
+      if (defense != null) {
+        if (!isObject(defense)) errors.push(`${at}.teamRunContext.defense: expected null or object`)
+        else {
+          validateOptionalMetric(`${at}.teamRunContext.defense.factor`, defense.factor, errors, { min: 0.96, max: 1.04 })
+          validateProbability(`${at}.teamRunContext.defense.coverage`, defense.coverage, errors)
+          validateOptionalMetric(`${at}.teamRunContext.defense.defenseRunsAdjustment`, defense.defenseRunsAdjustment, errors, { min: -0.18, max: 0.18 })
+          if (!Number.isFinite(defense.teamId)) errors.push(`${at}.teamRunContext.defense.teamId: expected finite team ID`)
+          if (!Number.isInteger(defense.games) || defense.games < 20) errors.push(`${at}.teamRunContext.defense.games: expected 20+`)
+          if (
+            Number.isFinite(input.opponentDefenseFactor)
+            && Number.isFinite(defense.factor)
+            && Math.abs(input.opponentDefenseFactor - defense.factor) > 0.001
+          ) errors.push(`${at}.opponentDefenseFactor: must match teamRunContext.defense.factor`)
+        }
+      } else if (input.opponentDefenseFactor !== 1) {
+        errors.push(`${at}.opponentDefenseFactor: must be neutral without defense context`)
+      }
+
+      const baserunning = context.baserunning
+      if (baserunning != null) {
+        if (!isObject(baserunning)) errors.push(`${at}.teamRunContext.baserunning: expected null or object`)
+        else {
+          validateOptionalMetric(`${at}.teamRunContext.baserunning.factor`, baserunning.factor, errors, { min: 0.973, max: 1.027 })
+          validateProbability(`${at}.teamRunContext.baserunning.coverage`, baserunning.coverage, errors)
+          validateOptionalMetric(`${at}.teamRunContext.baserunning.baserunningRunsAdjustment`, baserunning.baserunningRunsAdjustment, errors, { min: -0.12, max: 0.12 })
+          if (!Number.isFinite(baserunning.teamId)) errors.push(`${at}.teamRunContext.baserunning.teamId: expected finite team ID`)
+          if (!Number.isInteger(baserunning.games) || baserunning.games < 20) errors.push(`${at}.teamRunContext.baserunning.games: expected 20+`)
+          if (
+            Number.isFinite(input.baserunningFactor)
+            && Number.isFinite(baserunning.factor)
+            && Math.abs(input.baserunningFactor - baserunning.factor) > 0.001
+          ) errors.push(`${at}.baserunningFactor: must match teamRunContext.baserunning.factor`)
+        }
+      } else if (input.baserunningFactor !== 1) {
+        errors.push(`${at}.baserunningFactor: must be neutral without baserunning context`)
+      }
+
+      const schedule = context.schedule
+      if (!isObject(schedule)) {
+        errors.push(`${at}.teamRunContext.schedule: expected an object for model v5`)
+      } else {
+        validateOptionalMetric(`${at}.teamRunContext.schedule.factor`, schedule.factor, errors, { min: 0.96, max: 1.01 })
+        validateProbability(`${at}.teamRunContext.schedule.coverage`, schedule.coverage, errors)
+        if (!isValidDate(schedule.targetDate)) errors.push(`${at}.teamRunContext.schedule.targetDate: expected YYYY-MM-DD`)
+        if (schedule.lastGameDate != null && !isValidDate(schedule.lastGameDate)) {
+          errors.push(`${at}.teamRunContext.schedule.lastGameDate: expected null or YYYY-MM-DD`)
+        }
+        for (const field of ['previousDayGames', 'consecutiveDays', 'historyGames']) {
+          if (!Number.isInteger(schedule[field]) || schedule[field] < 0) {
+            errors.push(`${at}.teamRunContext.schedule.${field}: expected a non-negative integer`)
+          }
+        }
+        if (schedule.daysRest != null && (!Number.isInteger(schedule.daysRest) || schedule.daysRest < 0)) {
+          errors.push(`${at}.teamRunContext.schedule.daysRest: expected null or non-negative integer`)
+        }
+        for (const field of ['sameSeries', 'travelSpot', 'secondDoubleheaderGame']) {
+          if (typeof schedule[field] !== 'boolean') errors.push(`${at}.teamRunContext.schedule.${field}: expected boolean`)
+        }
+        if (
+          Number.isFinite(input.scheduleFactor)
+          && Number.isFinite(schedule.factor)
+          && Math.abs(input.scheduleFactor - schedule.factor) > 0.001
+        ) errors.push(`${at}.scheduleFactor: must match teamRunContext.schedule.factor`)
+      }
     }
   }
   if (projection.freezeState != null && !['refreshing-pregame', 'final-pregame'].includes(projection.freezeState)) {

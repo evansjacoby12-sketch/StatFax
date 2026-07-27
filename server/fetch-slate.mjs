@@ -474,6 +474,10 @@ import {
 } from '../src/sports/mlb/logic/bullpenRunEnvironment.js';
 import { buildGameRunEnvironment } from '../src/sports/mlb/logic/gameRunEnvironment.js';
 import {
+  buildGameScheduleContexts,
+  buildTeamSeasonRunProfiles,
+} from '../src/sports/mlb/logic/teamRunContext.js';
+import {
   buildSlateGameProjections,
   evaluateGameForecasts,
   settleGameForecasts,
@@ -1036,6 +1040,17 @@ async function fetchBullpenData(teamIds, {
     } catch {}
   }, 8);
   return { hr9, runProfiles, availability };
+}
+
+async function fetchTeamSeasonRunProfiles() {
+  try {
+    const data = await mlbGet(
+      `/teams/stats?stats=season&group=hitting,fielding&season=${SEASON}&sportIds=1`,
+    );
+    return buildTeamSeasonRunProfiles(data);
+  } catch {
+    return buildTeamSeasonRunProfiles({});
+  }
 }
 
 // ─── Pitcher recent form / hands ─────────────────────────────────────────────
@@ -2281,6 +2296,7 @@ async function main() {
   writeFileSync(MLB_GAME_RESULTS_OUT_PATH, JSON.stringify(mlbGameResults));
   const teamScoringProfiles = buildTeamScoringProfiles(mlbGameResults, date);
   const teamScoringEvaluation = evaluateTeamScoringForm(mlbGameResults);
+  const gameScheduleContexts = buildGameScheduleContexts(games, mlbGameResults, date);
   console.log(
     `[game-results] scoring profiles: ${teamScoringProfiles.games} prior games · `
     + `${Object.keys(teamScoringProfiles.teams).length} teams · `
@@ -2778,6 +2794,7 @@ async function main() {
     batterStats,
     pitcherStats,
     bullpenData,
+    teamSeasonRunProfiles,
     pitcherHands,
     savantBatter,
     savantPitcher,
@@ -2804,6 +2821,7 @@ async function main() {
       date,
       probablePitcherIdsByTeam,
     }),
+    fetchTeamSeasonRunProfiles(),
     fetchPitcherHands(pitcherIdArr),
     fetchSavantBatterStatsAll(),
     fetchSavantPitcherStats(),
@@ -4480,6 +4498,8 @@ async function main() {
       bullpenRunProfiles,
       bullpenAvailability,
       gameRunEnvironments,
+      teamSeasonRunProfiles,
+      gameScheduleContexts,
       gameOdds: gameOddsByGamePk,
       teamScoringProfiles,
       capturedAt,
@@ -4538,6 +4558,8 @@ async function main() {
     bullpenRunProfiles,
     bullpenAvailability,
     gameRunEnvironments,
+    teamSeasonRunProfiles,
+    gameScheduleContexts,
     weatherByGame,
     // HR prop prices per game/book (The Odds API) — drives the board's odds
     // column, best-price display, +EV chips and parlay EV math client-side.

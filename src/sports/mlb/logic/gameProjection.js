@@ -1,7 +1,7 @@
 import { teamScoringMatchupContext } from './teamScoringForm.js'
 import { expectedStarterInnings } from './starterIPDistribution.js'
 
-export const MLB_GAME_PROJECTION_VERSION = 4
+export const MLB_GAME_PROJECTION_VERSION = 5
 export const MLB_GAME_BASE_RUNS_PER_TEAM = 4.42
 export const MLB_GAME_EVALUATION_MIN_GAMES = 100
 export const MLB_GAME_EVALUATION_MIN_DATES = 10
@@ -255,6 +255,69 @@ function environmentFactor(lineup, gameRunEnvironment) {
   }
 }
 
+function teamRunContext({
+  gamePk,
+  teamId,
+  opponentTeamId,
+  teamSeasonRunProfiles,
+  gameScheduleContexts,
+}) {
+  const offenseTeam = teamSeasonRunProfiles?.teams?.[teamId] || null
+  const defenseTeam = teamSeasonRunProfiles?.teams?.[opponentTeamId] || null
+  const schedule = gameScheduleContexts?.byGame?.[gamePk]?.[teamId] || null
+  const defenseFactor = Number.isFinite(defenseTeam?.defenseFactor)
+    ? clamp(defenseTeam.defenseFactor, 0.96, 1.04)
+    : 1
+  const baserunningFactor = Number.isFinite(offenseTeam?.baserunningFactor)
+    ? clamp(offenseTeam.baserunningFactor, 0.973, 1.027)
+    : 1
+  const scheduleFactor = Number.isFinite(schedule?.factor)
+    ? clamp(schedule.factor, 0.96, 1.01)
+    : 1
+  const factor = clamp(defenseFactor * baserunningFactor * scheduleFactor, 0.92, 1.08)
+  const defenseCoverage = Number.isFinite(defenseTeam?.coverage) ? defenseTeam.coverage : 0
+  const baserunningCoverage = Number.isFinite(offenseTeam?.coverage) ? offenseTeam.coverage : 0
+  const scheduleCoverage = Number.isFinite(schedule?.coverage) ? schedule.coverage : 0
+  return {
+    factor,
+    defenseFactor,
+    baserunningFactor,
+    scheduleFactor,
+    coverage: (
+      0.45 * defenseCoverage
+      + 0.30 * baserunningCoverage
+      + 0.25 * scheduleCoverage
+    ),
+    defense: defenseTeam ? {
+      teamId: opponentTeamId,
+      teamName: defenseTeam.teamName,
+      games: defenseTeam.games,
+      defenseRunsAdjustment: defenseTeam.defenseRunsAdjustment,
+      errorsPerGame: defenseTeam.errorsPerGame,
+      doublePlaysPerGame: defenseTeam.doublePlaysPerGame,
+      caughtStealingDefensePerGame: defenseTeam.caughtStealingDefensePerGame,
+      factor: defenseFactor,
+      coverage: defenseCoverage,
+    } : null,
+    baserunning: offenseTeam ? {
+      teamId,
+      teamName: offenseTeam.teamName,
+      games: offenseTeam.games,
+      stolenBases: offenseTeam.stolenBases,
+      caughtStealing: offenseTeam.caughtStealing,
+      baserunningRunsPerGame: offenseTeam.baserunningRunsPerGame,
+      baserunningRunsAdjustment: offenseTeam.baserunningRunsAdjustment,
+      factor: baserunningFactor,
+      coverage: baserunningCoverage,
+    } : null,
+    schedule: schedule ? {
+      ...schedule,
+      factor: scheduleFactor,
+      coverage: scheduleCoverage,
+    } : null,
+  }
+}
+
 function poissonDistribution(lambda, max = 20) {
   const probabilities = [Math.exp(-lambda)]
   for (let runs = 1; runs <= max; runs++) {
@@ -367,6 +430,8 @@ function teamProjection({
   bullpenRunProfiles,
   bullpenAvailability,
   gameRunEnvironment,
+  teamSeasonRunProfiles,
+  gameScheduleContexts,
   teamScoringProfiles,
 }) {
   const lineup = selectTeamLineup(rows, teamId)
@@ -388,6 +453,13 @@ function teamProjection({
     1.24,
   )
   const environment = environmentFactor(lineup, gameRunEnvironment)
+  const situational = teamRunContext({
+    gamePk: game.gamePk,
+    teamId,
+    opponentTeamId,
+    teamSeasonRunProfiles,
+    gameScheduleContexts,
+  })
   const teamScoring = teamScoringMatchupContext(teamScoringProfiles, teamId, opponentTeamId)
   const baseRunsPerTeam = Number.isFinite(teamScoring.leagueRunsPerTeam)
     ? clamp(teamScoring.leagueRunsPerTeam, 3.80, 5.00)
@@ -399,6 +471,7 @@ function teamProjection({
       * pitchingFactor
       * environment.factor
       * teamScoring.factor
+      * situational.factor
       * homeField,
     2.35,
     7.25,
@@ -410,11 +483,12 @@ function teamProjection({
     + bullpenShare * bullpen.coverage
   )
   const coverage = (
-    0.35 * lineupCoverage * sourceWeight
-    + 0.20 * offense.coverage
-    + 0.20 * pitchingCoverage
-    + 0.10 * environment.coverage
+    0.31 * lineupCoverage * sourceWeight
+    + 0.18 * offense.coverage
+    + 0.18 * pitchingCoverage
+    + 0.08 * environment.coverage
     + 0.15 * teamScoring.coverage
+    + 0.10 * situational.coverage
   )
   return {
     expectedRuns,
@@ -470,6 +544,18 @@ function teamProjection({
         factor: round(environment.factor, 4),
         coverage: round(environment.coverage, 4),
       } : null,
+      teamContextFactor: round(situational.factor, 4),
+      opponentDefenseFactor: round(situational.defenseFactor, 4),
+      baserunningFactor: round(situational.baserunningFactor, 4),
+      scheduleFactor: round(situational.scheduleFactor, 4),
+      teamRunContextCoverage: round(situational.coverage, 4),
+      teamRunContext: {
+        factor: round(situational.factor, 4),
+        coverage: round(situational.coverage, 4),
+        defense: situational.defense,
+        baserunning: situational.baserunning,
+        schedule: situational.schedule,
+      },
       teamScoring: {
         ...teamScoring,
         factor: round(teamScoring.factor, 4),
@@ -486,6 +572,8 @@ export function buildGameProjection({
   bullpenRunProfiles = {},
   bullpenAvailability = {},
   gameRunEnvironments = {},
+  teamSeasonRunProfiles = null,
+  gameScheduleContexts = null,
   gameOdds = null,
   teamScoringProfiles = null,
   capturedAt = new Date().toISOString(),
@@ -502,6 +590,8 @@ export function buildGameProjection({
     bullpenRunProfiles,
     bullpenAvailability,
     gameRunEnvironment: gameRunEnvironments?.[game.gamePk] || null,
+    teamSeasonRunProfiles,
+    gameScheduleContexts,
     teamScoringProfiles,
   })
   const home = teamProjection({
@@ -515,6 +605,8 @@ export function buildGameProjection({
     bullpenRunProfiles,
     bullpenAvailability,
     gameRunEnvironment: gameRunEnvironments?.[game.gamePk] || null,
+    teamSeasonRunProfiles,
+    gameScheduleContexts,
     teamScoringProfiles,
   })
   const projectedTotal = away.expectedRuns + home.expectedRuns
@@ -558,6 +650,8 @@ export function buildSlateGameProjections({
   bullpenRunProfiles = {},
   bullpenAvailability = {},
   gameRunEnvironments = {},
+  teamSeasonRunProfiles = null,
+  gameScheduleContexts = null,
   gameOdds = {},
   teamScoringProfiles = null,
   capturedAt = new Date().toISOString(),
@@ -577,6 +671,8 @@ export function buildSlateGameProjections({
       bullpenRunProfiles,
       bullpenAvailability,
       gameRunEnvironments,
+      teamSeasonRunProfiles,
+      gameScheduleContexts,
       gameOdds: gameOdds?.[game.gamePk] || null,
       teamScoringProfiles,
       capturedAt,
