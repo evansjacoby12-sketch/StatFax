@@ -24238,6 +24238,18 @@ button.th:focus-visible {
   border-radius: inherit;
   background: color-mix(in srgb, var(--forecast-away) 78%, rgba(255, 255, 255, 0.12));
 }
+.game-forecast-win i::after {
+  content: '';
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  bottom: 0;
+  left: var(--forecast-away-share);
+  width: 2px;
+  transform: translateX(-1px);
+  background: linear-gradient(90deg, var(--bg) 0 1px, rgba(242, 242, 245, .82) 1px 2px);
+  pointer-events: none;
+}
 .game-forecast-quality small { color: var(--text-dim); }
 .game-forecast-quality strong { margin-top: 3px; color: #fff; font-size: 10px; }
 

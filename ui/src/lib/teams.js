@@ -10,7 +10,7 @@ export const TEAM_COLORS = {
   113: '#C6011F', // CIN
   114: '#E31937', // CLE
   115: '#9B5EA2', // COL
-  116: '#FA4616', // DET
+  116: '#0C2340', // DET
   117: '#EB6E1F', // HOU
   118: '#004687', // KC
   119: '#005A9C', // LAD

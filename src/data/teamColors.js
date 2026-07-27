@@ -11,7 +11,7 @@ export const TEAM_COLORS = {
   113: '#C6011F', // CIN Reds         — red
   114: '#E31937', // CLE Guardians    — red
   115: '#9B5EA2', // COL Rockies      — purple
-  116: '#FA4616', // DET Tigers       — orange
+  116: '#0C2340', // DET Tigers       — navy
   117: '#EB6E1F', // HOU Astros       — orange
   118: '#004687', // KC  Royals       — blue
   119: '#005A9C', // LAD Dodgers      — blue
