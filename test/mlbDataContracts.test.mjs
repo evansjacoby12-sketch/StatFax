@@ -362,7 +362,7 @@ test('daily contract validates forecast v4 platoon and run-environment provenanc
   assert.ok(validateDailySnapshot(mismatched).errors.some((error) => error.includes('must match runEnvironment.factor')))
 })
 
-test('daily contract validates forecast v6 run distributions and team context provenance', () => {
+test('daily contract validates forecast v7 distributions, market gate, and team context', () => {
   const runEnvironment = {
     factor: 1,
     rawParkFactor: 1,
@@ -445,7 +445,7 @@ test('daily contract validates forecast v6 run distributions and team context pr
     gameProjections: { 10: projection },
   }
 
-  assert.equal(projection.modelVersion, 6)
+  assert.equal(projection.modelVersion, 7)
   assert.deepEqual(validateDailySnapshot(snapshot).errors, [])
 
   const tampered = structuredClone(snapshot)
@@ -459,6 +459,10 @@ test('daily contract validates forecast v6 run distributions and team context pr
   const mismatchedMode = structuredClone(snapshot)
   mismatchedMode.gameProjections[10].scoreDistribution.mostLikelyScore.away += 1
   assert.ok(validateDailySnapshot(mismatchedMode).errors.some((error) => error.includes('must match away.mode')))
+
+  const badBlend = structuredClone(snapshot)
+  badBlend.gameProjections[10].marketBlend.total.finalProjectedTotal += 1
+  assert.ok(validateDailySnapshot(badBlend).errors.some((error) => error.includes('must match projectedTotal')))
 })
 
 test('daily contract rejects the retired bare alias and invalid probability', () => {

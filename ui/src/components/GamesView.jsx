@@ -196,6 +196,9 @@ function GameForecastStrip({ game, projection, evaluation }) {
     ? american(Math.round(moneyline.homeAmerican))
     : pct(moneyline?.homeMarketProbability, 1)
   const scoreDistribution = projection.scoreDistribution
+  const marketBlend = projection.marketBlend
+  const sideBlend = marketBlend?.side
+  const totalBlend = marketBlend?.total
   const intervalLabel = `${Math.round((scoreDistribution?.intervalLevel || 0.8) * 100)}% range`
   const range = (summary) => (
     Number.isInteger(summary?.low) && Number.isInteger(summary?.high)
@@ -203,6 +206,18 @@ function GameForecastStrip({ game, projection, evaluation }) {
       : '—'
   )
   const mostLikely = scoreDistribution?.mostLikelyScore || projection.estimatedScore
+  const appliedBlendParts = [
+    sideBlend?.applied ? `side ${pct(sideBlend.weight, 0)}` : null,
+    totalBlend?.applied ? `total ${pct(totalBlend.weight, 0)}` : null,
+  ].filter(Boolean)
+  const blendHeadline = marketBlend?.applied
+    ? `Applied · ${appliedBlendParts.join(' · ')}`
+    : marketBlend?.policyStatus === 'inactive'
+      ? 'Inactive · no proven edge'
+      : 'Collecting · no influence'
+  const blendReason = marketBlend?.applied
+    ? 'Only evidence-cleared market components influence this forecast.'
+    : [sideBlend?.reason, totalBlend?.reason].filter(Boolean).join(' ')
 
   return (
     <section
@@ -277,6 +292,17 @@ function GameForecastStrip({ game, projection, evaluation }) {
             {Number.isFinite(totalDelta)
               ? `${totalDelta >= 0 ? '+' : ''}${num(totalDelta, 1)} runs vs O/U ${num(totalMarket.line, 1)}`
               : 'No total comparison'}
+          </em>
+        </div>
+        <div>
+          <small>Market influence</small>
+          <strong className={`mono ${marketBlend?.applied ? 'good' : ''}`}>
+            {marketBlend ? blendHeadline : 'Unavailable'}
+          </strong>
+          <em title={blendReason || undefined}>
+            {marketBlend
+              ? blendReason
+              : 'This forecast predates the evidence-gated blend contract.'}
           </em>
         </div>
         <div>

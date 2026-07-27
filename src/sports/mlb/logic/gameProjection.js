@@ -1,7 +1,7 @@
 import { teamScoringMatchupContext } from './teamScoringForm.js'
 import { expectedStarterInnings } from './starterIPDistribution.js'
 
-export const MLB_GAME_PROJECTION_VERSION = 6
+export const MLB_GAME_PROJECTION_VERSION = 7
 export const MLB_GAME_BASE_RUNS_PER_TEAM = 4.42
 export const MLB_GAME_EVALUATION_MIN_GAMES = 100
 export const MLB_GAME_EVALUATION_MIN_DATES = 10
@@ -9,6 +9,9 @@ export const MLB_GAME_EVALUATION_MIN_DATES = 10
 // through 2026-07-27. Held-out team-run log loss improved 9.4% vs Poisson.
 export const MLB_GAME_SCORE_DISPERSION = 3.5
 export const MLB_GAME_SCORE_INTERVAL_LEVEL = 0.8
+export const MLB_GAME_MARKET_SIDE_MIN_ADVANTAGE = 0.005
+export const MLB_GAME_MARKET_TOTAL_MIN_ADVANTAGE = 0.15
+export const MLB_GAME_MARKET_MAX_WEIGHT = 0.2
 
 const clamp = (value, lo, hi) => Math.max(lo, Math.min(hi, value))
 const round = (value, digits = 3) => {
@@ -531,6 +534,192 @@ function marketComparison(gameOdds, win, projectedTotal, awayExpectedRuns, homeE
   return comparison
 }
 
+function marketBlendReason({
+  sample,
+  dates,
+  minimumGames,
+  minimumDates,
+  advantage,
+  minimumAdvantage,
+  unit,
+}) {
+  if (sample < minimumGames || dates < minimumDates) {
+    return `Collecting ${sample}/${minimumGames} paired games across ${dates}/${minimumDates} dates.`
+  }
+  if (!Number.isFinite(advantage)) return 'No paired model-versus-market evidence is available.'
+  if (advantage < minimumAdvantage) {
+    return `Market advantage ${round(advantage, unit === 'Brier' ? 4 : 3)} ${unit} is below the ${minimumAdvantage} gate.`
+  }
+  return `Market beat the unblended model by ${round(advantage, unit === 'Brier' ? 4 : 3)} ${unit}.`
+}
+
+export function gameMarketBlendPolicy(evaluation = null) {
+  const minimumGames = evaluation?.minimumSample?.games || MLB_GAME_EVALUATION_MIN_GAMES
+  const minimumDates = evaluation?.minimumSample?.dates || MLB_GAME_EVALUATION_MIN_DATES
+  const sideSample = evaluation?.winner?.marketSample || 0
+  const totalSample = evaluation?.total?.marketSample || 0
+  const sideDates = evaluation?.winner?.marketDates || 0
+  const totalDates = evaluation?.total?.marketDates || 0
+  const sideAdvantage = Number.isFinite(evaluation?.winner?.baseImprovementVsMarket)
+    ? -evaluation.winner.baseImprovementVsMarket
+    : null
+  const totalAdvantage = Number.isFinite(evaluation?.total?.baseImprovementVsMarket)
+    ? -evaluation.total.baseImprovementVsMarket
+    : null
+  const sideActive = (
+    sideSample >= minimumGames
+    && sideDates >= minimumDates
+    && Number.isFinite(sideAdvantage)
+    && sideAdvantage >= MLB_GAME_MARKET_SIDE_MIN_ADVANTAGE
+  )
+  const totalActive = (
+    totalSample >= minimumGames
+    && totalDates >= minimumDates
+    && Number.isFinite(totalAdvantage)
+    && totalAdvantage >= MLB_GAME_MARKET_TOTAL_MIN_ADVANTAGE
+  )
+  const sideWeight = sideActive
+    ? round(clamp(0.1 + sideAdvantage * 4, 0.1, MLB_GAME_MARKET_MAX_WEIGHT), 3)
+    : 0
+  const totalWeight = totalActive
+    ? round(clamp(0.1 + totalAdvantage * 0.1, 0.1, MLB_GAME_MARKET_MAX_WEIGHT), 3)
+    : 0
+  return {
+    version: 1,
+    evidenceGated: true,
+    status: sideActive || totalActive
+      ? 'active'
+      : sideSample < minimumGames || totalSample < minimumGames || sideDates < minimumDates || totalDates < minimumDates
+        ? 'collecting'
+        : 'inactive',
+    minimumGames,
+    minimumDates,
+    side: {
+      active: sideActive,
+      sample: sideSample,
+      dates: sideDates,
+      marketAdvantageBrier: Number.isFinite(sideAdvantage) ? round(sideAdvantage, 4) : null,
+      minimumAdvantageBrier: MLB_GAME_MARKET_SIDE_MIN_ADVANTAGE,
+      weight: sideWeight,
+      reason: marketBlendReason({
+        sample: sideSample,
+        dates: sideDates,
+        minimumGames,
+        minimumDates,
+        advantage: sideAdvantage,
+        minimumAdvantage: MLB_GAME_MARKET_SIDE_MIN_ADVANTAGE,
+        unit: 'Brier',
+      }),
+    },
+    total: {
+      active: totalActive,
+      sample: totalSample,
+      dates: totalDates,
+      marketAdvantageMae: Number.isFinite(totalAdvantage) ? round(totalAdvantage, 3) : null,
+      minimumAdvantageMae: MLB_GAME_MARKET_TOTAL_MIN_ADVANTAGE,
+      weight: totalWeight,
+      reason: marketBlendReason({
+        sample: totalSample,
+        dates: totalDates,
+        minimumGames,
+        minimumDates,
+        advantage: totalAdvantage,
+        minimumAdvantage: MLB_GAME_MARKET_TOTAL_MIN_ADVANTAGE,
+        unit: 'runs MAE',
+      }),
+    },
+  }
+}
+
+function applyMarketBlend(
+  baseAwayExpectedRuns,
+  baseHomeExpectedRuns,
+  gameOdds,
+  policy = gameMarketBlendPolicy(),
+) {
+  const consensus = gameOdds?.consensus
+  const marketTotal = consensus?.total?.line
+  const marketHome = consensus?.moneyline?.home?.fairProbability
+  const marketAway = consensus?.moneyline?.away?.fairProbability
+  const baseProjectedTotal = baseAwayExpectedRuns + baseHomeExpectedRuns
+  const totalApplied = policy.total.active && Number.isFinite(marketTotal)
+  const projectedTotal = totalApplied
+    ? baseProjectedTotal * (1 - policy.total.weight) + marketTotal * policy.total.weight
+    : baseProjectedTotal
+  const totalScale = baseProjectedTotal > 0 ? projectedTotal / baseProjectedTotal : 1
+  const awayExpectedRuns = baseAwayExpectedRuns * totalScale
+  const homeExpectedRuns = baseHomeExpectedRuns * totalScale
+  const runModelWin = winProbabilities(awayExpectedRuns, homeExpectedRuns)
+  const sideApplied = (
+    policy.side.active
+    && Number.isFinite(marketHome)
+    && Number.isFinite(marketAway)
+  )
+  const homeWinProbability = sideApplied
+    ? runModelWin.home * (1 - policy.side.weight) + marketHome * policy.side.weight
+    : runModelWin.home
+  const awayWinProbability = 1 - homeWinProbability
+
+  return {
+    awayExpectedRuns,
+    homeExpectedRuns,
+    projectedTotal,
+    win: {
+      away: awayWinProbability,
+      home: homeWinProbability,
+      tieAfterNine: runModelWin.tieAfterNine,
+    },
+    disclosure: {
+      version: 1,
+      evidenceGated: true,
+      policyStatus: policy.status,
+      applied: sideApplied || totalApplied,
+      side: {
+        eligible: policy.side.active,
+        applied: sideApplied,
+        weight: policy.side.weight,
+        sample: policy.side.sample,
+        dates: policy.side.dates,
+        minimumGames: policy.minimumGames,
+        minimumDates: policy.minimumDates,
+        marketAdvantageBrier: policy.side.marketAdvantageBrier,
+        minimumAdvantageBrier: policy.side.minimumAdvantageBrier,
+        baseHomeWinProbability: round(winProbabilities(
+          baseAwayExpectedRuns,
+          baseHomeExpectedRuns,
+        ).home, 4),
+        preBlendHomeWinProbability: round(runModelWin.home, 4),
+        marketHomeWinProbability: Number.isFinite(marketHome) ? round(marketHome, 4) : null,
+        finalHomeWinProbability: round(homeWinProbability, 4),
+        reason: policy.side.active && !sideApplied
+          ? 'Evidence gate passed, but this game has no consensus moneyline.'
+          : policy.side.reason,
+      },
+      total: {
+        eligible: policy.total.active,
+        applied: totalApplied,
+        weight: policy.total.weight,
+        sample: policy.total.sample,
+        dates: policy.total.dates,
+        minimumGames: policy.minimumGames,
+        minimumDates: policy.minimumDates,
+        marketAdvantageMae: policy.total.marketAdvantageMae,
+        minimumAdvantageMae: policy.total.minimumAdvantageMae,
+        baseAwayExpectedRuns: round(baseAwayExpectedRuns, 2),
+        baseHomeExpectedRuns: round(baseHomeExpectedRuns, 2),
+        baseProjectedTotal: round(baseProjectedTotal, 2),
+        marketTotal: Number.isFinite(marketTotal) ? round(marketTotal, 2) : null,
+        finalAwayExpectedRuns: round(awayExpectedRuns, 2),
+        finalHomeExpectedRuns: round(homeExpectedRuns, 2),
+        finalProjectedTotal: round(projectedTotal, 2),
+        reason: policy.total.active && !totalApplied
+          ? 'Evidence gate passed, but this game has no consensus total.'
+          : policy.total.reason,
+      },
+    },
+  }
+}
+
 function teamProjection({
   game,
   rows,
@@ -687,6 +876,7 @@ export function buildGameProjection({
   teamSeasonRunProfiles = null,
   gameScheduleContexts = null,
   gameOdds = null,
+  marketBlendPolicy = gameMarketBlendPolicy(),
   teamScoringProfiles = null,
   capturedAt = new Date().toISOString(),
 }) {
@@ -721,9 +911,18 @@ export function buildGameProjection({
     gameScheduleContexts,
     teamScoringProfiles,
   })
-  const projectedTotal = away.expectedRuns + home.expectedRuns
-  const scoreDistribution = scoreDistributionSummary(away.expectedRuns, home.expectedRuns)
-  const win = winProbabilities(away.expectedRuns, home.expectedRuns)
+  const blended = applyMarketBlend(
+    away.expectedRuns,
+    home.expectedRuns,
+    gameOdds,
+    marketBlendPolicy,
+  )
+  const projectedTotal = blended.projectedTotal
+  const scoreDistribution = scoreDistributionSummary(
+    blended.awayExpectedRuns,
+    blended.homeExpectedRuns,
+  )
+  const win = blended.win
   const projectedWinner = win.home >= win.away ? 'home' : 'away'
   const coverage = (away.coverage + home.coverage) / 2
   return {
@@ -735,8 +934,8 @@ export function buildGameProjection({
     capturedAt,
     awayTeam: { id: game.awayTeam?.id, name: game.awayTeam?.name, abbr: game.awayTeam?.abbr },
     homeTeam: { id: game.homeTeam?.id, name: game.homeTeam?.name, abbr: game.homeTeam?.abbr },
-    awayExpectedRuns: round(away.expectedRuns, 2),
-    homeExpectedRuns: round(home.expectedRuns, 2),
+    awayExpectedRuns: round(blended.awayExpectedRuns, 2),
+    homeExpectedRuns: round(blended.homeExpectedRuns, 2),
     projectedTotal: round(projectedTotal, 2),
     // Kept for older clients. Unlike the retired point estimate, this is the
     // literal joint mode and may honestly be tied after nine innings.
@@ -758,12 +957,13 @@ export function buildGameProjection({
         : 'Some lineup or pitcher inputs are projected or incomplete.',
     },
     inputs: { away: away.inputs, home: home.inputs },
+    marketBlend: blended.disclosure,
     marketComparison: marketComparison(
       gameOdds,
       win,
       projectedTotal,
-      away.expectedRuns,
-      home.expectedRuns,
+      blended.awayExpectedRuns,
+      blended.homeExpectedRuns,
     ),
   }
 }
@@ -778,6 +978,7 @@ export function buildSlateGameProjections({
   teamSeasonRunProfiles = null,
   gameScheduleContexts = null,
   gameOdds = {},
+  marketBlendPolicy = gameMarketBlendPolicy(),
   teamScoringProfiles = null,
   capturedAt = new Date().toISOString(),
 } = {}) {
@@ -799,6 +1000,7 @@ export function buildSlateGameProjections({
       teamSeasonRunProfiles,
       gameScheduleContexts,
       gameOdds: gameOdds?.[game.gamePk] || null,
+      marketBlendPolicy,
       teamScoringProfiles,
       capturedAt,
     }))
@@ -952,8 +1154,9 @@ function winnerCalibration(rows) {
   }).filter((bin) => bin.sample > 0)
 }
 
-// Evaluation is presentation-only. It summarizes frozen, settled pregame
-// forecasts and never feeds the HR engine or the next game projection.
+// Evaluation summarizes frozen, settled pregame forecasts. Only its aggregate
+// paired base-vs-market metrics can unlock the capped game-market blend; no
+// individual result or market input ever feeds the HR engine.
 export function evaluateGameForecasts(log = {}) {
   const rows = gameForecastResultRows(log)
   const dates = new Set(rows.map((row) => row.resultDate))
@@ -971,6 +1174,8 @@ export function evaluateGameForecasts(log = {}) {
   const marketTotalRows = totalRows.filter((row) => (
     Number.isFinite(row.marketComparison?.total?.line)
   ))
+  const marketWinnerDates = new Set(marketWinnerRows.map((row) => row.resultDate))
+  const marketTotalDates = new Set(marketTotalRows.map((row) => row.resultDate))
 
   const winnerBriers = winnerRows.map((row) => {
     const homeWon = row.actualWinner === 'home' ? 1 : 0
@@ -983,6 +1188,13 @@ export function evaluateGameForecasts(log = {}) {
   const pairedModelWinnerBriers = marketWinnerRows.map((row) => {
     const homeWon = row.actualWinner === 'home' ? 1 : 0
     return (row.homeWinProbability - homeWon) ** 2
+  })
+  const pairedBaseWinnerBriers = marketWinnerRows.map((row) => {
+    const homeWon = row.actualWinner === 'home' ? 1 : 0
+    const baseHomeProbability = Number.isFinite(row.marketBlend?.side?.baseHomeWinProbability)
+      ? row.marketBlend.side.baseHomeWinProbability
+      : row.homeWinProbability
+    return (baseHomeProbability - homeWon) ** 2
   })
   const totalErrors = totalRows.map((row) => row.projectedTotal - row.actualTotal)
   const totalMse = mean(totalErrors.map((value) => value ** 2))
@@ -1003,13 +1215,21 @@ export function evaluateGameForecasts(log = {}) {
   const pairedModelTotalErrors = marketTotalRows.map((row) => (
     Math.abs(row.projectedTotal - row.actualTotal)
   ))
+  const pairedBaseTotalErrors = marketTotalRows.map((row) => {
+    const baseProjectedTotal = Number.isFinite(row.marketBlend?.total?.baseProjectedTotal)
+      ? row.marketBlend.total.baseProjectedTotal
+      : row.projectedTotal
+    return Math.abs(baseProjectedTotal - row.actualTotal)
+  })
 
   const winnerBrier = mean(winnerBriers)
   const marketWinnerBrier = mean(marketWinnerBriers)
   const pairedModelWinnerBrier = mean(pairedModelWinnerBriers)
+  const pairedBaseWinnerBrier = mean(pairedBaseWinnerBriers)
   const totalMae = mean(totalErrors.map(Math.abs))
   const marketTotalMae = mean(marketTotalErrors)
   const pairedModelTotalMae = mean(pairedModelTotalErrors)
+  const pairedBaseTotalMae = mean(pairedBaseTotalErrors)
   const status = rows.length >= MLB_GAME_EVALUATION_MIN_GAMES && dates.size >= MLB_GAME_EVALUATION_MIN_DATES
     ? 'review-ready'
     : 'collecting'
@@ -1020,7 +1240,7 @@ export function evaluateGameForecasts(log = {}) {
     .at(-1) || null
 
   return {
-    version: 1,
+    version: 2,
     advisoryOnly: true,
     status,
     updatedAt,
@@ -1048,9 +1268,15 @@ export function evaluateGameForecasts(log = {}) {
       coinFlipBrier: winnerRows.length ? 0.25 : null,
       improvementVsCoinFlip: winnerRows.length ? roundedMetric(0.25 - winnerBrier) : null,
       marketSample: marketWinnerRows.length,
+      marketDates: marketWinnerDates.size,
       marketBrier: roundedMetric(marketWinnerBrier),
+      pairedModelBrier: roundedMetric(pairedModelWinnerBrier),
+      pairedBaseBrier: roundedMetric(pairedBaseWinnerBrier),
       improvementVsMarket: Number.isFinite(pairedModelWinnerBrier) && Number.isFinite(marketWinnerBrier)
         ? roundedMetric(marketWinnerBrier - pairedModelWinnerBrier)
+        : null,
+      baseImprovementVsMarket: Number.isFinite(pairedBaseWinnerBrier) && Number.isFinite(marketWinnerBrier)
+        ? roundedMetric(marketWinnerBrier - pairedBaseWinnerBrier)
         : null,
       calibration: winnerCalibration(winnerRows),
     },
@@ -1061,13 +1287,19 @@ export function evaluateGameForecasts(log = {}) {
       bias: roundedMetric(mean(totalErrors), 3),
       teamRunMae: roundedMetric(mean(teamRunErrors), 3),
       marketSample: marketTotalRows.length,
+      marketDates: marketTotalDates.size,
       marketLineMae: roundedMetric(marketTotalMae, 3),
+      pairedModelMae: roundedMetric(pairedModelTotalMae, 3),
+      pairedBaseMae: roundedMetric(pairedBaseTotalMae, 3),
       improvementVsMarket: Number.isFinite(pairedModelTotalMae) && Number.isFinite(marketTotalMae)
         ? roundedMetric(marketTotalMae - pairedModelTotalMae, 3)
         : null,
+      baseImprovementVsMarket: Number.isFinite(pairedBaseTotalMae) && Number.isFinite(marketTotalMae)
+        ? roundedMetric(marketTotalMae - pairedBaseTotalMae, 3)
+        : null,
     },
     note: status === 'collecting'
-      ? 'Forward results are still collecting; this report does not change production scoring.'
-      : 'Minimum review sample reached; promotion still requires a separate model review.',
+      ? 'Forward results are still collecting; the market blend remains evidence-gated.'
+      : 'The market blend reads only paired, unblended model evidence from prior settled games.',
   }
 }

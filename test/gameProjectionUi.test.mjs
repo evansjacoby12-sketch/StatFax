@@ -16,6 +16,7 @@ test('Games workspace receives and labels advisory game forecasts and validation
   assert.match(games, /Most likely/i)
   assert.doesNotMatch(games, />Estimated score</i)
   assert.match(games, /Market & validation/i)
+  assert.match(games, /Market influence/i)
   assert.match(games, /Frozen pregame/i)
   assert.match(games, /advisory/i)
   assert.match(css, /\.game-forecast-details/)

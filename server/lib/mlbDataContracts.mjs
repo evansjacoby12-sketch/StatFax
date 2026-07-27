@@ -153,7 +153,7 @@ function validateGameProjectionRecord(prefix, projection, errors, gameIds = null
     errors.push(`${prefix}: expected an object`)
     return
   }
-  if (![1, 2, 3, 4, 5, 6].includes(projection.modelVersion)) errors.push(`${prefix}.modelVersion: expected 1 through 6`)
+  if (![1, 2, 3, 4, 5, 6, 7].includes(projection.modelVersion)) errors.push(`${prefix}.modelVersion: expected 1 through 7`)
   if (projection.advisoryOnly !== true) errors.push(`${prefix}.advisoryOnly: must be true`)
   if (projection.captureState !== 'pregame') errors.push(`${prefix}.captureState: expected pregame`)
   if (!Number.isFinite(projection.gamePk)) errors.push(`${prefix}.gamePk: must be finite`)
@@ -536,6 +536,128 @@ function validateGameProjectionRecord(prefix, projection, errors, gameIds = null
       }
     }
   }
+  if (projection.modelVersion >= 7) {
+    const blend = projection.marketBlend
+    const at = `${prefix}.marketBlend`
+    if (!isObject(blend)) {
+      errors.push(`${at}: expected an object for model v7`)
+    } else {
+      if (blend.version !== 1) errors.push(`${at}.version: expected 1`)
+      if (blend.evidenceGated !== true) errors.push(`${at}.evidenceGated: must be true`)
+      if (!['collecting', 'inactive', 'active'].includes(blend.policyStatus)) {
+        errors.push(`${at}.policyStatus: unsupported`)
+      }
+      if (typeof blend.applied !== 'boolean') errors.push(`${at}.applied: expected boolean`)
+      for (const section of ['side', 'total']) {
+        const value = blend[section]
+        const sectionAt = `${at}.${section}`
+        if (!isObject(value)) {
+          errors.push(`${sectionAt}: expected an object`)
+          continue
+        }
+        for (const field of ['eligible', 'applied']) {
+          if (typeof value[field] !== 'boolean') errors.push(`${sectionAt}.${field}: expected boolean`)
+        }
+        if (value.applied === true && value.eligible !== true) errors.push(`${sectionAt}: applied requires eligible`)
+        if (!Number.isFinite(value.weight)) errors.push(`${sectionAt}.weight: required for model v7`)
+        else validateOptionalMetric(`${sectionAt}.weight`, value.weight, errors, { min: 0, max: 0.2 })
+        if (value.eligible === false && value.weight !== 0) errors.push(`${sectionAt}.weight: must be zero when ineligible`)
+        for (const field of ['sample', 'dates', 'minimumGames', 'minimumDates']) {
+          if (!Number.isInteger(value[field]) || value[field] < (field.startsWith('minimum') ? 1 : 0)) {
+            errors.push(`${sectionAt}.${field}: expected a ${field.startsWith('minimum') ? 'positive' : 'non-negative'} integer`)
+          }
+        }
+        if (typeof value.reason !== 'string' || !value.reason.trim()) {
+          errors.push(`${sectionAt}.reason: expected non-empty text`)
+        }
+      }
+
+      const side = blend.side
+      if (isObject(side)) {
+        for (const field of ['baseHomeWinProbability', 'preBlendHomeWinProbability', 'finalHomeWinProbability']) {
+          if (!Number.isFinite(side[field])) errors.push(`${at}.side.${field}: required for model v7`)
+          else validateOptionalMetric(`${at}.side.${field}`, side[field], errors, { min: 0, max: 1 })
+        }
+        validateOptionalMetric(`${at}.side.marketHomeWinProbability`, side.marketHomeWinProbability, errors, { min: 0, max: 1 })
+        validateOptionalMetric(`${at}.side.marketAdvantageBrier`, side.marketAdvantageBrier, errors, { min: -1, max: 1 })
+        if (!Number.isFinite(side.minimumAdvantageBrier)) errors.push(`${at}.side.minimumAdvantageBrier: required for model v7`)
+        else validateOptionalMetric(`${at}.side.minimumAdvantageBrier`, side.minimumAdvantageBrier, errors, { min: 0, max: 1 })
+        if (side.applied === true && !Number.isFinite(side.marketHomeWinProbability)) {
+          errors.push(`${at}.side.marketHomeWinProbability: required when applied`)
+        }
+        if (
+          Number.isFinite(side.finalHomeWinProbability)
+          && Number.isFinite(projection.homeWinProbability)
+          && Math.abs(side.finalHomeWinProbability - projection.homeWinProbability) > 0.001
+        ) errors.push(`${at}.side.finalHomeWinProbability: must match homeWinProbability`)
+        const expectedHome = side.applied
+          ? side.preBlendHomeWinProbability * (1 - side.weight) + side.marketHomeWinProbability * side.weight
+          : side.preBlendHomeWinProbability
+        if (
+          Number.isFinite(expectedHome)
+          && Number.isFinite(side.finalHomeWinProbability)
+          && Math.abs(expectedHome - side.finalHomeWinProbability) > 0.002
+        ) errors.push(`${at}.side.finalHomeWinProbability: inconsistent blend arithmetic`)
+      }
+
+      const total = blend.total
+      if (isObject(total)) {
+        for (const field of [
+          'baseAwayExpectedRuns',
+          'baseHomeExpectedRuns',
+          'baseProjectedTotal',
+          'finalAwayExpectedRuns',
+          'finalHomeExpectedRuns',
+          'finalProjectedTotal',
+        ]) {
+          if (!Number.isFinite(total[field])) errors.push(`${at}.total.${field}: required for model v7`)
+          else validateOptionalMetric(`${at}.total.${field}`, total[field], errors, { min: 0, max: 30 })
+        }
+        validateOptionalMetric(`${at}.total.marketTotal`, total.marketTotal, errors, { min: 0, max: 30 })
+        validateOptionalMetric(`${at}.total.marketAdvantageMae`, total.marketAdvantageMae, errors, { min: -30, max: 30 })
+        if (!Number.isFinite(total.minimumAdvantageMae)) errors.push(`${at}.total.minimumAdvantageMae: required for model v7`)
+        else validateOptionalMetric(`${at}.total.minimumAdvantageMae`, total.minimumAdvantageMae, errors, { min: 0, max: 30 })
+        if (total.applied === true && !Number.isFinite(total.marketTotal)) {
+          errors.push(`${at}.total.marketTotal: required when applied`)
+        }
+        if (
+          Number.isFinite(total.finalProjectedTotal)
+          && Number.isFinite(projection.projectedTotal)
+          && Math.abs(total.finalProjectedTotal - projection.projectedTotal) > 0.03
+        ) errors.push(`${at}.total.finalProjectedTotal: must match projectedTotal`)
+        for (const [field, projectionField] of [
+          ['finalAwayExpectedRuns', 'awayExpectedRuns'],
+          ['finalHomeExpectedRuns', 'homeExpectedRuns'],
+        ]) {
+          if (
+            Number.isFinite(total[field])
+            && Number.isFinite(projection[projectionField])
+            && Math.abs(total[field] - projection[projectionField]) > 0.03
+          ) errors.push(`${at}.total.${field}: must match ${projectionField}`)
+        }
+        if (
+          Number.isFinite(total.baseAwayExpectedRuns)
+          && Number.isFinite(total.baseHomeExpectedRuns)
+          && Number.isFinite(total.baseProjectedTotal)
+          && Math.abs(total.baseAwayExpectedRuns + total.baseHomeExpectedRuns - total.baseProjectedTotal) > 0.03
+        ) errors.push(`${at}.total.baseProjectedTotal: must equal base team runs`)
+        const expectedTotal = total.applied
+          ? total.baseProjectedTotal * (1 - total.weight) + total.marketTotal * total.weight
+          : total.baseProjectedTotal
+        if (
+          Number.isFinite(expectedTotal)
+          && Number.isFinite(total.finalProjectedTotal)
+          && Math.abs(expectedTotal - total.finalProjectedTotal) > 0.03
+        ) errors.push(`${at}.total.finalProjectedTotal: inconsistent blend arithmetic`)
+      }
+      if (
+        typeof blend.applied === 'boolean'
+        && isObject(blend.side)
+        && isObject(blend.total)
+        && blend.applied !== (blend.side.applied || blend.total.applied)
+      ) errors.push(`${at}.applied: must match side or total application`)
+    }
+  }
   if (projection.freezeState != null && !['refreshing-pregame', 'final-pregame'].includes(projection.freezeState)) {
     errors.push(`${prefix}.freezeState: unsupported`)
   }
@@ -569,7 +691,7 @@ function validateGameProjectionEvaluation(evaluation, errors) {
     return 0
   }
   const prefix = 'gameProjectionEvaluation'
-  if (evaluation.version !== 1) errors.push(`${prefix}.version: expected 1`)
+  if (![1, 2].includes(evaluation.version)) errors.push(`${prefix}.version: expected 1 or 2`)
   if (evaluation.advisoryOnly !== true) errors.push(`${prefix}.advisoryOnly: must be true`)
   if (!['collecting', 'review-ready'].includes(evaluation.status)) errors.push(`${prefix}.status: unsupported`)
   if (evaluation.updatedAt != null && Number.isNaN(Date.parse(evaluation.updatedAt))) errors.push(`${prefix}.updatedAt: expected null or ISO timestamp`)
@@ -598,6 +720,20 @@ function validateGameProjectionEvaluation(evaluation, errors) {
   for (const field of ['improvementVsCoinFlip', 'improvementVsMarket']) {
     validateOptionalMetric(`${prefix}.winner.${field}`, evaluation.winner?.[field], errors, { min: -1, max: 1 })
   }
+  if (evaluation.version >= 2) {
+    if (!Number.isInteger(evaluation.winner?.marketDates) || evaluation.winner.marketDates < 0) {
+      errors.push(`${prefix}.winner.marketDates: expected a non-negative integer`)
+    }
+    for (const field of ['pairedModelBrier', 'pairedBaseBrier']) {
+      validateOptionalMetric(`${prefix}.winner.${field}`, evaluation.winner?.[field], errors, { min: 0, max: 1 })
+    }
+    validateOptionalMetric(
+      `${prefix}.winner.baseImprovementVsMarket`,
+      evaluation.winner?.baseImprovementVsMarket,
+      errors,
+      { min: -1, max: 1 },
+    )
+  }
   if (!Array.isArray(evaluation.winner?.calibration)) {
     errors.push(`${prefix}.winner.calibration: expected an array`)
   } else {
@@ -614,6 +750,20 @@ function validateGameProjectionEvaluation(evaluation, errors) {
   }
   for (const field of ['bias', 'improvementVsMarket']) {
     validateOptionalMetric(`${prefix}.total.${field}`, evaluation.total?.[field], errors, { min: -30, max: 30 })
+  }
+  if (evaluation.version >= 2) {
+    if (!Number.isInteger(evaluation.total?.marketDates) || evaluation.total.marketDates < 0) {
+      errors.push(`${prefix}.total.marketDates: expected a non-negative integer`)
+    }
+    for (const field of ['pairedModelMae', 'pairedBaseMae']) {
+      validateOptionalMetric(`${prefix}.total.${field}`, evaluation.total?.[field], errors, { min: 0, max: 30 })
+    }
+    validateOptionalMetric(
+      `${prefix}.total.baseImprovementVsMarket`,
+      evaluation.total?.baseImprovementVsMarket,
+      errors,
+      { min: -30, max: 30 },
+    )
   }
   if (typeof evaluation.note !== 'string' || !evaluation.note.trim()) errors.push(`${prefix}.note: expected non-empty text`)
   return evaluation.sample?.games || 0

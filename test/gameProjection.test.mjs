@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import {
   buildGameProjection,
   evaluateGameForecasts,
+  gameMarketBlendPolicy,
   gameTotalProbabilities,
   negativeBinomialDistribution,
   scoreDistributionSummary,
@@ -122,7 +123,7 @@ test('game projection emits run ranges, transparent factors, and market comparis
 
   assert.equal(output.advisoryOnly, true)
   assert.equal(output.captureState, 'pregame')
-  assert.equal(output.modelVersion, 6)
+  assert.equal(output.modelVersion, 7)
   assert.ok(output.projectedTotal > 7 && output.projectedTotal < 11)
   assert.equal(output.estimatedScore.away + output.estimatedScore.home > 0, true)
   assert.deepEqual(output.estimatedScore, {
@@ -132,6 +133,8 @@ test('game projection emits run ranges, transparent factors, and market comparis
   assert.equal(output.scoreDistribution.family, 'negative-binomial')
   assert.equal(output.scoreDistribution.dispersion, 3.5)
   assert.ok(output.scoreDistribution.total.high > output.scoreDistribution.total.low)
+  assert.equal(output.marketBlend.policyStatus, 'collecting')
+  assert.equal(output.marketBlend.applied, false)
   assert.ok(Math.abs(output.awayWinProbability + output.homeWinProbability - 1) < 0.0002)
   assert.equal(output.inputs.away.lineupSource, 'confirmed')
   assert.equal(output.inputs.away.starterWorkloadSource, 'recent-starts')
@@ -140,6 +143,65 @@ test('game projection emits run ranges, transparent factors, and market comparis
   assert.ok(Number.isFinite(output.inputs.away.pitchingFactor))
   assert.equal(output.marketComparison.total.line, 8.5)
   assert.ok(Number.isFinite(output.marketComparison.moneyline.homeModelEdge))
+})
+
+test('market blend stays off without evidence and applies only cleared components', () => {
+  const market = {
+    consensus: {
+      moneyline: {
+        books: 2,
+        away: { fairProbability: 0.35 },
+        home: { fairProbability: 0.65 },
+      },
+      total: {
+        books: 2,
+        line: 10.5,
+        over: { fairProbability: 0.5 },
+        under: { fairProbability: 0.5 },
+      },
+    },
+  }
+  const baseline = buildGameProjection({ game, rows: balancedRows(), gameOdds: market })
+  assert.equal(baseline.marketBlend.applied, false)
+  assert.equal(baseline.marketBlend.total.baseProjectedTotal, baseline.projectedTotal)
+
+  const policy = gameMarketBlendPolicy({
+    minimumSample: { games: 100, dates: 10 },
+    sample: { dates: 12 },
+    winner: { marketSample: 140, marketDates: 12, baseImprovementVsMarket: -0.02 },
+    total: { marketSample: 135, marketDates: 11, baseImprovementVsMarket: -0.5 },
+  })
+  assert.equal(policy.status, 'active')
+  assert.equal(policy.side.active, true)
+  assert.equal(policy.total.active, true)
+  assert.ok(policy.side.weight > 0 && policy.side.weight <= 0.2)
+  assert.ok(policy.total.weight > 0 && policy.total.weight <= 0.2)
+  assert.equal(gameMarketBlendPolicy({
+    minimumSample: { games: 100, dates: 10 },
+    winner: { marketSample: 140, marketDates: 9, baseImprovementVsMarket: -0.02 },
+    total: { marketSample: 135, marketDates: 9, baseImprovementVsMarket: -0.5 },
+  }).status, 'collecting')
+  assert.equal(gameMarketBlendPolicy({
+    minimumSample: { games: 100, dates: 10 },
+    winner: { marketSample: 140, marketDates: 12, baseImprovementVsMarket: 0.01 },
+    total: { marketSample: 135, marketDates: 11, baseImprovementVsMarket: 0.2 },
+  }).status, 'inactive')
+
+  const blended = buildGameProjection({
+    game,
+    rows: balancedRows(),
+    gameOdds: market,
+    marketBlendPolicy: policy,
+  })
+  assert.equal(blended.marketBlend.applied, true)
+  assert.equal(blended.marketBlend.side.applied, true)
+  assert.equal(blended.marketBlend.total.applied, true)
+  assert.ok(blended.projectedTotal > baseline.projectedTotal)
+  assert.ok(blended.projectedTotal < market.consensus.total.line)
+  assert.ok(
+    blended.homeWinProbability > blended.marketBlend.side.preBlendHomeWinProbability
+    && blended.homeWinProbability < market.consensus.moneyline.home.fairProbability,
+  )
 })
 
 test('handed lineup production adds a bounded matchup adjustment', () => {
@@ -503,6 +565,7 @@ test('forward evaluation reports winner calibration and total error against simp
   })
 
   assert.equal(evaluation.status, 'collecting')
+  assert.equal(evaluation.version, 2)
   assert.deepEqual(evaluation.sample, {
     games: 3,
     dates: 2,
@@ -513,6 +576,10 @@ test('forward evaluation reports winner calibration and total error against simp
     progress: 0.03,
   })
   assert.equal(evaluation.winner.accuracy, 0.6667)
+  assert.equal(evaluation.winner.marketDates, 2)
+  assert.equal(evaluation.total.marketDates, 2)
+  assert.equal(evaluation.winner.pairedBaseBrier, evaluation.winner.pairedModelBrier)
+  assert.equal(evaluation.total.pairedBaseMae, evaluation.total.pairedModelMae)
   assert.ok(evaluation.winner.brier < evaluation.winner.coinFlipBrier)
   assert.equal(evaluation.total.mae, 1)
   assert.equal(evaluation.total.bias, 0.667)
@@ -525,4 +592,5 @@ test('empty forward evaluation stays null-safe while results collect', () => {
   assert.equal(evaluation.winner.brier, null)
   assert.equal(evaluation.total.rmse, null)
   assert.equal(evaluation.status, 'collecting')
+  assert.equal(gameMarketBlendPolicy(evaluation).status, 'collecting')
 })
