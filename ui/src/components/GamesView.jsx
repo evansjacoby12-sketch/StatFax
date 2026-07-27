@@ -195,17 +195,9 @@ function GameForecastStrip({ game, projection, evaluation }) {
   const homePrice = Number.isFinite(moneyline?.homeAmerican)
     ? american(Math.round(moneyline.homeAmerican))
     : pct(moneyline?.homeMarketProbability, 1)
-  const scoreDistribution = projection.scoreDistribution
   const marketBlend = projection.marketBlend
   const sideBlend = marketBlend?.side
   const totalBlend = marketBlend?.total
-  const intervalLabel = `${Math.round((scoreDistribution?.intervalLevel || 0.8) * 100)}% range`
-  const range = (summary) => (
-    Number.isInteger(summary?.low) && Number.isInteger(summary?.high)
-      ? `${summary.low}–${summary.high}`
-      : '—'
-  )
-  const mostLikely = scoreDistribution?.mostLikelyScore || projection.estimatedScore
   const appliedBlendParts = [
     sideBlend?.applied ? `side ${pct(sideBlend.weight, 0)}` : null,
     totalBlend?.applied ? `total ${pct(totalBlend.weight, 0)}` : null,
@@ -237,20 +229,17 @@ function GameForecastStrip({ game, projection, evaluation }) {
         <span className="game-forecast-state">{frozen ? 'Frozen pregame' : 'Pregame'} · advisory</span>
       </div>
       <div className="game-forecast-core">
-        <div className="game-forecast-range away">
-          <small>{awayAbbr} {intervalLabel}</small>
-          <strong className="mono">{range(scoreDistribution?.away)}</strong>
-          <em>Exp {num(projection.awayExpectedRuns, 1)}</em>
+        <div className="game-forecast-projection away">
+          <small>{awayAbbr} projected runs</small>
+          <strong className="mono">{num(projection.awayExpectedRuns, 1)}</strong>
         </div>
-        <div className="game-forecast-range home">
-          <small>{homeAbbr} {intervalLabel}</small>
-          <strong className="mono">{range(scoreDistribution?.home)}</strong>
-          <em>Exp {num(projection.homeExpectedRuns, 1)}</em>
+        <div className="game-forecast-projection home">
+          <small>{homeAbbr} projected runs</small>
+          <strong className="mono">{num(projection.homeExpectedRuns, 1)}</strong>
         </div>
-        <div className="game-forecast-range total">
-          <small>Total {intervalLabel}</small>
-          <strong className="mono">{range(scoreDistribution?.total)}</strong>
-          <em>Exp {num(projection.projectedTotal, 1)}</em>
+        <div className="game-forecast-projection total">
+          <small>Projected total</small>
+          <strong className="mono">{num(projection.projectedTotal, 1)}</strong>
         </div>
         <div className="game-forecast-win">
           <span><b>{awayAbbr}</b><strong className="mono">{pct(awayWin, 1)}</strong></span>
@@ -260,9 +249,6 @@ function GameForecastStrip({ game, projection, evaluation }) {
         <div className="game-forecast-quality">
           <small>{projection.confidence?.status || 'limited'} confidence</small>
           <strong className="mono">{pct(projection.confidence?.coverage, 0)} coverage</strong>
-          <em>
-            Most likely {awayAbbr} {mostLikely?.away ?? '—'}–{mostLikely?.home ?? '—'} {homeAbbr}
-          </em>
         </div>
       </div>
       <button
