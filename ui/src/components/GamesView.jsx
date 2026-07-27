@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Icon from './Icon.jsx'
 import CommandTabs from './CommandTabs.jsx'
+import GameFilterBar from './GameFilterBar.jsx'
 import { GradeChip, BadgeRow, ProbBar, ProbRing } from './atoms.jsx'
 import { teamColor, teamLogo, hexToRgba, readableOn, playerHeadshot } from '../lib/teams.js'
 import { american, pct, num, gameTime, signedPct } from '../lib/format.js'
@@ -9,6 +10,7 @@ import { HOT_HEAT } from '../lib/constants.js'
 import { compass } from '../lib/weather.js'
 import { interpretWind } from '../lib/wind.js'
 import { useLiveMode } from '../lib/liveMode.js'
+import { filterAndSortGames } from '../lib/gameFilters.js'
 import { hexA } from './atoms.jsx'
 
 const lastName = (n) => { const p = (n || '').trim().split(/\s+/).filter(Boolean); const l = p[p.length - 1] || ''; return /^(jr|sr|ii|iii|iv|v)\.?$/i.test(l) && p.length >= 2 ? p[p.length - 2] : l }
@@ -294,24 +296,39 @@ export default function GamesView({
     byGame.get(b.gamePk)[b.isHome ? 'home' : 'away'].push(b)
   }
 
-  const phase = (g) => (g.isLive ? 0 : g.isFinal ? 2 : 1)
-  const ordered = games
+  const eligibleGames = games
     .filter((g) => {
       const grp = byGame.get(g.gamePk)
       return grp && grp.away.length + grp.home.length > 0
     })
-    .sort((a, b) => phase(a) - phase(b) || new Date(a.gameDate) - new Date(b.gameDate))
 
   const god = computeGameOfDay(batters)
   const [view, setView] = useState('extractor')
+  const [gameQuery, setGameQuery] = useState('')
+  const [gameState, setGameState] = useState('all')
+  const [gameTimeWindow, setGameTimeWindow] = useState('all')
+  const [gameSortDirection, setGameSortDirection] = useState('asc')
+  const ordered = filterAndSortGames(eligibleGames, {
+    query: gameQuery,
+    state: gameState,
+    timeWindow: gameTimeWindow,
+    sortDirection: gameSortDirection,
+  })
+  const visibleGod = god && ordered.some((game) => game.gamePk === god.gamePk) ? god : null
   const [selectedGamePk, setSelectedGamePk] = useState(() => god?.gamePk || ordered[0]?.gamePk)
   const selectedGame = ordered.find((g) => g.gamePk === selectedGamePk) || ordered[0]
+  const filtersActive = Boolean(
+    gameQuery.trim()
+    || gameState !== 'all'
+    || gameTimeWindow !== 'all'
+    || gameSortDirection !== 'asc',
+  )
 
   useEffect(() => {
     if (selectedGame && selectedGame.gamePk !== selectedGamePk) setSelectedGamePk(selectedGame.gamePk)
   }, [selectedGame?.gamePk, selectedGamePk])
 
-  if (!ordered.length) {
+  if (!eligibleGames.length) {
     return (
       <div className="empty" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '64px', color: 'var(--text-faint)', gap: '12px' }}>
         <Icon name="Search" size={32} />
@@ -321,6 +338,12 @@ export default function GamesView({
   }
 
   const ctx = { onSelect, selectedId, watchlist, slip, onToggleWatch, onToggleSlip, onOpenPitcher }
+  const clearGameFilters = () => {
+    setGameQuery('')
+    setGameState('all')
+    setGameTimeWindow('all')
+    setGameSortDirection('asc')
+  }
 
   return (
     <>
@@ -337,53 +360,78 @@ export default function GamesView({
           ]}
         />
       </div>
-      <div className="games-desktop-layout games-command-center">
-        <aside className="games-navigator" aria-label="Game matchups">
-          <div className="games-nav-head"><span>Matchups</span><b>{ordered.length} games</b></div>
-          <div className="games-nav-list">
-            {ordered.map((g, i) => (
-              <GameNavItem
-                key={g.gamePk}
-                game={g}
-                groups={byGame.get(g.gamePk)}
-                active={g.gamePk === selectedGame?.gamePk}
-                featured={g.gamePk === god?.gamePk}
-                onClick={() => setSelectedGamePk(g.gamePk)}
-                idx={i}
-              />
-            ))}
+      <GameFilterBar
+        query={gameQuery}
+        onQueryChange={setGameQuery}
+        state={gameState}
+        onStateChange={setGameState}
+        timeWindow={gameTimeWindow}
+        onTimeWindowChange={setGameTimeWindow}
+        sortDirection={gameSortDirection}
+        onSortDirectionChange={setGameSortDirection}
+        shownCount={ordered.length}
+        totalCount={eligibleGames.length}
+        filtersActive={filtersActive}
+        onClear={clearGameFilters}
+      />
+      {ordered.length ? (
+        <>
+          <div className="games-desktop-layout games-command-center">
+            <aside className="games-navigator" aria-label="Game matchups">
+              <div className="games-nav-head"><span>Matchups</span><b>{ordered.length} games</b></div>
+              <div className="games-nav-list">
+                {ordered.map((g, i) => (
+                  <GameNavItem
+                    key={g.gamePk}
+                    game={g}
+                    groups={byGame.get(g.gamePk)}
+                    active={g.gamePk === selectedGame?.gamePk}
+                    featured={g.gamePk === visibleGod?.gamePk}
+                    onClick={() => setSelectedGamePk(g.gamePk)}
+                    idx={i}
+                  />
+                ))}
+              </div>
+            </aside>
+            <div className="games-workspace">
+              {selectedGame && (
+                <MatchupWorkspace
+                  game={selectedGame}
+                  groups={byGame.get(selectedGame.gamePk)}
+                  projection={gameProjections?.[selectedGame.gamePk]}
+                  evaluation={gameProjectionEvaluation}
+                  view={view}
+                  featured={selectedGame.gamePk === visibleGod?.gamePk}
+                  {...ctx}
+                />
+              )}
+            </div>
           </div>
-        </aside>
-        <div className="games-workspace">
-          {selectedGame && (
-            <MatchupWorkspace
-              game={selectedGame}
-              groups={byGame.get(selectedGame.gamePk)}
-              projection={gameProjections?.[selectedGame.gamePk]}
-              evaluation={gameProjectionEvaluation}
-              view={view}
-              featured={selectedGame.gamePk === god?.gamePk}
-              {...ctx}
-            />
-          )}
+          <div className="games-mobile-layout">
+            <MobileGameOfDay god={visibleGod} />
+            <div className="mobile-slate-head">
+              <span>Matchups</span>
+              <span>{ordered.length} games</span>
+            </div>
+            <div className="mobile-matchups">
+            {ordered.map((g, i) =>
+              view === 'extractor' ? (
+                <MobileMatchupCard key={g.gamePk} game={g} groups={byGame.get(g.gamePk)} projection={gameProjections?.[g.gamePk]} evaluation={gameProjectionEvaluation} idx={i} {...ctx} />
+              ) : (
+                <MobileDetailCard key={g.gamePk} game={g} groups={byGame.get(g.gamePk)} projection={gameProjections?.[g.gamePk]} evaluation={gameProjectionEvaluation} idx={i} {...ctx} />
+              ),
+            )}
+            </div>
+          </div>
+        </>
+      ) : (
+        <div className="games-filter-empty">
+          <Icon name="Search" size={28} />
+          <strong>No games match these filters</strong>
+          <span>Try another team, game state, or start-time window.</span>
+          <button type="button" onClick={clearGameFilters}>Clear game filters</button>
         </div>
-      </div>
-      <div className="games-mobile-layout">
-        <MobileGameOfDay god={god} />
-        <div className="mobile-slate-head">
-          <span>Matchups</span>
-          <span>{ordered.length} games</span>
-        </div>
-        <div className="mobile-matchups">
-        {ordered.map((g, i) =>
-          view === 'extractor' ? (
-            <MobileMatchupCard key={g.gamePk} game={g} groups={byGame.get(g.gamePk)} projection={gameProjections?.[g.gamePk]} evaluation={gameProjectionEvaluation} idx={i} {...ctx} />
-          ) : (
-            <MobileDetailCard key={g.gamePk} game={g} groups={byGame.get(g.gamePk)} projection={gameProjections?.[g.gamePk]} evaluation={gameProjectionEvaluation} idx={i} {...ctx} />
-          ),
-        )}
-        </div>
-      </div>
+      )}
     </>
   )
 }
