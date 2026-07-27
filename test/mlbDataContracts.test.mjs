@@ -8,7 +8,7 @@ import {
   normalizeHistoricalFeatureVector,
 } from '../server/lib/historicalFeatureArchive.mjs'
 import { buildPitcherContactLeak } from '../src/sports/mlb/logic/pitcherContactLeak.js'
-import { evaluateGameForecasts } from '../src/sports/mlb/logic/gameProjection.js'
+import { buildGameProjection, evaluateGameForecasts } from '../src/sports/mlb/logic/gameProjection.js'
 
 const batter = (playerId = 1, gamePk = 10) => ({
   playerId,
@@ -301,6 +301,64 @@ test('daily contract validates forecast v3 workload and bullpen provenance', () 
   const mismatched = structuredClone(snapshot)
   mismatched.gameProjections[10].inputs.home.bullpenContext.qualityFactor = 1.2
   assert.ok(validateDailySnapshot(mismatched).errors.some((error) => error.includes('must match bullpenContext')))
+})
+
+test('daily contract validates forecast v4 platoon and run-environment provenance', () => {
+  const projection = {
+    ...buildGameProjection({
+      game: {
+        gamePk: 10,
+        gameDate: '2026-07-14T23:00:00.000Z',
+        isLive: false,
+        isFinal: false,
+        awayTeam: { id: 1, name: 'Away', abbr: 'AWY' },
+        homeTeam: { id: 2, name: 'Home', abbr: 'HME' },
+      },
+      rows: [],
+      capturedAt: '2026-07-14T20:00:00.000Z',
+      gameRunEnvironments: {
+        10: {
+          factor: 1.05,
+          rawParkFactor: 1.06,
+          appliedParkFactor: 1.039,
+          weatherFactor: 1.0106,
+          tempFactor: 1.012,
+          windFactor: 0.9986,
+          windComponent: -0.1,
+          tempF: 80,
+          windSpeedMph: 7,
+          parkPeriod: '2024-2026',
+          parkSource: 'Baseball Savant Statcast Park Factors',
+          weatherStatus: 'outdoor',
+          roofClosed: false,
+          roofPending: false,
+          coverage: 1,
+        },
+      },
+    }),
+    freezeState: 'refreshing-pregame',
+  }
+  const snapshot = {
+    version: 5,
+    date: '2026-07-14',
+    generatedAt: '2026-07-14T12:00:00.000Z',
+    finishedAt: '2026-07-14T12:00:01.000Z',
+    games: [{ gamePk: 10 }],
+    scoredBatters: { '1-10': batter() },
+    stats: { scoredBatters: 1 },
+    gameProjections: { 10: projection },
+  }
+
+  assert.equal(projection.modelVersion, 4)
+  assert.deepEqual(validateDailySnapshot(snapshot).errors, [])
+
+  const wrongSource = structuredClone(snapshot)
+  wrongSource.gameProjections[10].inputs.away.environmentSource = 'legacy-hr-fallback'
+  assert.ok(validateDailySnapshot(wrongSource).errors.some((error) => error.includes('expected run-specific')))
+
+  const mismatched = structuredClone(snapshot)
+  mismatched.gameProjections[10].inputs.home.runEnvironment.factor = 0.9
+  assert.ok(validateDailySnapshot(mismatched).errors.some((error) => error.includes('must match runEnvironment.factor')))
 })
 
 test('daily contract rejects the retired bare alias and invalid probability', () => {

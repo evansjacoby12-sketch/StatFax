@@ -153,7 +153,7 @@ function validateGameProjectionRecord(prefix, projection, errors, gameIds = null
     errors.push(`${prefix}: expected an object`)
     return
   }
-  if (![1, 2, 3].includes(projection.modelVersion)) errors.push(`${prefix}.modelVersion: expected 1, 2, or 3`)
+  if (![1, 2, 3, 4].includes(projection.modelVersion)) errors.push(`${prefix}.modelVersion: expected 1, 2, 3, or 4`)
   if (projection.advisoryOnly !== true) errors.push(`${prefix}.advisoryOnly: must be true`)
   if (projection.captureState !== 'pregame') errors.push(`${prefix}.captureState: expected pregame`)
   if (!Number.isFinite(projection.gamePk)) errors.push(`${prefix}.gamePk: must be finite`)
@@ -289,6 +289,72 @@ function validateGameProjectionRecord(prefix, projection, errors, gameIds = null
         && Number.isFinite(bullpen.availabilityFactor)
         && Math.abs(input.bullpenAvailabilityFactor - bullpen.availabilityFactor) > 0.001
       ) errors.push(`${at}.bullpenAvailabilityFactor: must match bullpenContext.availabilityFactor`)
+    }
+  }
+  if (projection.modelVersion >= 4) {
+    for (const side of ['away', 'home']) {
+      const input = projection.inputs?.[side]
+      const at = `${prefix}.inputs.${side}`
+      if (!isObject(input)) continue
+      for (const [field, min, max] of [
+        ['overallOffenseFactor', 0.84, 1.18],
+        ['platoonFactor', 0.84, 1.18],
+        ['platoonCoverage', 0, 1],
+        ['runEnvironmentFactor', 0.86, 1.17],
+        ['runEnvironmentCoverage', 0, 1],
+      ]) {
+        if (!Number.isFinite(input[field])) errors.push(`${at}.${field}: required for model v4`)
+        else validateOptionalMetric(`${at}.${field}`, input[field], errors, { min, max })
+      }
+      if (input.opposingPitcherHand != null && !['L', 'R'].includes(input.opposingPitcherHand)) {
+        errors.push(`${at}.opposingPitcherHand: expected null, L, or R`)
+      }
+      validateOptionalMetric(`${at}.lineupVsHandObp`, input.lineupVsHandObp, errors, { min: 0, max: 1 })
+      validateOptionalMetric(`${at}.lineupVsHandSlg`, input.lineupVsHandSlg, errors, { min: 0, max: 1.5 })
+      validateOptionalMetric(`${at}.parkRunFactor`, input.parkRunFactor, errors, { min: 0.8, max: 1.3 })
+      validateOptionalMetric(`${at}.weatherRunFactor`, input.weatherRunFactor, errors, { min: 0.9, max: 1.1 })
+      if (input.environmentSource !== 'run-specific') {
+        errors.push(`${at}.environmentSource: expected run-specific for model v4`)
+      }
+      const environment = input.runEnvironment
+      if (!isObject(environment)) {
+        errors.push(`${at}.runEnvironment: expected an object for model v4`)
+        continue
+      }
+      for (const [field, min, max] of [
+        ['factor', 0.86, 1.17],
+        ['rawParkFactor', 0.8, 1.3],
+        ['appliedParkFactor', 0.88, 1.18],
+        ['weatherFactor', 0.9, 1.1],
+        ['tempFactor', 0.96, 1.04],
+        ['windFactor', 0.96, 1.04],
+        ['coverage', 0, 1],
+      ]) {
+        if (!Number.isFinite(environment[field])) errors.push(`${at}.runEnvironment.${field}: required for model v4`)
+        else validateOptionalMetric(`${at}.runEnvironment.${field}`, environment[field], errors, { min, max })
+      }
+      validateOptionalMetric(`${at}.runEnvironment.windComponent`, environment.windComponent, errors, { min: -1, max: 1 })
+      if (!['indoor', 'outdoor', 'roof-pending', 'missing'].includes(environment.weatherStatus)) {
+        errors.push(`${at}.runEnvironment.weatherStatus: unsupported`)
+      }
+      for (const field of ['roofClosed', 'roofPending']) {
+        if (typeof environment[field] !== 'boolean') errors.push(`${at}.runEnvironment.${field}: expected boolean`)
+      }
+      if (
+        Number.isFinite(input.runEnvironmentFactor)
+        && Number.isFinite(environment.factor)
+        && Math.abs(input.runEnvironmentFactor - environment.factor) > 0.001
+      ) errors.push(`${at}.runEnvironmentFactor: must match runEnvironment.factor`)
+      if (
+        Number.isFinite(input.parkRunFactor)
+        && Number.isFinite(environment.rawParkFactor)
+        && Math.abs(input.parkRunFactor - environment.rawParkFactor) > 0.001
+      ) errors.push(`${at}.parkRunFactor: must match runEnvironment.rawParkFactor`)
+      if (
+        Number.isFinite(input.weatherRunFactor)
+        && Number.isFinite(environment.weatherFactor)
+        && Math.abs(input.weatherRunFactor - environment.weatherFactor) > 0.001
+      ) errors.push(`${at}.weatherRunFactor: must match runEnvironment.weatherFactor`)
     }
   }
   if (projection.freezeState != null && !['refreshing-pregame', 'final-pregame'].includes(projection.freezeState)) {

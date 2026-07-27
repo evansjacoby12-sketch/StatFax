@@ -1,7 +1,7 @@
 import { teamScoringMatchupContext } from './teamScoringForm.js'
 import { expectedStarterInnings } from './starterIPDistribution.js'
 
-export const MLB_GAME_PROJECTION_VERSION = 3
+export const MLB_GAME_PROJECTION_VERSION = 4
 export const MLB_GAME_BASE_RUNS_PER_TEAM = 4.42
 export const MLB_GAME_EVALUATION_MIN_GAMES = 100
 export const MLB_GAME_EVALUATION_MIN_DATES = 10
@@ -68,18 +68,32 @@ function selectTeamLineup(rows, teamId) {
   return { rows: selected, source, orderedCount }
 }
 
-function lineupOffense(lineup) {
+function lineupOffense(lineup, pitcher) {
+  const pitcherHand = pitcher?.hand === 'L' ? 'L' : pitcher?.hand === 'R' ? 'R' : null
+  const splitCode = pitcherHand === 'L' ? 'vl' : pitcherHand === 'R' ? 'vr' : null
   const batterProfiles = lineup.rows.map((row) => {
     const season = row.season || {}
     const recent = row.recent || {}
     const xStats = row.xStats || {}
     const paWeight = Number.isFinite(row.expectedPAs) ? clamp(row.expectedPAs, 3, 5) : 4
+    const seasonObp = shrunkRate(season.obp, season.ab, 0.315, 100)
+    const seasonSlg = shrunkRate(season.slg, season.ab, 0.400, 100)
+    const split = splitCode ? row.platoon?.[splitCode] : null
+    const splitSample = finite(split?.pa, split?.ab)
+    const splitCovered = Number.isFinite(splitSample) && splitSample >= 20
     return {
       weight: paWeight,
-      obp: shrunkRate(season.obp, season.ab, 0.315, 100),
-      slg: shrunkRate(season.slg, season.ab, 0.400, 100),
+      obp: seasonObp,
+      slg: seasonSlg,
       xwoba: Number.isFinite(xStats.xwOBA) ? xStats.xwOBA : null,
       recentSlg: shrunkRate(recent.slg, recent.ab, 0.400, 80),
+      splitCovered,
+      splitObp: splitCovered && Number.isFinite(split?.obp)
+        ? shrunkRate(split.obp, splitSample, seasonObp, 120)
+        : null,
+      splitSlg: splitCovered && Number.isFinite(split?.slg)
+        ? shrunkRate(split.slg, splitSample, seasonSlg, 120)
+        : null,
     }
   })
   const obp = weightedMean(batterProfiles.map((row) => ({ value: row.obp, weight: row.weight }))) ?? 0.315
@@ -92,15 +106,31 @@ function lineupOffense(lineup) {
     + 0.20 * ((xwoba ?? 0.320) / 0.320)
     + 0.10 * (recentSlg / 0.400)
   )
+  const splitObp = weightedMean(batterProfiles.map((row) => ({ value: row.splitObp, weight: row.weight })))
+  const splitSlg = weightedMean(batterProfiles.map((row) => ({ value: row.splitSlg, weight: row.weight })))
+  const platoonCoverage = lineup.rows.length
+    ? batterProfiles.filter((row) => row.splitCovered).length / lineup.rows.length
+    : 0
+  const platoonFactor = Number.isFinite(splitObp) && Number.isFinite(splitSlg)
+    ? clamp(0.5 * (splitObp / 0.315) + 0.5 * (splitSlg / 0.400), 0.84, 1.18)
+    : 1
+  const platoonWeight = 0.20 * platoonCoverage
+  const seasonCoverage = lineup.rows.length
+    ? lineup.rows.filter((row) => Number.isFinite(row.season?.obp) && Number.isFinite(row.season?.slg)).length / lineup.rows.length
+    : 0
   return {
-    factor: clamp(raw, 0.84, 1.18),
+    factor: clamp(raw * (1 - platoonWeight) + platoonFactor * platoonWeight, 0.84, 1.18),
+    overallFactor: clamp(raw, 0.84, 1.18),
+    platoonFactor,
+    platoonCoverage,
+    pitcherHand,
     obp,
     slg,
+    splitObp,
+    splitSlg,
     xwoba,
     recentSlg,
-    coverage: lineup.rows.length
-      ? lineup.rows.filter((row) => Number.isFinite(row.season?.obp) && Number.isFinite(row.season?.slg)).length / lineup.rows.length
-      : 0,
+    coverage: 0.8 * seasonCoverage + 0.2 * platoonCoverage,
   }
 }
 
@@ -190,15 +220,38 @@ function bullpenRunFactor(opponentTeamId, bullpenHR9, bullpenRunProfiles, bullpe
   }
 }
 
-function environmentFactor(lineup) {
+function environmentFactor(lineup, gameRunEnvironment) {
   const values = lineup.rows
     .map((row) => finite(row.parkWeatherHandFactor, row.gameParkHRFactor))
     .filter(Number.isFinite)
   const hrFactor = values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 1
+  if (Number.isFinite(gameRunEnvironment?.factor)) {
+    return {
+      factor: clamp(gameRunEnvironment.factor, 0.86, 1.17),
+      hrFactor,
+      runFactor: gameRunEnvironment.factor,
+      rawParkFactor: Number.isFinite(gameRunEnvironment.rawParkFactor)
+        ? gameRunEnvironment.rawParkFactor
+        : null,
+      weatherFactor: Number.isFinite(gameRunEnvironment.weatherFactor)
+        ? gameRunEnvironment.weatherFactor
+        : null,
+      coverage: Number.isFinite(gameRunEnvironment.coverage)
+        ? clamp(gameRunEnvironment.coverage, 0, 1)
+        : 0,
+      source: 'run-specific',
+      context: gameRunEnvironment,
+    }
+  }
   return {
     factor: clamp(1 + 0.32 * (hrFactor - 1), 0.92, 1.08),
     hrFactor,
+    runFactor: null,
+    rawParkFactor: null,
+    weatherFactor: null,
     coverage: lineup.rows.length ? values.length / lineup.rows.length : 0,
+    source: 'legacy-hr-fallback',
+    context: null,
   }
 }
 
@@ -313,11 +366,13 @@ function teamProjection({
   bullpenHR9,
   bullpenRunProfiles,
   bullpenAvailability,
+  gameRunEnvironment,
   teamScoringProfiles,
 }) {
   const lineup = selectTeamLineup(rows, teamId)
-  const offense = lineupOffense(lineup)
-  const starter = starterRunFactor(opposingPitcher(lineup, probablePitcherId))
+  const pitcher = opposingPitcher(lineup, probablePitcherId)
+  const offense = lineupOffense(lineup, pitcher)
+  const starter = starterRunFactor(pitcher)
   const bullpen = bullpenRunFactor(
     opponentTeamId,
     bullpenHR9,
@@ -332,7 +387,7 @@ function teamProjection({
     0.82,
     1.24,
   )
-  const environment = environmentFactor(lineup)
+  const environment = environmentFactor(lineup, gameRunEnvironment)
   const teamScoring = teamScoringMatchupContext(teamScoringProfiles, teamId, opponentTeamId)
   const baseRunsPerTeam = Number.isFinite(teamScoring.leagueRunsPerTeam)
     ? clamp(teamScoring.leagueRunsPerTeam, 3.80, 5.00)
@@ -384,6 +439,12 @@ function teamProjection({
       baseRunsPerTeam: round(baseRunsPerTeam, 4),
       lineupObp: round(offense.obp),
       lineupSlg: round(offense.slg),
+      opposingPitcherHand: offense.pitcherHand,
+      overallOffenseFactor: round(offense.overallFactor, 4),
+      platoonFactor: round(offense.platoonFactor, 4),
+      platoonCoverage: round(offense.platoonCoverage, 4),
+      lineupVsHandObp: Number.isFinite(offense.splitObp) ? round(offense.splitObp) : null,
+      lineupVsHandSlg: Number.isFinite(offense.splitSlg) ? round(offense.splitSlg) : null,
       lineupXwoba: Number.isFinite(offense.xwoba) ? round(offense.xwoba) : null,
       estimatedStarterEra: Number.isFinite(starter.estimatedEra) ? round(starter.estimatedEra, 2) : null,
       bullpenHr9: bullpen.hr9,
@@ -399,6 +460,16 @@ function teamProjection({
         coverage: round(bullpen.coverage, 4),
       },
       parkWeatherHrFactor: round(environment.hrFactor),
+      runEnvironmentFactor: round(environment.factor, 4),
+      parkRunFactor: Number.isFinite(environment.rawParkFactor) ? round(environment.rawParkFactor, 4) : null,
+      weatherRunFactor: Number.isFinite(environment.weatherFactor) ? round(environment.weatherFactor, 4) : null,
+      runEnvironmentCoverage: round(environment.coverage, 4),
+      environmentSource: environment.source,
+      runEnvironment: environment.context ? {
+        ...environment.context,
+        factor: round(environment.factor, 4),
+        coverage: round(environment.coverage, 4),
+      } : null,
       teamScoring: {
         ...teamScoring,
         factor: round(teamScoring.factor, 4),
@@ -414,6 +485,7 @@ export function buildGameProjection({
   bullpenHR9 = {},
   bullpenRunProfiles = {},
   bullpenAvailability = {},
+  gameRunEnvironments = {},
   gameOdds = null,
   teamScoringProfiles = null,
   capturedAt = new Date().toISOString(),
@@ -429,6 +501,7 @@ export function buildGameProjection({
     bullpenHR9,
     bullpenRunProfiles,
     bullpenAvailability,
+    gameRunEnvironment: gameRunEnvironments?.[game.gamePk] || null,
     teamScoringProfiles,
   })
   const home = teamProjection({
@@ -441,6 +514,7 @@ export function buildGameProjection({
     bullpenHR9,
     bullpenRunProfiles,
     bullpenAvailability,
+    gameRunEnvironment: gameRunEnvironments?.[game.gamePk] || null,
     teamScoringProfiles,
   })
   const projectedTotal = away.expectedRuns + home.expectedRuns
@@ -483,6 +557,7 @@ export function buildSlateGameProjections({
   bullpenHR9 = {},
   bullpenRunProfiles = {},
   bullpenAvailability = {},
+  gameRunEnvironments = {},
   gameOdds = {},
   teamScoringProfiles = null,
   capturedAt = new Date().toISOString(),
@@ -501,6 +576,7 @@ export function buildSlateGameProjections({
       bullpenHR9,
       bullpenRunProfiles,
       bullpenAvailability,
+      gameRunEnvironments,
       gameOdds: gameOdds?.[game.gamePk] || null,
       teamScoringProfiles,
       capturedAt,

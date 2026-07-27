@@ -30,6 +30,8 @@ const batter = (playerId, teamId, pitcherId, {
   seasonIp = 100,
   seasonStarts = 18,
   isOpener = false,
+  pitcherHand = 'R',
+  platoon = null,
 } = {}) => ({
   playerId,
   gamePk: 10,
@@ -41,9 +43,11 @@ const batter = (playerId, teamId, pitcherId, {
   season: { ab: 300, obp, slg, ops: obp + slg },
   recent: { ab: 40, slg },
   xStats: { xwOBA: obp },
+  platoon,
   parkWeatherHandFactor: 1,
   pitcher: {
     id: pitcherId,
+    hand: pitcherHand,
     isOpener,
     season: { ip: seasonIp, gs: seasonStarts, era },
     recentForm: { ip: recentIp, games: recentGames, era },
@@ -94,7 +98,7 @@ test('game projection emits expected score, transparent factors, and market comp
 
   assert.equal(output.advisoryOnly, true)
   assert.equal(output.captureState, 'pregame')
-  assert.equal(output.modelVersion, 3)
+  assert.equal(output.modelVersion, 4)
   assert.ok(output.projectedTotal > 7 && output.projectedTotal < 11)
   assert.equal(output.estimatedScore.away + output.estimatedScore.home > 0, true)
   assert.ok(Math.abs(output.awayWinProbability + output.homeWinProbability - 1) < 0.0002)
@@ -105,6 +109,72 @@ test('game projection emits expected score, transparent factors, and market comp
   assert.ok(Number.isFinite(output.inputs.away.pitchingFactor))
   assert.equal(output.marketComparison.total.line, 8.5)
   assert.ok(Number.isFinite(output.marketComparison.moneyline.homeModelEdge))
+})
+
+test('handed lineup production adds a bounded matchup adjustment', () => {
+  const baseline = buildGameProjection({ game, rows: balancedRows() })
+  const splitRows = balancedRows().map((row) => (
+    row.teamId === 1
+      ? batter(row.playerId, 1, 60, {
+        order: row.battingOrder,
+        pitcherHand: 'R',
+        platoon: {
+          vr: { pa: 240, ab: 210, obp: 0.405, slg: 0.590 },
+          vl: { pa: 80, ab: 70, obp: 0.280, slg: 0.330 },
+        },
+      })
+      : row
+  ))
+  const favorable = buildGameProjection({ game, rows: splitRows })
+
+  assert.equal(favorable.inputs.away.opposingPitcherHand, 'R')
+  assert.equal(favorable.inputs.away.platoonCoverage, 1)
+  assert.ok(favorable.inputs.away.platoonFactor > 1)
+  assert.ok(favorable.awayExpectedRuns > baseline.awayExpectedRuns)
+  assert.ok(favorable.homeExpectedRuns === baseline.homeExpectedRuns)
+})
+
+test('run-specific park and weather context replaces the HR environment proxy', () => {
+  const neutral = buildGameProjection({
+    game,
+    rows: balancedRows(),
+    gameRunEnvironments: {
+      10: {
+        factor: 1,
+        rawParkFactor: 1,
+        appliedParkFactor: 1,
+        weatherFactor: 1,
+        tempFactor: 1,
+        windFactor: 1,
+        windComponent: 0,
+        tempF: 72,
+        windSpeedMph: 0,
+        parkPeriod: '2024-2026',
+        parkSource: 'Baseball Savant Statcast Park Factors',
+        weatherStatus: 'outdoor',
+        roofClosed: false,
+        roofPending: false,
+        coverage: 1,
+      },
+    },
+  })
+  const boosted = buildGameProjection({
+    game,
+    rows: balancedRows(),
+    gameRunEnvironments: {
+      10: {
+        ...neutral.inputs.away.runEnvironment,
+        factor: 1.1,
+        rawParkFactor: 1.1,
+        appliedParkFactor: 1.065,
+        weatherFactor: 1.033,
+      },
+    },
+  })
+
+  assert.equal(boosted.inputs.away.environmentSource, 'run-specific')
+  assert.equal(boosted.inputs.away.runEnvironmentFactor, 1.1)
+  assert.ok(boosted.projectedTotal > neutral.projectedTotal)
 })
 
 test('starter quality carries more weight for a long outing than an opener', () => {

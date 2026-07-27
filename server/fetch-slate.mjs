@@ -472,6 +472,7 @@ import {
   buildBullpenAvailability,
   buildBullpenRunProfile,
 } from '../src/sports/mlb/logic/bullpenRunEnvironment.js';
+import { buildGameRunEnvironment } from '../src/sports/mlb/logic/gameRunEnvironment.js';
 import {
   buildSlateGameProjections,
   evaluateGameForecasts,
@@ -816,10 +817,17 @@ async function fetchBatterStatsBatch(playerIds) {
     try {
       const ids = chunk.join(',');
       const url = `${MLB_BASE}/people?personIds=${ids}` +
-        `&hydrate=stats(group=[hitting],type=[season,lastXGames],season=${SEASON},gameType=[R],limit=15)`;
+        `&hydrate=stats(group=[hitting],type=[season,lastXGames,statSplits],season=${SEASON},gameType=[R],limit=15,sitCodes=[vl,vr])`;
       const data = await getJson(url);
       for (const person of data.people || []) {
-        const out = { id: person.id, name: person.fullName, batSide: person.batSide?.code || 'R', season: null, recent: null };
+        const out = {
+          id: person.id,
+          name: person.fullName,
+          batSide: person.batSide?.code || 'R',
+          season: null,
+          recent: null,
+          platoon: null,
+        };
         for (const sg of person.stats || []) {
           const splits = sg.splits || [];
           if (sg.type?.displayName === 'statsSingleSeason' || sg.type?.displayName === 'season') {
@@ -830,6 +838,23 @@ async function fetchBatterStatsBatch(playerIds) {
               obp: +s.obp   || 0, ops: +s.ops     || 0,
               k:   +s.strikeOuts || 0, bb: +s.baseOnBalls || 0,
             };
+          } else if (sg.type?.displayName === 'statSplits') {
+            const platoon = {};
+            for (const split of splits) {
+              const code = split.split?.code;
+              if (code !== 'vl' && code !== 'vr') continue;
+              const s = split.stat || {};
+              platoon[code] = {
+                ab: +s.atBats || 0,
+                pa: +s.plateAppearances || 0,
+                avg: +s.avg || 0,
+                obp: +s.obp || 0,
+                slg: +s.slg || 0,
+                ops: +s.ops || 0,
+                hr: +s.homeRuns || 0,
+              };
+            }
+            if (platoon.vl || platoon.vr) out.platoon = platoon;
           } else if (sg.type?.displayName === 'lastXGames') {
             const totals = splits.reduce((acc, sp) => {
               const s = sp.stat || {};
@@ -2979,6 +3004,13 @@ async function main() {
       }
     }
   }
+  const gameRunEnvironments = Object.fromEntries(games.map((game) => [
+    game.gamePk,
+    buildGameRunEnvironment({
+      weather: weatherByGame[game.gamePk] || null,
+      stadium: findStadium(game.venueName),
+    }),
+  ]));
 
   // 8b) HR-prop odds were removed from statfax-brain — the engine scores on
   //     model signal alone, so there's no Vegas blend and no odds in the
@@ -3401,6 +3433,7 @@ async function main() {
           lineupAsOf: projectedBattingOrder != null ? projectedLineup?.asOf ?? null : null,
           season,
           recent:     batter.recent || null,
+          platoon:    batter.platoon || null,
           // Statcast contact-quality fields lifted onto the row so the app
           // can render Zone Kings / parlay strategies without re-joining.
           barrelPct:  savantStats?.barrelPct  ?? null,
@@ -3468,6 +3501,7 @@ async function main() {
           // Always present (unlike parkWeatherHandFactor) so the Heat Index
           // "HR Park" check works for every game.
           gameParkHRFactor,
+          gameParkRunFactor: gameRunEnvironments[game.gamePk]?.rawParkFactor ?? null,
           // Statcast expected stats — luck-adjusted contact quality. PlayerDetailModal
           // can render these as "true talent" alongside the observed numbers.
           xStats: xStatsForBatter ? {
@@ -4445,6 +4479,7 @@ async function main() {
       bullpenHR9,
       bullpenRunProfiles,
       bullpenAvailability,
+      gameRunEnvironments,
       gameOdds: gameOddsByGamePk,
       teamScoringProfiles,
       capturedAt,
@@ -4502,6 +4537,7 @@ async function main() {
     bullpenHR9,
     bullpenRunProfiles,
     bullpenAvailability,
+    gameRunEnvironments,
     weatherByGame,
     // HR prop prices per game/book (The Odds API) — drives the board's odds
     // column, best-price display, +EV chips and parlay EV math client-side.
