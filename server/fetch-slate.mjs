@@ -469,6 +469,7 @@ import { pitchMixScore } from '../ui/src/lib/scout.js';
 import { buildPitcherContactLeak } from '../src/sports/mlb/logic/pitcherContactLeak.js';
 import {
   buildSlateGameProjections,
+  evaluateGameForecasts,
   settleGameForecasts,
   updateGameForecastLog,
 } from '../src/sports/mlb/logic/gameProjection.js';
@@ -4355,6 +4356,7 @@ async function main() {
   } catch (e) {
     console.warn(`[game-projection] build skipped: ${e?.message}`);
   }
+  const gameProjectionEvaluation = evaluateGameForecasts(backtestLog);
 
   // Attach the market's implied HR prob to each row (mean of 1/decimal across
   // books). Feeds the reconcile log's `vig` — the field whose 94-of-7197
@@ -4407,6 +4409,9 @@ async function main() {
     // Expected team runs, projected total, and win probabilities. These remain
     // advisory while forward results collect and never feed the HR engine.
     gameProjections: gameProjectionsByGamePk,
+    // Aggregate proof layer for the frozen pregame game forecasts. No individual
+    // historical rows ship to the browser, and these metrics never feed scoring.
+    gameProjectionEvaluation,
 
     // For Final games today: which players actually hit a HR.
     // Shape: { [gamePk]: [playerId, ...] }. Empty when no games are

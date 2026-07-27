@@ -760,6 +760,8 @@ export default function App() {
           <GamesView
             games={data.games}
             batters={filtered}
+            gameProjections={data.raw?.gameProjections || {}}
+            gameProjectionEvaluation={data.raw?.gameProjectionEvaluation || null}
             onSelect={(b) => setSelectedId(b.id)}
             selectedId={selectedId}
             watchlist={watchlist}

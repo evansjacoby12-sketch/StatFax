@@ -208,6 +208,70 @@ function validateGameProjections(projections, gameIds, errors) {
   return Object.keys(projections).length
 }
 
+function validateOptionalMetric(prefix, value, errors, { min = Number.NEGATIVE_INFINITY, max = Number.POSITIVE_INFINITY } = {}) {
+  if (value == null) return
+  if (!Number.isFinite(value) || value < min || value > max) {
+    errors.push(`${prefix}: expected null or finite value in [${min},${max}]`)
+  }
+}
+
+function validateGameProjectionEvaluation(evaluation, errors) {
+  if (evaluation == null) return 0
+  if (!isObject(evaluation)) {
+    errors.push('gameProjectionEvaluation: expected an object')
+    return 0
+  }
+  const prefix = 'gameProjectionEvaluation'
+  if (evaluation.version !== 1) errors.push(`${prefix}.version: expected 1`)
+  if (evaluation.advisoryOnly !== true) errors.push(`${prefix}.advisoryOnly: must be true`)
+  if (!['collecting', 'review-ready'].includes(evaluation.status)) errors.push(`${prefix}.status: unsupported`)
+  if (evaluation.updatedAt != null && Number.isNaN(Date.parse(evaluation.updatedAt))) errors.push(`${prefix}.updatedAt: expected null or ISO timestamp`)
+  for (const field of ['games', 'dates']) {
+    if (!Number.isInteger(evaluation.minimumSample?.[field]) || evaluation.minimumSample[field] < 1) {
+      errors.push(`${prefix}.minimumSample.${field}: expected a positive integer`)
+    }
+  }
+  for (const field of ['games', 'dates', 'winnerGames', 'totalGames', 'marketMoneylineGames', 'marketTotalGames']) {
+    if (!Number.isInteger(evaluation.sample?.[field]) || evaluation.sample[field] < 0) {
+      errors.push(`${prefix}.sample.${field}: expected a non-negative integer`)
+    }
+  }
+  validateProbability(`${prefix}.sample.progress`, evaluation.sample?.progress, errors)
+
+  for (const section of ['winner', 'total']) {
+    if (!isObject(evaluation[section])) errors.push(`${prefix}.${section}: expected an object`)
+  }
+  for (const field of ['sample', 'marketSample']) {
+    if (!Number.isInteger(evaluation.winner?.[field]) || evaluation.winner[field] < 0) errors.push(`${prefix}.winner.${field}: expected a non-negative integer`)
+    if (!Number.isInteger(evaluation.total?.[field]) || evaluation.total[field] < 0) errors.push(`${prefix}.total.${field}: expected a non-negative integer`)
+  }
+  for (const field of ['accuracy', 'brier', 'coinFlipBrier', 'marketBrier']) {
+    validateOptionalMetric(`${prefix}.winner.${field}`, evaluation.winner?.[field], errors, { min: 0, max: 1 })
+  }
+  for (const field of ['improvementVsCoinFlip', 'improvementVsMarket']) {
+    validateOptionalMetric(`${prefix}.winner.${field}`, evaluation.winner?.[field], errors, { min: -1, max: 1 })
+  }
+  if (!Array.isArray(evaluation.winner?.calibration)) {
+    errors.push(`${prefix}.winner.calibration: expected an array`)
+  } else {
+    for (const [index, bin] of evaluation.winner.calibration.entries()) {
+      const at = `${prefix}.winner.calibration[${index}]`
+      if (!Number.isInteger(bin?.sample) || bin.sample < 1) errors.push(`${at}.sample: expected a positive integer`)
+      for (const field of ['minProbability', 'maxProbability', 'meanProbability', 'observedWinRate']) {
+        validateProbability(`${at}.${field}`, bin?.[field], errors)
+      }
+    }
+  }
+  for (const field of ['mae', 'rmse', 'teamRunMae', 'marketLineMae']) {
+    validateOptionalMetric(`${prefix}.total.${field}`, evaluation.total?.[field], errors, { min: 0, max: 30 })
+  }
+  for (const field of ['bias', 'improvementVsMarket']) {
+    validateOptionalMetric(`${prefix}.total.${field}`, evaluation.total?.[field], errors, { min: -30, max: 30 })
+  }
+  if (typeof evaluation.note !== 'string' || !evaluation.note.trim()) errors.push(`${prefix}.note: expected non-empty text`)
+  return evaluation.sample?.games || 0
+}
+
 export function validateDailySnapshot(snapshot) {
   const errors = []
   const warnings = []
@@ -302,12 +366,14 @@ export function validateDailySnapshot(snapshot) {
   for (const [key, dist] of Object.entries(snapshot.kDistByPitcher || {})) validateKDistribution(key, dist, errors)
   const gameMarkets = validateGameOdds(snapshot.gameOdds, gameIds, errors)
   const gameProjections = validateGameProjections(snapshot.gameProjections, gameIds, errors)
+  const gameProjectionResults = validateGameProjectionEvaluation(snapshot.gameProjectionEvaluation, errors)
 
   if (games.length && entries.length === 0) warnings.push('scoredBatters: empty despite scheduled games')
   return result(errors, warnings, {
     games: games.length,
     gameMarkets,
     gameProjections,
+    gameProjectionResults,
     scoredBatters: entries.length,
     kDistributions: Object.keys(snapshot.kDistByPitcher || {}).length,
   })

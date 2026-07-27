@@ -1,5 +1,7 @@
 export const MLB_GAME_PROJECTION_VERSION = 1
 export const MLB_GAME_BASE_RUNS_PER_TEAM = 4.42
+export const MLB_GAME_EVALUATION_MIN_GAMES = 100
+export const MLB_GAME_EVALUATION_MIN_DATES = 10
 
 const clamp = (value, lo, hi) => Math.max(lo, Math.min(hi, value))
 const round = (value, digits = 3) => {
@@ -209,6 +211,8 @@ function marketComparison(gameOdds, win, projectedTotal) {
       books: consensus.moneyline.books,
       homeMarketProbability: homeMarket,
       awayMarketProbability: awayMarket,
+      homeAmerican: consensus.moneyline.home?.american ?? null,
+      awayAmerican: consensus.moneyline.away?.american ?? null,
       homeModelEdge: Number.isFinite(homeMarket) ? round(win.home - homeMarket, 4) : null,
       awayModelEdge: Number.isFinite(awayMarket) ? round(win.away - awayMarket, 4) : null,
     }
@@ -225,6 +229,8 @@ function marketComparison(gameOdds, win, projectedTotal) {
       modelPushProbability: distribution ? round(distribution.push, 4) : null,
       marketOverProbability: overMarket,
       marketUnderProbability: underMarket,
+      overAmerican: consensus.total.over?.american ?? null,
+      underAmerican: consensus.total.under?.american ?? null,
       overModelEdge: distribution && Number.isFinite(overMarket) ? round(distribution.over - overMarket, 4) : null,
       underModelEdge: distribution && Number.isFinite(underMarket) ? round(distribution.under - underMarket, 4) : null,
     }
@@ -466,4 +472,179 @@ export function settleGameForecasts(log = {}, date, snapshot) {
     delete next.gameForecasts.resultsByDate[key]
   }
   return next
+}
+
+const mean = (values) => (
+  values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null
+)
+
+function roundedMetric(value, digits = 4) {
+  return Number.isFinite(value) ? round(value, digits) : null
+}
+
+function gameForecastResultRows(log = {}) {
+  const results = log?.gameForecasts?.resultsByDate
+  if (!results || typeof results !== 'object' || Array.isArray(results)) return []
+  const seen = new Set()
+  const rows = []
+  for (const date of Object.keys(results).sort()) {
+    if (!Array.isArray(results[date])) continue
+    for (const row of results[date]) {
+      const key = `${date}|${row?.gamePk}`
+      if (
+        seen.has(key)
+        || row?.captureState !== 'pregame'
+        || row?.freezeState !== 'final-pregame'
+        || !['away', 'home'].includes(row?.actualWinner)
+      ) continue
+      seen.add(key)
+      rows.push({ ...row, resultDate: date })
+    }
+  }
+  return rows
+}
+
+function winnerCalibration(rows) {
+  const bins = [
+    [0.50, 0.55],
+    [0.55, 0.60],
+    [0.60, 0.65],
+    [0.65, 0.70],
+    [0.70, 1.001],
+  ]
+  return bins.map(([lo, hi]) => {
+    const matched = rows.filter((row) => (
+      Number.isFinite(row.projectedWinnerProbability)
+      && row.projectedWinnerProbability >= lo
+      && row.projectedWinnerProbability < hi
+      && typeof row.winnerCorrect === 'boolean'
+    ))
+    return {
+      minProbability: lo,
+      maxProbability: hi > 1 ? 1 : hi,
+      sample: matched.length,
+      meanProbability: roundedMetric(mean(matched.map((row) => row.projectedWinnerProbability))),
+      observedWinRate: roundedMetric(mean(matched.map((row) => (row.winnerCorrect ? 1 : 0)))),
+    }
+  }).filter((bin) => bin.sample > 0)
+}
+
+// Evaluation is presentation-only. It summarizes frozen, settled pregame
+// forecasts and never feeds the HR engine or the next game projection.
+export function evaluateGameForecasts(log = {}) {
+  const rows = gameForecastResultRows(log)
+  const dates = new Set(rows.map((row) => row.resultDate))
+  const winnerRows = rows.filter((row) => (
+    Number.isFinite(row.homeWinProbability)
+    && typeof row.winnerCorrect === 'boolean'
+  ))
+  const totalRows = rows.filter((row) => (
+    Number.isFinite(row.projectedTotal)
+    && Number.isFinite(row.actualTotal)
+  ))
+  const marketWinnerRows = winnerRows.filter((row) => (
+    Number.isFinite(row.marketComparison?.moneyline?.homeMarketProbability)
+  ))
+  const marketTotalRows = totalRows.filter((row) => (
+    Number.isFinite(row.marketComparison?.total?.line)
+  ))
+
+  const winnerBriers = winnerRows.map((row) => {
+    const homeWon = row.actualWinner === 'home' ? 1 : 0
+    return (row.homeWinProbability - homeWon) ** 2
+  })
+  const marketWinnerBriers = marketWinnerRows.map((row) => {
+    const homeWon = row.actualWinner === 'home' ? 1 : 0
+    return (row.marketComparison.moneyline.homeMarketProbability - homeWon) ** 2
+  })
+  const pairedModelWinnerBriers = marketWinnerRows.map((row) => {
+    const homeWon = row.actualWinner === 'home' ? 1 : 0
+    return (row.homeWinProbability - homeWon) ** 2
+  })
+  const totalErrors = totalRows.map((row) => row.projectedTotal - row.actualTotal)
+  const totalMse = mean(totalErrors.map((value) => value ** 2))
+  const teamRunErrors = totalRows.flatMap((row) => (
+    Number.isFinite(row.awayExpectedRuns)
+    && Number.isFinite(row.homeExpectedRuns)
+    && Number.isFinite(row.actualAwayRuns)
+    && Number.isFinite(row.actualHomeRuns)
+      ? [
+          Math.abs(row.awayExpectedRuns - row.actualAwayRuns),
+          Math.abs(row.homeExpectedRuns - row.actualHomeRuns),
+        ]
+      : []
+  ))
+  const marketTotalErrors = marketTotalRows.map((row) => (
+    Math.abs(row.marketComparison.total.line - row.actualTotal)
+  ))
+  const pairedModelTotalErrors = marketTotalRows.map((row) => (
+    Math.abs(row.projectedTotal - row.actualTotal)
+  ))
+
+  const winnerBrier = mean(winnerBriers)
+  const marketWinnerBrier = mean(marketWinnerBriers)
+  const pairedModelWinnerBrier = mean(pairedModelWinnerBriers)
+  const totalMae = mean(totalErrors.map(Math.abs))
+  const marketTotalMae = mean(marketTotalErrors)
+  const pairedModelTotalMae = mean(pairedModelTotalErrors)
+  const status = rows.length >= MLB_GAME_EVALUATION_MIN_GAMES && dates.size >= MLB_GAME_EVALUATION_MIN_DATES
+    ? 'review-ready'
+    : 'collecting'
+  const updatedAt = rows
+    .map((row) => row.settledAt)
+    .filter((value) => value && !Number.isNaN(Date.parse(value)))
+    .sort()
+    .at(-1) || null
+
+  return {
+    version: 1,
+    advisoryOnly: true,
+    status,
+    updatedAt,
+    minimumSample: {
+      games: MLB_GAME_EVALUATION_MIN_GAMES,
+      dates: MLB_GAME_EVALUATION_MIN_DATES,
+    },
+    sample: {
+      games: rows.length,
+      dates: dates.size,
+      winnerGames: winnerRows.length,
+      totalGames: totalRows.length,
+      marketMoneylineGames: marketWinnerRows.length,
+      marketTotalGames: marketTotalRows.length,
+      progress: round(Math.min(
+        rows.length / MLB_GAME_EVALUATION_MIN_GAMES,
+        dates.size / MLB_GAME_EVALUATION_MIN_DATES,
+        1,
+      ), 3),
+    },
+    winner: {
+      sample: winnerRows.length,
+      accuracy: roundedMetric(mean(winnerRows.map((row) => (row.winnerCorrect ? 1 : 0)))),
+      brier: roundedMetric(winnerBrier),
+      coinFlipBrier: winnerRows.length ? 0.25 : null,
+      improvementVsCoinFlip: winnerRows.length ? roundedMetric(0.25 - winnerBrier) : null,
+      marketSample: marketWinnerRows.length,
+      marketBrier: roundedMetric(marketWinnerBrier),
+      improvementVsMarket: Number.isFinite(pairedModelWinnerBrier) && Number.isFinite(marketWinnerBrier)
+        ? roundedMetric(marketWinnerBrier - pairedModelWinnerBrier)
+        : null,
+      calibration: winnerCalibration(winnerRows),
+    },
+    total: {
+      sample: totalRows.length,
+      mae: roundedMetric(totalMae, 3),
+      rmse: Number.isFinite(totalMse) ? roundedMetric(Math.sqrt(totalMse), 3) : null,
+      bias: roundedMetric(mean(totalErrors), 3),
+      teamRunMae: roundedMetric(mean(teamRunErrors), 3),
+      marketSample: marketTotalRows.length,
+      marketLineMae: roundedMetric(marketTotalMae, 3),
+      improvementVsMarket: Number.isFinite(pairedModelTotalMae) && Number.isFinite(marketTotalMae)
+        ? roundedMetric(marketTotalMae - pairedModelTotalMae, 3)
+        : null,
+    },
+    note: status === 'collecting'
+      ? 'Forward results are still collecting; this report does not change production scoring.'
+      : 'Minimum review sample reached; promotion still requires a separate model review.',
+  }
 }

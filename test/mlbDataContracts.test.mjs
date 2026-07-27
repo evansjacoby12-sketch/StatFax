@@ -8,6 +8,7 @@ import {
   normalizeHistoricalFeatureVector,
 } from '../server/lib/historicalFeatureArchive.mjs'
 import { buildPitcherContactLeak } from '../src/sports/mlb/logic/pitcherContactLeak.js'
+import { evaluateGameForecasts } from '../src/sports/mlb/logic/gameProjection.js'
 
 const batter = (playerId = 1, gamePk = 10) => ({
   playerId,
@@ -106,6 +107,7 @@ test('daily and backtest contracts validate frozen game projections', () => {
     scoredBatters: { '1-10': batter() },
     stats: { scoredBatters: 1 },
     gameProjections: { 10: projection },
+    gameProjectionEvaluation: evaluateGameForecasts({}),
   }
   assert.deepEqual(validateDailySnapshot(snapshot).errors, [])
 
@@ -130,6 +132,10 @@ test('daily and backtest contracts validate frozen game projections', () => {
     },
   }
   assert.deepEqual(validateBacktestLog(log).errors, [])
+
+  const badEvaluation = structuredClone(snapshot)
+  badEvaluation.gameProjectionEvaluation.status = 'production'
+  assert.ok(validateDailySnapshot(badEvaluation).errors.some((error) => error.includes('gameProjectionEvaluation.status')))
 
   snapshot.gameProjections[10].captureState = 'live'
   assert.ok(validateDailySnapshot(snapshot).errors.some((error) => error.includes('captureState')))

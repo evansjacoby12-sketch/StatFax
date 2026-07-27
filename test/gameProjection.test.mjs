@@ -2,6 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   buildGameProjection,
+  evaluateGameForecasts,
   gameTotalProbabilities,
   settleGameForecasts,
   updateGameForecastLog,
@@ -151,4 +152,83 @@ test('settlement uses only an explicitly frozen pregame capture', () => {
   leaked.gameProjections[10].captureState = 'live'
   const rejected = settleGameForecasts({}, '2026-07-27', leaked)
   assert.equal(rejected.gameForecasts.resultsByDate['2026-07-27'], undefined)
+})
+
+test('forward evaluation reports winner calibration and total error against simple and market baselines', () => {
+  const result = ({
+    gamePk,
+    date,
+    homeProbability,
+    homeWon,
+    projectedTotal,
+    actualTotal,
+    marketHomeProbability,
+    marketTotal,
+  }) => ({
+    modelVersion: 1,
+    advisoryOnly: true,
+    captureState: 'pregame',
+    freezeState: 'final-pregame',
+    gamePk,
+    gameDate: `${date}T23:00:00.000Z`,
+    capturedAt: `${date}T20:00:00.000Z`,
+    settledAt: `${date}T23:59:00.000Z`,
+    awayExpectedRuns: projectedTotal / 2,
+    homeExpectedRuns: projectedTotal / 2,
+    projectedTotal,
+    estimatedScore: { away: 4, home: 5 },
+    awayWinProbability: 1 - homeProbability,
+    homeWinProbability: homeProbability,
+    tieAfterNineProbability: 0.1,
+    projectedWinner: homeProbability >= 0.5 ? 'home' : 'away',
+    projectedWinnerProbability: Math.max(homeProbability, 1 - homeProbability),
+    confidence: { status: 'medium', coverage: 0.9 },
+    inputs: { away: {}, home: {} },
+    actualAwayRuns: homeWon ? 3 : 5,
+    actualHomeRuns: homeWon ? 5 : 3,
+    actualTotal,
+    actualWinner: homeWon ? 'home' : 'away',
+    winnerCorrect: (homeProbability >= 0.5) === homeWon,
+    marketComparison: {
+      moneyline: { homeMarketProbability: marketHomeProbability },
+      total: { line: marketTotal },
+    },
+  })
+  const rows = [
+    result({ gamePk: 1, date: '2026-07-25', homeProbability: 0.62, homeWon: true, projectedTotal: 8.5, actualTotal: 9, marketHomeProbability: 0.55, marketTotal: 8 }),
+    result({ gamePk: 2, date: '2026-07-25', homeProbability: 0.58, homeWon: false, projectedTotal: 7.5, actualTotal: 7, marketHomeProbability: 0.52, marketTotal: 8.5 }),
+    result({ gamePk: 3, date: '2026-07-26', homeProbability: 0.45, homeWon: false, projectedTotal: 10, actualTotal: 8, marketHomeProbability: 0.48, marketTotal: 8.5 }),
+  ]
+  const evaluation = evaluateGameForecasts({
+    gameForecasts: {
+      resultsByDate: {
+        '2026-07-25': rows.slice(0, 2),
+        '2026-07-26': rows.slice(2),
+      },
+    },
+  })
+
+  assert.equal(evaluation.status, 'collecting')
+  assert.deepEqual(evaluation.sample, {
+    games: 3,
+    dates: 2,
+    winnerGames: 3,
+    totalGames: 3,
+    marketMoneylineGames: 3,
+    marketTotalGames: 3,
+    progress: 0.03,
+  })
+  assert.equal(evaluation.winner.accuracy, 0.6667)
+  assert.ok(evaluation.winner.brier < evaluation.winner.coinFlipBrier)
+  assert.equal(evaluation.total.mae, 1)
+  assert.equal(evaluation.total.bias, 0.667)
+  assert.equal(evaluation.winner.calibration.reduce((sum, bin) => sum + bin.sample, 0), 3)
+})
+
+test('empty forward evaluation stays null-safe while results collect', () => {
+  const evaluation = evaluateGameForecasts({})
+  assert.equal(evaluation.sample.games, 0)
+  assert.equal(evaluation.winner.brier, null)
+  assert.equal(evaluation.total.rmse, null)
+  assert.equal(evaluation.status, 'collecting')
 })
