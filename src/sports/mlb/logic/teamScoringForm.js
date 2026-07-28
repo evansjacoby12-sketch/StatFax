@@ -181,6 +181,36 @@ function shrunkRate(rate, sample, prior, priorGames) {
   return (rate * sample + prior * priorGames) / (sample + priorGames)
 }
 
+function poissonMass(lambda, runs) {
+  if (!Number.isFinite(lambda) || lambda <= 0 || !Number.isInteger(runs) || runs < 0) return 0
+  let probability = Math.exp(-lambda)
+  for (let index = 1; index <= runs; index++) probability *= lambda / index
+  return probability
+}
+
+function homeWinProbability(awayExpectedRuns, homeExpectedRuns) {
+  if (
+    !Number.isFinite(awayExpectedRuns)
+    || !Number.isFinite(homeExpectedRuns)
+    || awayExpectedRuns <= 0
+    || homeExpectedRuns <= 0
+  ) return null
+  let homeWin = 0
+  let tie = 0
+  for (let awayRuns = 0; awayRuns <= 20; awayRuns++) {
+    const awayProbability = poissonMass(awayExpectedRuns, awayRuns)
+    for (let homeRuns = 0; homeRuns <= 20; homeRuns++) {
+      const joint = awayProbability * poissonMass(homeExpectedRuns, homeRuns)
+      if (homeRuns > awayRuns) homeWin += joint
+      else if (homeRuns === awayRuns) tie += joint
+    }
+  }
+  // A tied nine-inning score is split evenly. Historical final scores settle
+  // after extras, and the score archive does not preserve an extra-inning
+  // run-expectancy state that would support a more detailed assumption.
+  return clamp(homeWin + 0.5 * tie, 0, 1)
+}
+
 function teamProfile(teamId, rows, leagueRunsPerTeam) {
   const ordered = [...rows].sort((a, b) => (
     a.officialDate.localeCompare(b.officialDate)
@@ -328,7 +358,9 @@ export function evaluateTeamScoringForm(artifact, {
     byDate.get(game.officialDate).push(game)
   }
   const teamRunErrors = { baseline: [], form: [] }
+  const totalErrors = { baseline: [], form: [] }
   const winnerCorrect = { baseline: [], form: [] }
+  const winnerBrier = { baseline: [], form: [] }
   const evaluatedDates = []
   let gameSample = 0
 
@@ -346,10 +378,18 @@ export function evaluateTeamScoringForm(artifact, {
       const formHome = baselineHome * home.factor
       teamRunErrors.baseline.push(baselineAway - game.awayRuns, baselineHome - game.homeRuns)
       teamRunErrors.form.push(formAway - game.awayRuns, formHome - game.homeRuns)
+      const actualTotal = game.awayRuns + game.homeRuns
+      totalErrors.baseline.push(baselineAway + baselineHome - actualTotal)
+      totalErrors.form.push(formAway + formHome - actualTotal)
       if (game.awayRuns !== game.homeRuns) {
         const homeWon = game.homeRuns > game.awayRuns
+        const outcome = homeWon ? 1 : 0
+        const baselineHomeWin = homeWinProbability(baselineAway, baselineHome)
+        const formHomeWin = homeWinProbability(formAway, formHome)
         winnerCorrect.baseline.push((baselineHome > baselineAway) === homeWon ? 1 : 0)
         winnerCorrect.form.push((formHome > formAway) === homeWon ? 1 : 0)
+        if (Number.isFinite(baselineHomeWin)) winnerBrier.baseline.push((baselineHomeWin - outcome) ** 2)
+        if (Number.isFinite(formHomeWin)) winnerBrier.form.push((formHomeWin - outcome) ** 2)
       }
       gameSample++
       dateSample++
@@ -360,17 +400,32 @@ export function evaluateTeamScoringForm(artifact, {
   const average = (values) => (
     values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null
   )
-  const metrics = (errors, winners) => {
+  const metrics = (errors, totalScoreErrors, winners, brierScores) => {
     const mae = average(errors.map(Math.abs))
     const mse = average(errors.map((error) => error ** 2))
+    const totalMae = average(totalScoreErrors.map(Math.abs))
+    const totalMse = average(totalScoreErrors.map((error) => error ** 2))
     return {
       teamRunMae: Number.isFinite(mae) ? round(mae, 4) : null,
       teamRunRmse: Number.isFinite(mse) ? round(Math.sqrt(mse), 4) : null,
+      totalMae: Number.isFinite(totalMae) ? round(totalMae, 4) : null,
+      totalRmse: Number.isFinite(totalMse) ? round(Math.sqrt(totalMse), 4) : null,
       winnerAccuracy: Number.isFinite(average(winners)) ? round(average(winners), 4) : null,
+      winnerBrier: Number.isFinite(average(brierScores)) ? round(average(brierScores), 4) : null,
     }
   }
-  const baseline = metrics(teamRunErrors.baseline, winnerCorrect.baseline)
-  const form = metrics(teamRunErrors.form, winnerCorrect.form)
+  const baseline = metrics(
+    teamRunErrors.baseline,
+    totalErrors.baseline,
+    winnerCorrect.baseline,
+    winnerBrier.baseline,
+  )
+  const form = metrics(
+    teamRunErrors.form,
+    totalErrors.form,
+    winnerCorrect.form,
+    winnerBrier.form,
+  )
   const improvement = (baselineValue, formValue, higherIsBetter = false) => (
     Number.isFinite(baselineValue) && Number.isFinite(formValue)
       ? round(higherIsBetter ? formValue - baselineValue : baselineValue - formValue, 4)
@@ -395,7 +450,10 @@ export function evaluateTeamScoringForm(artifact, {
     improvement: {
       teamRunMae: improvement(baseline.teamRunMae, form.teamRunMae),
       teamRunRmse: improvement(baseline.teamRunRmse, form.teamRunRmse),
+      totalMae: improvement(baseline.totalMae, form.totalMae),
+      totalRmse: improvement(baseline.totalRmse, form.totalRmse),
       winnerAccuracy: improvement(baseline.winnerAccuracy, form.winnerAccuracy, true),
+      winnerBrier: improvement(baseline.winnerBrier, form.winnerBrier),
     },
   }
 }

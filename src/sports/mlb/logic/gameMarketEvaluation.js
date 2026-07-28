@@ -443,18 +443,25 @@ export function buildGameMarketPortfolio(
       excluded.push({ ...candidate, exclusionReason: reason })
       continue
     }
-    const promotion = evaluation?.markets?.[candidate.market]?.promotion
     selections.push({
       ...candidate,
-      validated: promotion?.eligible === true && candidate.tier === 'play',
+      validated: candidate.tier === 'play' && candidate.provisional === false,
     })
     perMarket.set(candidate.market, (perMarket.get(candidate.market) || 0) + 1)
     perGame.set(candidate.gamePk, (perGame.get(candidate.gamePk) || 0) + 1)
   }
+  const decisionStatuses = projections
+    .map((projection) => projection?.marketDecision?.status)
+    .filter(Boolean)
+  const status = decisionStatuses.includes('ready')
+    ? 'eligible'
+    : decisionStatuses.some((value) => ['hold', 'drift-hold'].includes(value))
+      ? 'hold'
+      : evaluation?.status || 'collecting'
   return {
     version: MLB_GAME_MARKET_PORTFOLIO_VERSION,
     advisoryOnly: true,
-    status: evaluation?.status || 'collecting',
+    status,
     constraints: {
       maximumSelections,
       maximumPerMarket,

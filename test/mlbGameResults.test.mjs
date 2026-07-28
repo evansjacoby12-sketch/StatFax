@@ -205,10 +205,12 @@ test('team scoring evaluation is expanding-window and never trains on its target
   assert.ok(evaluation.sample.games > 0)
   assert.equal(evaluation.methodology, 'expanding-date walk-forward')
   assert.ok(evaluation.seasonForm.teamRunMae < evaluation.baseline.teamRunMae)
+  assert.ok(Number.isFinite(evaluation.seasonForm.totalMae))
   assert.ok(evaluation.seasonForm.winnerAccuracy > evaluation.baseline.winnerAccuracy)
+  assert.ok(evaluation.seasonForm.winnerBrier < evaluation.baseline.winnerBrier)
 })
 
-test('deployment restores, validates, publishes, and bundles the season results archive', async () => {
+test('deployment restores, validates, publishes, and bundles game score archives', async () => {
   const [workflow, packageJson, vite] = await Promise.all([
     readFile(new URL('../.github/workflows/deploy.yml', import.meta.url), 'utf8'),
     readFile(new URL('../package.json', import.meta.url), 'utf8'),
@@ -216,8 +218,11 @@ test('deployment restores, validates, publishes, and bundles the season results 
   ])
 
   assert.match(workflow, /Restore MLB game results/)
+  assert.match(workflow, /Restore MLB game history/)
   assert.match(workflow, /npm run validate:mlb-game-results/)
-  assert.match(workflow, /backtest-log\.json mlb-game-results\.json list-builder-evidence\.json/)
+  assert.match(workflow, /npm run validate:mlb-game-history/)
+  assert.match(workflow, /backtest-log\.json mlb-game-results\.json mlb-game-history\.json list-builder-evidence\.json/)
   assert.match(packageJson, /"validate:mlb-game-results"/)
+  assert.match(packageJson, /"validate:mlb-game-history"/)
   assert.match(vite, /mlb-game-results\.json/)
 })

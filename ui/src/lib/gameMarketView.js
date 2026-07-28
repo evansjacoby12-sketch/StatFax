@@ -11,18 +11,25 @@ export function gameMarketPortfolioSelection(portfolio, gamePk, market) {
   )) || null
 }
 
-export function gameMarketValidation(marketEvaluation, market) {
+export function gameMarketValidation(policy, marketEvaluation, market) {
   const performance = marketEvaluation?.markets?.[market]
   const promotion = performance?.promotion
   const actionable = performance?.actionable
-  const status = promotion?.status || 'collecting'
+  const historicalStatus = policy?.historicalStatus || 'collecting'
+  const drift = performance?.drift?.status || policy?.driftStatus || 'collecting'
+  const status = drift === 'drift'
+    ? 'hold'
+    : historicalStatus
   return {
     status,
     label: status === 'eligible'
-      ? 'Validated'
+      ? '3-season validated'
       : status === 'hold'
-        ? 'Hold'
-        : 'Collecting',
+        ? drift === 'drift' ? 'Drift hold' : 'Historical hold'
+        : 'History collecting',
+    historicalSeasons: policy?.historicalSample?.seasons || 0,
+    historicalGames: policy?.historicalSample?.games || 0,
+    historicalDates: policy?.historicalSample?.dates || 0,
     decisions: actionable?.decisions || 0,
     dates: actionable?.dates || 0,
     minimumGames: promotion?.minimumGames
@@ -31,7 +38,8 @@ export function gameMarketValidation(marketEvaluation, market) {
     minimumDates: promotion?.minimumDates
       || marketEvaluation?.minimumSample?.dates
       || 10,
-    drift: performance?.drift?.status || 'collecting',
+    drift,
+    forwardStatus: promotion?.status || 'collecting',
   }
 }
 

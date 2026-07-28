@@ -3,9 +3,10 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 
 test('Games workspace receives and labels advisory game forecasts and validation', async () => {
-  const [app, games, css] = await Promise.all([
+  const [app, games, marketView, css] = await Promise.all([
     readFile(new URL('../ui/src/App.jsx', import.meta.url), 'utf8'),
     readFile(new URL('../ui/src/components/GamesView.jsx', import.meta.url), 'utf8'),
+    readFile(new URL('../ui/src/lib/gameMarketView.js', import.meta.url), 'utf8'),
     readFile(new URL('../ui/src/app.css', import.meta.url), 'utf8'),
   ])
 
@@ -21,7 +22,9 @@ test('Games workspace receives and labels advisory game forecasts and validation
   assert.match(games, /Model chance/i)
   assert.match(games, /Est\. ROI/i)
   assert.match(games, /Curated slate/i)
-  assert.match(games, /actionable calls/i)
+  assert.match(games, /historical games/i)
+  assert.match(games, /Forward monitor/i)
+  assert.match(marketView, /3-season validated/i)
   assert.match(games, /gameMarketMovementCaution/)
   assert.match(games, /gameMarketPortfolioSelection/)
   assert.match(games, /gameMarketValidation/)

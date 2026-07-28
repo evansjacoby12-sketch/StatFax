@@ -9,11 +9,26 @@ const awayTeam = { id: 1, name: 'Away', abbr: 'AWY' }
 const homeTeam = { id: 2, name: 'Home', abbr: 'HME' }
 const confidence = { status: 'medium', coverage: 0.9 }
 
+const historicalValidation = (moneylineEligible = true, totalEligible = true) => ({
+  markets: {
+    moneyline: {
+      status: moneylineEligible ? 'eligible' : 'hold',
+      eligible: moneylineEligible,
+      sample: { seasons: 3, games: 5905, dates: 448 },
+    },
+    total: {
+      status: totalEligible ? 'eligible' : 'hold',
+      eligible: totalEligible,
+      sample: { seasons: 3, games: 5905, dates: 448 },
+    },
+  },
+})
+
 const readyPolicy = () => gameMarketDecisionPolicy({
   minimumSample: { games: 100, dates: 10 },
-  winner: { marketSample: 120, marketDates: 12 },
-  total: { marketSample: 120, marketDates: 12 },
-})
+  winner: { marketSample: 0, marketDates: 0 },
+  total: { marketSample: 0, marketDates: 0 },
+}, null, historicalValidation())
 
 test('market decision keeps the forecast favorite separate from the value side', () => {
   const decision = buildGameMarketDecision({
@@ -104,7 +119,7 @@ test('totals use push-adjusted probability and price EV instead of mean directio
   assert.equal(decision.total.tier, 'pass')
 })
 
-test('unvalidated PLAY thresholds are capped to LEAN until forward evidence is ready', () => {
+test('unvalidated PLAY thresholds are capped until three-season history is ready', () => {
   const input = {
     awayTeam,
     homeTeam,
@@ -131,12 +146,13 @@ test('unvalidated PLAY thresholds are capped to LEAN until forward evidence is r
   assert.equal(collecting.total.rawTier, 'play')
   assert.equal(collecting.total.tier, 'lean')
   assert.equal(collecting.total.provisional, true)
-  assert.match(collecting.total.reason, /forward validation/i)
+  assert.match(collecting.total.reason, /historical validation/i)
 
   const ready = buildGameMarketDecision({ ...input, policy: readyPolicy() })
   assert.equal(ready.total.rawTier, 'play')
   assert.equal(ready.total.tier, 'play')
   assert.equal(ready.total.provisional, false)
+  assert.equal(ready.policy.total.historicalGate, true)
 })
 
 test('missing prices produce unavailable decisions without inventing an edge', () => {
@@ -156,27 +172,57 @@ test('missing prices produce unavailable decisions without inventing an edge', (
   assert.equal(decision.total.selectedSide, null)
 })
 
-test('performance evidence can keep PLAY capped after sample counts are met', () => {
+test('forward call counts no longer block a historically validated PLAY', () => {
   const projectionEvaluation = {
     minimumSample: { games: 100, dates: 10 },
-    winner: { marketSample: 150, marketDates: 15 },
-    total: { marketSample: 150, marketDates: 15 },
+    winner: { marketSample: 0, marketDates: 0 },
+    total: { marketSample: 0, marketDates: 0 },
   }
   const performance = {
     markets: {
       moneyline: {
-        actionable: { decisions: 120, dates: 12 },
-        promotion: { status: 'hold', eligible: false },
+        actionable: { decisions: 0, dates: 0 },
+        promotion: { status: 'collecting', eligible: false },
+        drift: { status: 'collecting' },
       },
       total: {
-        actionable: { decisions: 125, dates: 12 },
-        promotion: { status: 'eligible', eligible: true },
+        actionable: { decisions: 0, dates: 0 },
+        promotion: { status: 'collecting', eligible: false },
+        drift: { status: 'collecting' },
       },
     },
   }
-  const policy = gameMarketDecisionPolicy(projectionEvaluation, performance)
-  assert.equal(policy.moneyline.ready, false)
-  assert.equal(policy.moneyline.performanceStatus, 'hold')
+  const policy = gameMarketDecisionPolicy(
+    projectionEvaluation,
+    performance,
+    historicalValidation(),
+  )
+  assert.equal(policy.moneyline.ready, true)
+  assert.equal(policy.moneyline.sample, 0)
+  assert.equal(policy.moneyline.historicalSample.games, 5905)
   assert.equal(policy.total.ready, true)
-  assert.equal(policy.total.performanceStatus, 'eligible')
+  assert.equal(policy.status, 'ready')
+})
+
+test('a mature forward drift signal pauses PLAY despite eligible history', () => {
+  const performance = {
+    markets: {
+      moneyline: {
+        actionable: { decisions: 120, dates: 20 },
+        promotion: { status: 'hold', eligible: false },
+        drift: { status: 'drift' },
+      },
+      total: {
+        actionable: { decisions: 120, dates: 20 },
+        promotion: { status: 'eligible', eligible: true },
+        drift: { status: 'stable' },
+      },
+    },
+  }
+  const policy = gameMarketDecisionPolicy(null, performance, historicalValidation())
+
+  assert.equal(policy.status, 'drift-hold')
+  assert.equal(policy.moneyline.ready, false)
+  assert.equal(policy.moneyline.performanceGate, false)
+  assert.equal(policy.total.ready, true)
 })

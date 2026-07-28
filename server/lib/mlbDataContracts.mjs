@@ -449,7 +449,9 @@ function validateGameMarketDecision(prefix, decision, projection, errors) {
   }
   if (decision.version !== 1) errors.push(`${prefix}.version: expected 1`)
   if (decision.advisoryOnly !== true) errors.push(`${prefix}.advisoryOnly: must be true`)
-  if (!['collecting', 'ready'].includes(decision.status)) errors.push(`${prefix}.status: unsupported`)
+  if (!['collecting', 'hold', 'drift-hold', 'ready'].includes(decision.status)) {
+    errors.push(`${prefix}.status: unsupported`)
+  }
   const policy = decision.policy
   if (!isObject(policy)) {
     errors.push(`${prefix}.policy: expected an object`)
@@ -464,6 +466,7 @@ function validateGameMarketDecision(prefix, decision, projection, errors) {
         continue
       }
       if (typeof value.ready !== 'boolean') errors.push(`${at}.ready: expected boolean`)
+      if (typeof value.historicalGate !== 'boolean') errors.push(`${at}.historicalGate: expected boolean`)
       if (value.performanceGate != null && typeof value.performanceGate !== 'boolean') {
         errors.push(`${at}.performanceGate: expected boolean when present`)
       }
@@ -471,6 +474,24 @@ function validateGameMarketDecision(prefix, decision, projection, errors) {
         value.performanceStatus != null
         && !['sample-only', 'collecting', 'hold', 'eligible'].includes(value.performanceStatus)
       ) errors.push(`${at}.performanceStatus: unsupported`)
+      if (!['collecting', 'hold', 'eligible'].includes(value.historicalStatus)) {
+        errors.push(`${at}.historicalStatus: unsupported`)
+      }
+      if (!['collecting', 'watch', 'stable', 'drift'].includes(value.driftStatus)) {
+        errors.push(`${at}.driftStatus: unsupported`)
+      }
+      if (value.evidenceSource !== 'three-season-history-plus-forward-drift') {
+        errors.push(`${at}.evidenceSource: unsupported`)
+      }
+      if (!isObject(value.historicalSample)) {
+        errors.push(`${at}.historicalSample: expected an object`)
+      } else {
+        for (const field of ['seasons', 'games', 'dates']) {
+          if (!Number.isInteger(value.historicalSample[field]) || value.historicalSample[field] < 0) {
+            errors.push(`${at}.historicalSample.${field}: expected a non-negative integer`)
+          }
+        }
+      }
       for (const field of ['sample', 'dates', 'minimumGames', 'minimumDates']) {
         const minimum = field.startsWith('minimum')
         if (!Number.isInteger(value[field]) || value[field] < (minimum ? 1 : 0)) {
@@ -479,16 +500,10 @@ function validateGameMarketDecision(prefix, decision, projection, errors) {
       }
       if (
         typeof value.ready === 'boolean'
-        && Number.isInteger(value.sample)
-        && Number.isInteger(value.dates)
-        && Number.isInteger(value.minimumGames)
-        && Number.isInteger(value.minimumDates)
-        && value.ready !== (
-          value.sample >= value.minimumGames
-          && value.dates >= value.minimumDates
-          && value.performanceGate !== false
-        )
-      ) errors.push(`${at}.ready: inconsistent with sample gates`)
+        && typeof value.historicalGate === 'boolean'
+        && typeof value.performanceGate === 'boolean'
+        && value.ready !== (value.historicalGate && value.performanceGate)
+      ) errors.push(`${at}.ready: inconsistent with historical and drift gates`)
     }
   }
 
@@ -1259,6 +1274,120 @@ function validateGameProjectionEvaluation(evaluation, errors) {
   return evaluation.sample?.games || 0
 }
 
+function validateGameHistoricalValidation(evaluation, errors) {
+  if (evaluation == null) return 0
+  const prefix = 'gameHistoricalValidation'
+  if (!isObject(evaluation)) {
+    errors.push(`${prefix}: expected an object`)
+    return 0
+  }
+  if (evaluation.version !== 1) errors.push(`${prefix}.version: expected 1`)
+  if (evaluation.advisoryOnly !== true) errors.push(`${prefix}.advisoryOnly: must be true`)
+  if (evaluation.methodology !== 'season-isolated-expanding-date-walk-forward') {
+    errors.push(`${prefix}.methodology: unsupported`)
+  }
+  if (!['collecting', 'hold', 'eligible'].includes(evaluation.status)) {
+    errors.push(`${prefix}.status: unsupported`)
+  }
+  if (typeof evaluation.scope !== 'string' || !evaluation.scope.trim()) {
+    errors.push(`${prefix}.scope: expected non-empty text`)
+  }
+  validateOptionalIso(`${prefix}.updatedAt`, evaluation.updatedAt, errors)
+  for (const field of ['seasons', 'games', 'dates']) {
+    if (!Number.isInteger(evaluation.minimumSample?.[field]) || evaluation.minimumSample[field] < 1) {
+      errors.push(`${prefix}.minimumSample.${field}: expected a positive integer`)
+    }
+  }
+  for (const field of ['seasons', 'games', 'teamRuns', 'dates']) {
+    if (!Number.isInteger(evaluation.sample?.[field]) || evaluation.sample[field] < 0) {
+      errors.push(`${prefix}.sample.${field}: expected a non-negative integer`)
+    }
+  }
+  for (const field of ['fromDate', 'throughDate']) {
+    if (evaluation.sample?.[field] != null && !isValidDate(evaluation.sample[field])) {
+      errors.push(`${prefix}.sample.${field}: expected null or YYYY-MM-DD`)
+    }
+  }
+  for (const section of ['baseline', 'forecastBackbone']) {
+    const metrics = evaluation[section]
+    if (!isObject(metrics)) {
+      errors.push(`${prefix}.${section}: expected an object`)
+      continue
+    }
+    for (const field of ['teamRunMae', 'teamRunRmse', 'totalMae', 'totalRmse']) {
+      validateOptionalMetric(`${prefix}.${section}.${field}`, metrics[field], errors, { min: 0, max: 30 })
+    }
+    validateOptionalMetric(`${prefix}.${section}.winnerAccuracy`, metrics.winnerAccuracy, errors, { min: 0, max: 1 })
+    validateOptionalMetric(`${prefix}.${section}.winnerBrier`, metrics.winnerBrier, errors, { min: 0, max: 1 })
+  }
+  if (!isObject(evaluation.improvement)) {
+    errors.push(`${prefix}.improvement: expected an object`)
+  } else {
+    for (const field of ['teamRunMae', 'teamRunRmse', 'totalMae', 'totalRmse']) {
+      validateOptionalMetric(`${prefix}.improvement.${field}`, evaluation.improvement[field], errors, { min: -30, max: 30 })
+    }
+    for (const field of ['winnerAccuracy', 'winnerBrier']) {
+      validateOptionalMetric(`${prefix}.improvement.${field}`, evaluation.improvement[field], errors, { min: -1, max: 1 })
+    }
+  }
+  for (const market of ['moneyline', 'total']) {
+    const value = evaluation.markets?.[market]
+    const at = `${prefix}.markets.${market}`
+    if (!isObject(value)) {
+      errors.push(`${at}: expected an object`)
+      continue
+    }
+    if (!['collecting', 'hold', 'eligible'].includes(value.status)) errors.push(`${at}.status: unsupported`)
+    if (typeof value.eligible !== 'boolean') errors.push(`${at}.eligible: expected boolean`)
+    if (typeof value.eligible === 'boolean' && value.eligible !== (value.status === 'eligible')) {
+      errors.push(`${at}.eligible: must match status`)
+    }
+    if (!isObject(value.checks) || Object.values(value.checks).some((check) => typeof check !== 'boolean')) {
+      errors.push(`${at}.checks: expected boolean checks`)
+    } else if (value.eligible !== Object.values(value.checks).every(Boolean)) {
+      errors.push(`${at}.eligible: inconsistent with checks`)
+    }
+    for (const field of ['seasons', 'games', 'dates']) {
+      if (!Number.isInteger(value.sample?.[field]) || value.sample[field] < 0) {
+        errors.push(`${at}.sample.${field}: expected a non-negative integer`)
+      }
+    }
+    if (market === 'moneyline') {
+      for (const field of ['baselineBrier', 'forecastBrier', 'forecastAccuracy']) {
+        validateOptionalMetric(`${at}.${field}`, value[field], errors, { min: 0, max: 1 })
+      }
+      validateOptionalMetric(`${at}.brierImprovement`, value.brierImprovement, errors, { min: -1, max: 1 })
+    } else {
+      for (const field of ['baselineMae', 'forecastMae']) {
+        validateOptionalMetric(`${at}.${field}`, value[field], errors, { min: 0, max: 30 })
+      }
+      validateOptionalMetric(`${at}.maeImprovement`, value.maeImprovement, errors, { min: -30, max: 30 })
+    }
+  }
+  if (!Array.isArray(evaluation.seasons)) {
+    errors.push(`${prefix}.seasons: expected an array`)
+  } else {
+    const seen = new Set()
+    for (const [index, season] of evaluation.seasons.entries()) {
+      const at = `${prefix}.seasons[${index}]`
+      if (!Number.isInteger(season?.season)) errors.push(`${at}.season: expected an integer`)
+      if (seen.has(season?.season)) errors.push(`${at}.season: duplicate`)
+      seen.add(season?.season)
+      if (!Number.isInteger(season?.sample?.games) || season.sample.games < 1) {
+        errors.push(`${at}.sample.games: expected a positive integer`)
+      }
+    }
+    if (
+      Number.isInteger(evaluation.sample?.seasons)
+      && evaluation.sample.seasons !== evaluation.seasons.length
+    ) errors.push(`${prefix}.sample.seasons: must match seasons length`)
+  }
+  if (typeof evaluation.note !== 'string' || !evaluation.note.trim()) {
+    errors.push(`${prefix}.note: expected non-empty text`)
+  }
+  return evaluation.sample?.games || 0
+}
+
 function validateGameMarketPerformanceSummary(prefix, summary, errors) {
   if (!isObject(summary)) {
     errors.push(`${prefix}: expected an object`)
@@ -1668,6 +1797,7 @@ export function validateDailySnapshot(snapshot) {
   const gameMarkets = validateGameOdds(snapshot.gameOdds, gameIds, errors)
   const gameProjections = validateGameProjections(snapshot.gameProjections, gameIds, errors)
   const gameProjectionResults = validateGameProjectionEvaluation(snapshot.gameProjectionEvaluation, errors)
+  const gameHistoricalValidationGames = validateGameHistoricalValidation(snapshot.gameHistoricalValidation, errors)
   const gameMarketEvaluationCalls = validateGameMarketEvaluation(snapshot.gameMarketEvaluation, errors)
   const gameMarketPortfolioSelections = validateGameMarketPortfolio(snapshot.gameMarketPortfolio, gameIds, errors)
   const gameScoreResults = validateGameScoreData(snapshot.gameScoreData, errors, snapshot.date)
@@ -1678,6 +1808,7 @@ export function validateDailySnapshot(snapshot) {
     gameMarkets,
     gameProjections,
     gameProjectionResults,
+    gameHistoricalValidationGames,
     gameMarketEvaluationCalls,
     gameMarketPortfolioSelections,
     gameScoreResults,

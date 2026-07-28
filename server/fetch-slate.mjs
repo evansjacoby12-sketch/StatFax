@@ -178,6 +178,7 @@ const OUT_PATH  = resolve(__dirname, '../dist/daily.json');
 const CALIBRATION_OUT_PATH = resolve(__dirname, '../dist/calibration.json');
 const BACKTEST_OUT_PATH    = resolve(__dirname, '../dist/backtest-log.json');
 const MLB_GAME_RESULTS_OUT_PATH = resolve(__dirname, '../dist/mlb-game-results.json');
+const MLB_GAME_HISTORY_OUT_PATH = resolve(__dirname, '../dist/mlb-game-history.json');
 const LIST_BUILDER_EVIDENCE_OUT_PATH = resolve(__dirname, '../dist/list-builder-evidence.json');
 // Per-day "pregame freeze": once a batter's game starts we keep serving his
 // pre-first-pitch model/form values. Persisted across cron runs via the same
@@ -498,6 +499,11 @@ import {
   validateMlbSeasonResults,
 } from '../src/sports/mlb/logic/teamScoringForm.js';
 import { refreshMlbSeasonResults } from './lib/mlbGameResults.mjs';
+import {
+  evaluateGameHistoricalValidation,
+  validateMlbGameHistory,
+} from '../src/sports/mlb/logic/gameHistoricalValidation.js';
+import { refreshMlbGameHistory } from './lib/mlbGameHistory.mjs';
 
 // ─── HTTP helpers ────────────────────────────────────────────────────────────
 
@@ -2168,6 +2174,7 @@ const SNAPSHOT_URL    = `${R2_PUBLIC_BASE}/daily.json`;
 const CALIBRATION_URL = `${R2_PUBLIC_BASE}/calibration.json`;
 const BACKTEST_URL    = `${R2_PUBLIC_BASE}/backtest-log.json`;
 const MLB_GAME_RESULTS_URL = `${R2_PUBLIC_BASE}/mlb-game-results.json`;
+const MLB_GAME_HISTORY_URL = `${R2_PUBLIC_BASE}/mlb-game-history.json`;
 const ZONE_CACHE_URL  = `${R2_PUBLIC_BASE}/zone-cache.json`;
 
 /**
@@ -2323,6 +2330,59 @@ async function main() {
     console.warn(`[game-results] refresh failed; using ${mlbGameResults.games.length} cached finals: ${e?.message}`);
   }
   writeFileSync(MLB_GAME_RESULTS_OUT_PATH, JSON.stringify(mlbGameResults));
+
+  // Three-season final-score archive for the production decision gate. Each
+  // season is evaluated in isolation with strict prior-date inputs, so later
+  // seasons cannot leak into earlier predictions. Completed seasons are
+  // immutable after their first full pull; the current season reuses the
+  // incrementally refreshed archive above.
+  let mlbGameHistory = await fetchFromR2(MLB_GAME_HISTORY_URL);
+  try {
+    if (existsSync(MLB_GAME_HISTORY_OUT_PATH)) {
+      const local = JSON.parse(readFileSync(MLB_GAME_HISTORY_OUT_PATH, 'utf8'));
+      const localValidation = validateMlbGameHistory(local);
+      const remoteValidation = validateMlbGameHistory(mlbGameHistory);
+      if (
+        localValidation.ok
+        && (!remoteValidation.ok || localValidation.metrics.games > remoteValidation.metrics.games)
+      ) mlbGameHistory = local;
+    }
+  } catch (e) {
+    console.warn(`[game-history] local archive merge skipped: ${e?.message}`);
+  }
+  try {
+    const refreshed = await refreshMlbGameHistory({
+      seasons: [SEASON - 2, SEASON - 1, SEASON],
+      currentSeason: SEASON,
+      currentSeasonArtifact: mlbGameResults,
+      prior: mlbGameHistory,
+      throughDate: date,
+      fetchedAt: startedAt.toISOString(),
+    });
+    mlbGameHistory = refreshed.artifact;
+    const failures = refreshed.metrics.failed.length
+      ? ` · ${refreshed.metrics.failed.length} failed`
+      : '';
+    console.log(
+      `[game-history] ${refreshed.metrics.games} finals across `
+      + `${refreshed.metrics.seasons}/3 seasons`
+      + ` · refreshed ${refreshed.metrics.refreshed.join(', ') || 'none'}`
+      + failures,
+    );
+  } catch (e) {
+    console.warn(`[game-history] refresh failed; cached history retained: ${e?.message}`);
+  }
+  if (!validateMlbGameHistory(mlbGameHistory).ok) {
+    mlbGameHistory = {
+      version: 1,
+      source: 'MLB Stats API regular-season final scores',
+      fetchedAt: startedAt.toISOString(),
+      seasons: [],
+    };
+  }
+  writeFileSync(MLB_GAME_HISTORY_OUT_PATH, JSON.stringify(mlbGameHistory));
+  const gameHistoricalValidation = evaluateGameHistoricalValidation(mlbGameHistory);
+
   const teamScoringProfiles = buildTeamScoringProfiles(mlbGameResults, date);
   const teamScoringEvaluation = evaluateTeamScoringForm(mlbGameResults);
   console.log(
@@ -2334,6 +2394,13 @@ async function main() {
     `[game-results] walk-forward ${teamScoringEvaluation.sample.games} games · `
     + `form MAE ${teamScoringEvaluation.seasonForm.teamRunMae ?? '—'} `
     + `vs ${teamScoringEvaluation.baseline.teamRunMae ?? '—'} baseline`,
+  );
+
+  console.log(
+    `[game-history] ${gameHistoricalValidation.status} gate · `
+    + `${gameHistoricalValidation.sample.games} walk-forward games · `
+    + `winner Brier ${gameHistoricalValidation.forecastBackbone.winnerBrier ?? '—'} · `
+    + `total MAE ${gameHistoricalValidation.forecastBackbone.totalMae ?? '—'}`,
   );
 
   // Reconcile every still-unsettled, identity-bound pregame forecast against
@@ -4581,6 +4648,7 @@ async function main() {
   const marketDecisionPolicy = gameMarketDecisionPolicy(
     gameProjectionEvaluation,
     gameMarketEvaluation,
+    gameHistoricalValidation,
   );
   try {
     const capturedAt = new Date().toISOString();
@@ -4686,6 +4754,9 @@ async function main() {
     // Aggregate proof layer for the frozen pregame game forecasts. No individual
     // historical rows ship to the browser, and these metrics never feed scoring.
     gameProjectionEvaluation,
+    // Three-season, season-isolated validation of the scoring backbone. This
+    // replaces the live-call-count lock for PLAY while live calls monitor drift.
+    gameHistoricalValidation,
     // Exact closing-call validation, segmented performance, drift, and a
     // diversified advisory slate. Neither artifact mutates projections.
     gameMarketEvaluation,

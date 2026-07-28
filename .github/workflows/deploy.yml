@@ -110,6 +110,15 @@ jobs:
           key: mlb-game-results-${{ github.run_id }}
           restore-keys: mlb-game-results-
 
+      # Three-season regular-season finals used by the leakage-safe historical
+      # game-forecast gate. Completed seasons are fetched once and then reused.
+      - name: Restore MLB game history
+        uses: actions/cache@v4
+        with:
+          path: dist/mlb-game-history.json
+          key: mlb-game-history-${{ github.run_id }}
+          restore-keys: mlb-game-history-
+
       # Per-day pregame freeze (keeps started-game batters at pre-first-pitch
       # model/form values). Same unique-key-saves / restore-by-prefix pattern.
       - name: Restore pregame freeze
@@ -219,6 +228,7 @@ jobs:
         run: |
           npm run validate:mlb-data
           npm run validate:mlb-game-results
+          npm run validate:mlb-game-history
           npm run validate:list-builder-evidence
 
       - name: Build prospective MLB zone evaluation
@@ -264,7 +274,7 @@ jobs:
             exit 0
           fi
           ENDPOINT="https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com"
-          for f in calibration.json backtest-log.json mlb-game-results.json list-builder-evidence.json board-history.json zone-cache.json zone-evaluation.json; do
+          for f in calibration.json backtest-log.json mlb-game-results.json mlb-game-history.json list-builder-evidence.json board-history.json zone-cache.json zone-evaluation.json; do
             if [ -f "dist/$f" ]; then
               aws s3 cp "dist/$f" "s3://$R2_BUCKET/$f" --endpoint-url "$ENDPOINT" \
                 --content-type application/json --cache-control no-cache \

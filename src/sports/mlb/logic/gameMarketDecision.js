@@ -44,30 +44,43 @@ const sidePolicy = (
   minimumGames,
   minimumDates,
   performance = null,
+  historical = null,
 ) => {
-  const performanceGate = performance == null
-    ? true
-    : performance?.promotion?.eligible === true
+  const historicalGate = historical?.eligible === true
+  const driftStatus = performance?.drift?.status || 'collecting'
+  const forwardGate = driftStatus !== 'drift'
+  const ready = historicalGate && forwardGate
   return {
     sample,
     dates,
     minimumGames,
     minimumDates,
-    performanceGate,
+    performanceGate: forwardGate,
     performanceStatus: performance?.promotion?.status || 'sample-only',
-    ready: (
-      sample >= minimumGames
-      && dates >= minimumDates
-      && performanceGate
-    ),
+    driftStatus,
+    historicalGate,
+    historicalStatus: historical?.status || 'collecting',
+    historicalSample: {
+      seasons: historical?.sample?.seasons || 0,
+      games: historical?.sample?.games || 0,
+      dates: historical?.sample?.dates || 0,
+    },
+    evidenceSource: 'three-season-history-plus-forward-drift',
+    ready,
   }
 }
 
-export function gameMarketDecisionPolicy(evaluation = null, marketEvaluation = null) {
+export function gameMarketDecisionPolicy(
+  evaluation = null,
+  marketEvaluation = null,
+  historicalValidation = null,
+) {
   const minimumGames = evaluation?.minimumSample?.games || MLB_GAME_MARKET_MIN_GAMES
   const minimumDates = evaluation?.minimumSample?.dates || MLB_GAME_MARKET_MIN_DATES
   const moneylinePerformance = marketEvaluation?.markets?.moneyline || null
   const totalPerformance = marketEvaluation?.markets?.total || null
+  const moneylineHistorical = historicalValidation?.markets?.moneyline || null
+  const totalHistorical = historicalValidation?.markets?.total || null
   const moneyline = sidePolicy(
     moneylinePerformance?.actionable?.decisions
       ?? evaluation?.winner?.marketSample
@@ -78,6 +91,7 @@ export function gameMarketDecisionPolicy(evaluation = null, marketEvaluation = n
     minimumGames,
     minimumDates,
     moneylinePerformance,
+    moneylineHistorical,
   )
   const total = sidePolicy(
     totalPerformance?.actionable?.decisions
@@ -89,10 +103,18 @@ export function gameMarketDecisionPolicy(evaluation = null, marketEvaluation = n
     minimumGames,
     minimumDates,
     totalPerformance,
+    totalHistorical,
   )
+  const status = moneyline.ready && total.ready
+    ? 'ready'
+    : [moneyline, total].some((market) => market.driftStatus === 'drift')
+      ? 'drift-hold'
+      : [moneyline, total].some((market) => market.historicalStatus === 'hold')
+        ? 'hold'
+        : 'collecting'
   return {
     version: 1,
-    status: moneyline.ready && total.ready ? 'ready' : 'collecting',
+    status,
     moneyline,
     total,
   }
@@ -123,10 +145,17 @@ function tierReason({
 }) {
   if (missing) return missing
   if (rawTier === 'play' && tier === 'lean') {
-    return `PLAY thresholds cleared, but forward validation is ${policy.sample}/${policy.minimumGames} games across ${policy.dates}/${policy.minimumDates} dates.`
+    if (!policy.historicalGate) {
+      const history = policy.historicalSample
+      return `PLAY thresholds cleared, but historical validation is ${history.games} games across ${history.seasons} of 3 seasons.`
+    }
+    if (policy.driftStatus === 'drift') {
+      return 'PLAY thresholds cleared, but recent settled calls triggered the forward drift hold.'
+    }
+    return 'PLAY thresholds cleared, but the production validation gate is not ready.'
   }
-  if (tier === 'play') return `${side} clears the validated ${market} edge, ROI, coverage, and market-quality gates.`
-  if (tier === 'lean') return `${side} clears the provisional ${market} edge, ROI, coverage, and market-quality gates.`
+  if (tier === 'play') return `${side} clears the historically validated ${market} edge, ROI, coverage, and market-quality gates.`
+  if (tier === 'lean') return `${side} clears the ${market} LEAN thresholds but not every PLAY threshold.`
   return `${side} does not clear every ${market} decision gate.`
 }
 

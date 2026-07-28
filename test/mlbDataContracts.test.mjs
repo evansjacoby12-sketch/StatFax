@@ -13,6 +13,10 @@ import {
   buildGameMarketPortfolio,
   evaluateGameMarketPerformance,
 } from '../src/sports/mlb/logic/gameMarketEvaluation.js'
+import {
+  buildMlbGameHistory,
+  evaluateGameHistoricalValidation,
+} from '../src/sports/mlb/logic/gameHistoricalValidation.js'
 
 const batter = (playerId = 1, gamePk = 10) => ({
   playerId,
@@ -20,6 +24,31 @@ const batter = (playerId = 1, gamePk = 10) => ({
   score: 72,
   hrProbability: 0.18,
   grade: { label: 'PRIME' },
+})
+
+test('daily contract validates the three-season historical game gate', () => {
+  const history = buildMlbGameHistory([], {
+    fetchedAt: '2026-07-28T12:00:00.000Z',
+  })
+  const snapshot = {
+    version: 5,
+    date: '2026-07-28',
+    generatedAt: '2026-07-28T12:00:00.000Z',
+    finishedAt: '2026-07-28T12:00:01.000Z',
+    games: [],
+    scoredBatters: {},
+    stats: { scoredBatters: 0 },
+    gameHistoricalValidation: evaluateGameHistoricalValidation(history),
+  }
+
+  const validated = validateDailySnapshot(snapshot)
+  assert.deepEqual(validated.errors, [])
+  assert.equal(validated.metrics.gameHistoricalValidationGames, 0)
+
+  snapshot.gameHistoricalValidation.methodology = 'random-holdout'
+  assert.ok(validateDailySnapshot(snapshot).errors.some((error) => (
+    error.includes('gameHistoricalValidation.methodology')
+  )))
 })
 
 test('daily contract accepts schema-v5 composite rows and canonical K output', () => {

@@ -179,12 +179,13 @@ function MarketDecisionCard({
   gamePk,
   market,
   decision,
+  policy,
   projection,
   marketEvaluation,
   portfolio,
 }) {
   const tier = decision?.tier || 'unavailable'
-  const validation = gameMarketValidation(marketEvaluation, market)
+  const validation = gameMarketValidation(policy?.[market] || null, marketEvaluation, market)
   const selection = gameMarketPortfolioSelection(portfolio, gamePk, market)
   const caution = gameMarketMovementCaution(projection, market, decision)
   const modelProbability = market === 'moneyline'
@@ -253,9 +254,12 @@ function MarketDecisionCard({
       </div>
       <div className="game-decision-proof">
         <span>
-          {validation.decisions}/{validation.minimumGames} calls
+          {validation.historicalGames} historical games
           {' · '}
-          {validation.dates}/{validation.minimumDates} dates
+          {validation.historicalSeasons}/3 seasons
+        </span>
+        <span>
+          Forward monitor: {validation.decisions} settled calls
         </span>
         {selection && (
           <span className="game-decision-curated">
@@ -297,6 +301,7 @@ function GameForecastStrip({
   const totalDelta = totalDecision?.projectionDelta
   const sample = evaluation?.sample?.games || 0
   const actionableCalls = marketEvaluation?.sample?.actionable
+  const historicalGames = projection?.marketDecision?.policy?.moneyline?.historicalSample?.games
   const frozen = projection.freezeState === 'final-pregame'
   const awayPrice = Number.isFinite(moneyline?.awayAmerican)
     ? american(Math.round(moneyline.awayAmerican))
@@ -335,8 +340,8 @@ function GameForecastStrip({
           <Icon name="ChartNoAxesCombined" size={12} /> Model forecast v{projection.modelVersion || 1}
         </span>
         <span className="game-forecast-sample">
-          {Number.isFinite(actionableCalls)
-            ? `${actionableCalls} actionable calls`
+          {Number.isFinite(historicalGames)
+            ? `${historicalGames} historical games · ${actionableCalls || 0} live calls`
             : `${sample} settled forecasts`}
         </span>
         <span className="game-forecast-state">{frozen ? 'Frozen pregame' : 'Pregame'} · advisory</span>
@@ -346,6 +351,7 @@ function GameForecastStrip({
           gamePk={projection.gamePk ?? game?.gamePk}
           market="moneyline"
           decision={moneylineDecision}
+          policy={projection.marketDecision?.policy}
           projection={projection}
           marketEvaluation={marketEvaluation}
           portfolio={portfolio}
@@ -354,6 +360,7 @@ function GameForecastStrip({
           gamePk={projection.gamePk ?? game?.gamePk}
           market="total"
           decision={totalDecision}
+          policy={projection.marketDecision?.policy}
           projection={projection}
           marketEvaluation={marketEvaluation}
           portfolio={portfolio}

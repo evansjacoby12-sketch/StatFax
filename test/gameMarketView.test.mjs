@@ -25,7 +25,7 @@ test('decision grade portfolio badges remain scoped to the exact gamePk and mark
   )
 })
 
-test('decision grade validation exposes exact actionable calls and dates', () => {
+test('decision grade validation separates historical readiness from forward calls', () => {
   const evaluation = {
     minimumSample: { games: 100, dates: 10 },
     markets: {
@@ -49,17 +49,50 @@ test('decision grade validation exposes exact actionable calls and dates', () =>
       },
     },
   }
+  const historicalPolicy = {
+    historicalStatus: 'eligible',
+    historicalSample: { seasons: 3, games: 5905, dates: 448 },
+    driftStatus: 'watch',
+  }
 
-  assert.deepEqual(gameMarketValidation(evaluation, 'moneyline'), {
-    status: 'collecting',
-    label: 'Collecting',
+  assert.deepEqual(gameMarketValidation(historicalPolicy, evaluation, 'moneyline'), {
+    status: 'eligible',
+    label: '3-season validated',
+    historicalSeasons: 3,
+    historicalGames: 5905,
+    historicalDates: 448,
     decisions: 83,
     dates: 9,
     minimumGames: 100,
     minimumDates: 10,
     drift: 'watch',
+    forwardStatus: 'collecting',
   })
-  assert.equal(gameMarketValidation(evaluation, 'total').label, 'Validated')
+  assert.equal(
+    gameMarketValidation(
+      { ...historicalPolicy, driftStatus: 'stable' },
+      evaluation,
+      'total',
+    ).label,
+    '3-season validated',
+  )
+  assert.equal(
+    gameMarketValidation(
+      historicalPolicy,
+      {
+        ...evaluation,
+        markets: {
+          ...evaluation.markets,
+          moneyline: {
+            ...evaluation.markets.moneyline,
+            drift: { status: 'drift' },
+          },
+        },
+      },
+      'moneyline',
+    ).label,
+    'Drift hold',
+  )
 })
 
 test('decision grade cautions only flag material movement against the selected side', () => {
