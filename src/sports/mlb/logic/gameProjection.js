@@ -1,7 +1,11 @@
 import { teamScoringMatchupContext } from './teamScoringForm.js'
 import { expectedStarterInnings } from './starterIPDistribution.js'
+import {
+  buildGameMarketDecision,
+  gameMarketDecisionPolicy,
+} from './gameMarketDecision.js'
 
-export const MLB_GAME_PROJECTION_VERSION = 7
+export const MLB_GAME_PROJECTION_VERSION = 8
 export const MLB_GAME_BASE_RUNS_PER_TEAM = 4.42
 export const MLB_GAME_EVALUATION_MIN_GAMES = 100
 export const MLB_GAME_EVALUATION_MIN_DATES = 10
@@ -877,6 +881,7 @@ export function buildGameProjection({
   gameScheduleContexts = null,
   gameOdds = null,
   marketBlendPolicy = gameMarketBlendPolicy(),
+  marketDecisionPolicy = gameMarketDecisionPolicy(),
   teamScoringProfiles = null,
   capturedAt = new Date().toISOString(),
 }) {
@@ -925,6 +930,22 @@ export function buildGameProjection({
   const win = blended.win
   const projectedWinner = win.home >= win.away ? 'home' : 'away'
   const coverage = (away.coverage + home.coverage) / 2
+  const awayTeam = { id: game.awayTeam?.id, name: game.awayTeam?.name, abbr: game.awayTeam?.abbr }
+  const homeTeam = { id: game.homeTeam?.id, name: game.homeTeam?.name, abbr: game.homeTeam?.abbr }
+  const confidence = {
+    status: coverage >= 0.82 ? 'medium' : 'limited',
+    coverage: round(coverage),
+    note: coverage >= 0.82
+      ? 'Core lineup and pitcher inputs are available; validation is still collecting.'
+      : 'Some lineup or pitcher inputs are projected or incomplete.',
+  }
+  const comparison = marketComparison(
+    gameOdds,
+    win,
+    projectedTotal,
+    blended.awayExpectedRuns,
+    blended.homeExpectedRuns,
+  )
   return {
     modelVersion: MLB_GAME_PROJECTION_VERSION,
     advisoryOnly: true,
@@ -932,8 +953,8 @@ export function buildGameProjection({
     gamePk: game.gamePk,
     gameDate: game.gameDate,
     capturedAt,
-    awayTeam: { id: game.awayTeam?.id, name: game.awayTeam?.name, abbr: game.awayTeam?.abbr },
-    homeTeam: { id: game.homeTeam?.id, name: game.homeTeam?.name, abbr: game.homeTeam?.abbr },
+    awayTeam,
+    homeTeam,
     awayExpectedRuns: round(blended.awayExpectedRuns, 2),
     homeExpectedRuns: round(blended.homeExpectedRuns, 2),
     projectedTotal: round(projectedTotal, 2),
@@ -949,22 +970,20 @@ export function buildGameProjection({
     tieAfterNineProbability: round(win.tieAfterNine, 4),
     projectedWinner,
     projectedWinnerProbability: round(Math.max(win.away, win.home), 4),
-    confidence: {
-      status: coverage >= 0.82 ? 'medium' : 'limited',
-      coverage: round(coverage),
-      note: coverage >= 0.82
-        ? 'Core lineup and pitcher inputs are available; validation is still collecting.'
-        : 'Some lineup or pitcher inputs are projected or incomplete.',
-    },
+    confidence,
     inputs: { away: away.inputs, home: home.inputs },
     marketBlend: blended.disclosure,
-    marketComparison: marketComparison(
-      gameOdds,
-      win,
+    marketComparison: comparison,
+    marketDecision: buildGameMarketDecision({
+      awayTeam,
+      homeTeam,
+      awayWinProbability: win.away,
+      homeWinProbability: win.home,
       projectedTotal,
-      blended.awayExpectedRuns,
-      blended.homeExpectedRuns,
-    ),
+      confidence,
+      marketComparison: comparison,
+      policy: marketDecisionPolicy,
+    }),
   }
 }
 
@@ -979,6 +998,7 @@ export function buildSlateGameProjections({
   gameScheduleContexts = null,
   gameOdds = {},
   marketBlendPolicy = gameMarketBlendPolicy(),
+  marketDecisionPolicy = gameMarketDecisionPolicy(),
   teamScoringProfiles = null,
   capturedAt = new Date().toISOString(),
 } = {}) {
@@ -1001,6 +1021,7 @@ export function buildSlateGameProjections({
       gameScheduleContexts,
       gameOdds: gameOdds?.[game.gamePk] || null,
       marketBlendPolicy,
+      marketDecisionPolicy,
       teamScoringProfiles,
       capturedAt,
     }))

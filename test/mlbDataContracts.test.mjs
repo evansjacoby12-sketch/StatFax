@@ -362,7 +362,7 @@ test('daily contract validates forecast v4 platoon and run-environment provenanc
   assert.ok(validateDailySnapshot(mismatched).errors.some((error) => error.includes('must match runEnvironment.factor')))
 })
 
-test('daily contract validates forecast v7 distributions, market gate, and team context', () => {
+test('daily contract validates forecast v8 distributions, market gate, decision layer, and team context', () => {
   const runEnvironment = {
     factor: 1,
     rawParkFactor: 1,
@@ -445,7 +445,7 @@ test('daily contract validates forecast v7 distributions, market gate, and team 
     gameProjections: { 10: projection },
   }
 
-  assert.equal(projection.modelVersion, 7)
+  assert.equal(projection.modelVersion, 8)
   assert.deepEqual(validateDailySnapshot(snapshot).errors, [])
 
   const tampered = structuredClone(snapshot)
@@ -463,6 +463,10 @@ test('daily contract validates forecast v7 distributions, market gate, and team 
   const badBlend = structuredClone(snapshot)
   badBlend.gameProjections[10].marketBlend.total.finalProjectedTotal += 1
   assert.ok(validateDailySnapshot(badBlend).errors.some((error) => error.includes('must match projectedTotal')))
+
+  const badDecision = structuredClone(snapshot)
+  badDecision.gameProjections[10].marketDecision.moneyline.tier = 'play'
+  assert.ok(validateDailySnapshot(badDecision).errors.some((error) => error.includes('PLAY cannot be provisional')))
 })
 
 test('daily contract rejects the retired bare alias and invalid probability', () => {

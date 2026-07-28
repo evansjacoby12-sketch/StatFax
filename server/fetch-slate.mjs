@@ -484,6 +484,7 @@ import {
   settleGameForecasts,
   updateGameForecastLog,
 } from '../src/sports/mlb/logic/gameProjection.js';
+import { gameMarketDecisionPolicy } from '../src/sports/mlb/logic/gameMarketDecision.js';
 import {
   buildTeamScoringProfiles,
   evaluateTeamScoringForm,
@@ -4509,6 +4510,7 @@ async function main() {
   let gameProjectionsByGamePk = {};
   const gameProjectionEvaluation = evaluateGameForecasts(backtestLog);
   const marketBlendPolicy = gameMarketBlendPolicy(gameProjectionEvaluation);
+  const marketDecisionPolicy = gameMarketDecisionPolicy(gameProjectionEvaluation);
   try {
     const capturedAt = new Date().toISOString();
     const current = buildSlateGameProjections({
@@ -4522,6 +4524,7 @@ async function main() {
       gameScheduleContexts,
       gameOdds: gameOddsByGamePk,
       marketBlendPolicy,
+      marketDecisionPolicy,
       teamScoringProfiles,
       capturedAt,
     });

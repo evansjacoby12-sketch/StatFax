@@ -148,12 +148,138 @@ function validateProbability(prefix, value, errors) {
   if (!Number.isFinite(value) || value < 0 || value > 1) errors.push(`${prefix}: expected probability in [0,1]`)
 }
 
+function validateGameMarketDecision(prefix, decision, projection, errors) {
+  if (!isObject(decision)) {
+    errors.push(`${prefix}: expected an object for model v8`)
+    return
+  }
+  if (decision.version !== 1) errors.push(`${prefix}.version: expected 1`)
+  if (decision.advisoryOnly !== true) errors.push(`${prefix}.advisoryOnly: must be true`)
+  if (!['collecting', 'ready'].includes(decision.status)) errors.push(`${prefix}.status: unsupported`)
+  const policy = decision.policy
+  if (!isObject(policy)) {
+    errors.push(`${prefix}.policy: expected an object`)
+  } else {
+    if (policy.version !== 1) errors.push(`${prefix}.policy.version: expected 1`)
+    if (policy.status !== decision.status) errors.push(`${prefix}.policy.status: must match decision status`)
+    for (const market of ['moneyline', 'total']) {
+      const value = policy[market]
+      const at = `${prefix}.policy.${market}`
+      if (!isObject(value)) {
+        errors.push(`${at}: expected an object`)
+        continue
+      }
+      if (typeof value.ready !== 'boolean') errors.push(`${at}.ready: expected boolean`)
+      for (const field of ['sample', 'dates', 'minimumGames', 'minimumDates']) {
+        const minimum = field.startsWith('minimum')
+        if (!Number.isInteger(value[field]) || value[field] < (minimum ? 1 : 0)) {
+          errors.push(`${at}.${field}: expected a ${minimum ? 'positive' : 'non-negative'} integer`)
+        }
+      }
+      if (
+        typeof value.ready === 'boolean'
+        && Number.isInteger(value.sample)
+        && Number.isInteger(value.dates)
+        && Number.isInteger(value.minimumGames)
+        && Number.isInteger(value.minimumDates)
+        && value.ready !== (value.sample >= value.minimumGames && value.dates >= value.minimumDates)
+      ) errors.push(`${at}.ready: inconsistent with sample gates`)
+    }
+  }
+
+  const tiers = ['play', 'lean', 'pass', 'unavailable']
+  for (const market of ['moneyline', 'total']) {
+    const value = decision[market]
+    const at = `${prefix}.${market}`
+    if (!isObject(value)) {
+      errors.push(`${at}: expected an object`)
+      continue
+    }
+    if (value.market !== market) errors.push(`${at}.market: expected ${market}`)
+    if (!tiers.includes(value.rawTier)) errors.push(`${at}.rawTier: unsupported`)
+    if (!tiers.includes(value.tier)) errors.push(`${at}.tier: unsupported`)
+    if (typeof value.provisional !== 'boolean') errors.push(`${at}.provisional: expected boolean`)
+    if (value.tier === 'play' && value.provisional !== false) errors.push(`${at}.tier: PLAY cannot be provisional`)
+    if (value.rawTier === 'play' && value.provisional === true && value.tier !== 'lean') {
+      errors.push(`${at}.tier: provisional PLAY must be capped to LEAN`)
+    }
+    if (typeof value.reason !== 'string' || !value.reason.trim()) errors.push(`${at}.reason: expected non-empty text`)
+    if (!Number.isInteger(value.books) || value.books < 0) errors.push(`${at}.books: expected a non-negative integer`)
+    validateOptionalMetric(`${at}.coverage`, value.coverage, errors, { min: 0, max: 1 })
+    validateOptionalMetric(`${at}.modelEdge`, value.modelEdge, errors, { min: -1, max: 1 })
+    validateOptionalMetric(`${at}.expectedRoi`, value.expectedRoi, errors, { min: -1, max: 20 })
+    if (value.american != null && (!Number.isFinite(value.american) || (value.american > -100 && value.american < 100))) {
+      errors.push(`${at}.american: expected null or valid American odds`)
+    }
+    if (!isObject(value.gates)) {
+      errors.push(`${at}.gates: expected an object`)
+    } else {
+      const names = market === 'moneyline'
+        ? ['edge', 'roi', 'coverage', 'marketQuality']
+        : ['edge', 'roi', 'coverage', 'marketQuality', 'separation']
+      for (const name of names) {
+        if (typeof value.gates[name] !== 'boolean') errors.push(`${at}.gates.${name}: expected boolean`)
+      }
+    }
+  }
+
+  const moneyline = decision.moneyline
+  if (isObject(moneyline)) {
+    if (!['away', 'home'].includes(moneyline.forecastSide)) errors.push(`${prefix}.moneyline.forecastSide: unsupported`)
+    if (moneyline.selectedSide != null && !['away', 'home'].includes(moneyline.selectedSide)) {
+      errors.push(`${prefix}.moneyline.selectedSide: unsupported`)
+    }
+    validateOptionalMetric(`${prefix}.moneyline.forecastProbability`, moneyline.forecastProbability, errors, { min: 0, max: 1 })
+    validateOptionalMetric(`${prefix}.moneyline.modelProbability`, moneyline.modelProbability, errors, { min: 0, max: 1 })
+    validateOptionalMetric(`${prefix}.moneyline.marketFairProbability`, moneyline.marketFairProbability, errors, { min: 0, max: 1 })
+    const expectedForecast = moneyline.forecastSide === 'home'
+      ? projection.homeWinProbability
+      : projection.awayWinProbability
+    if (
+      Number.isFinite(expectedForecast)
+      && Number.isFinite(moneyline.forecastProbability)
+      && Math.abs(expectedForecast - moneyline.forecastProbability) > 0.001
+    ) errors.push(`${prefix}.moneyline.forecastProbability: must match forecast side probability`)
+  }
+
+  const total = decision.total
+  if (isObject(total)) {
+    if (total.selectedSide != null && !['over', 'under'].includes(total.selectedSide)) {
+      errors.push(`${prefix}.total.selectedSide: unsupported`)
+    }
+    for (const field of [
+      'modelWinProbability',
+      'modelLoseProbability',
+      'modelPushProbability',
+      'conditionalModelProbability',
+      'marketFairProbability',
+    ]) validateOptionalMetric(`${prefix}.total.${field}`, total[field], errors, { min: 0, max: 1 })
+    for (const field of ['line', 'projectedTotal']) {
+      validateOptionalMetric(`${prefix}.total.${field}`, total[field], errors, { min: 0, max: 30 })
+    }
+    for (const field of ['projectionDelta', 'runSeparation']) {
+      validateOptionalMetric(`${prefix}.total.${field}`, total[field], errors, { min: -30, max: 30 })
+    }
+    if (
+      Number.isFinite(total.projectedTotal)
+      && Number.isFinite(projection.projectedTotal)
+      && Math.abs(total.projectedTotal - projection.projectedTotal) > 0.03
+    ) errors.push(`${prefix}.total.projectedTotal: must match projection`)
+    if (
+      Number.isFinite(total.modelWinProbability)
+      && Number.isFinite(total.modelLoseProbability)
+      && Number.isFinite(total.modelPushProbability)
+      && Math.abs(total.modelWinProbability + total.modelLoseProbability + total.modelPushProbability - 1) > 0.002
+    ) errors.push(`${prefix}.total: win, lose, and push probabilities must sum to 1`)
+  }
+}
+
 function validateGameProjectionRecord(prefix, projection, errors, gameIds = null) {
   if (!isObject(projection)) {
     errors.push(`${prefix}: expected an object`)
     return
   }
-  if (![1, 2, 3, 4, 5, 6, 7].includes(projection.modelVersion)) errors.push(`${prefix}.modelVersion: expected 1 through 7`)
+  if (![1, 2, 3, 4, 5, 6, 7, 8].includes(projection.modelVersion)) errors.push(`${prefix}.modelVersion: expected 1 through 8`)
   if (projection.advisoryOnly !== true) errors.push(`${prefix}.advisoryOnly: must be true`)
   if (projection.captureState !== 'pregame') errors.push(`${prefix}.captureState: expected pregame`)
   if (!Number.isFinite(projection.gamePk)) errors.push(`${prefix}.gamePk: must be finite`)
@@ -657,6 +783,9 @@ function validateGameProjectionRecord(prefix, projection, errors, gameIds = null
         && blend.applied !== (blend.side.applied || blend.total.applied)
       ) errors.push(`${at}.applied: must match side or total application`)
     }
+  }
+  if (projection.modelVersion >= 8) {
+    validateGameMarketDecision(`${prefix}.marketDecision`, projection.marketDecision, projection, errors)
   }
   if (projection.freezeState != null && !['refreshing-pregame', 'final-pregame'].includes(projection.freezeState)) {
     errors.push(`${prefix}.freezeState: unsupported`)

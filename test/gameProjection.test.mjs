@@ -123,7 +123,7 @@ test('game projection emits run ranges, transparent factors, and market comparis
 
   assert.equal(output.advisoryOnly, true)
   assert.equal(output.captureState, 'pregame')
-  assert.equal(output.modelVersion, 7)
+  assert.equal(output.modelVersion, 8)
   assert.ok(output.projectedTotal > 7 && output.projectedTotal < 11)
   assert.equal(output.estimatedScore.away + output.estimatedScore.home > 0, true)
   assert.deepEqual(output.estimatedScore, {
@@ -143,6 +143,10 @@ test('game projection emits run ranges, transparent factors, and market comparis
   assert.ok(Number.isFinite(output.inputs.away.pitchingFactor))
   assert.equal(output.marketComparison.total.line, 8.5)
   assert.ok(Number.isFinite(output.marketComparison.moneyline.homeModelEdge))
+  assert.equal(output.marketDecision.version, 1)
+  assert.equal(output.marketDecision.status, 'collecting')
+  assert.equal(output.marketDecision.moneyline.rawTier, 'unavailable')
+  assert.equal(output.marketDecision.total.rawTier, 'unavailable')
 })
 
 test('market blend stays off without evidence and applies only cleared components', () => {
