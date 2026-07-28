@@ -1,6 +1,10 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { americanToDecimal, parseGameOdds } from '../server/lib/theOddsApi.mjs'
+import {
+  americanToDecimal,
+  parseGameOdds,
+  pruneOddsToGames,
+} from '../server/lib/theOddsApi.mjs'
 
 const market = (key, outcomes) => ({ key, outcomes })
 const book = (key, moneyline, total) => ({
@@ -101,4 +105,19 @@ test('doubleheader matching assigns each market event to one MLB gamePk', () => 
   const { gameOddsByGamePk } = parseGameOdds(events, games)
   assert.equal(gameOddsByGamePk[101].eventId, 'early')
   assert.equal(gameOddsByGamePk[102].eventId, 'late')
+})
+
+test('cached odds drop a game removed from the active slate after postponement', () => {
+  const cached = {
+    824490: { eventId: 'postponed' },
+    824491: { eventId: 'active' },
+  }
+  const games = [{ gamePk: 824491 }]
+
+  const pruned = pruneOddsToGames(cached, games)
+
+  assert.deepEqual(pruned, {
+    824491: { eventId: 'active' },
+  })
+  assert.equal(cached[824490].eventId, 'postponed')
 })

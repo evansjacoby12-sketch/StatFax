@@ -21,6 +21,24 @@ const BOOK_KEY = { williamhill_us: 'caesars' };
 
 const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z]/g, '');
 
+/**
+ * Keep cached markets only for games that still belong to the active slate.
+ * MLB can mark a game postponed after prices were cached, and that game is
+ * deliberately removed from daily.json. Retaining its market would leave an
+ * orphaned gamePk and fail the snapshot contract.
+ */
+export function pruneOddsToGames(oddsByGamePk, games) {
+  const activeGamePks = new Set(
+    (games || [])
+      .map((game) => Number(game?.gamePk))
+      .filter(Number.isFinite),
+  );
+  return Object.fromEntries(
+    Object.entries(oddsByGamePk || {})
+      .filter(([gamePk]) => activeGamePks.has(Number(gamePk))),
+  );
+}
+
 export function americanToDecimal(a) {
   if (!Number.isFinite(a)) return null;
   if (a >= 100) return 1 + a / 100;

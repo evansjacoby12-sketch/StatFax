@@ -463,7 +463,7 @@ import { fetchRecentBatterBarrelsMultiWindow, fetchRecentPitcherVelo } from './s
 import { applySimResolution } from './lib/simResolution.mjs';
 import { applyGameNormalizedPrimeCap } from './lib/primeCap.mjs';
 import { applyZonePowerProbabilityInflation } from './lib/zonePowerInflation.mjs';
-import { fetchGameOdds, fetchHROdds } from './lib/theOddsApi.mjs';
+import { fetchGameOdds, fetchHROdds, pruneOddsToGames } from './lib/theOddsApi.mjs';
 import { advisoryBarrel } from './lib/barrelScore.mjs';
 import { powerReadySignal, barrelReadySignal } from '../ui/src/lib/powerReady.js';
 import { pitchMixScore } from '../ui/src/lib/scout.js';
@@ -4428,12 +4428,20 @@ async function main() {
     const oddsKey = process.env.ODDS_API_KEY;
     const refreshMin = +(process.env.ODDS_REFRESH_MINUTES ?? 120);
     const cache = backtestLog.oddsCache;
-    if (cache?.date === date) oddsByGamePk = cache.odds || {};
+    if (cache?.date === date) {
+      const cachedOdds = cache.odds || {};
+      oddsByGamePk = pruneOddsToGames(cachedOdds, games);
+      const pruned = Object.keys(cachedOdds).length - Object.keys(oddsByGamePk).length;
+      if (pruned > 0) {
+        backtestLog.oddsCache = { ...cache, odds: oddsByGamePk };
+        console.log(`[odds] pruned ${pruned} game(s) no longer on the active slate`);
+      }
+    }
     // An EMPTY cached snapshot is never fresh — one pre-props morning save
     // must not block retries for the whole refresh window (bit us 2026-07-04:
     // a pre-fix run cached {} at 12:32 and the 1440-min window sat on it).
     const cacheFresh = cache?.date === date
-      && Object.keys(cache.odds || {}).length > 0
+      && Object.keys(oddsByGamePk).length > 0
       && Date.now() - Date.parse(cache.at) < refreshMin * 60_000;
     const anyPregame = games.some((g) => !g.isLive && !g.isFinal);
     if (oddsKey && cacheFresh) {
@@ -4464,9 +4472,17 @@ async function main() {
     const oddsKey = process.env.ODDS_API_KEY;
     const refreshMin = +(process.env.GAME_ODDS_REFRESH_MINUTES ?? 60);
     const cache = backtestLog.gameOddsCache;
-    if (cache?.date === date) gameOddsByGamePk = cache.markets || {};
+    if (cache?.date === date) {
+      const cachedMarkets = cache.markets || {};
+      gameOddsByGamePk = pruneOddsToGames(cachedMarkets, games);
+      const pruned = Object.keys(cachedMarkets).length - Object.keys(gameOddsByGamePk).length;
+      if (pruned > 0) {
+        backtestLog.gameOddsCache = { ...cache, markets: gameOddsByGamePk };
+        console.log(`[game-odds] pruned ${pruned} game(s) no longer on the active slate`);
+      }
+    }
     const cacheFresh = cache?.date === date
-      && Object.keys(cache.markets || {}).length > 0
+      && Object.keys(gameOddsByGamePk).length > 0
       && Date.now() - Date.parse(cache.at) < refreshMin * 60_000;
     const anyPregame = games.some((game) => !game.isLive && !game.isFinal);
     if (oddsKey && cacheFresh) {
