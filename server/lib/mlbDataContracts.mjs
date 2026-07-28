@@ -657,6 +657,96 @@ function validateGameProjectionRecord(prefix, projection, errors, gameIds = null
   if (!['away', 'home'].includes(projection.projectedWinner)) errors.push(`${prefix}.projectedWinner: expected away or home`)
   if (!['limited', 'medium'].includes(projection.confidence?.status)) errors.push(`${prefix}.confidence.status: unsupported`)
   validateProbability(`${prefix}.confidence.coverage`, projection.confidence?.coverage, errors)
+  if (projection.firstInning != null) {
+    const first = projection.firstInning
+    const at = `${prefix}.firstInning`
+    if (!isObject(first)) {
+      errors.push(`${at}: expected an object`)
+    } else {
+      if (first.version !== 1) errors.push(`${at}.version: expected 1`)
+      if (first.advisoryOnly !== true) errors.push(`${at}.advisoryOnly: must be true`)
+      if (first.model !== 'Forecast V9 + 1st Inning Layer') errors.push(`${at}.model: unsupported`)
+      if (!['ready', 'limited'].includes(first.status)) errors.push(`${at}.status: unsupported`)
+      if (!['nrfi', 'yrfi'].includes(first.lean)) errors.push(`${at}.lean: unsupported`)
+      if (!['strong', 'lean', 'watch', 'limited'].includes(first.tier)) errors.push(`${at}.tier: unsupported`)
+      if (typeof first.qualified !== 'boolean') errors.push(`${at}.qualified: expected boolean`)
+      if (first.pricesAvailable !== false) errors.push(`${at}.pricesAvailable: expected false until prices are modeled`)
+      for (const field of ['selectedProbability', 'nrfiProbability', 'yrfiProbability', 'coverage']) {
+        validateProbability(`${at}.${field}`, first[field], errors)
+      }
+      if (
+        Number.isFinite(first.nrfiProbability)
+        && Number.isFinite(first.yrfiProbability)
+        && Math.abs(first.nrfiProbability + first.yrfiProbability - 1) > 0.002
+      ) errors.push(`${at}: NRFI and YRFI probabilities must sum to 1`)
+      validateOptionalMetric(`${at}.projectedRuns`, first.projectedRuns, errors, { min: 0, max: 5 })
+      if (first.shadow != null) {
+        if (!isObject(first.shadow)) {
+          errors.push(`${at}.shadow: expected an object`)
+        } else {
+          if (first.shadow.recent30Applied !== false) {
+            errors.push(`${at}.shadow.recent30Applied: must remain false until validated`)
+          }
+          validateProbability(`${at}.shadow.recent30YrfiProbability`, first.shadow.recent30YrfiProbability, errors)
+          if (typeof first.shadow.reason !== 'string' || !first.shadow.reason.trim()) {
+            errors.push(`${at}.shadow.reason: expected non-empty text`)
+          }
+        }
+      }
+      for (const side of ['away', 'home']) {
+        const half = first.halves?.[side]
+        const halfAt = `${at}.halves.${side}`
+        if (!isObject(half)) {
+          errors.push(`${halfAt}: expected an object`)
+          continue
+        }
+        validateProbability(`${halfAt}.scoringProbability`, half.scoringProbability, errors)
+        validateProbability(`${halfAt}.coverage`, half.coverage, errors)
+        validateOptionalMetric(`${halfAt}.expectedRuns`, half.expectedRuns, errors, { min: 0, max: 3 })
+        validateOptionalMetric(`${halfAt}.topOrderObp`, half.topOrderObp, errors, { min: 0, max: 1 })
+        validateOptionalMetric(`${halfAt}.topOrderSplitCoverage`, half.topOrderSplitCoverage, errors, { min: 0, max: 1 })
+        if (!Array.isArray(half.topOrder) || half.topOrder.length > 3) {
+          errors.push(`${halfAt}.topOrder: expected up to three hitters`)
+        }
+        for (const field of ['offenseRecent30ScoreRate', 'teamRecent30YrfiRate', 'matchupYrfiRate']) {
+          validateOptionalMetric(`${halfAt}.historical.${field}`, half.historical?.[field], errors, { min: 0, max: 1 })
+        }
+        if (half.pitcherFirstInning != null) {
+          const micro = half.pitcherFirstInning
+          const microAt = `${halfAt}.pitcherFirstInning`
+          if (!isObject(micro)) {
+            errors.push(`${microAt}: expected an object`)
+          } else {
+            validateProbability(`${microAt}.coverage`, micro.coverage, errors)
+            validateOptionalMetric(`${microAt}.factor`, micro.factor, errors, { min: 0.5, max: 1.5 })
+            validateOptionalMetric(`${microAt}.preventionScore`, micro.preventionScore, errors, { min: 0, max: 100 })
+            for (const field of ['firstInningFip', 'firstInningK9', 'firstInningBb9', 'ttoK9', 'ttoBb9']) {
+              validateOptionalMetric(`${microAt}.${field}`, micro[field], errors, { min: 0, max: 30 })
+            }
+            if (micro.sampleMode != null && !['current-season-only', 'blended-previous-season'].includes(micro.sampleMode)) {
+              errors.push(`${microAt}.sampleMode: unsupported`)
+            }
+            for (const field of ['currentWindowStarts', 'previousSeasonStartsUsed']) {
+              if (!Number.isInteger(micro[field]) || micro[field] < 0) {
+                errors.push(`${microAt}.${field}: expected a non-negative integer`)
+              }
+            }
+          }
+        }
+        if (half.collision != null) {
+          validateOptionalMetric(`${halfAt}.collision.factor`, half.collision?.factor, errors, { min: 0.5, max: 1.5 })
+          validateOptionalMetric(`${halfAt}.collision.edge`, half.collision?.edge, errors, { min: -1, max: 1 })
+          validateProbability(`${halfAt}.collision.coverage`, half.collision?.coverage, errors)
+        }
+      }
+      if (typeof first.evidence?.case !== 'string' || !first.evidence.case.trim()) {
+        errors.push(`${at}.evidence.case: expected non-empty text`)
+      }
+      if (typeof first.evidence?.caution !== 'string' || !first.evidence.caution.trim()) {
+        errors.push(`${at}.evidence.caution: expected non-empty text`)
+      }
+    }
+  }
   if (!isObject(projection.inputs?.away) || !isObject(projection.inputs?.home)) errors.push(`${prefix}.inputs: expected away and home factor breakdowns`)
   if (projection.modelVersion >= 2) {
     for (const side of ['away', 'home']) {
@@ -1466,6 +1556,76 @@ function validateGameHistoricalValidation(evaluation, errors) {
   return evaluation.sample?.games || 0
 }
 
+function validateFirstInningHistoricalValidation(evaluation, errors) {
+  if (evaluation == null) return 0
+  const prefix = 'firstInningHistoricalValidation'
+  if (!isObject(evaluation)) {
+    errors.push(`${prefix}: expected an object`)
+    return 0
+  }
+  if (evaluation.version !== 1) errors.push(`${prefix}.version: expected 1`)
+  if (evaluation.advisoryOnly !== true) errors.push(`${prefix}.advisoryOnly: must be true`)
+  if (evaluation.methodology !== 'expanding-date walk-forward first-inning backbone') {
+    errors.push(`${prefix}.methodology: unsupported`)
+  }
+  if (!['collecting', 'hold', 'eligible'].includes(evaluation.status)) {
+    errors.push(`${prefix}.status: unsupported`)
+  }
+  if (typeof evaluation.scope !== 'string' || !evaluation.scope.trim()) {
+    errors.push(`${prefix}.scope: expected non-empty text`)
+  }
+  for (const field of ['seasons', 'games', 'dates', 'priorGames']) {
+    if (!Number.isInteger(evaluation.minimumSample?.[field]) || evaluation.minimumSample[field] < 1) {
+      errors.push(`${prefix}.minimumSample.${field}: expected a positive integer`)
+    }
+  }
+  for (const field of ['seasons', 'games', 'dates']) {
+    if (!Number.isInteger(evaluation.sample?.[field]) || evaluation.sample[field] < 0) {
+      errors.push(`${prefix}.sample.${field}: expected a non-negative integer`)
+    }
+  }
+  for (const field of ['fromDate', 'throughDate']) {
+    if (evaluation.sample?.[field] != null && !isValidDate(evaluation.sample[field])) {
+      errors.push(`${prefix}.sample.${field}: expected null or YYYY-MM-DD`)
+    }
+  }
+  validateOptionalMetric(`${prefix}.baseline.brier`, evaluation.baseline?.brier, errors, { min: 0, max: 1 })
+  for (const field of ['brier', 'accuracy']) {
+    validateOptionalMetric(`${prefix}.model.${field}`, evaluation.model?.[field], errors, { min: 0, max: 1 })
+  }
+  validateOptionalMetric(
+    `${prefix}.model.improvementVsBaseline`,
+    evaluation.model?.improvementVsBaseline,
+    errors,
+    { min: -1, max: 1 },
+  )
+  if (!Array.isArray(evaluation.model?.calibration)) {
+    errors.push(`${prefix}.model.calibration: expected an array`)
+  }
+  if (evaluation.challengers?.recent30Team != null) {
+    const challenger = evaluation.challengers.recent30Team
+    if (challenger.applied !== false) {
+      errors.push(`${prefix}.challengers.recent30Team.applied: must remain false`)
+    }
+    validateOptionalMetric(
+      `${prefix}.challengers.recent30Team.brier`,
+      challenger.brier,
+      errors,
+      { min: 0, max: 1 },
+    )
+    validateOptionalMetric(
+      `${prefix}.challengers.recent30Team.improvementVsBackbone`,
+      challenger.improvementVsBackbone,
+      errors,
+      { min: -1, max: 1 },
+    )
+  }
+  if (typeof evaluation.note !== 'string' || !evaluation.note.trim()) {
+    errors.push(`${prefix}.note: expected non-empty text`)
+  }
+  return evaluation.sample?.games || 0
+}
+
 function validateGameRunHistoricalEvaluation(evaluation, errors) {
   if (evaluation == null) return 0
   const prefix = 'gameRunHistoricalEvaluation'
@@ -1991,6 +2151,10 @@ export function validateDailySnapshot(snapshot) {
   const gameProjections = validateGameProjections(snapshot.gameProjections, gameIds, errors)
   const gameProjectionResults = validateGameProjectionEvaluation(snapshot.gameProjectionEvaluation, errors)
   const gameHistoricalValidationGames = validateGameHistoricalValidation(snapshot.gameHistoricalValidation, errors)
+  const firstInningHistoricalValidationGames = validateFirstInningHistoricalValidation(
+    snapshot.firstInningHistoricalValidation,
+    errors,
+  )
   const gameRunHistoricalEvaluationGames = validateGameRunHistoricalEvaluation(
     snapshot.gameRunHistoricalEvaluation,
     errors,
@@ -2006,6 +2170,7 @@ export function validateDailySnapshot(snapshot) {
     gameProjections,
     gameProjectionResults,
     gameHistoricalValidationGames,
+    firstInningHistoricalValidationGames,
     gameRunHistoricalEvaluationGames,
     gameMarketEvaluationCalls,
     gameMarketPortfolioSelections,

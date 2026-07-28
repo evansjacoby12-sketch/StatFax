@@ -22,6 +22,8 @@ function scheduleGame({
   doubleHeader = 'N',
   state = 'Final',
   gameType = 'R',
+  awayFirstInningRuns = 0,
+  homeFirstInningRuns = 0,
 }) {
   return {
     gamePk,
@@ -31,6 +33,13 @@ function scheduleGame({
     gameNumber,
     doubleHeader,
     status: { abstractGameState: state },
+    linescore: {
+      innings: [{
+        num: 1,
+        away: { runs: awayFirstInningRuns },
+        home: { runs: homeFirstInningRuns },
+      }],
+    },
     teams: {
       away: { team: { id: awayId, name: `Team ${awayId}` }, score: awayRuns },
       home: { team: { id: homeId, name: `Team ${homeId}` }, score: homeRuns },
@@ -64,6 +73,7 @@ test('season results parser keeps only completed regular-season scores and stabl
   assert.deepEqual(artifact.games.map((game) => game.gamePk), [11])
   assert.deepEqual(artifact.games[0].awayTeam, { id: 1, name: 'Team 1' })
   assert.equal(artifact.games[0].awayRuns, 6)
+  assert.equal(artifact.games[0].awayFirstInningRuns, 0)
   assert.equal(validateMlbSeasonResults(artifact).ok, true)
 })
 
@@ -170,6 +180,7 @@ test('season score refresh backfills once, then requests only a 14-day overlap',
     fetchedAt: '2026-07-27T12:00:00.000Z',
   })
   assert.match(calls[0], /startDate=2026-03-01/)
+  assert.match(calls[0], /hydrate=team,linescore/)
   assert.equal(first.artifact.games.length, 1)
 
   await refreshMlbSeasonResults({
@@ -219,9 +230,10 @@ test('deployment restores, validates, publishes, and bundles game score archives
 
   assert.match(workflow, /Restore MLB game results/)
   assert.match(workflow, /Restore MLB game history/)
+  assert.match(workflow, /Restore first-inning pitcher cache/)
   assert.match(workflow, /npm run validate:mlb-game-results/)
   assert.match(workflow, /npm run validate:mlb-game-history/)
-  assert.match(workflow, /backtest-log\.json mlb-game-results\.json mlb-game-history\.json list-builder-evidence\.json/)
+  assert.match(workflow, /backtest-log\.json mlb-game-results\.json mlb-game-history\.json first-inning-pitcher-cache\.json list-builder-evidence\.json/)
   assert.match(packageJson, /"validate:mlb-game-results"/)
   assert.match(packageJson, /"validate:mlb-game-history"/)
   assert.match(vite, /mlb-game-results\.json/)

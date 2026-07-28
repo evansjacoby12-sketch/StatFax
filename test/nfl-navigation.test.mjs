@@ -88,10 +88,13 @@ test('NFL Bet Lab shares the core MLB workspace modes without a Saved destinatio
     readFile(new URL('../ui/src/components/WorkspaceShell.jsx', import.meta.url), 'utf8'),
     readFile(new URL('../ui/src/components/NFLBoard.jsx', import.meta.url), 'utf8'),
   ])
-  for (const label of ['Explore combos', 'Custom builder', 'Same game']) {
+  for (const label of ['Explore combos', 'Same game']) {
     assert.match(mlbLab, new RegExp(`label: '${label}'`))
     assert.match(nflLab, new RegExp(`label: '${label}'`))
   }
+  assert.match(mlbLab, /label: 'NRFI \/ YRFI zone'/)
+  assert.doesNotMatch(mlbLab, /label: 'Custom builder'/)
+  assert.match(nflLab, /label: 'Custom builder'/)
   assert.match(mlbLab, /label: 'Top 10 straights'/)
   assert.doesNotMatch(mlbLab, /label: 'Saved'/)
   assert.doesNotMatch(nflLab, /label: 'Saved'/)

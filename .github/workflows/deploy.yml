@@ -119,6 +119,16 @@ jobs:
           key: mlb-game-history-${{ github.run_id }}
           restore-keys: mlb-game-history-
 
+      # Parsed first-inning and first-time-through pitcher samples. Carrying
+      # this forward avoids re-fetching hundreds of MLB play-by-play games on
+      # every slate refresh while the engine rebuilds the rolling 60-day view.
+      - name: Restore first-inning pitcher cache
+        uses: actions/cache@v4
+        with:
+          path: dist/first-inning-pitcher-cache.json
+          key: first-inning-pitcher-cache-${{ github.run_id }}
+          restore-keys: first-inning-pitcher-cache-
+
       # Per-day pregame freeze (keeps started-game batters at pre-first-pitch
       # model/form values). Same unique-key-saves / restore-by-prefix pattern.
       - name: Restore pregame freeze
@@ -274,7 +284,7 @@ jobs:
             exit 0
           fi
           ENDPOINT="https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com"
-          for f in calibration.json backtest-log.json mlb-game-results.json mlb-game-history.json list-builder-evidence.json board-history.json zone-cache.json zone-evaluation.json; do
+          for f in calibration.json backtest-log.json mlb-game-results.json mlb-game-history.json first-inning-pitcher-cache.json list-builder-evidence.json board-history.json zone-cache.json zone-evaluation.json; do
             if [ -f "dist/$f" ]; then
               aws s3 cp "dist/$f" "s3://$R2_BUCKET/$f" --endpoint-url "$ENDPOINT" \
                 --content-type application/json --cache-control no-cache \

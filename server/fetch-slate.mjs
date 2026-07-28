@@ -180,6 +180,7 @@ const BACKTEST_OUT_PATH    = resolve(__dirname, '../dist/backtest-log.json');
 const MLB_GAME_RESULTS_OUT_PATH = resolve(__dirname, '../dist/mlb-game-results.json');
 const MLB_GAME_HISTORY_OUT_PATH = resolve(__dirname, '../dist/mlb-game-history.json');
 const LIST_BUILDER_EVIDENCE_OUT_PATH = resolve(__dirname, '../dist/list-builder-evidence.json');
+const FIRST_INNING_PITCHER_CACHE_OUT_PATH = resolve(__dirname, '../dist/first-inning-pitcher-cache.json');
 // Per-day "pregame freeze": once a batter's game starts we keep serving his
 // pre-first-pitch model/form values. Persisted across cron runs via the same
 // Actions cache mechanism as the backtest log.
@@ -507,6 +508,15 @@ import {
   buildMultiSeasonRunProfiles,
   evaluateMultiSeasonRunPrior,
 } from '../src/sports/mlb/logic/multiSeasonRunPrior.js';
+import {
+  buildFirstInningProfiles,
+  evaluateFirstInningHistory,
+} from '../src/sports/mlb/logic/firstInningProjection.js';
+import {
+  buildPitcherFirstInningProfile,
+  parsePitcherMicroGame,
+  selectPitcherStartSample,
+} from './lib/firstInningPitcherProfile.mjs';
 import { refreshMlbGameHistory } from './lib/mlbGameHistory.mjs';
 
 // ─── HTTP helpers ────────────────────────────────────────────────────────────
@@ -685,6 +695,8 @@ async function fetchSchedule(date) {
   const games = [];
   for (const dayEntry of data.dates || []) {
     for (const g of dayEntry.games || []) {
+      const firstInning = (g.linescore?.innings || [])
+        .find((inning) => Number(inning?.num) === 1);
       games.push({
         gamePk:        g.gamePk,
         gameDate:      g.gameDate,
@@ -721,6 +733,8 @@ async function fetchSchedule(date) {
         inningHalf:    g.linescore?.inningHalf ?? null,
         awayScore:     g.teams?.away?.score ?? null,
         homeScore:     g.teams?.home?.score ?? null,
+        awayFirstInningRuns: Number.isInteger(firstInning?.away?.runs) ? firstInning.away.runs : null,
+        homeFirstInningRuns: Number.isInteger(firstInning?.home?.runs) ? firstInning.home.runs : null,
       });
     }
   }
@@ -1185,7 +1199,7 @@ async function fetchLiveGameContext(gamePk) {
   }
 }
 
-async function fetchPitcherRecentForm(pitcherId) {
+async function fetchPitcherRecentForm(pitcherId, cutoffDate = null) {
   try {
     const data = await mlbGet(
       `/people/${pitcherId}/stats?stats=gameLog&group=pitching&season=${SEASON}&gameType=R`
@@ -1193,7 +1207,13 @@ async function fetchPitcherRecentForm(pitcherId) {
     const splits = data.stats?.[0]?.splits || [];
     if (!splits.length) return null;
 
-    const { appearances: ordered, starts: orderedStarts } = orderPitcherGameLogs(splits);
+    const { appearances: rawOrdered, starts: rawOrderedStarts } = orderPitcherGameLogs(splits);
+    const ordered = cutoffDate
+      ? rawOrdered.filter((game) => !game.date || game.date < cutoffDate)
+      : rawOrdered;
+    const orderedStarts = cutoffDate
+      ? rawOrderedStarts.filter((game) => !game.date || game.date < cutoffDate)
+      : rawOrderedStarts;
     // A projected starter may have made a relief appearance between starts.
     // Keep those appearances for the short-rest workload signal below, but do
     // not let them collapse the starter's expected innings or recent K rate.
@@ -1223,6 +1243,7 @@ async function fetchPitcherRecentForm(pitcherId) {
       const opp = TEAM_ABBR_BY_ID[g.opponent?.id] || g.opponent?.name || null;
       const isHome = !!(g.isHome);
       return {
+        gamePk: Number.isFinite(Number(g.game?.gamePk)) ? Number(g.game.gamePk) : null,
         date:   g.date || null,
         opp,
         isHome,
@@ -1248,7 +1269,7 @@ async function fetchPitcherRecentForm(pitcherId) {
       hr += parseInt(stat.homeRuns,    10) || 0;
       k  += parseInt(stat.strikeOuts,  10) || 0;
     }
-    if (ip < 5) return null;
+    if (!lastN.length) return null;
 
     // Fatigue signal — sum pitches thrown across games in the last 3
     // calendar days. Most starters (4-day rest) → 0. A starter on short
@@ -1270,10 +1291,11 @@ async function fetchPitcherRecentForm(pitcherId) {
 
     return {
       games:         lastN.length,
+      seasonStarts:  orderedStarts.length,
       ip,
-      era:           (er * 9) / ip,
-      hrPer9:        (hr * 9) / ip,
-      k9:            (k  * 9) / ip,
+      era:           ip > 0 ? (er * 9) / ip : null,
+      hrPer9:        ip > 0 ? (hr * 9) / ip : null,
+      k9:            ip > 0 ? (k  * 9) / ip : null,
       lastStartDate: orderedStarts[0]?.date || null,
       pitchesL3D,
       recentStarts,
@@ -1281,6 +1303,143 @@ async function fetchPitcherRecentForm(pitcherId) {
   } catch {
     return null;
   }
+}
+
+async function fetchPitcherPreviousSeasonStarts(pitcherId, cutoffDate) {
+  try {
+    const data = await mlbGet(
+      `/people/${pitcherId}/stats?stats=gameLog&group=pitching&season=${SEASON - 1}&gameType=R`,
+    );
+    const splits = data.stats?.[0]?.splits || [];
+    if (!splits.length) return [];
+    const { starts } = orderPitcherGameLogs(splits);
+    return starts
+      .filter((game) => !cutoffDate || !game.date || game.date < cutoffDate)
+      .slice(0, 8)
+      .map((game) => ({
+        gamePk: Number.isFinite(Number(game.game?.gamePk)) ? Number(game.game.gamePk) : null,
+        date: game.date || null,
+        season: SEASON - 1,
+      }))
+      .filter((game) => Number.isFinite(game.gamePk) && game.date);
+  } catch {
+    return [];
+  }
+}
+
+function readFirstInningPitcherCache() {
+  try {
+    if (!existsSync(FIRST_INNING_PITCHER_CACHE_OUT_PATH)) return {};
+    const artifact = JSON.parse(readFileSync(FIRST_INNING_PITCHER_CACHE_OUT_PATH, 'utf8'));
+    return artifact?.version === 1 && artifact.records && typeof artifact.records === 'object'
+      ? artifact.records
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+async function buildSlateFirstInningPitcherProfiles(pitcherRecentForm, pitcherIds, cutoffDate) {
+  const previousStartsByPitcher = {};
+  const thinPitchers = pitcherIds.filter((pitcherId) => (
+    (pitcherRecentForm[pitcherId]?.seasonStarts || 0) < 8
+  ));
+  const priorResults = await pMap(thinPitchers, async (pitcherId) => ({
+    pitcherId,
+    starts: await fetchPitcherPreviousSeasonStarts(pitcherId, cutoffDate),
+  }), 6);
+  for (const result of priorResults) previousStartsByPitcher[result.pitcherId] = result.starts;
+
+  const samples = {};
+  for (const pitcherId of pitcherIds) {
+    const form = pitcherRecentForm[pitcherId];
+    samples[pitcherId] = selectPitcherStartSample({
+      currentStarts: (form?.recentStarts || [])
+        .filter((start) => Number.isFinite(start.gamePk) && start.date)
+        .map((start) => ({ gamePk: start.gamePk, date: start.date, season: SEASON })),
+      previousStarts: previousStartsByPitcher[pitcherId] || [],
+      currentSeasonStarts: form?.seasonStarts || 0,
+      asOf: cutoffDate,
+    });
+  }
+
+  let cache = readFirstInningPitcherCache();
+  if (!Object.keys(cache).length) {
+    const remote = await fetchFromR2(FIRST_INNING_PITCHER_CACHE_URL);
+    if (remote?.version === 1 && remote.records && typeof remote.records === 'object') {
+      cache = remote.records;
+      console.log(`[first-inning] restored ${Object.keys(cache).length} cached pitcher-game samples from R2`);
+    }
+  }
+  const jobs = [];
+  const seen = new Set();
+  for (const [pitcherId, sample] of Object.entries(samples)) {
+    for (const start of sample.selected) {
+      const key = `${pitcherId}-${start.gamePk}`;
+      if (cache[key] || seen.has(key)) continue;
+      seen.add(key);
+      jobs.push({ pitcherId: Number(pitcherId), ...start, key });
+    }
+  }
+  const fetched = await pMap(jobs, async (job) => {
+    try {
+      const playByPlay = await getJson(`${MLB_BASE}/game/${job.gamePk}/playByPlay`);
+      return {
+        key: job.key,
+        record: parsePitcherMicroGame(playByPlay, {
+          pitcherId: job.pitcherId,
+          gamePk: job.gamePk,
+          date: job.date,
+          season: job.season,
+        }),
+      };
+    } catch {
+      return { key: job.key, record: null };
+    }
+  }, 12);
+  for (const result of fetched) {
+    if (result.record) cache[result.key] = result.record;
+  }
+
+  const keepAfterSeason = SEASON - 2;
+  const compactRecords = Object.fromEntries(
+    Object.entries(cache).filter(([, record]) => Number(record?.season) >= keepAfterSeason),
+  );
+  mkdirSync(dirname(FIRST_INNING_PITCHER_CACHE_OUT_PATH), { recursive: true });
+  writeFileSync(FIRST_INNING_PITCHER_CACHE_OUT_PATH, JSON.stringify({
+    version: 1,
+    updatedAt: new Date().toISOString(),
+    records: compactRecords,
+  }));
+
+  const profiles = {};
+  for (const pitcherId of pitcherIds) {
+    const sample = samples[pitcherId];
+    const records = sample.selected
+      .map((start) => {
+        const record = compactRecords[`${pitcherId}-${start.gamePk}`];
+        return record ? { ...record, sampleWeight: start.sampleWeight } : null;
+      })
+      .filter(Boolean);
+    profiles[pitcherId] = buildPitcherFirstInningProfile(records, {
+      pitcherId,
+      asOf: cutoffDate,
+      sampleMode: sample.sampleMode,
+      currentSeasonStarts: pitcherRecentForm[pitcherId]?.seasonStarts || 0,
+      currentWindowStarts: sample.current.length,
+      previousSeasonStartsUsed: sample.previous.length,
+    });
+  }
+  return {
+    profiles,
+    metrics: {
+      pitchers: pitcherIds.length,
+      thinPitchers: thinPitchers.length,
+      requestedGames: jobs.length,
+      cachedGames: Object.keys(compactRecords).length,
+      profilesWithCoverage: Object.values(profiles).filter((profile) => profile.coverage > 0).length,
+    },
+  };
 }
 
 /**
@@ -2179,6 +2338,7 @@ const CALIBRATION_URL = `${R2_PUBLIC_BASE}/calibration.json`;
 const BACKTEST_URL    = `${R2_PUBLIC_BASE}/backtest-log.json`;
 const MLB_GAME_RESULTS_URL = `${R2_PUBLIC_BASE}/mlb-game-results.json`;
 const MLB_GAME_HISTORY_URL = `${R2_PUBLIC_BASE}/mlb-game-history.json`;
+const FIRST_INNING_PITCHER_CACHE_URL = `${R2_PUBLIC_BASE}/first-inning-pitcher-cache.json`;
 const ZONE_CACHE_URL  = `${R2_PUBLIC_BASE}/zone-cache.json`;
 
 /**
@@ -2387,12 +2547,16 @@ async function main() {
   writeFileSync(MLB_GAME_HISTORY_OUT_PATH, JSON.stringify(mlbGameHistory));
   const gameHistoricalValidation = evaluateGameHistoricalValidation(mlbGameHistory);
   const gameRunHistoricalEvaluation = evaluateMultiSeasonRunPrior(mlbGameHistory);
+  const firstInningHistoricalValidation = evaluateFirstInningHistory(mlbGameHistory);
 
   const teamScoringProfiles = buildTeamScoringProfiles(mlbGameResults, date);
   const multiSeasonRunProfiles = buildMultiSeasonRunProfiles(mlbGameHistory, {
     season: SEASON,
     cutoffDate: date,
     enabled: gameRunHistoricalEvaluation.eligible,
+  });
+  const firstInningProfiles = buildFirstInningProfiles(mlbGameHistory, {
+    cutoffDate: date,
   });
   const teamScoringEvaluation = evaluateTeamScoringForm(mlbGameResults);
   console.log(
@@ -2419,6 +2583,13 @@ async function main() {
     + `vs ${gameRunHistoricalEvaluation.currentSeason.teamRunMae ?? '—'} current · `
     + `total MAE ${gameRunHistoricalEvaluation.multiSeason.totalMae ?? '—'} `
     + `vs ${gameRunHistoricalEvaluation.currentSeason.totalMae ?? '—'} current`,
+  );
+
+  console.log(
+    `[first-inning] ${firstInningHistoricalValidation.status} backbone; `
+    + `${firstInningHistoricalValidation.sample.games} walk-forward games; `
+    + `Brier ${firstInningHistoricalValidation.model.brier ?? 'unavailable'} `
+    + `vs ${firstInningHistoricalValidation.baseline.brier ?? 'unavailable'} baseline`,
   );
 
   // Reconcile every still-unsettled, identity-bound pregame forecast against
@@ -3003,10 +3174,28 @@ async function main() {
 
   // 7) Pitcher recent form (gameLog) — per-pitcher fetch, parallelized
   const pitcherRecentForm = {};
-  const recentFormResults = await pMap(pitcherIdArr, async (pid) => ({ pid, form: await fetchPitcherRecentForm(pid) }), 6);
+  const recentFormResults = await pMap(
+    pitcherIdArr,
+    async (pid) => ({ pid, form: await fetchPitcherRecentForm(pid, date) }),
+    6,
+  );
   for (const r of recentFormResults) {
     if (r?.pid && r.form) pitcherRecentForm[r.pid] = r.form;
   }
+  const firstInningPitcherLayer = await buildSlateFirstInningPitcherProfiles(
+    pitcherRecentForm,
+    pitcherIdArr,
+    date,
+  );
+  for (const [pitcherId, profile] of Object.entries(firstInningPitcherLayer.profiles)) {
+    if (!pitcherRecentForm[pitcherId]) pitcherRecentForm[pitcherId] = {};
+    pitcherRecentForm[pitcherId].firstInning = profile;
+  }
+  console.log(
+    `[first-inning] pitcher micro profiles ${firstInningPitcherLayer.metrics.profilesWithCoverage}`
+    + `/${firstInningPitcherLayer.metrics.pitchers}; fetched ${firstInningPitcherLayer.metrics.requestedGames}`
+    + ` play-by-play game(s); ${firstInningPitcherLayer.metrics.thinPitchers} previous-season blends`,
+  );
 
   // 7b) Head-to-head (H2H) stats — per batter × opposing pitcher pair
   //
@@ -4685,6 +4874,8 @@ async function main() {
       marketDecisionPolicy,
       teamScoringProfiles,
       multiSeasonRunProfiles,
+      firstInningProfiles,
+      firstInningHistoricalValidation,
       capturedAt,
     });
     const tracked = updateGameForecastLog(backtestLog, date, current, games, { capturedAt });
@@ -4785,6 +4976,10 @@ async function main() {
     // Three-season, season-isolated validation of the scoring backbone. This
     // replaces the live-call-count lock for PLAY while live calls monitor drift.
     gameHistoricalValidation,
+    // Three-season first-inning linescore validation for the NRFI/YRFI layer.
+    // Current starters, top orders, and weather are applied only after this
+    // leakage-safe historical backbone is built.
+    firstInningHistoricalValidation,
     // Champion/challenger proof for the prior-season run stabilizer. The
     // blend remains off unless its isolated walk-forward comparison is eligible.
     gameRunHistoricalEvaluation,

@@ -1,4 +1,4 @@
-export const MLB_GAME_RESULTS_VERSION = 1
+export const MLB_GAME_RESULTS_VERSION = 2
 export const MLB_TEAM_SCORING_FORM_VERSION = 1
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
@@ -21,6 +21,12 @@ function finiteTeam(team) {
   }
 }
 
+function firstInningRuns(game, side) {
+  const inning = (game?.linescore?.innings || []).find((row) => Number(row?.num) === 1)
+  const runs = Number(inning?.[side]?.runs)
+  return Number.isInteger(runs) && runs >= 0 ? runs : null
+}
+
 function normalizeFinalGame(game, officialDate) {
   if (
     game?.gameType !== 'R'
@@ -33,6 +39,8 @@ function normalizeFinalGame(game, officialDate) {
   const homeTeam = finiteTeam(game.teams.home.team)
   const gamePk = Number(game.gamePk)
   const gameDate = game.gameDate
+  const awayFirstInningRuns = firstInningRuns(game, 'away')
+  const homeFirstInningRuns = firstInningRuns(game, 'home')
   if (
     !awayTeam
     || !homeTeam
@@ -40,6 +48,8 @@ function normalizeFinalGame(game, officialDate) {
     || !Number.isFinite(gamePk)
     || !validDate(officialDate)
     || Number.isNaN(Date.parse(gameDate))
+    || !Number.isInteger(awayFirstInningRuns)
+    || !Number.isInteger(homeFirstInningRuns)
   ) return null
 
   return {
@@ -53,6 +63,8 @@ function normalizeFinalGame(game, officialDate) {
     homeTeam,
     awayRuns: Number(game.teams.away.score),
     homeRuns: Number(game.teams.home.score),
+    awayFirstInningRuns,
+    homeFirstInningRuns,
   }
 }
 
@@ -145,7 +157,7 @@ export function validateMlbSeasonResults(artifact) {
     } else if (game.awayTeam.id === game.homeTeam.id) {
       errors.push(`${at}: away and home team IDs must differ`)
     }
-    for (const field of ['awayRuns', 'homeRuns']) {
+    for (const field of ['awayRuns', 'homeRuns', 'awayFirstInningRuns', 'homeFirstInningRuns']) {
       if (!Number.isInteger(game?.[field]) || game[field] < 0) errors.push(`${at}.${field}: expected a non-negative integer`)
     }
     const sortKey = `${game?.officialDate || ''}|${game?.gameDate || ''}|${String(game?.gamePk || '').padStart(10, '0')}`

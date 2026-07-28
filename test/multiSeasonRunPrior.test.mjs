@@ -25,10 +25,12 @@ function seasonArtifact(season, scores) {
       homeTeam: { id: 2, name: 'Home' },
       awayRuns,
       homeRuns,
+      awayFirstInningRuns: awayRuns > 4 ? 1 : 0,
+      homeFirstInningRuns: homeRuns > 4 ? 1 : 0,
     }
   })
   return {
-    version: 1,
+    version: 2,
     season,
     source: 'MLB Stats API schedule',
     fetchedAt: `${season}-10-01T12:00:00.000Z`,

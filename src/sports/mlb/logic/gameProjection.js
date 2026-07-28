@@ -4,6 +4,7 @@ import {
   buildGameMarketDecision,
   gameMarketDecisionPolicy,
 } from './gameMarketDecision.js'
+import { buildFirstInningProjection } from './firstInningProjection.js'
 
 export const MLB_GAME_PROJECTION_VERSION = 9
 export const MLB_GAME_BASE_RUNS_PER_TEAM = 4.42
@@ -892,6 +893,8 @@ export function buildGameProjection({
   marketDecisionPolicy = gameMarketDecisionPolicy(),
   teamScoringProfiles = null,
   multiSeasonRunProfiles = null,
+  firstInningProfiles = null,
+  firstInningHistoricalValidation = null,
   capturedAt = new Date().toISOString(),
 }) {
   if (!game || game.isLive === true || game.isFinal === true) return null
@@ -957,7 +960,7 @@ export function buildGameProjection({
     blended.awayExpectedRuns,
     blended.homeExpectedRuns,
   )
-  return {
+  const projection = {
     modelVersion: MLB_GAME_PROJECTION_VERSION,
     advisoryOnly: true,
     captureState: 'pregame',
@@ -1005,6 +1008,14 @@ export function buildGameProjection({
       policy: marketDecisionPolicy,
     }),
   }
+  projection.firstInning = buildFirstInningProjection({
+    game,
+    rows,
+    gameProjection: projection,
+    profiles: firstInningProfiles,
+    historicalValidation: firstInningHistoricalValidation,
+  })
+  return projection
 }
 
 export function buildSlateGameProjections({
@@ -1022,6 +1033,8 @@ export function buildSlateGameProjections({
   marketDecisionPolicy = gameMarketDecisionPolicy(),
   teamScoringProfiles = null,
   multiSeasonRunProfiles = null,
+  firstInningProfiles = null,
+  firstInningHistoricalValidation = null,
   capturedAt = new Date().toISOString(),
 } = {}) {
   const rows = Object.values(scoredBatters).filter((row, index, all) => (
@@ -1047,6 +1060,8 @@ export function buildSlateGameProjections({
       marketDecisionPolicy,
       teamScoringProfiles,
       multiSeasonRunProfiles,
+      firstInningProfiles,
+      firstInningHistoricalValidation,
       capturedAt,
     }))
     .filter(Boolean)
@@ -1188,6 +1203,7 @@ export function gameMarketCallSnapshot(
     homeWinProbability: projection.homeWinProbability,
     projectedWinner: projection.projectedWinner,
     projectedWinnerProbability: projection.projectedWinnerProbability,
+    firstInning: cloneJson(projection.firstInning),
     marketDecision: cloneJson(projection.marketDecision),
     market: cloneJson(projection.marketTracking?.current),
   }
@@ -1205,6 +1221,7 @@ function gameMarketCallFingerprint(call) {
     homeWinProbability: call.homeWinProbability,
     projectedWinner: call.projectedWinner,
     projectedWinnerProbability: call.projectedWinnerProbability,
+    firstInning: call.firstInning,
     marketDecision: call.marketDecision,
     market: call.market,
   })
@@ -1438,6 +1455,13 @@ function settledGameProjection(projection, game, {
   const actualHomeRuns = Number(game?.homeRuns)
   if (!Number.isFinite(actualAwayRuns) || !Number.isFinite(actualHomeRuns)) return null
   const actualTotal = actualAwayRuns + actualHomeRuns
+  const awayFirstInningRuns = Number(game?.awayFirstInningRuns)
+  const homeFirstInningRuns = Number(game?.homeFirstInningRuns)
+  const firstInningRuns = (
+    Number.isFinite(awayFirstInningRuns)
+    && Number.isFinite(homeFirstInningRuns)
+  ) ? awayFirstInningRuns + homeFirstInningRuns : null
+  const actualYrfi = Number.isFinite(firstInningRuns) ? firstInningRuns > 0 : null
   const homeWon = actualHomeRuns > actualAwayRuns
   const awayWon = actualAwayRuns > actualHomeRuns
   return {
@@ -1455,6 +1479,22 @@ function settledGameProjection(projection, game, {
       : null,
     winnerBrier: homeWon || awayWon
       ? round((projection.homeWinProbability - (homeWon ? 1 : 0)) ** 2, 6)
+      : null,
+    actualAwayFirstInningRuns: Number.isFinite(awayFirstInningRuns) ? awayFirstInningRuns : null,
+    actualHomeFirstInningRuns: Number.isFinite(homeFirstInningRuns) ? homeFirstInningRuns : null,
+    actualFirstInningRuns: firstInningRuns,
+    actualYrfi,
+    firstInningCorrect: typeof actualYrfi === 'boolean' && ['nrfi', 'yrfi'].includes(projection.firstInning?.lean)
+      ? projection.firstInning.lean === (actualYrfi ? 'yrfi' : 'nrfi')
+      : null,
+    firstInningBrier: typeof actualYrfi === 'boolean' && Number.isFinite(projection.firstInning?.yrfiProbability)
+      ? round((projection.firstInning.yrfiProbability - (actualYrfi ? 1 : 0)) ** 2, 6)
+      : null,
+    firstInningRecent30ShadowBrier: (
+      typeof actualYrfi === 'boolean'
+      && Number.isFinite(projection.firstInning?.shadow?.recent30YrfiProbability)
+    )
+      ? round((projection.firstInning.shadow.recent30YrfiProbability - (actualYrfi ? 1 : 0)) ** 2, 6)
       : null,
     marketOutcome: gradeGameMarketDecision(projection.marketDecision, {
       awayRuns: actualAwayRuns,
@@ -1481,6 +1521,10 @@ function settleGameMarketCallEntry(prior, projection, game, settledProjection, {
       actualHomeRuns: settledProjection.actualHomeRuns,
       actualTotal: settledProjection.actualTotal,
       actualWinner: settledProjection.actualWinner,
+      actualAwayFirstInningRuns: settledProjection.actualAwayFirstInningRuns,
+      actualHomeFirstInningRuns: settledProjection.actualHomeFirstInningRuns,
+      actualFirstInningRuns: settledProjection.actualFirstInningRuns,
+      actualYrfi: settledProjection.actualYrfi,
       marketOutcome: cloneJson(settledProjection.marketOutcome),
       settlementSource,
       settledAt,
@@ -1516,6 +1560,8 @@ export function settleGameForecasts(log = {}, date, snapshot) {
       ...game,
       awayRuns: game.awayScore,
       homeRuns: game.homeScore,
+      awayFirstInningRuns: game.awayFirstInningRuns,
+      homeFirstInningRuns: game.homeFirstInningRuns,
     }
     const settled = settledGameProjection(projection, normalizedGame, {
       settledAt,
@@ -1692,6 +1738,32 @@ function winnerCalibration(rows) {
   }).filter((bin) => bin.sample > 0)
 }
 
+function firstInningCalibration(rows) {
+  const bins = [
+    [0.30, 0.40],
+    [0.40, 0.45],
+    [0.45, 0.50],
+    [0.50, 0.55],
+    [0.55, 0.60],
+    [0.60, 0.70],
+  ]
+  return bins.map(([lo, hi]) => {
+    const matched = rows.filter((row) => (
+      Number.isFinite(row.firstInning?.yrfiProbability)
+      && row.firstInning.yrfiProbability >= lo
+      && row.firstInning.yrfiProbability < hi
+      && typeof row.actualYrfi === 'boolean'
+    ))
+    return {
+      minProbability: lo,
+      maxProbability: hi,
+      sample: matched.length,
+      meanProbability: roundedMetric(mean(matched.map((row) => row.firstInning.yrfiProbability))),
+      observedRate: roundedMetric(mean(matched.map((row) => (row.actualYrfi ? 1 : 0)))),
+    }
+  }).filter((bin) => bin.sample > 0)
+}
+
 // Evaluation summarizes frozen, settled pregame forecasts. Only its aggregate
 // paired base-vs-market metrics can unlock the capped game-market blend; no
 // individual result or market input ever feeds the HR engine.
@@ -1705,6 +1777,10 @@ export function evaluateGameForecasts(log = {}) {
   const totalRows = rows.filter((row) => (
     Number.isFinite(row.projectedTotal)
     && Number.isFinite(row.actualTotal)
+  ))
+  const firstInningRows = rows.filter((row) => (
+    Number.isFinite(row.firstInning?.yrfiProbability)
+    && typeof row.actualYrfi === 'boolean'
   ))
   const marketWinnerRows = winnerRows.filter((row) => (
     Number.isFinite(row.marketComparison?.moneyline?.homeMarketProbability)
@@ -1759,6 +1835,16 @@ export function evaluateGameForecasts(log = {}) {
       : row.projectedTotal
     return Math.abs(baseProjectedTotal - row.actualTotal)
   })
+  const firstInningBriers = firstInningRows.map((row) => (
+    (row.firstInning.yrfiProbability - (row.actualYrfi ? 1 : 0)) ** 2
+  ))
+  const firstInningRecent30Rows = firstInningRows.filter((row) => (
+    Number.isFinite(row.firstInning?.shadow?.recent30YrfiProbability)
+  ))
+  const firstInningRecent30Briers = firstInningRecent30Rows.map((row) => (
+    (row.firstInning.shadow.recent30YrfiProbability - (row.actualYrfi ? 1 : 0)) ** 2
+  ))
+  const qualifiedFirstInningRows = firstInningRows.filter((row) => row.firstInning?.qualified === true)
 
   const winnerBrier = mean(winnerBriers)
   const marketWinnerBrier = mean(marketWinnerBriers)
@@ -1793,6 +1879,7 @@ export function evaluateGameForecasts(log = {}) {
       totalGames: totalRows.length,
       marketMoneylineGames: marketWinnerRows.length,
       marketTotalGames: marketTotalRows.length,
+      firstInningGames: firstInningRows.length,
       progress: round(Math.min(
         rows.length / MLB_GAME_EVALUATION_MIN_GAMES,
         dates.size / MLB_GAME_EVALUATION_MIN_DATES,
@@ -1835,6 +1922,29 @@ export function evaluateGameForecasts(log = {}) {
       baseImprovementVsMarket: Number.isFinite(pairedBaseTotalMae) && Number.isFinite(marketTotalMae)
         ? roundedMetric(marketTotalMae - pairedBaseTotalMae, 3)
         : null,
+    },
+    firstInning: {
+      status: firstInningRows.length >= MLB_GAME_EVALUATION_MIN_GAMES && dates.size >= MLB_GAME_EVALUATION_MIN_DATES
+        ? 'review-ready'
+        : 'collecting',
+      sample: firstInningRows.length,
+      qualifiedSample: qualifiedFirstInningRows.length,
+      brier: roundedMetric(mean(firstInningBriers)),
+      coinFlipBrier: firstInningRows.length ? 0.25 : null,
+      accuracy: roundedMetric(mean(firstInningRows.map((row) => (row.firstInningCorrect ? 1 : 0)))),
+      qualifiedAccuracy: roundedMetric(mean(qualifiedFirstInningRows.map((row) => (row.firstInningCorrect ? 1 : 0)))),
+      recent30Shadow: {
+        applied: false,
+        sample: firstInningRecent30Rows.length,
+        brier: roundedMetric(mean(firstInningRecent30Briers)),
+        improvementVsBackbone: (
+          firstInningRecent30Rows.length === firstInningRows.length
+          && firstInningRows.length > 0
+        )
+          ? roundedMetric(mean(firstInningBriers) - mean(firstInningRecent30Briers))
+          : null,
+      },
+      calibration: firstInningCalibration(firstInningRows),
     },
     note: status === 'collecting'
       ? 'Forward results are still collecting; the market blend remains evidence-gated.'

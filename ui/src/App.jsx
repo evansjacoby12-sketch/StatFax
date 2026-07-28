@@ -463,7 +463,6 @@ export default function App() {
     buzz()
     replaceSlip(legs)
     setFindPlaysTab(null)
-    setBetLabTab('builder')
     toast.success(`${legs.length}-leg curated parlay loaded`)
   }, [replaceSlip])
 
@@ -706,7 +705,7 @@ export default function App() {
           games={data.games}
           onOpenGuide={() => setLearnTab('guide')}
           onOpenHowTo={() => setLearnTab('playbook')}
-          onOpenBuilder={() => setBetLabTab('builder')}
+          onOpenBuilder={() => setBetLabTab('first-inning')}
           onOpenWeather={() => setFindPlaysTab('weather')}
           onOpenListBuilder={() => setFindPlaysTab('list-builder')}
           onOpenGroups={() => setBetLabTab('explore')}
@@ -827,7 +826,7 @@ export default function App() {
                 watchCount={watchlist.size}
                 slipCount={slipIds.length}
                 onWatchlist={() => patch({ watchedOnly: true })}
-                onBuilder={() => setBetLabTab('builder')}
+                onBuilder={() => setBetLabTab('explore')}
               />
             </aside>
           </div>
@@ -846,7 +845,6 @@ export default function App() {
         onClear={clearSlip}
         onReplace={replaceSlip}
         onSelect={(b) => setSelectedId(b.id)}
-        onOpenBuilder={() => setBetLabTab('builder')}
       />
 
       <Suspense fallback={null}>
@@ -872,6 +870,10 @@ export default function App() {
           onClear={clearSlip}
           onReplace={replaceSlip}
           sgpScorecard={data.meta?.sgpScorecard}
+          games={data.games}
+          gameProjections={data.raw?.gameProjections || {}}
+          gameProjectionEvaluation={data.raw?.gameProjectionEvaluation || null}
+          firstInningHistoricalValidation={data.raw?.firstInningHistoricalValidation || null}
         />
       )}
 

@@ -1,4 +1,5 @@
 import {
+  MLB_GAME_RESULTS_VERSION,
   mergeMlbSeasonResults,
   parseMlbSeasonResults,
   validateMlbSeasonResults,
@@ -19,7 +20,7 @@ export async function refreshMlbSeasonResults({
   fetchImpl = fetch,
   fetchedAt = new Date().toISOString(),
 } = {}) {
-  const usablePrior = prior?.version === 1
+  const usablePrior = prior?.version === MLB_GAME_RESULTS_VERSION
     && Number(prior.season) === Number(season)
     && validateMlbSeasonResults(prior).ok
       ? prior
@@ -29,7 +30,7 @@ export async function refreshMlbSeasonResults({
   const startDate = usablePrior?.games?.length
     ? minusDays(throughDate, 14)
     : `${season}-03-01`
-  const url = `${MLB_BASE}/schedule?sportId=1&startDate=${startDate}&endDate=${throughDate}&gameType=R&hydrate=team`
+  const url = `${MLB_BASE}/schedule?sportId=1&startDate=${startDate}&endDate=${throughDate}&gameType=R&hydrate=team,linescore`
   const response = await fetchImpl(url, { headers: { Accept: 'application/json' } })
   if (!response.ok) throw new Error(`MLB season scores returned HTTP ${response.status}`)
   const schedule = await response.json()

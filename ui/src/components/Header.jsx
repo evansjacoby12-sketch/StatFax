@@ -132,7 +132,7 @@ function HelpMenu({ sport, onOpenWeather, onOpenGroups, onOpenSplits, onOpenBack
     {
       title: 'Build',
       items: [
-        { label: 'Bet Lab', desc: 'Explore combos, rank straights, build slips and isolate same-game plays', icon: 'Beaker', fn: onOpenGroups },
+        { label: 'Bet Lab', desc: 'Explore combos, rank first innings and isolate same-game plays', icon: 'Beaker', fn: onOpenGroups },
       ],
     },
     {
@@ -173,10 +173,10 @@ function HelpMenu({ sport, onOpenWeather, onOpenGroups, onOpenSplits, onOpenBack
     keywords: 'nfl football reload games players injuries odds live stats',
   } : {
     label: 'Bet Lab',
-    desc: 'Analyze model edge and parlay combos',
+    desc: 'Analyze first innings and parlay combos',
     icon: 'Beaker',
     fn: onOpenGroups,
-    keywords: 'build slips same game top straights combos',
+    keywords: 'nrfi yrfi first inning same game top straights combos',
   }
   const quickTools = isNFL ? [
     { label: 'Cheat Sheet', meta: 'NFL leaders', icon: 'LayoutGrid', fn: onOpenSplits, keywords: 'nfl football ranked props touchdown receiving rushing passing' },

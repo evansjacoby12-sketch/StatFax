@@ -146,6 +146,6 @@ test('slate deployment builds, validates, publishes, and bundles rolling evidenc
   assert.match(slate, /buildListBuilderEvidence/)
   assert.match(slate, /LIST_BUILDER_EVIDENCE_OUT_PATH/)
   assert.match(workflow, /npm run validate:list-builder-evidence/)
-  assert.match(workflow, /backtest-log\.json mlb-game-results\.json mlb-game-history\.json list-builder-evidence\.json/)
+  assert.match(workflow, /backtest-log\.json mlb-game-results\.json mlb-game-history\.json first-inning-pitcher-cache\.json list-builder-evidence\.json/)
   assert.match(vite, /list-builder-evidence\.json/)
 })

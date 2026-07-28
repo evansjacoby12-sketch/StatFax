@@ -25,6 +25,13 @@ function seasonArtifact(season, {
         gameNumber: 1,
         doubleHeader: 'N',
         status: { abstractGameState: 'Final' },
+        linescore: {
+          innings: [{
+            num: 1,
+            away: { runs: index % 3 === 0 ? 1 : 0 },
+            home: { runs: index % 4 === 0 ? 1 : 0 },
+          }],
+        },
         teams: {
           away: {
             team: { id: index % 2 ? 1 : 3, name: index % 2 ? 'Away A' : 'Away B' },

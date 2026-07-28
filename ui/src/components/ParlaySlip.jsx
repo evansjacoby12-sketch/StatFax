@@ -74,7 +74,7 @@ function saveSlip(legs, parlay, wager) {
   toast.success('Slip saved')
 }
 
-export default function ParlaySlip({ legs, batters = [], onRemove, onClear, onSelect, onOpenBuilder, onReplace }) {
+export default function ParlaySlip({ legs, batters = [], onRemove, onClear, onSelect, onReplace }) {
   const [open, setOpen] = useState(false)
   const [wager, setWager] = useState('10')
   const [replaceOpen, setReplaceOpen] = useState(false)
@@ -262,7 +262,7 @@ export default function ParlaySlip({ legs, batters = [], onRemove, onClear, onSe
               <Icon name="ArrowRight" size={14} />
               <div><span>Payout{parlay.allPriced ? '' : ' at fair odds'}</span><strong className="mono">{shownPayout != null && Number.isFinite(shownPayout) ? `$${shownPayout >= 100 ? Math.round(shownPayout) : shownPayout.toFixed(2)}` : '—'}</strong></div>
             </div>
-            <button type="button" className="slip-review-btn" onClick={() => { setOpen(false); onOpenBuilder?.() }}><Icon name="ScanSearch" size={16} /> {unconfirmed ? 'Review preview' : 'Review parlay'}</button>
+            <button type="button" className="slip-review-btn" onClick={() => setOpen(false)}><Icon name="CircleCheck" size={16} /> Done reviewing</button>
           </footer>
         </div>
       )}

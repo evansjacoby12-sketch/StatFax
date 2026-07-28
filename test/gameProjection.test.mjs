@@ -795,9 +795,10 @@ test('forward evaluation reports winner calibration and total error against simp
     dates: 2,
     winnerGames: 3,
     totalGames: 3,
-    marketMoneylineGames: 3,
-    marketTotalGames: 3,
-    progress: 0.03,
+      marketMoneylineGames: 3,
+      marketTotalGames: 3,
+      firstInningGames: 0,
+      progress: 0.03,
   })
   assert.equal(evaluation.winner.accuracy, 0.6667)
   assert.equal(evaluation.winner.marketDates, 2)
