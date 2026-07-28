@@ -2,6 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   americanToDecimal,
+  decimalToAmerican,
   parseGameOdds,
   pruneOddsToGames,
 } from '../server/lib/theOddsApi.mjs'
@@ -22,6 +23,13 @@ test('American odds convert to decimal without accepting malformed prices', () =
   assert.equal(americanToDecimal(-200), 1.5)
   assert.equal(americanToDecimal(50), null)
   assert.equal(americanToDecimal(Number.NaN), null)
+})
+
+test('decimal odds convert back to a valid American price across even money', () => {
+  assert.equal(decimalToAmerican(2.5), 150)
+  assert.equal(decimalToAmerican(1.5), -200)
+  assert.equal(decimalToAmerican(2), 100)
+  assert.equal(decimalToAmerican(1), null)
 })
 
 test('game odds parser de-vigs moneylines and totals across books', () => {
@@ -62,6 +70,11 @@ test('game odds parser de-vigs moneylines and totals across books', () => {
   assert.equal(result.consensus.moneyline.books, 2)
   assert.equal(result.consensus.total.line, 8.5)
   assert.equal(result.consensus.total.books, 2)
+  assert.ok(
+    result.consensus.total.over.american <= -100
+      || result.consensus.total.over.american >= 100,
+  )
+  assert.equal(result.consensus.total.over.american, -102)
   assert.ok(Math.abs(
     result.consensus.moneyline.away.fairProbability
       + result.consensus.moneyline.home.fairProbability - 1,

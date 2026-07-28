@@ -46,6 +46,13 @@ export function americanToDecimal(a) {
   return null;
 }
 
+export function decimalToAmerican(decimal) {
+  if (!Number.isFinite(decimal) || decimal <= 1) return null;
+  return decimal >= 2
+    ? Math.round((decimal - 1) * 100)
+    : Math.round(-100 / (decimal - 1));
+}
+
 const median = (values) => {
   const sorted = values.filter(Number.isFinite).slice().sort((a, b) => a - b);
   if (!sorted.length) return null;
@@ -120,17 +127,19 @@ function consensusMoneyline(books) {
   if (!rows.length) return null;
   const awayFair = rows.reduce((sum, row) => sum + row.fair.first, 0) / rows.length;
   const homeFair = rows.reduce((sum, row) => sum + row.fair.second, 0) / rows.length;
+  const awayDecimal = median(rows.map((row) => row.away.decimal));
+  const homeDecimal = median(rows.map((row) => row.home.decimal));
   return {
     books: rows.length,
     away: {
-      american: Math.round(median(rows.map((row) => row.away.american))),
-      decimal: median(rows.map((row) => row.away.decimal)),
+      american: decimalToAmerican(awayDecimal),
+      decimal: awayDecimal,
       impliedProbability: median(rows.map((row) => row.away.impliedProbability)),
       fairProbability: awayFair,
     },
     home: {
-      american: Math.round(median(rows.map((row) => row.home.american))),
-      decimal: median(rows.map((row) => row.home.decimal)),
+      american: decimalToAmerican(homeDecimal),
+      decimal: homeDecimal,
       impliedProbability: median(rows.map((row) => row.home.impliedProbability)),
       fairProbability: homeFair,
     },
@@ -157,18 +166,20 @@ function consensusTotal(books) {
     .map((market) => ({ ...market, fair: fairPair(market.over, market.under) }));
   const overFair = rows.reduce((sum, row) => sum + row.fair.first, 0) / rows.length;
   const underFair = rows.reduce((sum, row) => sum + row.fair.second, 0) / rows.length;
+  const overDecimal = median(rows.map((row) => row.over.decimal));
+  const underDecimal = median(rows.map((row) => row.under.decimal));
   return {
     line,
     books: rows.length,
     over: {
-      american: Math.round(median(rows.map((row) => row.over.american))),
-      decimal: median(rows.map((row) => row.over.decimal)),
+      american: decimalToAmerican(overDecimal),
+      decimal: overDecimal,
       impliedProbability: median(rows.map((row) => row.over.impliedProbability)),
       fairProbability: overFair,
     },
     under: {
-      american: Math.round(median(rows.map((row) => row.under.american))),
-      decimal: median(rows.map((row) => row.under.decimal)),
+      american: decimalToAmerican(underDecimal),
+      decimal: underDecimal,
       impliedProbability: median(rows.map((row) => row.under.impliedProbability)),
       fairProbability: underFair,
     },
