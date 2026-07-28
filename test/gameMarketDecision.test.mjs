@@ -155,3 +155,28 @@ test('missing prices produce unavailable decisions without inventing an edge', (
   assert.equal(decision.total.tier, 'unavailable')
   assert.equal(decision.total.selectedSide, null)
 })
+
+test('performance evidence can keep PLAY capped after sample counts are met', () => {
+  const projectionEvaluation = {
+    minimumSample: { games: 100, dates: 10 },
+    winner: { marketSample: 150, marketDates: 15 },
+    total: { marketSample: 150, marketDates: 15 },
+  }
+  const performance = {
+    markets: {
+      moneyline: {
+        actionable: { decisions: 120, dates: 12 },
+        promotion: { status: 'hold', eligible: false },
+      },
+      total: {
+        actionable: { decisions: 125, dates: 12 },
+        promotion: { status: 'eligible', eligible: true },
+      },
+    },
+  }
+  const policy = gameMarketDecisionPolicy(projectionEvaluation, performance)
+  assert.equal(policy.moneyline.ready, false)
+  assert.equal(policy.moneyline.performanceStatus, 'hold')
+  assert.equal(policy.total.ready, true)
+  assert.equal(policy.total.performanceStatus, 'eligible')
+})

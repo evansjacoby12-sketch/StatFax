@@ -38,28 +38,57 @@ const americanToDecimal = (american) => {
   return null
 }
 
-const sidePolicy = (sample, dates, minimumGames, minimumDates) => ({
+const sidePolicy = (
   sample,
   dates,
   minimumGames,
   minimumDates,
-  ready: sample >= minimumGames && dates >= minimumDates,
-})
+  performance = null,
+) => {
+  const performanceGate = performance == null
+    ? true
+    : performance?.promotion?.eligible === true
+  return {
+    sample,
+    dates,
+    minimumGames,
+    minimumDates,
+    performanceGate,
+    performanceStatus: performance?.promotion?.status || 'sample-only',
+    ready: (
+      sample >= minimumGames
+      && dates >= minimumDates
+      && performanceGate
+    ),
+  }
+}
 
-export function gameMarketDecisionPolicy(evaluation = null) {
+export function gameMarketDecisionPolicy(evaluation = null, marketEvaluation = null) {
   const minimumGames = evaluation?.minimumSample?.games || MLB_GAME_MARKET_MIN_GAMES
   const minimumDates = evaluation?.minimumSample?.dates || MLB_GAME_MARKET_MIN_DATES
+  const moneylinePerformance = marketEvaluation?.markets?.moneyline || null
+  const totalPerformance = marketEvaluation?.markets?.total || null
   const moneyline = sidePolicy(
-    evaluation?.winner?.marketSample || 0,
-    evaluation?.winner?.marketDates || 0,
+    moneylinePerformance?.actionable?.decisions
+      ?? evaluation?.winner?.marketSample
+      ?? 0,
+    moneylinePerformance?.actionable?.dates
+      ?? evaluation?.winner?.marketDates
+      ?? 0,
     minimumGames,
     minimumDates,
+    moneylinePerformance,
   )
   const total = sidePolicy(
-    evaluation?.total?.marketSample || 0,
-    evaluation?.total?.marketDates || 0,
+    totalPerformance?.actionable?.decisions
+      ?? evaluation?.total?.marketSample
+      ?? 0,
+    totalPerformance?.actionable?.dates
+      ?? evaluation?.total?.marketDates
+      ?? 0,
     minimumGames,
     minimumDates,
+    totalPerformance,
   )
   return {
     version: 1,

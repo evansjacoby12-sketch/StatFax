@@ -464,6 +464,13 @@ function validateGameMarketDecision(prefix, decision, projection, errors) {
         continue
       }
       if (typeof value.ready !== 'boolean') errors.push(`${at}.ready: expected boolean`)
+      if (value.performanceGate != null && typeof value.performanceGate !== 'boolean') {
+        errors.push(`${at}.performanceGate: expected boolean when present`)
+      }
+      if (
+        value.performanceStatus != null
+        && !['sample-only', 'collecting', 'hold', 'eligible'].includes(value.performanceStatus)
+      ) errors.push(`${at}.performanceStatus: unsupported`)
       for (const field of ['sample', 'dates', 'minimumGames', 'minimumDates']) {
         const minimum = field.startsWith('minimum')
         if (!Number.isInteger(value[field]) || value[field] < (minimum ? 1 : 0)) {
@@ -476,7 +483,11 @@ function validateGameMarketDecision(prefix, decision, projection, errors) {
         && Number.isInteger(value.dates)
         && Number.isInteger(value.minimumGames)
         && Number.isInteger(value.minimumDates)
-        && value.ready !== (value.sample >= value.minimumGames && value.dates >= value.minimumDates)
+        && value.ready !== (
+          value.sample >= value.minimumGames
+          && value.dates >= value.minimumDates
+          && value.performanceGate !== false
+        )
       ) errors.push(`${at}.ready: inconsistent with sample gates`)
     }
   }
@@ -1248,6 +1259,258 @@ function validateGameProjectionEvaluation(evaluation, errors) {
   return evaluation.sample?.games || 0
 }
 
+function validateGameMarketPerformanceSummary(prefix, summary, errors) {
+  if (!isObject(summary)) {
+    errors.push(`${prefix}: expected an object`)
+    return
+  }
+  for (const field of ['decisions', 'dates', 'wins', 'losses', 'pushes']) {
+    if (!Number.isInteger(summary[field]) || summary[field] < 0) {
+      errors.push(`${prefix}.${field}: expected a non-negative integer`)
+    }
+  }
+  if (
+    Number.isInteger(summary.decisions)
+    && Number.isInteger(summary.wins)
+    && Number.isInteger(summary.losses)
+    && Number.isInteger(summary.pushes)
+    && summary.decisions !== summary.wins + summary.losses + summary.pushes
+  ) errors.push(`${prefix}.decisions: must equal wins, losses, and pushes`)
+  for (const field of [
+    'hitRate',
+    'modelBrier',
+    'marketBrier',
+    'meanModelProbability',
+    'meanMarketProbability',
+  ]) validateOptionalMetric(`${prefix}.${field}`, summary[field], errors, { min: 0, max: 1 })
+  validateOptionalMetric(`${prefix}.brierAdvantageVsMarket`, summary.brierAdvantageVsMarket, errors, { min: -1, max: 1 })
+  validateOptionalMetric(`${prefix}.unitProfit`, summary.unitProfit, errors, { min: -10000, max: 100000 })
+  for (const field of ['roi', 'roiLower95', 'roiUpper95']) {
+    validateOptionalMetric(`${prefix}.${field}`, summary[field], errors, { min: -1, max: 100 })
+  }
+  for (const field of ['meanModelEdge', 'meanExpectedRoi']) {
+    validateOptionalMetric(`${prefix}.${field}`, summary[field], errors, { min: -10, max: 20 })
+  }
+  validateOptionalMetric(`${prefix}.meanFavorableMarketMove`, summary.meanFavorableMarketMove, errors, {
+    min: -30,
+    max: 30,
+  })
+}
+
+function validateGameMarketPerformance(prefix, performance, errors) {
+  if (!isObject(performance)) {
+    errors.push(`${prefix}: expected an object`)
+    return
+  }
+  validateGameMarketPerformanceSummary(`${prefix}.allCalls`, performance.allCalls, errors)
+  validateGameMarketPerformanceSummary(`${prefix}.actionable`, performance.actionable, errors)
+  const promotion = performance.promotion
+  if (!isObject(promotion)) {
+    errors.push(`${prefix}.promotion: expected an object`)
+  } else {
+    if (!['collecting', 'hold', 'eligible'].includes(promotion.status)) {
+      errors.push(`${prefix}.promotion.status: unsupported`)
+    }
+    if (typeof promotion.eligible !== 'boolean') errors.push(`${prefix}.promotion.eligible: expected boolean`)
+    if (promotion.eligible !== (promotion.status === 'eligible')) {
+      errors.push(`${prefix}.promotion.eligible: must match status`)
+    }
+    for (const field of ['minimumGames', 'minimumDates']) {
+      if (!Number.isInteger(promotion[field]) || promotion[field] < 1) {
+        errors.push(`${prefix}.promotion.${field}: expected a positive integer`)
+      }
+    }
+    const checks = promotion.checks
+    if (!isObject(checks)) {
+      errors.push(`${prefix}.promotion.checks: expected an object`)
+    } else {
+      for (const field of ['sample', 'dates', 'positiveRoi', 'conservativeRoi', 'calibration']) {
+        if (typeof checks[field] !== 'boolean') {
+          errors.push(`${prefix}.promotion.checks.${field}: expected boolean`)
+        }
+      }
+      if (
+        typeof promotion.eligible === 'boolean'
+        && promotion.eligible !== Object.values(checks).every((value) => value === true)
+      ) errors.push(`${prefix}.promotion.eligible: inconsistent with checks`)
+    }
+  }
+  const calibration = performance.calibration
+  if (!isObject(calibration)) {
+    errors.push(`${prefix}.calibration: expected an object`)
+  } else {
+    if (calibration.methodology !== 'strict-prior-date-empirical-shrinkage') {
+      errors.push(`${prefix}.calibration.methodology: unsupported`)
+    }
+    if (calibration.advisoryOnly !== true) errors.push(`${prefix}.calibration.advisoryOnly: must be true`)
+    for (const field of ['sample', 'dates']) {
+      if (!Number.isInteger(calibration[field]) || calibration[field] < 0) {
+        errors.push(`${prefix}.calibration.${field}: expected a non-negative integer`)
+      }
+    }
+    for (const field of ['rawBrier', 'calibratedBrier']) {
+      validateOptionalMetric(`${prefix}.calibration.${field}`, calibration[field], errors, { min: 0, max: 1 })
+    }
+    validateOptionalMetric(`${prefix}.calibration.improvement`, calibration.improvement, errors, { min: -1, max: 1 })
+    if (typeof calibration.ready !== 'boolean') errors.push(`${prefix}.calibration.ready: expected boolean`)
+  }
+  const drift = performance.drift
+  if (!isObject(drift)) {
+    errors.push(`${prefix}.drift: expected an object`)
+  } else {
+    if (!['collecting', 'drift', 'watch', 'stable'].includes(drift.status)) {
+      errors.push(`${prefix}.drift.status: unsupported`)
+    }
+    if (typeof drift.ready !== 'boolean') errors.push(`${prefix}.drift.ready: expected boolean`)
+    validateGameMarketPerformanceSummary(`${prefix}.drift.recent`, drift.recent, errors)
+    validateGameMarketPerformanceSummary(`${prefix}.drift.prior`, drift.prior, errors)
+    validateOptionalMetric(`${prefix}.drift.roiDrop`, drift.roiDrop, errors, { min: -101, max: 101 })
+    validateOptionalMetric(`${prefix}.drift.brierWorsening`, drift.brierWorsening, errors, { min: -1, max: 1 })
+  }
+  const segments = performance.segments
+  if (!isObject(segments)) {
+    errors.push(`${prefix}.segments: expected an object`)
+  } else {
+    for (const section of ['tier', 'side', 'edge']) {
+      if (!isObject(segments[section])) {
+        errors.push(`${prefix}.segments.${section}: expected an object`)
+        continue
+      }
+      for (const [key, summary] of Object.entries(segments[section])) {
+        validateGameMarketPerformanceSummary(`${prefix}.segments.${section}.${key}`, summary, errors)
+      }
+    }
+  }
+}
+
+function validateGameMarketEvaluation(evaluation, errors) {
+  if (evaluation == null) return 0
+  const prefix = 'gameMarketEvaluation'
+  if (!isObject(evaluation)) {
+    errors.push(`${prefix}: expected an object`)
+    return 0
+  }
+  if (evaluation.version !== 1) errors.push(`${prefix}.version: expected 1`)
+  if (evaluation.advisoryOnly !== true) errors.push(`${prefix}.advisoryOnly: must be true`)
+  if (evaluation.methodology !== 'frozen-closing-calls-with-strict-prior-date-calibration') {
+    errors.push(`${prefix}.methodology: unsupported`)
+  }
+  if (!['collecting', 'hold', 'eligible'].includes(evaluation.status)) {
+    errors.push(`${prefix}.status: unsupported`)
+  }
+  validateOptionalIso(`${prefix}.updatedAt`, evaluation.updatedAt, errors)
+  for (const field of ['games', 'dates']) {
+    if (!Number.isInteger(evaluation.minimumSample?.[field]) || evaluation.minimumSample[field] < 1) {
+      errors.push(`${prefix}.minimumSample.${field}: expected a positive integer`)
+    }
+  }
+  for (const field of ['calls', 'actionable', 'dates']) {
+    if (!Number.isInteger(evaluation.sample?.[field]) || evaluation.sample[field] < 0) {
+      errors.push(`${prefix}.sample.${field}: expected a non-negative integer`)
+    }
+  }
+  for (const field of ['fromDate', 'throughDate']) {
+    if (evaluation.sample?.[field] != null && !isValidDate(evaluation.sample[field])) {
+      errors.push(`${prefix}.sample.${field}: expected null or YYYY-MM-DD`)
+    }
+  }
+  for (const market of ['moneyline', 'total']) {
+    validateGameMarketPerformance(`${prefix}.markets.${market}`, evaluation.markets?.[market], errors)
+  }
+  if (typeof evaluation.note !== 'string' || !evaluation.note.trim()) {
+    errors.push(`${prefix}.note: expected non-empty text`)
+  }
+  return evaluation.sample?.calls || 0
+}
+
+function validateGameMarketPortfolio(portfolio, gameIds, errors) {
+  if (portfolio == null) return 0
+  const prefix = 'gameMarketPortfolio'
+  if (!isObject(portfolio)) {
+    errors.push(`${prefix}: expected an object`)
+    return 0
+  }
+  if (portfolio.version !== 1) errors.push(`${prefix}.version: expected 1`)
+  if (portfolio.advisoryOnly !== true) errors.push(`${prefix}.advisoryOnly: must be true`)
+  if (!['collecting', 'hold', 'eligible'].includes(portfolio.status)) {
+    errors.push(`${prefix}.status: unsupported`)
+  }
+  for (const field of ['maximumSelections', 'maximumPerMarket', 'maximumPerGame']) {
+    if (!Number.isInteger(portfolio.constraints?.[field]) || portfolio.constraints[field] < 1) {
+      errors.push(`${prefix}.constraints.${field}: expected a positive integer`)
+    }
+  }
+  if (!Number.isInteger(portfolio.candidates) || portfolio.candidates < 0) {
+    errors.push(`${prefix}.candidates: expected a non-negative integer`)
+  }
+  for (const section of ['selections', 'excluded']) {
+    const rows = portfolio[section]
+    if (!Array.isArray(rows)) {
+      errors.push(`${prefix}.${section}: expected an array`)
+      continue
+    }
+    for (const [index, row] of rows.entries()) {
+      const at = `${prefix}.${section}[${index}]`
+      if (!Number.isFinite(row?.gamePk) || (gameIds.size && !gameIds.has(row.gamePk))) {
+        errors.push(`${at}.gamePk: game is missing from games[]`)
+      }
+      if (!['moneyline', 'total'].includes(row?.market)) errors.push(`${at}.market: unsupported`)
+      if (!['play', 'lean'].includes(row?.tier)) errors.push(`${at}.tier: expected play or lean`)
+      if (!['play', 'lean'].includes(row?.rawTier)) errors.push(`${at}.rawTier: expected play or lean`)
+      if (typeof row?.provisional !== 'boolean') errors.push(`${at}.provisional: expected boolean`)
+      const allowedSides = row?.market === 'moneyline' ? ['away', 'home'] : ['over', 'under']
+      if (!allowedSides.includes(row?.selectedSide)) errors.push(`${at}.selectedSide: unsupported`)
+      validateTrackedAmerican(`${at}.american`, row?.american, errors)
+      validateOptionalMetric(`${at}.line`, row?.line, errors, { min: 0.5, max: 30 })
+      for (const field of ['modelProbability', 'marketProbability', 'coverage']) {
+        validateOptionalMetric(`${at}.${field}`, row?.[field], errors, { min: 0, max: 1 })
+      }
+      for (const field of ['modelEdge', 'expectedRoi']) {
+        validateOptionalMetric(`${at}.${field}`, row?.[field], errors, { min: -10, max: 20 })
+      }
+      if (!Array.isArray(row?.conflicts) || row.conflicts.some((value) => typeof value !== 'string')) {
+        errors.push(`${at}.conflicts: expected an array of strings`)
+      }
+      if (section === 'selections') {
+        if (typeof row?.validated !== 'boolean') errors.push(`${at}.validated: expected boolean`)
+      } else if (!['slate-exposure', 'market-exposure', 'game-exposure'].includes(row?.exclusionReason)) {
+        errors.push(`${at}.exclusionReason: unsupported`)
+      }
+    }
+  }
+  if (
+    Number.isInteger(portfolio.candidates)
+    && Array.isArray(portfolio.selections)
+    && Array.isArray(portfolio.excluded)
+    && portfolio.candidates !== portfolio.selections.length + portfolio.excluded.length
+  ) errors.push(`${prefix}.candidates: must equal selections plus excluded`)
+  if (
+    Array.isArray(portfolio.selections)
+    && Number.isInteger(portfolio.constraints?.maximumSelections)
+    && portfolio.selections.length > portfolio.constraints.maximumSelections
+  ) errors.push(`${prefix}.selections: exceeds maximumSelections`)
+  if (Array.isArray(portfolio.selections)) {
+    const perMarket = new Map()
+    const perGame = new Map()
+    for (const row of portfolio.selections) {
+      perMarket.set(row.market, (perMarket.get(row.market) || 0) + 1)
+      perGame.set(row.gamePk, (perGame.get(row.gamePk) || 0) + 1)
+    }
+    if (
+      Number.isInteger(portfolio.constraints?.maximumPerMarket)
+      && [...perMarket.values()].some((count) => count > portfolio.constraints.maximumPerMarket)
+    ) errors.push(`${prefix}.selections: exceeds maximumPerMarket`)
+    if (
+      Number.isInteger(portfolio.constraints?.maximumPerGame)
+      && [...perGame.values()].some((count) => count > portfolio.constraints.maximumPerGame)
+    ) errors.push(`${prefix}.selections: exceeds maximumPerGame`)
+  }
+  if (typeof portfolio.note !== 'string' || !portfolio.note.trim()) {
+    errors.push(`${prefix}.note: expected non-empty text`)
+  }
+  return Array.isArray(portfolio.selections) ? portfolio.selections.length : 0
+}
+
 function validateGameScoreData(data, errors, snapshotDate) {
   if (data == null) return 0
   const prefix = 'gameScoreData'
@@ -1405,6 +1668,8 @@ export function validateDailySnapshot(snapshot) {
   const gameMarkets = validateGameOdds(snapshot.gameOdds, gameIds, errors)
   const gameProjections = validateGameProjections(snapshot.gameProjections, gameIds, errors)
   const gameProjectionResults = validateGameProjectionEvaluation(snapshot.gameProjectionEvaluation, errors)
+  const gameMarketEvaluationCalls = validateGameMarketEvaluation(snapshot.gameMarketEvaluation, errors)
+  const gameMarketPortfolioSelections = validateGameMarketPortfolio(snapshot.gameMarketPortfolio, gameIds, errors)
   const gameScoreResults = validateGameScoreData(snapshot.gameScoreData, errors, snapshot.date)
 
   if (games.length && entries.length === 0) warnings.push('scoredBatters: empty despite scheduled games')
@@ -1413,6 +1678,8 @@ export function validateDailySnapshot(snapshot) {
     gameMarkets,
     gameProjections,
     gameProjectionResults,
+    gameMarketEvaluationCalls,
+    gameMarketPortfolioSelections,
     gameScoreResults,
     scoredBatters: entries.length,
     kDistributions: Object.keys(snapshot.kDistByPitcher || {}).length,

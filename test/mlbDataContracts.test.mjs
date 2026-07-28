@@ -9,6 +9,10 @@ import {
 } from '../server/lib/historicalFeatureArchive.mjs'
 import { buildPitcherContactLeak } from '../src/sports/mlb/logic/pitcherContactLeak.js'
 import { buildGameProjection, evaluateGameForecasts } from '../src/sports/mlb/logic/gameProjection.js'
+import {
+  buildGameMarketPortfolio,
+  evaluateGameMarketPerformance,
+} from '../src/sports/mlb/logic/gameMarketEvaluation.js'
 
 const batter = (playerId = 1, gamePk = 10) => ({
   playerId,
@@ -108,8 +112,13 @@ test('daily and backtest contracts validate frozen game projections', () => {
     stats: { scoredBatters: 1 },
     gameProjections: { 10: projection },
     gameProjectionEvaluation: evaluateGameForecasts({}),
+    gameMarketEvaluation: evaluateGameMarketPerformance({}),
+    gameMarketPortfolio: buildGameMarketPortfolio([projection]),
   }
-  assert.deepEqual(validateDailySnapshot(snapshot).errors, [])
+  const validatedSnapshot = validateDailySnapshot(snapshot)
+  assert.deepEqual(validatedSnapshot.errors, [])
+  assert.equal(validatedSnapshot.metrics.gameMarketEvaluationCalls, 0)
+  assert.equal(validatedSnapshot.metrics.gameMarketPortfolioSelections, 0)
 
   const result = {
     ...projection,
@@ -215,6 +224,10 @@ test('daily and backtest contracts validate frozen game projections', () => {
   const badEvaluation = structuredClone(snapshot)
   badEvaluation.gameProjectionEvaluation.status = 'production'
   assert.ok(validateDailySnapshot(badEvaluation).errors.some((error) => error.includes('gameProjectionEvaluation.status')))
+
+  const badMarketEvaluation = structuredClone(snapshot)
+  badMarketEvaluation.gameMarketEvaluation.markets.total.promotion.eligible = true
+  assert.ok(validateDailySnapshot(badMarketEvaluation).errors.some((error) => error.includes('promotion.eligible')))
 
   snapshot.gameProjections[10].captureState = 'live'
   assert.ok(validateDailySnapshot(snapshot).errors.some((error) => error.includes('captureState')))

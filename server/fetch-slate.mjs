@@ -488,6 +488,10 @@ import {
 import { gameMarketDecisionPolicy } from '../src/sports/mlb/logic/gameMarketDecision.js';
 import { updateGameMarketHistory } from '../src/sports/mlb/logic/gameMarketTracking.js';
 import {
+  buildGameMarketPortfolio,
+  evaluateGameMarketPerformance,
+} from '../src/sports/mlb/logic/gameMarketEvaluation.js';
+import {
   buildTeamScoringProfiles,
   evaluateTeamScoringForm,
   parseMlbSeasonResults,
@@ -4570,9 +4574,14 @@ async function main() {
   // are deliberately inspectable. Market influence is capped and remains off
   // until prior paired, settled forecasts clear the forward-evidence gate.
   let gameProjectionsByGamePk = {};
+  let gameMarketPortfolio = buildGameMarketPortfolio([]);
   const gameProjectionEvaluation = evaluateGameForecasts(backtestLog);
+  const gameMarketEvaluation = evaluateGameMarketPerformance(backtestLog);
   const marketBlendPolicy = gameMarketBlendPolicy(gameProjectionEvaluation);
-  const marketDecisionPolicy = gameMarketDecisionPolicy(gameProjectionEvaluation);
+  const marketDecisionPolicy = gameMarketDecisionPolicy(
+    gameProjectionEvaluation,
+    gameMarketEvaluation,
+  );
   try {
     const capturedAt = new Date().toISOString();
     const current = buildSlateGameProjections({
@@ -4594,6 +4603,10 @@ async function main() {
     const tracked = updateGameForecastLog(backtestLog, date, current, games, { capturedAt });
     backtestLog = tracked.log;
     gameProjectionsByGamePk = Object.fromEntries(tracked.projections.map((projection) => [projection.gamePk, projection]));
+    gameMarketPortfolio = buildGameMarketPortfolio(
+      tracked.projections,
+      gameMarketEvaluation,
+    );
     const frozen = tracked.projections.filter((projection) => projection.freezeState === 'final-pregame').length;
     console.log(`[game-projection] ${current.length} pregame refreshed, ${frozen} final-pregame frozen`);
   } catch (e) {
@@ -4673,6 +4686,10 @@ async function main() {
     // Aggregate proof layer for the frozen pregame game forecasts. No individual
     // historical rows ship to the browser, and these metrics never feed scoring.
     gameProjectionEvaluation,
+    // Exact closing-call validation, segmented performance, drift, and a
+    // diversified advisory slate. Neither artifact mutates projections.
+    gameMarketEvaluation,
+    gameMarketPortfolio,
 
     // For Final games today: which players actually hit a HR.
     // Shape: { [gamePk]: [playerId, ...] }. Empty when no games are
