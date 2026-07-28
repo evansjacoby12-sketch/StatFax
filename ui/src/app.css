@@ -24737,3 +24737,431 @@ button.th:focus-visible {
   .games-filter-empty { min-height: 240px; }
   .games-filter-empty button { min-height: 44px; }
 }
+
+/* Games accordion: keep the slate minimal until a matchup is opened. */
+.main:has(.games-accordion) { max-width: 1560px; }
+.games-accordion {
+  min-width: 0;
+}
+.games-accordion-head {
+  min-height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 4px 7px;
+  color: var(--text-faint);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.games-accordion-head span:last-child {
+  font-family: var(--mono);
+  letter-spacing: .03em;
+}
+.games-accordion-list {
+  display: grid;
+  gap: 8px;
+}
+.games-accordion-item {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--border-soft);
+  border-radius: 13px;
+  background: rgba(17, 18, 20, .4);
+  box-shadow: 0 10px 28px -26px rgba(0, 0, 0, .9);
+  transition: border-color .18s, background .18s, box-shadow .18s;
+}
+.games-accordion-item:hover {
+  border-color: var(--border);
+  background: rgba(17, 18, 20, .52);
+}
+.games-accordion-item.open {
+  border-color: rgba(151, 149, 203, .34);
+  background: rgba(17, 18, 20, .48);
+  box-shadow: inset 2px 0 0 var(--accent), 0 14px 34px -28px var(--accent-glow);
+}
+.games-accordion-item.live {
+  border-color: rgba(239, 68, 68, .22);
+}
+.games-accordion-toggle {
+  width: 100%;
+  min-height: 86px;
+  display: grid;
+  grid-template-columns: minmax(235px, 1.1fr) minmax(150px, .75fr) minmax(130px, .55fr) minmax(220px, .9fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: 11px 13px;
+  color: var(--text-dim);
+  text-align: left;
+  background: transparent;
+}
+.games-accordion-toggle:hover {
+  background: rgba(255, 255, 255, .018);
+}
+.games-accordion-toggle:active {
+  background: rgba(255, 255, 255, .035);
+}
+.games-accordion-toggle:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 72%, transparent);
+  outline-offset: -3px;
+}
+.games-accordion-primary,
+.games-accordion-pitchers,
+.games-accordion-opportunity,
+.games-accordion-decisions {
+  min-width: 0;
+}
+.games-accordion-primary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.games-accordion-matchup {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.games-accordion-matchup img {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  filter: drop-shadow(0 3px 7px rgba(0, 0, 0, .5));
+}
+.games-accordion-matchup strong {
+  color: #fff;
+  font-family: var(--display);
+  font-size: 17px;
+  letter-spacing: .01em;
+}
+.games-accordion-matchup small {
+  color: var(--text-faint);
+  font-size: 9px;
+}
+.games-accordion-status {
+  flex: none;
+  padding: 4px 7px;
+  color: var(--accent);
+  border-radius: 7px;
+  background: rgba(151, 149, 203, .08);
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.games-accordion-status.live {
+  color: var(--bad);
+  background: rgba(239, 68, 68, .1);
+}
+.games-accordion-featured {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--accent);
+  font-size: 8px;
+  font-weight: 800;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.games-accordion-pitchers {
+  display: grid;
+  gap: 3px;
+}
+.games-accordion-pitchers small,
+.games-accordion-xhr small {
+  color: var(--text-faint);
+  font-size: 7px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.games-accordion-pitchers b {
+  overflow: hidden;
+  color: var(--text-dim);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.games-accordion-opportunity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.games-accordion-env {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-dim);
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+.games-accordion-env.strong { color: var(--good); }
+.games-accordion-env.suppressed { color: var(--bad); }
+.games-accordion-xhr {
+  display: grid;
+  justify-items: end;
+  gap: 1px;
+}
+.games-accordion-xhr b {
+  color: #fff;
+  font-size: 13px;
+}
+.games-accordion-decisions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+.games-accordion-decision {
+  min-width: 0;
+  min-height: 36px;
+  display: grid;
+  align-content: center;
+  gap: 2px;
+  padding: 5px 7px;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, .02);
+}
+.games-accordion-decision small {
+  color: var(--text-faint);
+  font-size: 7px;
+  font-weight: 900;
+  letter-spacing: .05em;
+}
+.games-accordion-decision b {
+  overflow: hidden;
+  color: var(--text-dim);
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.games-accordion-decision.play {
+  border-color: rgba(105, 185, 158, .24);
+  background: rgba(105, 185, 158, .055);
+}
+.games-accordion-decision.play small,
+.games-accordion-decision.play b {
+  color: var(--strong);
+}
+.games-accordion-decision.lean {
+  border-color: rgba(214, 181, 111, .24);
+  background: rgba(214, 181, 111, .055);
+}
+.games-accordion-decision.lean small,
+.games-accordion-decision.lean b {
+  color: var(--prime);
+}
+.games-accordion-decision.pass small {
+  color: #a9abb4;
+}
+.games-accordion-chevron {
+  min-width: 70px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  color: var(--text-faint);
+}
+.games-accordion-chevron small {
+  font-size: 8px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+.games-accordion-item.open .games-accordion-chevron {
+  color: var(--accent);
+}
+.games-accordion-panel {
+  padding: 10px;
+  border-top: 1px solid var(--border-soft);
+  animation: games-accordion-open .2s ease-out both;
+  transform-origin: top;
+}
+.game-lineup-scope {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 9px;
+  margin-bottom: 8px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, .18);
+}
+.game-lineup-scope > span {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--accent);
+}
+.game-lineup-scope > span > span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.game-lineup-scope strong {
+  color: var(--text-dim);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+.game-lineup-scope small {
+  overflow: hidden;
+  color: var(--text-faint);
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.game-lineup-scope button {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 11px;
+  color: var(--accent);
+  border: 1px solid rgba(151, 149, 203, .22);
+  border-radius: 9px;
+  background: rgba(151, 149, 203, .075);
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.game-lineup-scope button:hover {
+  color: #fff;
+  border-color: rgba(151, 149, 203, .38);
+  background: rgba(151, 149, 203, .12);
+}
+.game-lineup-scope button:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 72%, transparent);
+  outline-offset: 2px;
+}
+.games-accordion-desktop-detail .matchup-workspace-card {
+  height: auto;
+}
+.games-accordion-desktop-detail .matchup-workspace-body {
+  overflow: visible;
+}
+.games-accordion-mobile-detail {
+  display: none;
+}
+
+@keyframes games-accordion-open {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 1040px) and (min-width: 561px) {
+  .games-accordion-toggle {
+    grid-template-columns: minmax(210px, 1.1fr) minmax(145px, .8fr) minmax(120px, .6fr) minmax(185px, .9fr) auto;
+    gap: 10px;
+  }
+  .games-accordion-featured { display: none; }
+  .games-accordion-chevron { min-width: 24px; }
+  .games-accordion-chevron small { display: none; }
+}
+
+@media (max-width: 560px) {
+  .games-accordion-head {
+    min-height: 34px;
+    padding: 0 3px 8px;
+  }
+  .games-accordion-head span:last-child {
+    max-width: 62%;
+    overflow: hidden;
+    text-align: right;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .games-accordion-list { gap: 9px; }
+  .games-accordion-item { border-radius: 14px; }
+  .games-accordion-toggle {
+    min-height: 136px;
+    grid-template-columns: minmax(0, 1fr) 28px;
+    grid-template-areas:
+      "primary chevron"
+      "pitchers chevron"
+      "opportunity chevron"
+      "decisions chevron";
+    gap: 7px 9px;
+    padding: 10px 11px;
+  }
+  .games-accordion-primary {
+    grid-area: primary;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .games-accordion-matchup img {
+    width: 24px;
+    height: 24px;
+  }
+  .games-accordion-matchup strong { font-size: 15px; }
+  .games-accordion-status { font-size: 8px; }
+  .games-accordion-featured { font-size: 7px; }
+  .games-accordion-pitchers { grid-area: pitchers; }
+  .games-accordion-pitchers b { font-size: 10px; }
+  .games-accordion-opportunity {
+    grid-area: opportunity;
+    justify-content: flex-start;
+  }
+  .games-accordion-xhr {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+  }
+  .games-accordion-decisions {
+    grid-area: decisions;
+    max-width: 100%;
+  }
+  .games-accordion-decision {
+    min-height: 34px;
+    padding: 4px 6px;
+  }
+  .games-accordion-chevron {
+    grid-area: chevron;
+    min-width: 28px;
+    min-height: 44px;
+    align-self: stretch;
+    justify-content: center;
+  }
+  .games-accordion-chevron small { display: none; }
+  .games-accordion-panel { padding: 0; }
+  .game-lineup-scope {
+    min-height: 58px;
+    padding: 7px 9px;
+    margin: 0;
+    border-width: 0 0 1px;
+    border-radius: 0;
+  }
+  .game-lineup-scope small { max-width: 190px; }
+  .game-lineup-scope button {
+    min-height: 44px;
+    padding-inline: 10px;
+  }
+  .games-accordion-desktop-detail { display: none; }
+  .games-accordion-mobile-detail { display: block; }
+  .games-accordion-mobile-detail .mobile-matchup,
+  .games-accordion-mobile-detail .mobile-detail-card {
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .games-accordion-item,
+  .games-accordion-toggle,
+  .games-accordion-panel {
+    transition: none;
+    animation: none;
+  }
+}

@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
 import Icon from './Icon.jsx'
-import CommandTabs from './CommandTabs.jsx'
 import GameFilterBar from './GameFilterBar.jsx'
 import { GradeChip, BadgeRow, ProbBar, ProbRing } from './atoms.jsx'
 import { teamColor, teamLogo, hexToRgba, readableOn, playerHeadshot } from '../lib/teams.js'
@@ -471,7 +470,6 @@ export default function GamesView({
     })
 
   const god = computeGameOfDay(batters)
-  const [view, setView] = useState('extractor')
   const [gameQuery, setGameQuery] = useState('')
   const [gameState, setGameState] = useState('all')
   const [gameTimeWindow, setGameTimeWindow] = useState('all')
@@ -483,8 +481,8 @@ export default function GamesView({
     sortDirection: gameSortDirection,
   })
   const visibleGod = god && ordered.some((game) => game.gamePk === god.gamePk) ? god : null
-  const [selectedGamePk, setSelectedGamePk] = useState(() => god?.gamePk || ordered[0]?.gamePk)
-  const selectedGame = ordered.find((g) => g.gamePk === selectedGamePk) || ordered[0]
+  const [expandedGamePk, setExpandedGamePk] = useState(null)
+  const orderedGameKey = ordered.map((game) => game.gamePk).join('|')
   const filtersActive = Boolean(
     gameQuery.trim()
     || gameState !== 'all'
@@ -493,8 +491,13 @@ export default function GamesView({
   )
 
   useEffect(() => {
-    if (selectedGame && selectedGame.gamePk !== selectedGamePk) setSelectedGamePk(selectedGame.gamePk)
-  }, [selectedGame?.gamePk, selectedGamePk])
+    if (
+      expandedGamePk != null
+      && !orderedGameKey.split('|').includes(String(expandedGamePk))
+    ) {
+      setExpandedGamePk(null)
+    }
+  }, [expandedGamePk, orderedGameKey])
 
   if (!eligibleGames.length) {
     return (
@@ -515,19 +518,6 @@ export default function GamesView({
 
   return (
     <>
-      <div className="games-controls">
-        <span className="games-controls-k dim">View Mode</span>
-        <CommandTabs
-          className="games-mode-tabs"
-          label="Games view"
-          value={view}
-          onChange={setView}
-          tabs={[
-            { id: 'extractor', label: 'HR Extractor', icon: 'Focus' },
-            { id: 'detail', label: 'Detail Silos', icon: 'Rows3' },
-          ]}
-        />
-      </div>
       <GameFilterBar
         query={gameQuery}
         onQueryChange={setGameQuery}
@@ -543,57 +533,32 @@ export default function GamesView({
         onClear={clearGameFilters}
       />
       {ordered.length ? (
-        <>
-          <div className="games-desktop-layout games-command-center">
-            <aside className="games-navigator" aria-label="Game matchups">
-              <div className="games-nav-head"><span>Matchups</span><b>{ordered.length} games</b></div>
-              <div className="games-nav-list">
-                {ordered.map((g, i) => (
-                  <GameNavItem
-                    key={g.gamePk}
-                    game={g}
-                    groups={byGame.get(g.gamePk)}
-                    active={g.gamePk === selectedGame?.gamePk}
-                    featured={g.gamePk === visibleGod?.gamePk}
-                    onClick={() => setSelectedGamePk(g.gamePk)}
-                    idx={i}
-                  />
+        <section className="games-accordion" aria-label="Game matchups">
+          <div className="games-accordion-head">
+            <span>Matchups</span>
+            <span>{ordered.length} games · Select a game for full analysis</span>
+          </div>
+          <div className="games-accordion-list">
+            {ordered.map((g, i) => (
+              <GameAccordionItem
+                key={g.gamePk}
+                game={g}
+                groups={byGame.get(g.gamePk)}
+                projection={gameProjections?.[g.gamePk]}
+                evaluation={gameProjectionEvaluation}
+                marketEvaluation={gameMarketEvaluation}
+                portfolio={gameMarketPortfolio}
+                featured={g.gamePk === visibleGod?.gamePk}
+                open={String(g.gamePk) === String(expandedGamePk)}
+                onToggle={() => setExpandedGamePk((current) => (
+                  String(current) === String(g.gamePk) ? null : g.gamePk
                 ))}
-              </div>
-            </aside>
-            <div className="games-workspace">
-              {selectedGame && (
-                <MatchupWorkspace
-                  game={selectedGame}
-                  groups={byGame.get(selectedGame.gamePk)}
-                  projection={gameProjections?.[selectedGame.gamePk]}
-                  evaluation={gameProjectionEvaluation}
-                  marketEvaluation={gameMarketEvaluation}
-                  portfolio={gameMarketPortfolio}
-                  view={view}
-                  featured={selectedGame.gamePk === visibleGod?.gamePk}
-                  {...ctx}
-                />
-              )}
-            </div>
+                idx={i}
+                {...ctx}
+              />
+            ))}
           </div>
-          <div className="games-mobile-layout">
-            <MobileGameOfDay god={visibleGod} />
-            <div className="mobile-slate-head">
-              <span>Matchups</span>
-              <span>{ordered.length} games</span>
-            </div>
-            <div className="mobile-matchups">
-            {ordered.map((g, i) =>
-              view === 'extractor' ? (
-                <MobileMatchupCard key={g.gamePk} game={g} groups={byGame.get(g.gamePk)} projection={gameProjections?.[g.gamePk]} evaluation={gameProjectionEvaluation} marketEvaluation={gameMarketEvaluation} portfolio={gameMarketPortfolio} idx={i} {...ctx} />
-              ) : (
-                <MobileDetailCard key={g.gamePk} game={g} groups={byGame.get(g.gamePk)} projection={gameProjections?.[g.gamePk]} evaluation={gameProjectionEvaluation} marketEvaluation={gameMarketEvaluation} portfolio={gameMarketPortfolio} idx={i} {...ctx} />
-              ),
-            )}
-            </div>
-          </div>
-        </>
+        </section>
       ) : (
         <div className="games-filter-empty">
           <Icon name="Search" size={28} />
@@ -606,39 +571,164 @@ export default function GamesView({
   )
 }
 
-function MobileGameOfDay({ god }) {
-  if (!god) return null
-  const g = god.game
+function AccordionDecision({ market, decision }) {
+  const tier = decision?.tier || 'unavailable'
+  const headline = market === 'moneyline'
+    ? decision?.selectedTeam?.abbr && Number.isFinite(decision?.american)
+      ? `${decision.selectedTeam.abbr} ${american(Math.round(decision.american))}`
+      : 'Side pending'
+    : decision?.selectedSide && Number.isFinite(decision?.line)
+      ? `${decision.selectedSide.toUpperCase()} ${num(decision.line, 1)}`
+      : 'Total pending'
+
   return (
-    <section className="mobile-god" aria-label="Game of the Day">
-      <span className="mobile-god-icon"><Icon name="Flame" size={17} /></span>
-      <span className="mobile-god-copy">
-        <span className="mobile-god-kicker">Game of the Day</span>
-        <strong>{g?.awayTeam?.abbr || '—'} @ {g?.homeTeam?.abbr || '—'}</strong>
-        <span>{gameTime(g?.gameDate) || 'TBD'}</span>
-      </span>
-      <span className="mobile-god-xhr"><small>EXP HR</small><b>{num(god.xhr, 1)}</b></span>
-    </section>
+    <span className={`games-accordion-decision ${tier}`}>
+      <small>{tier === 'unavailable' ? 'PENDING' : tier.toUpperCase()}</small>
+      <b className="mono">{headline}</b>
+    </span>
   )
 }
 
-function GameNavItem({ game: g, groups, active, featured, onClick, idx }) {
+function GameAccordionItem({
+  game: g,
+  groups,
+  projection,
+  evaluation,
+  marketEvaluation,
+  portfolio,
+  featured,
+  open,
+  onToggle,
+  idx,
+  ...ctx
+}) {
   const info = gameOpportunity(g, groups)
-  const status = g.isFinal ? 'Final' : g.isLive ? `${(g.inningHalf || '').slice(0, 3)} ${g.currentInning || ''}`.trim() : gameTime(g.gameDate) || 'TBD'
+  const status = g.isFinal
+    ? 'Final'
+    : g.isLive
+      ? `${(g.inningHalf || '').slice(0, 3)} ${g.currentInning || ''}`.trim()
+      : gameTime(g.gameDate) || 'TBD'
+  const moneylineDecision = projection?.marketDecision?.moneyline
+  const totalDecision = projection?.marketDecision?.total
+  const panelId = `game-accordion-panel-${g.gamePk}`
+  const toggleId = `game-accordion-toggle-${g.gamePk}`
+  const awayLogo = teamLogo(g.awayTeam?.id)
+  const homeLogo = teamLogo(g.homeTeam?.id)
+  const [showFullLineup, setShowFullLineup] = useState(false)
+
+  useEffect(() => {
+    if (!open) setShowFullLineup(false)
+  }, [open])
+
   return (
-    <button className={`games-nav-item${active ? ' active' : ''}${g.isLive ? ' live' : ''}`} onClick={onClick} aria-current={active ? 'true' : undefined} style={{ '--i': Math.min(idx, 12) }}>
-      <span className="games-nav-title"><strong>{g.awayTeam?.abbr} @ {g.homeTeam?.abbr}</strong><small className={g.isLive ? 'live' : ''}>{status}</small></span>
-      <span className="games-nav-pitchers">{lastName(g.awayPitcher?.name) || 'TBD'} vs {lastName(g.homePitcher?.name) || 'TBD'}</span>
-      <span className="games-nav-foot">
-        <span className={`games-nav-env ${info.envLabel.toLowerCase()}`}><Icon name="Gauge" size={11} />{info.envLabel}</span>
-        {featured && <span className="games-nav-featured"><Icon name="Flame" size={10} />Top game</span>}
-        <span className="games-nav-xhr"><b className="mono">{num(info.expectedHRs, 1)}</b><small>EXP HR</small></span>
-      </span>
-    </button>
+    <article
+      className={`games-accordion-item${open ? ' open' : ''}${g.isLive ? ' live' : ''}`}
+      style={{ '--i': Math.min(idx, 12) }}
+    >
+      <button
+        id={toggleId}
+        type="button"
+        className="games-accordion-toggle"
+        onClick={onToggle}
+        aria-expanded={open}
+        aria-controls={panelId}
+      >
+        <span className="games-accordion-primary">
+          <span className="games-accordion-matchup">
+            {awayLogo && <img src={awayLogo} alt="" loading="lazy" />}
+            <strong>{g.awayTeam?.abbr || '—'}</strong>
+            <small>@</small>
+            {homeLogo && <img src={homeLogo} alt="" loading="lazy" />}
+            <strong>{g.homeTeam?.abbr || '—'}</strong>
+          </span>
+          <span className={`games-accordion-status${g.isLive ? ' live' : ''}`}>{status}</span>
+          {featured && <span className="games-accordion-featured"><Icon name="Flame" size={11} /> Top game</span>}
+        </span>
+        <span className="games-accordion-pitchers">
+          <small>Probable pitchers</small>
+          <b>{lastName(g.awayPitcher?.name) || 'TBD'} vs {lastName(g.homePitcher?.name) || 'TBD'}</b>
+        </span>
+        <span className="games-accordion-opportunity">
+          <span className={`games-accordion-env ${info.envLabel.toLowerCase()}`}>
+            <Icon name="Gauge" size={12} />
+            {info.envLabel}
+          </span>
+          <span className="games-accordion-xhr">
+            <b className="mono">{num(info.expectedHRs, 1)}</b>
+            <small>EXP HR</small>
+          </span>
+        </span>
+        <span className="games-accordion-decisions">
+          <AccordionDecision market="moneyline" decision={moneylineDecision} />
+          <AccordionDecision market="total" decision={totalDecision} />
+        </span>
+        <span className="games-accordion-chevron" aria-hidden="true">
+          <small>{open ? 'Collapse' : 'Open game'}</small>
+          <Icon name={open ? 'ChevronUp' : 'ChevronDown'} size={18} />
+        </span>
+      </button>
+      {open && (
+        <div
+          id={panelId}
+          className="games-accordion-panel"
+          role="region"
+          aria-labelledby={toggleId}
+        >
+          <LineupScopeToggle
+            showFullLineup={showFullLineup}
+            onToggle={() => setShowFullLineup((current) => !current)}
+          />
+          <div className="games-accordion-desktop-detail">
+            <MatchupWorkspace
+              game={g}
+              groups={groups}
+              projection={projection}
+              evaluation={evaluation}
+              marketEvaluation={marketEvaluation}
+              portfolio={portfolio}
+              showFullLineup={showFullLineup}
+              featured={featured}
+              {...ctx}
+            />
+          </div>
+          <div className="games-accordion-mobile-detail">
+            <MobileDetailCard
+              game={g}
+              groups={groups}
+              projection={projection}
+              evaluation={evaluation}
+              marketEvaluation={marketEvaluation}
+              portfolio={portfolio}
+              idx={idx}
+              showFullLineup={showFullLineup}
+              {...ctx}
+            />
+          </div>
+        </div>
+      )}
+    </article>
   )
 }
 
-function MatchupWorkspace({ game: g, groups, projection, evaluation, marketEvaluation, portfolio, view, featured, onSelect, selectedId, watchlist, slip, onToggleWatch, onToggleSlip, onOpenPitcher }) {
+function LineupScopeToggle({ showFullLineup, onToggle }) {
+  return (
+    <div className="game-lineup-scope">
+      <span>
+        <Icon name={showFullLineup ? 'Users' : 'ListFilter'} size={15} />
+        <span>
+          <strong>{showFullLineup ? 'Full lineup' : 'Qualified targets'}</strong>
+          <small>{showFullLineup ? 'Every listed hitter, including SKIP' : 'PRIME, STRONG, and LEAN only'}</small>
+        </span>
+      </span>
+      <button type="button" onClick={onToggle} aria-pressed={showFullLineup}>
+        {showFullLineup ? 'Qualified only' : 'Show full lineup'}
+        <Icon name={showFullLineup ? 'ListFilter' : 'Users'} size={15} />
+      </button>
+    </div>
+  )
+}
+
+function MatchupWorkspace({ game: g, groups, projection, evaluation, marketEvaluation, portfolio, showFullLineup, featured, onSelect, selectedId, watchlist, slip, onToggleWatch, onToggleSlip, onOpenPitcher }) {
   const info = gameOpportunity(g, groups)
   const live = g.isLive || g.isFinal
   const status = g.isFinal ? 'Final' : g.isLive ? `${(g.inningHalf || '').slice(0, 3)} ${g.currentInning || ''}`.trim() : gameTime(g.gameDate) || 'TBD'
@@ -666,8 +756,8 @@ function MatchupWorkspace({ game: g, groups, projection, evaluation, marketEvalu
         </div>
       </header>
       <div className="matchup-workspace-body">
-        <WorkspaceTargets team={g.awayTeam} bats={groups.away} view={view} {...teamCtx} />
-        <WorkspaceTargets team={g.homeTeam} bats={groups.home} view={view} {...teamCtx} />
+        <WorkspaceTargets team={g.awayTeam} bats={groups.away} showFullLineup={showFullLineup} {...teamCtx} />
+        <WorkspaceTargets team={g.homeTeam} bats={groups.home} showFullLineup={showFullLineup} {...teamCtx} />
       </div>
     </section>
   )
@@ -694,9 +784,11 @@ function WorkspaceMetric({ icon, label, value, tone = '', sub }) {
   )
 }
 
-function WorkspaceTargets({ team, bats, view, onSelect, selectedId, watchlist, slip, onToggleWatch, onToggleSlip }) {
+function WorkspaceTargets({ team, bats, showFullLineup, onSelect, selectedId, watchlist, slip, onToggleWatch, onToggleSlip }) {
   const sorted = [...(bats || [])].sort((a, b) => (b.hrProbability ?? 0) - (a.hrProbability ?? 0) || (b.score ?? 0) - (a.score ?? 0))
-  const visible = view === 'extractor' ? sorted.filter((b) => (b.grade?.label || 'SKIP') !== 'SKIP').slice(0, 5) : sorted
+  const visible = showFullLineup
+    ? sorted
+    : sorted.filter((b) => (b.grade?.label || 'SKIP') !== 'SKIP').slice(0, 5)
   return (
     <div className="matchup-target-column">
       <div className="matchup-target-head"><span>{team?.name || team?.abbr} targets</span><b>{visible.length}</b></div>
@@ -755,8 +847,9 @@ function MobileTopTargets({ targets, onSelect }) {
   )
 }
 
-function MobileMatchupCard({ game: g, groups, projection, evaluation, marketEvaluation, portfolio, idx = 0, onSelect, onOpenPitcher, watchlist, slip, onToggleWatch, onToggleSlip }) {
-  const [open, setOpen] = useState(false)
+function MobileMatchupCard({ game: g, groups, projection, evaluation, marketEvaluation, portfolio, idx = 0, expanded = false, onSelect, onOpenPitcher, watchlist, slip, onToggleWatch, onToggleSlip }) {
+  const [reasonsOpen, setReasonsOpen] = useState(false)
+  const open = expanded || reasonsOpen
   const away = [...(groups.away || [])].filter((b) => (b.grade?.label || 'SKIP') !== 'SKIP').sort((a, b) => (b.hrProbability ?? 0) - (a.hrProbability ?? 0))[0]
   const home = [...(groups.home || [])].filter((b) => (b.grade?.label || 'SKIP') !== 'SKIP').sort((a, b) => (b.hrProbability ?? 0) - (a.hrProbability ?? 0))[0]
   const sample = groups.away?.[0] || groups.home?.[0]
@@ -796,10 +889,12 @@ function MobileMatchupCard({ game: g, groups, projection, evaluation, marketEval
           ))}
         </div>
       )}
-      <button className="mobile-matchup-toggle" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
-        {open ? 'Hide matchup details' : 'View reasons & data'}
-        <Icon name={open ? 'ChevronUp' : 'ChevronDown'} size={16} />
-      </button>
+      {!expanded && (
+        <button className="mobile-matchup-toggle" onClick={() => setReasonsOpen((v) => !v)} aria-expanded={open}>
+          {open ? 'Hide matchup details' : 'View reasons & data'}
+          <Icon name={open ? 'ChevronUp' : 'ChevronDown'} size={16} />
+        </button>
+      )}
     </section>
   )
 }
@@ -833,22 +928,22 @@ function MobileLeader({ b, icon, onSelect, watched, inSlip, onToggleWatch, onTog
   )
 }
 
-function MobileDetailCard({ game: g, groups, projection, evaluation, marketEvaluation, portfolio, idx = 0, onSelect, selectedId, watchlist, slip, onToggleWatch, onToggleSlip, onOpenPitcher }) {
+function MobileDetailCard({ game: g, groups, projection, evaluation, marketEvaluation, portfolio, idx = 0, showFullLineup = false, onSelect, selectedId, watchlist, slip, onToggleWatch, onToggleSlip, onOpenPitcher }) {
   const [side, setSide] = useState('away')
-  const [showAll, setShowAll] = useState(false)
   const sample = groups.away?.[0] || groups.home?.[0]
   const env = Number.isFinite(sample?.envScore) ? Math.round(sample.envScore) : null
   const envTone = env == null ? '' : env >= 70 ? 'good' : env <= 45 ? 'bad' : ''
   const status = g.isFinal ? 'Final' : g.isLive ? `${(g.inningHalf || '').slice(0, 3)} ${g.currentInning || ''}`.trim() : gameTime(g.gameDate) || 'TBD'
   const sortBats = (list) => [...(list || [])].sort((a, b) => (b.hrProbability ?? 0) - (a.hrProbability ?? 0) || (b.score ?? 0) - (a.score ?? 0))
-  const awayBats = sortBats(groups.away)
-  const homeBats = sortBats(groups.home)
-  const activeBats = side === 'away' ? awayBats : homeBats
-  const visibleBats = showAll ? activeBats : activeBats.slice(0, 4)
-  const switchSide = (next) => {
-    setSide(next)
-    setShowAll(false)
+  const selectBats = (list) => {
+    const sorted = sortBats(list)
+    return showFullLineup
+      ? sorted
+      : sorted.filter((b) => (b.grade?.label || 'SKIP') !== 'SKIP').slice(0, 5)
   }
+  const awayBats = selectBats(groups.away)
+  const homeBats = selectBats(groups.home)
+  const activeBats = side === 'away' ? awayBats : homeBats
   return (
     <section className={`mobile-detail-card${g.isLive ? ' live' : ''}`} style={{ '--i': Math.min(idx, 12) }}>
       <div className="mobile-matchup-scoreboard">
@@ -862,11 +957,11 @@ function MobileDetailCard({ game: g, groups, projection, evaluation, marketEvalu
       <GameForecastStrip game={g} projection={projection} evaluation={evaluation} marketEvaluation={marketEvaluation} portfolio={portfolio} />
       <GameChips sample={sample} game={g} />
       <div className="mobile-team-switcher" role="tablist" aria-label={`${g.awayTeam?.abbr} and ${g.homeTeam?.abbr} hitters`}>
-        <MobileTeamTab side="away" active={side === 'away'} team={g.awayTeam} batters={awayBats} onClick={() => switchSide('away')} />
-        <MobileTeamTab side="home" active={side === 'home'} team={g.homeTeam} batters={homeBats} onClick={() => switchSide('home')} />
+        <MobileTeamTab side="away" active={side === 'away'} team={g.awayTeam} batters={awayBats} onClick={() => setSide('away')} />
+        <MobileTeamTab side="home" active={side === 'home'} team={g.homeTeam} batters={homeBats} onClick={() => setSide('home')} />
       </div>
       <div className="mobile-roster" role="tabpanel" aria-label={`${side === 'away' ? g.awayTeam?.abbr : g.homeTeam?.abbr} hitters`}>
-        {visibleBats.map((b) => (
+        {activeBats.map((b) => (
           <MobileDetailRow
             key={b.id}
             b={b}
@@ -878,14 +973,8 @@ function MobileDetailCard({ game: g, groups, projection, evaluation, marketEvalu
             onToggleSlip={onToggleSlip}
           />
         ))}
-        {!activeBats.length && <div className="mobile-roster-empty">No matching hitters</div>}
+        {!activeBats.length && <div className="mobile-roster-empty">No qualified targets</div>}
       </div>
-      {activeBats.length > 4 && (
-        <button className="mobile-roster-more" onClick={() => setShowAll((v) => !v)} aria-expanded={showAll}>
-          {showAll ? 'Show top four' : `Show all hitters (${activeBats.length - 4} more)`}
-          <Icon name={showAll ? 'ChevronUp' : 'ChevronDown'} size={16} />
-        </button>
-      )}
     </section>
   )
 }
