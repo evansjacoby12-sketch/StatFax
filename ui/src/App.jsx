@@ -762,6 +762,8 @@ export default function App() {
             batters={filtered}
             gameProjections={data.raw?.gameProjections || {}}
             gameProjectionEvaluation={data.raw?.gameProjectionEvaluation || null}
+            gameMarketEvaluation={data.raw?.gameMarketEvaluation || null}
+            gameMarketPortfolio={data.raw?.gameMarketPortfolio || null}
             onSelect={(b) => setSelectedId(b.id)}
             selectedId={selectedId}
             watchlist={watchlist}

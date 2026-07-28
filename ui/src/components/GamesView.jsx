@@ -11,6 +11,11 @@ import { compass } from '../lib/weather.js'
 import { interpretWind } from '../lib/wind.js'
 import { useLiveMode } from '../lib/liveMode.js'
 import { filterAndSortGames } from '../lib/gameFilters.js'
+import {
+  gameMarketMovementCaution,
+  gameMarketPortfolioSelection,
+  gameMarketValidation,
+} from '../lib/gameMarketView.js'
 import { hexA } from './atoms.jsx'
 
 const lastName = (n) => { const p = (n || '').trim().split(/\s+/).filter(Boolean); const l = p[p.length - 1] || ''; return /^(jr|sr|ii|iii|iv|v)\.?$/i.test(l) && p.length >= 2 ? p[p.length - 2] : l }
@@ -170,7 +175,113 @@ function GameOfDay({ god, onSelect, onOpenPitcher }) {
   )
 }
 
-function GameForecastStrip({ game, projection, evaluation }) {
+function MarketDecisionCard({
+  gamePk,
+  market,
+  decision,
+  projection,
+  marketEvaluation,
+  portfolio,
+}) {
+  const tier = decision?.tier || 'unavailable'
+  const validation = gameMarketValidation(marketEvaluation, market)
+  const selection = gameMarketPortfolioSelection(portfolio, gamePk, market)
+  const caution = gameMarketMovementCaution(projection, market, decision)
+  const modelProbability = market === 'moneyline'
+    ? decision?.modelProbability
+    : decision?.conditionalModelProbability
+  const headline = market === 'moneyline'
+    ? decision?.selectedTeam?.abbr && Number.isFinite(decision?.american)
+      ? `${decision.selectedTeam.abbr} ${american(Math.round(decision.american))}`
+      : 'No complete price'
+    : decision?.selectedSide && Number.isFinite(decision?.line) && Number.isFinite(decision?.american)
+      ? `${decision.selectedSide.toUpperCase()} ${num(decision.line, 1)} ${american(Math.round(decision.american))}`
+      : 'No complete total'
+  const forecastDiffers = market === 'moneyline'
+    && decision?.selectedSide
+    && decision?.forecastSide
+    && decision.selectedSide !== decision.forecastSide
+  const validationIcon = validation.status === 'eligible'
+    ? 'CircleCheck'
+    : validation.status === 'hold'
+      ? 'TriangleAlert'
+      : 'Hourglass'
+  const driftWarning = validation.drift === 'drift'
+    ? 'Performance drift'
+    : validation.drift === 'watch'
+      ? 'Drift watch'
+      : null
+
+  return (
+    <article className={`game-decision-card ${tier}`} aria-label={`${market} decision: ${tier}`}>
+      <div className="game-decision-head">
+        <span className={`game-decision-tier ${tier}`}>{tier.toUpperCase()}</span>
+        <strong>{headline}</strong>
+        <span className={`game-decision-validation ${validation.status}`}>
+          <Icon name={validationIcon} size={11} />
+          {validation.label}
+        </span>
+      </div>
+      <div className="game-decision-stats">
+        <span>
+          <small>Model chance</small>
+          <b className="mono">{pct(modelProbability, 1)}</b>
+        </span>
+        <span>
+          <small>Edge</small>
+          <b className="mono">{signedPct(decision?.modelEdge, 1)}</b>
+        </span>
+        <span>
+          <small>Est. ROI</small>
+          <b className="mono">{signedPct(decision?.expectedRoi, 1)}</b>
+        </span>
+      </div>
+      <div className="game-decision-context">
+        {market === 'moneyline' ? (
+          <>
+            <span className={forecastDiffers ? 'decision-difference' : ''}>
+              Forecast favorite: <b>{decision?.forecastTeam?.abbr || '—'} {pct(decision?.forecastProbability, 1)}</b>
+            </span>
+            <span>vs {pct(decision?.marketFairProbability, 1)} fair market</span>
+          </>
+        ) : (
+          <>
+            <span><b>{num(decision?.projectedTotal, 1)}</b> projected vs {num(decision?.line, 1)}</span>
+            <span>{num(decision?.runSeparation, 1)} run separation</span>
+          </>
+        )}
+      </div>
+      <div className="game-decision-proof">
+        <span>
+          {validation.decisions}/{validation.minimumGames} calls
+          {' · '}
+          {validation.dates}/{validation.minimumDates} dates
+        </span>
+        {selection && (
+          <span className="game-decision-curated">
+            <Icon name="Star" size={10} />
+            Curated slate
+          </span>
+        )}
+      </div>
+      {(caution || driftWarning) && (
+        <div className="game-decision-caution">
+          <Icon name="TriangleAlert" size={11} />
+          {[caution, driftWarning].filter(Boolean).join(' · ')}
+        </div>
+      )}
+      <p className="game-decision-reason">{decision?.reason || 'No complete market decision is available.'}</p>
+    </article>
+  )
+}
+
+function GameForecastStrip({
+  game,
+  projection,
+  evaluation,
+  marketEvaluation,
+  portfolio,
+}) {
   const [detailsOpen, setDetailsOpen] = useState(false)
   if (!projection) return null
 
@@ -179,30 +290,13 @@ function GameForecastStrip({ game, projection, evaluation }) {
   const awayWin = projection.awayWinProbability
   const homeWin = projection.homeWinProbability
   const moneyline = projection.marketComparison?.moneyline
-  const totalMarket = projection.marketComparison?.total
-  const winnerSide = projection.projectedWinner === 'home' ? 'home' : 'away'
-  const winnerAbbr = winnerSide === 'home' ? homeAbbr : awayAbbr
-  const winnerProbability = winnerSide === 'home' ? homeWin : awayWin
-  const sideEdge = moneyline?.[`${winnerSide}ModelEdge`]
-  const hasTotalComparison = Number.isFinite(totalMarket?.line)
-    && Number.isFinite(projection.projectedTotal)
-  const totalDelta = hasTotalComparison
-    ? projection.projectedTotal - totalMarket.line
-    : null
-  const totalDirection = !hasTotalComparison
-    ? 'unavailable'
-    : totalDelta > 0
-      ? 'over'
-      : totalDelta < 0
-        ? 'under'
-        : 'even'
-  const totalCall = totalDirection === 'unavailable'
-    ? 'No total posted'
-    : totalDirection === 'even'
-      ? `No lean at ${num(totalMarket.line, 1)}`
-      : `${totalDirection.toUpperCase()} ${num(totalMarket.line, 1)}`
+  const moneylineDecision = projection.marketDecision?.moneyline
+  const totalDecision = projection.marketDecision?.total
+  const sideEdge = moneylineDecision?.modelEdge
+  const valueAbbr = moneylineDecision?.selectedTeam?.abbr
+  const totalDelta = totalDecision?.projectionDelta
   const sample = evaluation?.sample?.games || 0
-  const collecting = evaluation?.status !== 'review-ready'
+  const actionableCalls = marketEvaluation?.sample?.actionable
   const frozen = projection.freezeState === 'final-pregame'
   const awayPrice = Number.isFinite(moneyline?.awayAmerican)
     ? american(Math.round(moneyline.awayAmerican))
@@ -240,37 +334,30 @@ function GameForecastStrip({ game, projection, evaluation }) {
         <span className="game-forecast-title">
           <Icon name="ChartNoAxesCombined" size={12} /> Model forecast v{projection.modelVersion || 1}
         </span>
-        <span className="game-forecast-sample">{collecting ? 'Collecting' : 'Review sample'} · {sample} settled</span>
+        <span className="game-forecast-sample">
+          {Number.isFinite(actionableCalls)
+            ? `${actionableCalls} actionable calls`
+            : `${sample} settled forecasts`}
+        </span>
         <span className="game-forecast-state">{frozen ? 'Frozen pregame' : 'Pregame'} · advisory</span>
       </div>
-      <div className="game-forecast-call" aria-label="Model game calls">
-        <div className="game-forecast-call-item side">
-          <Icon name="TrendingUp" size={14} />
-          <span>
-            <small>Model call</small>
-            <strong>{winnerAbbr} to win</strong>
-          </span>
-          <b className="mono">{pct(winnerProbability, 1)}</b>
-        </div>
-        <div className={`game-forecast-call-item total ${totalDirection}`}>
-          <Icon name={totalDirection === 'under' ? 'TrendingDown' : totalDirection === 'over' ? 'TrendingUp' : 'Scale'} size={14} />
-          <span>
-            <small>Total call</small>
-            <strong>{totalCall}</strong>
-          </span>
-          <span className="game-forecast-call-evidence">
-            {hasTotalComparison ? (
-              <>
-                <b className="mono">{num(projection.projectedTotal, 1)} proj</b>
-                <em className="mono">
-                  {totalDelta >= 0 ? '+' : ''}{num(totalDelta, 1)} runs
-                </em>
-              </>
-            ) : (
-              <em>Market line unavailable</em>
-            )}
-          </span>
-        </div>
+      <div className="game-decision-grid" aria-label="Game market decision grades">
+        <MarketDecisionCard
+          gamePk={projection.gamePk ?? game?.gamePk}
+          market="moneyline"
+          decision={moneylineDecision}
+          projection={projection}
+          marketEvaluation={marketEvaluation}
+          portfolio={portfolio}
+        />
+        <MarketDecisionCard
+          gamePk={projection.gamePk ?? game?.gamePk}
+          market="total"
+          decision={totalDecision}
+          projection={projection}
+          marketEvaluation={marketEvaluation}
+          portfolio={portfolio}
+        />
       </div>
       <div className="game-forecast-core">
         <div className="game-forecast-projection away">
@@ -314,13 +401,13 @@ function GameForecastStrip({ game, projection, evaluation }) {
           {moneyline && <em>{pct(moneyline.awayMarketProbability, 1)} / {pct(moneyline.homeMarketProbability, 1)} fair</em>}
         </div>
         <div>
-          <small>Model vs market</small>
+          <small>Selected value vs market</small>
           <strong className={`mono ${Number.isFinite(sideEdge) && sideEdge >= 0 ? 'good' : ''}`}>
-            {Number.isFinite(sideEdge) ? `${signedPct(sideEdge, 1)} ${winnerAbbr}` : 'No side comparison'}
+            {Number.isFinite(sideEdge) ? `${signedPct(sideEdge, 1)} ${valueAbbr || 'side'}` : 'No side comparison'}
           </strong>
           <em>
             {Number.isFinite(totalDelta)
-              ? `${totalDelta >= 0 ? '+' : ''}${num(totalDelta, 1)} runs vs O/U ${num(totalMarket.line, 1)}`
+              ? `${totalDecision?.selectedSide?.toUpperCase() || 'Total'} ${num(totalDecision?.line, 1)} · ${num(totalDecision?.runSeparation, 1)} run separation`
               : 'No total comparison'}
           </em>
         </div>
@@ -354,6 +441,8 @@ export default function GamesView({
   batters,
   gameProjections = {},
   gameProjectionEvaluation = null,
+  gameMarketEvaluation = null,
+  gameMarketPortfolio = null,
   onSelect,
   selectedId,
   watchlist,
@@ -472,6 +561,8 @@ export default function GamesView({
                   groups={byGame.get(selectedGame.gamePk)}
                   projection={gameProjections?.[selectedGame.gamePk]}
                   evaluation={gameProjectionEvaluation}
+                  marketEvaluation={gameMarketEvaluation}
+                  portfolio={gameMarketPortfolio}
                   view={view}
                   featured={selectedGame.gamePk === visibleGod?.gamePk}
                   {...ctx}
@@ -488,9 +579,9 @@ export default function GamesView({
             <div className="mobile-matchups">
             {ordered.map((g, i) =>
               view === 'extractor' ? (
-                <MobileMatchupCard key={g.gamePk} game={g} groups={byGame.get(g.gamePk)} projection={gameProjections?.[g.gamePk]} evaluation={gameProjectionEvaluation} idx={i} {...ctx} />
+                <MobileMatchupCard key={g.gamePk} game={g} groups={byGame.get(g.gamePk)} projection={gameProjections?.[g.gamePk]} evaluation={gameProjectionEvaluation} marketEvaluation={gameMarketEvaluation} portfolio={gameMarketPortfolio} idx={i} {...ctx} />
               ) : (
-                <MobileDetailCard key={g.gamePk} game={g} groups={byGame.get(g.gamePk)} projection={gameProjections?.[g.gamePk]} evaluation={gameProjectionEvaluation} idx={i} {...ctx} />
+                <MobileDetailCard key={g.gamePk} game={g} groups={byGame.get(g.gamePk)} projection={gameProjections?.[g.gamePk]} evaluation={gameProjectionEvaluation} marketEvaluation={gameMarketEvaluation} portfolio={gameMarketPortfolio} idx={i} {...ctx} />
               ),
             )}
             </div>
@@ -540,7 +631,7 @@ function GameNavItem({ game: g, groups, active, featured, onClick, idx }) {
   )
 }
 
-function MatchupWorkspace({ game: g, groups, projection, evaluation, view, featured, onSelect, selectedId, watchlist, slip, onToggleWatch, onToggleSlip, onOpenPitcher }) {
+function MatchupWorkspace({ game: g, groups, projection, evaluation, marketEvaluation, portfolio, view, featured, onSelect, selectedId, watchlist, slip, onToggleWatch, onToggleSlip, onOpenPitcher }) {
   const info = gameOpportunity(g, groups)
   const live = g.isLive || g.isFinal
   const status = g.isFinal ? 'Final' : g.isLive ? `${(g.inningHalf || '').slice(0, 3)} ${g.currentInning || ''}`.trim() : gameTime(g.gameDate) || 'TBD'
@@ -560,7 +651,7 @@ function MatchupWorkspace({ game: g, groups, projection, evaluation, view, featu
           <div className="matchup-workspace-status"><b className={g.isLive ? 'live' : ''}>{status}</b><span>{g.venueName || ''}</span></div>
           <WorkspaceTeam team={g.homeTeam} pitcher={g.homePitcher} score={g.homeScore} showScore={live} gamePk={g.gamePk} onOpenPitcher={onOpenPitcher} align="right" />
         </div>
-        <GameForecastStrip game={g} projection={projection} evaluation={evaluation} />
+        <GameForecastStrip game={g} projection={projection} evaluation={evaluation} marketEvaluation={marketEvaluation} portfolio={portfolio} />
         <div className="matchup-workspace-metrics">
           <WorkspaceMetric icon="Gauge" label="Environment" value={info.envLabel} tone={info.envScore >= 70 ? 'good' : info.envScore <= 45 ? 'bad' : ''} sub={info.envScore == null ? 'No score' : `${info.envScore}/100`} />
           <WorkspaceMetric icon="Shield" label="Pitcher vulnerability" value={info.vulnerability} tone={info.vulnerability === 'High' ? 'good' : info.vulnerability === 'Low' ? 'bad' : ''} sub={info.maxHr9 == null ? 'HR/9 unavailable' : `${num(info.maxHr9, 2)} max HR/9`} />
@@ -657,7 +748,7 @@ function MobileTopTargets({ targets, onSelect }) {
   )
 }
 
-function MobileMatchupCard({ game: g, groups, projection, evaluation, idx = 0, onSelect, onOpenPitcher, watchlist, slip, onToggleWatch, onToggleSlip }) {
+function MobileMatchupCard({ game: g, groups, projection, evaluation, marketEvaluation, portfolio, idx = 0, onSelect, onOpenPitcher, watchlist, slip, onToggleWatch, onToggleSlip }) {
   const [open, setOpen] = useState(false)
   const away = [...(groups.away || [])].filter((b) => (b.grade?.label || 'SKIP') !== 'SKIP').sort((a, b) => (b.hrProbability ?? 0) - (a.hrProbability ?? 0))[0]
   const home = [...(groups.home || [])].filter((b) => (b.grade?.label || 'SKIP') !== 'SKIP').sort((a, b) => (b.hrProbability ?? 0) - (a.hrProbability ?? 0))[0]
@@ -676,7 +767,7 @@ function MobileMatchupCard({ game: g, groups, projection, evaluation, idx = 0, o
         </div>
         <MobileTeam team={g.homeTeam} pitcher={g.homePitcher} score={g.homeScore} live={g.isLive || g.isFinal} onOpenPitcher={onOpenPitcher} gamePk={g.gamePk} />
       </div>
-      <GameForecastStrip game={g} projection={projection} evaluation={evaluation} />
+      <GameForecastStrip game={g} projection={projection} evaluation={evaluation} marketEvaluation={marketEvaluation} portfolio={portfolio} />
       <div className="mobile-matchup-verdicts">
         <span className={envTone}><small>Environment</small><b>{opportunity.envLabel}</b></span>
         <span className={opportunity.vulnerability === 'High' ? 'good' : opportunity.vulnerability === 'Low' ? 'bad' : ''}><small>Vulnerability</small><b>{opportunity.vulnerability}</b></span>
@@ -735,7 +826,7 @@ function MobileLeader({ b, icon, onSelect, watched, inSlip, onToggleWatch, onTog
   )
 }
 
-function MobileDetailCard({ game: g, groups, projection, evaluation, idx = 0, onSelect, selectedId, watchlist, slip, onToggleWatch, onToggleSlip, onOpenPitcher }) {
+function MobileDetailCard({ game: g, groups, projection, evaluation, marketEvaluation, portfolio, idx = 0, onSelect, selectedId, watchlist, slip, onToggleWatch, onToggleSlip, onOpenPitcher }) {
   const [side, setSide] = useState('away')
   const [showAll, setShowAll] = useState(false)
   const sample = groups.away?.[0] || groups.home?.[0]
@@ -761,7 +852,7 @@ function MobileDetailCard({ game: g, groups, projection, evaluation, idx = 0, on
         </div>
         <MobileTeam team={g.homeTeam} pitcher={g.homePitcher} score={g.homeScore} live={g.isLive || g.isFinal} onOpenPitcher={onOpenPitcher} gamePk={g.gamePk} />
       </div>
-      <GameForecastStrip game={g} projection={projection} evaluation={evaluation} />
+      <GameForecastStrip game={g} projection={projection} evaluation={evaluation} marketEvaluation={marketEvaluation} portfolio={portfolio} />
       <GameChips sample={sample} game={g} />
       <div className="mobile-team-switcher" role="tablist" aria-label={`${g.awayTeam?.abbr} and ${g.homeTeam?.abbr} hitters`}>
         <MobileTeamTab side="away" active={side === 'away'} team={g.awayTeam} batters={awayBats} onClick={() => switchSide('away')} />
