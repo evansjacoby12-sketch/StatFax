@@ -1,7 +1,9 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
+  buildGameProjectionRevision,
   buildGameProjection,
+  detectGameProjectionChanges,
   evaluateGameForecasts,
   gameMarketBlendPolicy,
   gameTotalProbabilities,
@@ -478,6 +480,8 @@ test('forecast tracker refreshes pregame rows and freezes them when the game sta
     capturedAt: '2026-07-27T22:30:00.000Z',
   })
   assert.equal(first.projections[0].freezeState, 'refreshing-pregame')
+  assert.equal(first.projections[0].revision.number, 1)
+  assert.deepEqual(first.projections[0].revision.reasons, ['initial-capture'])
 
   const startedGame = { ...game, isLive: true }
   const second = updateGameForecastLog(first.log, '2026-07-27', [], [startedGame], {
@@ -485,6 +489,51 @@ test('forecast tracker refreshes pregame rows and freezes them when the game sta
   })
   assert.equal(second.projections[0].freezeState, 'final-pregame')
   assert.equal(second.projections[0].awayExpectedRuns, projection.awayExpectedRuns)
+})
+
+test('forecast revisions identify material input, projection, and market changes', () => {
+  const baseline = {
+    ...buildGameProjection({
+      game,
+      rows: balancedRows(),
+      capturedAt: '2026-07-27T21:00:00.000Z',
+    }),
+    marketTracking: {
+      current: {
+        moneyline: { homeFairProbability: 0.52, homeAmerican: -110 },
+        total: { line: 8.5, overAmerican: -110 },
+      },
+    },
+  }
+  baseline.revision = buildGameProjectionRevision(null, baseline, {
+    observedAt: baseline.capturedAt,
+  })
+  const identical = structuredClone(baseline)
+  identical.capturedAt = '2026-07-27T21:10:00.000Z'
+  const unchanged = buildGameProjectionRevision(baseline, identical, {
+    observedAt: identical.capturedAt,
+  })
+  assert.equal(unchanged.number, 1)
+  assert.equal(unchanged.material, false)
+  assert.deepEqual(unchanged.reasons, [])
+
+  const changed = structuredClone(identical)
+  changed.probablePitchers.home = { id: 61, name: 'New Home Arm' }
+  changed.inputs.away.lineupPlayerIds = changed.inputs.away.lineupPlayerIds.slice().reverse()
+  changed.homeWinProbability += 0.025
+  changed.awayWinProbability -= 0.025
+  changed.marketTracking.current.total.line = 9
+  const reasons = detectGameProjectionChanges(baseline, changed)
+  assert.ok(reasons.includes('home-starter'))
+  assert.ok(reasons.includes('away-lineup'))
+  assert.ok(reasons.includes('side-projection'))
+  assert.ok(reasons.includes('total-market'))
+  const revision = buildGameProjectionRevision(baseline, changed, {
+    observedAt: changed.capturedAt,
+  })
+  assert.equal(revision.number, 2)
+  assert.equal(revision.material, true)
+  assert.deepEqual(revision.reasons, reasons)
 })
 
 test('settlement uses only an explicitly frozen pregame capture', () => {

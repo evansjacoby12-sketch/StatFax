@@ -485,6 +485,7 @@ import {
   updateGameForecastLog,
 } from '../src/sports/mlb/logic/gameProjection.js';
 import { gameMarketDecisionPolicy } from '../src/sports/mlb/logic/gameMarketDecision.js';
+import { updateGameMarketHistory } from '../src/sports/mlb/logic/gameMarketTracking.js';
 import {
   buildTeamScoringProfiles,
   evaluateTeamScoringForm,
@@ -2251,6 +2252,16 @@ async function main() {
           resultsByDate: {
             ...(bg?.resultsByDate || {}),
             ...(lg?.resultsByDate || {}),
+          },
+        };
+      }
+      const lm = local?.gameMarketHistory, bm = backtestLog?.gameMarketHistory;
+      if (lm?.byDate || bm?.byDate) {
+        backtestLog.gameMarketHistory = {
+          version: 1,
+          byDate: {
+            ...(bm?.byDate || {}),
+            ...(lm?.byDate || {}),
           },
         };
       }
@@ -4503,6 +4514,27 @@ async function main() {
     }
   } catch (e) { console.warn(`[game-odds] fetch skipped: ${e?.message}`); }
 
+  let gameMarketTrackingByGamePk = {};
+  try {
+    const trackedMarkets = updateGameMarketHistory(
+      backtestLog,
+      date,
+      gameOddsByGamePk,
+      games,
+      { capturedAt: new Date().toISOString() },
+    );
+    backtestLog = trackedMarkets.log;
+    gameMarketTrackingByGamePk = trackedMarkets.currentByGame;
+    const materialMoves = Object.values(gameMarketTrackingByGamePk)
+      .filter((entry) => entry?.movement?.material).length;
+    console.log(
+      `[game-market] tracked ${Object.keys(gameMarketTrackingByGamePk).length} games`
+      + ` (${materialMoves} material move${materialMoves === 1 ? '' : 's'})`,
+    );
+  } catch (e) {
+    console.warn(`[game-market] tracking skipped: ${e?.message}`);
+  }
+
   // Advisory game forecast. It is built only while a game is pregame, then
   // the last capture is preserved when that exact gamePk starts. Model inputs
   // are deliberately inspectable. Market influence is capped and remains off
@@ -4523,6 +4555,7 @@ async function main() {
       teamSeasonRunProfiles,
       gameScheduleContexts,
       gameOdds: gameOddsByGamePk,
+      gameMarketTracking: gameMarketTrackingByGamePk,
       marketBlendPolicy,
       marketDecisionPolicy,
       teamScoringProfiles,

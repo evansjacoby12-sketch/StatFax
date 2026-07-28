@@ -642,6 +642,78 @@ test('backtest contract enforces operational/archive caps and synchronization', 
   assert.ok(check.errors.some((error) => error.includes('missing operational date')))
 })
 
+test('backtest contract validates doubleheader-safe game market history', () => {
+  const snapshot = (line) => ({
+    capturedAt: '2026-07-28T18:00:00.000Z',
+    sourceUpdatedAt: '2026-07-28T17:59:00.000Z',
+    moneyline: {
+      books: 5,
+      awayAmerican: 110,
+      homeAmerican: -120,
+      awayFairProbability: 0.4762,
+      homeFairProbability: 0.5238,
+    },
+    total: {
+      books: 5,
+      line,
+      overAmerican: -110,
+      underAmerican: -110,
+      overFairProbability: 0.5,
+      underFairProbability: 0.5,
+    },
+  })
+  const entry = (gamePk, gameNumber, line) => ({
+    gamePk,
+    gameDate: '2026-07-28T23:10:00.000Z',
+    awayTeamId: 1,
+    homeTeamId: 2,
+    gameNumber,
+    status: 'pregame',
+    opening: snapshot(line),
+    current: snapshot(line),
+    closing: null,
+    firstCapturedAt: '2026-07-28T18:00:00.000Z',
+    lastObservedAt: '2026-07-28T18:00:00.000Z',
+    lastChangedAt: '2026-07-28T18:00:00.000Z',
+    closedAt: null,
+    observationCount: 1,
+    revisionCount: 1,
+    movement: {
+      moneylineHomeProbability: 0,
+      moneylineHomePrice: 0,
+      totalLine: 0,
+      overPrice: 0,
+      material: false,
+      changed: [],
+    },
+  })
+  const log = {
+    dates: [],
+    records: {},
+    gameMarketHistory: {
+      version: 1,
+      byDate: {
+        '2026-07-28': {
+          10: entry(10, 1, 8),
+          11: entry(11, 2, 9.5),
+        },
+      },
+    },
+  }
+  const valid = validateBacktestLog(log)
+  assert.deepEqual(valid.errors, [])
+  assert.equal(valid.metrics.gameMarketDays, 1)
+  assert.equal(valid.metrics.gameMarketGames, 2)
+
+  const mismatched = structuredClone(log)
+  mismatched.gameMarketHistory.byDate['2026-07-28']['11'].gamePk = 10
+  assert.ok(validateBacktestLog(mismatched).errors.some((error) => error.includes('must match map key')))
+
+  const invalidClose = structuredClone(log)
+  invalidClose.gameMarketHistory.byDate['2026-07-28']['10'].closing = snapshot(8)
+  assert.ok(validateBacktestLog(invalidClose).errors.some((error) => error.includes('must be null while pregame')))
+})
+
 test('backtest contract verifies schema-v2 features and the derived coverage summary', () => {
   const row = {
     playerId: 1, gamePk: 10, score: 70, homered: false, actuallyPlayed: true,

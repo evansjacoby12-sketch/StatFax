@@ -148,6 +148,139 @@ function validateProbability(prefix, value, errors) {
   if (!Number.isFinite(value) || value < 0 || value > 1) errors.push(`${prefix}: expected probability in [0,1]`)
 }
 
+function validateOptionalIso(prefix, value, errors) {
+  if (value != null && (typeof value !== 'string' || Number.isNaN(Date.parse(value)))) {
+    errors.push(`${prefix}: expected null or an ISO timestamp`)
+  }
+}
+
+function validateTrackedAmerican(prefix, value, errors) {
+  if (value != null && (!Number.isFinite(value) || (value > -100 && value < 100))) {
+    errors.push(`${prefix}: expected null or valid American odds`)
+  }
+}
+
+function validateGameMarketSnapshot(prefix, snapshot, errors) {
+  if (!isObject(snapshot)) {
+    errors.push(`${prefix}: expected an object`)
+    return
+  }
+  validateOptionalIso(`${prefix}.capturedAt`, snapshot.capturedAt, errors)
+  if (snapshot.capturedAt == null) errors.push(`${prefix}.capturedAt: required`)
+  validateOptionalIso(`${prefix}.sourceUpdatedAt`, snapshot.sourceUpdatedAt, errors)
+  if (snapshot.moneyline == null && snapshot.total == null) {
+    errors.push(`${prefix}: requires a moneyline or total`)
+  }
+  if (snapshot.moneyline != null) {
+    const moneyline = snapshot.moneyline
+    const at = `${prefix}.moneyline`
+    if (!isObject(moneyline)) {
+      errors.push(`${at}: expected null or an object`)
+    } else {
+      if (!Number.isInteger(moneyline.books) || moneyline.books < 0) {
+        errors.push(`${at}.books: expected a non-negative integer`)
+      }
+      for (const side of ['away', 'home']) {
+        validateTrackedAmerican(`${at}.${side}American`, moneyline[`${side}American`], errors)
+        validateOptionalMetric(`${at}.${side}FairProbability`, moneyline[`${side}FairProbability`], errors, {
+          min: 0,
+          max: 1,
+        })
+      }
+      if (
+        Number.isFinite(moneyline.awayFairProbability)
+        && Number.isFinite(moneyline.homeFairProbability)
+        && Math.abs(moneyline.awayFairProbability + moneyline.homeFairProbability - 1) > 0.002
+      ) errors.push(`${at}: fair probabilities must sum to 1`)
+    }
+  }
+  if (snapshot.total != null) {
+    const total = snapshot.total
+    const at = `${prefix}.total`
+    if (!isObject(total)) {
+      errors.push(`${at}: expected null or an object`)
+    } else {
+      if (!Number.isInteger(total.books) || total.books < 0) {
+        errors.push(`${at}.books: expected a non-negative integer`)
+      }
+      validateOptionalMetric(`${at}.line`, total.line, errors, { min: 0.5, max: 30 })
+      for (const side of ['over', 'under']) {
+        validateTrackedAmerican(`${at}.${side}American`, total[`${side}American`], errors)
+        validateOptionalMetric(`${at}.${side}FairProbability`, total[`${side}FairProbability`], errors, {
+          min: 0,
+          max: 1,
+        })
+      }
+      if (
+        Number.isFinite(total.overFairProbability)
+        && Number.isFinite(total.underFairProbability)
+        && Math.abs(total.overFairProbability + total.underFairProbability - 1) > 0.002
+      ) errors.push(`${at}: fair probabilities must sum to 1`)
+    }
+  }
+}
+
+function validateGameMarketTrackingEntry(prefix, entry, errors) {
+  if (!isObject(entry)) {
+    errors.push(`${prefix}: expected an object`)
+    return
+  }
+  if (!Number.isFinite(entry.gamePk)) errors.push(`${prefix}.gamePk: expected a finite game ID`)
+  if (!entry.gameDate || Number.isNaN(Date.parse(entry.gameDate))) {
+    errors.push(`${prefix}.gameDate: expected an ISO timestamp`)
+  }
+  for (const field of ['awayTeamId', 'homeTeamId']) {
+    if (entry[field] != null && !Number.isFinite(entry[field])) {
+      errors.push(`${prefix}.${field}: expected null or a finite team ID`)
+    }
+  }
+  if (!Number.isInteger(entry.gameNumber) || entry.gameNumber < 1) {
+    errors.push(`${prefix}.gameNumber: expected a positive integer`)
+  }
+  if (!['pregame', 'frozen'].includes(entry.status)) errors.push(`${prefix}.status: unsupported`)
+  validateGameMarketSnapshot(`${prefix}.opening`, entry.opening, errors)
+  validateGameMarketSnapshot(`${prefix}.current`, entry.current, errors)
+  if (entry.closing != null) validateGameMarketSnapshot(`${prefix}.closing`, entry.closing, errors)
+  if (entry.status === 'pregame' && entry.closing != null) {
+    errors.push(`${prefix}.closing: must be null while pregame`)
+  }
+  if (entry.status === 'frozen' && entry.closing == null) {
+    errors.push(`${prefix}.closing: required when frozen`)
+  }
+  for (const field of ['firstCapturedAt', 'lastObservedAt', 'lastChangedAt', 'closedAt']) {
+    validateOptionalIso(`${prefix}.${field}`, entry[field], errors)
+  }
+  for (const field of ['firstCapturedAt', 'lastObservedAt', 'lastChangedAt']) {
+    if (entry[field] == null) errors.push(`${prefix}.${field}: required`)
+  }
+  if (entry.status === 'frozen' && entry.closedAt == null) errors.push(`${prefix}.closedAt: required when frozen`)
+  if (entry.status === 'pregame' && entry.closedAt != null) errors.push(`${prefix}.closedAt: must be null while pregame`)
+  for (const field of ['observationCount', 'revisionCount']) {
+    if (!Number.isInteger(entry[field]) || entry[field] < 1) {
+      errors.push(`${prefix}.${field}: expected a positive integer`)
+    }
+  }
+  if (
+    Number.isInteger(entry.observationCount)
+    && Number.isInteger(entry.revisionCount)
+    && entry.revisionCount > entry.observationCount
+  ) errors.push(`${prefix}.revisionCount: cannot exceed observationCount`)
+  const movement = entry.movement
+  if (!isObject(movement)) {
+    errors.push(`${prefix}.movement: expected an object`)
+  } else {
+    for (const field of ['moneylineHomeProbability', 'moneylineHomePrice', 'totalLine', 'overPrice']) {
+      validateOptionalMetric(`${prefix}.movement.${field}`, movement[field], errors, { min: -10000, max: 10000 })
+    }
+    if (typeof movement.material !== 'boolean') errors.push(`${prefix}.movement.material: expected boolean`)
+    if (!Array.isArray(movement.changed) || movement.changed.some((value) => typeof value !== 'string')) {
+      errors.push(`${prefix}.movement.changed: expected an array of strings`)
+    } else if (movement.material !== (movement.changed.length > 0)) {
+      errors.push(`${prefix}.movement.material: must match changed[]`)
+    }
+  }
+}
+
 function validateGameMarketDecision(prefix, decision, projection, errors) {
   if (!isObject(decision)) {
     errors.push(`${prefix}: expected an object for model v8`)
@@ -787,6 +920,62 @@ function validateGameProjectionRecord(prefix, projection, errors, gameIds = null
   if (projection.modelVersion >= 8) {
     validateGameMarketDecision(`${prefix}.marketDecision`, projection.marketDecision, projection, errors)
   }
+  if (projection.probablePitchers != null) {
+    if (!isObject(projection.probablePitchers)) {
+      errors.push(`${prefix}.probablePitchers: expected an object`)
+    } else {
+      for (const side of ['away', 'home']) {
+        const pitcher = projection.probablePitchers[side]
+        if (pitcher == null) continue
+        if (!isObject(pitcher)) {
+          errors.push(`${prefix}.probablePitchers.${side}: expected null or an object`)
+          continue
+        }
+        if (pitcher.id != null && !Number.isFinite(pitcher.id)) {
+          errors.push(`${prefix}.probablePitchers.${side}.id: expected null or finite`)
+        }
+        if (pitcher.name != null && typeof pitcher.name !== 'string') {
+          errors.push(`${prefix}.probablePitchers.${side}.name: expected null or text`)
+        }
+      }
+    }
+  }
+  if (projection.marketTracking != null) {
+    validateGameMarketTrackingEntry(`${prefix}.marketTracking`, projection.marketTracking, errors)
+    if (
+      Number.isFinite(projection.marketTracking?.gamePk)
+      && Number.isFinite(projection.gamePk)
+      && projection.marketTracking.gamePk !== projection.gamePk
+    ) errors.push(`${prefix}.marketTracking.gamePk: must match projection gamePk`)
+  }
+  if (projection.revision != null) {
+    const revision = projection.revision
+    const at = `${prefix}.revision`
+    if (!isObject(revision)) {
+      errors.push(`${at}: expected an object`)
+    } else {
+      if (!Number.isInteger(revision.number) || revision.number < 1) {
+        errors.push(`${at}.number: expected a positive integer`)
+      }
+      for (const field of ['firstCapturedAt', 'lastChangedAt', 'previousCapturedAt', 'observedAt']) {
+        validateOptionalIso(`${at}.${field}`, revision[field], errors)
+      }
+      for (const field of ['firstCapturedAt', 'lastChangedAt', 'observedAt']) {
+        if (revision[field] == null) errors.push(`${at}.${field}: required`)
+      }
+      if (typeof revision.material !== 'boolean') errors.push(`${at}.material: expected boolean`)
+      if (!Array.isArray(revision.reasons) || revision.reasons.some((value) => typeof value !== 'string')) {
+        errors.push(`${at}.reasons: expected an array of strings`)
+      }
+    }
+  }
+  for (const side of ['away', 'home']) {
+    const playerIds = projection.inputs?.[side]?.lineupPlayerIds
+    if (
+      playerIds != null
+      && (!Array.isArray(playerIds) || playerIds.some((playerId) => !Number.isFinite(playerId)))
+    ) errors.push(`${prefix}.inputs.${side}.lineupPlayerIds: expected an array of finite player IDs`)
+  }
   if (projection.freezeState != null && !['refreshing-pregame', 'final-pregame'].includes(projection.freezeState)) {
     errors.push(`${prefix}.freezeState: unsupported`)
   }
@@ -1207,6 +1396,45 @@ export function validateBacktestLog(log) {
     }
   }
 
+  let gameMarketDays = 0
+  let gameMarketGames = 0
+  if (log.gameMarketHistory != null) {
+    const history = log.gameMarketHistory
+    if (!isObject(history)) {
+      errors.push('gameMarketHistory: expected an object')
+    } else {
+      if (history.version !== 1) {
+        errors.push(`gameMarketHistory.version: expected 1, received ${String(history.version)}`)
+      }
+      const byDate = history.byDate
+      const marketDates = isObject(byDate) ? Object.keys(byDate) : []
+      if (!isObject(byDate)) errors.push('gameMarketHistory.byDate: expected an object')
+      if (marketDates.length > 180) {
+        errors.push(`gameMarketHistory.byDate: exceeds 180-day cap (${marketDates.length})`)
+      }
+      if (!marketDates.every(isValidDate)) {
+        errors.push('gameMarketHistory.byDate: every key must use YYYY-MM-DD')
+      }
+      for (const date of marketDates) {
+        const entries = byDate[date]
+        if (!isObject(entries)) {
+          errors.push(`gameMarketHistory.byDate.${date}: expected an object`)
+          continue
+        }
+        gameMarketDays++
+        for (const [gamePk, entry] of Object.entries(entries)) {
+          const prefix = `gameMarketHistory.byDate.${date}.${gamePk}`
+          if (!Number.isFinite(Number(gamePk))) errors.push(`${prefix}: key must be a finite game ID`)
+          validateGameMarketTrackingEntry(prefix, entry, errors)
+          if (Number.isFinite(entry?.gamePk) && String(entry.gamePk) !== String(gamePk)) {
+            errors.push(`${prefix}.gamePk: must match map key`)
+          }
+          gameMarketGames++
+        }
+      }
+    }
+  }
+
   return result(errors, warnings, {
     operationalDays: dates.length,
     operationalRows,
@@ -1216,6 +1444,8 @@ export function validateBacktestLog(log) {
     kResultDays,
     gameForecastDays,
     gameForecastResults,
+    gameMarketDays,
+    gameMarketGames,
   })
 }
 

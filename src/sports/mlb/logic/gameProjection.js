@@ -802,6 +802,7 @@ function teamProjection({
       lineupSource: lineup.source,
       lineupSize: lineup.rows.length,
       lineupOrdered: lineup.orderedCount,
+      lineupPlayerIds: lineup.rows.map((row) => Number(row.playerId)).filter(Number.isFinite),
       offenseFactor: round(offense.factor),
       starterFactor: round(starter.factor),
       bullpenFactor: round(bullpen.factor),
@@ -880,6 +881,7 @@ export function buildGameProjection({
   teamSeasonRunProfiles = null,
   gameScheduleContexts = null,
   gameOdds = null,
+  gameMarketTracking = null,
   marketBlendPolicy = gameMarketBlendPolicy(),
   marketDecisionPolicy = gameMarketDecisionPolicy(),
   teamScoringProfiles = null,
@@ -955,6 +957,14 @@ export function buildGameProjection({
     capturedAt,
     awayTeam,
     homeTeam,
+    probablePitchers: {
+      away: game.awayPitcher
+        ? { id: game.awayPitcher.id ?? null, name: game.awayPitcher.name || null }
+        : null,
+      home: game.homePitcher
+        ? { id: game.homePitcher.id ?? null, name: game.homePitcher.name || null }
+        : null,
+    },
     awayExpectedRuns: round(blended.awayExpectedRuns, 2),
     homeExpectedRuns: round(blended.homeExpectedRuns, 2),
     projectedTotal: round(projectedTotal, 2),
@@ -974,6 +984,7 @@ export function buildGameProjection({
     inputs: { away: away.inputs, home: home.inputs },
     marketBlend: blended.disclosure,
     marketComparison: comparison,
+    marketTracking: gameMarketTracking,
     marketDecision: buildGameMarketDecision({
       awayTeam,
       homeTeam,
@@ -997,6 +1008,7 @@ export function buildSlateGameProjections({
   teamSeasonRunProfiles = null,
   gameScheduleContexts = null,
   gameOdds = {},
+  gameMarketTracking = {},
   marketBlendPolicy = gameMarketBlendPolicy(),
   marketDecisionPolicy = gameMarketDecisionPolicy(),
   teamScoringProfiles = null,
@@ -1020,12 +1032,128 @@ export function buildSlateGameProjections({
       teamSeasonRunProfiles,
       gameScheduleContexts,
       gameOdds: gameOdds?.[game.gamePk] || null,
+      gameMarketTracking: gameMarketTracking?.[game.gamePk] || null,
       marketBlendPolicy,
       marketDecisionPolicy,
       teamScoringProfiles,
       capturedAt,
     }))
     .filter(Boolean)
+}
+
+const sameNumbers = (left = [], right = []) => (
+  left.length === right.length
+  && left.every((value, index) => Number(value) === Number(right[index]))
+)
+
+const changedBy = (left, right, threshold) => (
+  Number.isFinite(left)
+  && Number.isFinite(right)
+  && Math.abs(left - right) >= threshold
+)
+
+const changedNames = (left = [], right = []) => (
+  [...left].sort().join('|') !== [...right].sort().join('|')
+)
+
+export function detectGameProjectionChanges(previous, current) {
+  if (!previous || !current) return []
+  const changes = []
+  for (const side of ['away', 'home']) {
+    if (
+      Number(previous.probablePitchers?.[side]?.id || 0)
+      !== Number(current.probablePitchers?.[side]?.id || 0)
+    ) changes.push(`${side}-starter`)
+    if (
+      previous.inputs?.[side]?.lineupSource !== current.inputs?.[side]?.lineupSource
+      || !sameNumbers(
+        previous.inputs?.[side]?.lineupPlayerIds || [],
+        current.inputs?.[side]?.lineupPlayerIds || [],
+      )
+    ) changes.push(`${side}-lineup`)
+    if (
+      changedBy(
+        previous.inputs?.[side]?.bullpenAvailabilityFactor,
+        current.inputs?.[side]?.bullpenAvailabilityFactor,
+        0.01,
+      )
+      || changedNames(
+        previous.inputs?.[side]?.bullpenContext?.unavailableNames || [],
+        current.inputs?.[side]?.bullpenContext?.unavailableNames || [],
+      )
+    ) changes.push(`${side}-bullpen`)
+  }
+
+  const previousEnvironment = previous.inputs?.away?.runEnvironment
+  const currentEnvironment = current.inputs?.away?.runEnvironment
+  if (
+    previousEnvironment?.roofClosed !== currentEnvironment?.roofClosed
+    || previousEnvironment?.roofPending !== currentEnvironment?.roofPending
+  ) changes.push('roof')
+  if (
+    changedBy(
+      previous.inputs?.away?.runEnvironmentFactor,
+      current.inputs?.away?.runEnvironmentFactor,
+      0.015,
+    )
+  ) changes.push('weather')
+
+  if (
+    changedBy(previous.homeWinProbability, current.homeWinProbability, 0.02)
+  ) changes.push('side-projection')
+  if (
+    changedBy(previous.projectedTotal, current.projectedTotal, 0.25)
+  ) changes.push('total-projection')
+
+  const previousMoneyline = previous.marketTracking?.current?.moneyline
+  const currentMoneyline = current.marketTracking?.current?.moneyline
+  if (
+    changedBy(
+      previousMoneyline?.homeFairProbability,
+      currentMoneyline?.homeFairProbability,
+      0.02,
+    )
+    || changedBy(previousMoneyline?.homeAmerican, currentMoneyline?.homeAmerican, 15)
+  ) changes.push('moneyline-market')
+  const previousTotal = previous.marketTracking?.current?.total
+  const currentTotal = current.marketTracking?.current?.total
+  if (
+    changedBy(previousTotal?.line, currentTotal?.line, 0.5)
+    || changedBy(previousTotal?.overAmerican, currentTotal?.overAmerican, 15)
+  ) changes.push('total-market')
+  return [...new Set(changes)]
+}
+
+export function buildGameProjectionRevision(
+  previous,
+  current,
+  { observedAt = current?.capturedAt || new Date().toISOString() } = {},
+) {
+  if (!previous) {
+    return {
+      number: 1,
+      firstCapturedAt: current?.capturedAt || observedAt,
+      lastChangedAt: current?.capturedAt || observedAt,
+      previousCapturedAt: null,
+      observedAt,
+      material: false,
+      reasons: ['initial-capture'],
+    }
+  }
+  const reasons = detectGameProjectionChanges(previous, current)
+  const priorRevision = previous.revision || {}
+  return {
+    number: (Number.isInteger(priorRevision.number) ? priorRevision.number : 1)
+      + (reasons.length ? 1 : 0),
+    firstCapturedAt: priorRevision.firstCapturedAt || previous.capturedAt,
+    lastChangedAt: reasons.length
+      ? observedAt
+      : priorRevision.lastChangedAt || previous.capturedAt,
+    previousCapturedAt: reasons.length ? previous.capturedAt : priorRevision.previousCapturedAt || null,
+    observedAt,
+    material: reasons.length > 0,
+    reasons,
+  }
 }
 
 export function updateGameForecastLog(log = {}, date, current = [], games = [], { capturedAt = new Date().toISOString() } = {}) {
@@ -1055,8 +1183,12 @@ export function updateGameForecastLog(log = {}, date, current = [], games = [], 
         })
       }
     } else if (fresh.has(gamePk)) {
+      const freshProjection = fresh.get(gamePk)
       merged.push({
-        ...fresh.get(gamePk),
+        ...freshProjection,
+        revision: buildGameProjectionRevision(prior.get(gamePk), freshProjection, {
+          observedAt: capturedAt,
+        }),
         freezeState: 'refreshing-pregame',
         frozenAt: null,
       })
