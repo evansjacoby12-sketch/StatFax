@@ -24175,6 +24175,85 @@ button.th:focus-visible {
 
 .game-forecast-state { margin-left: auto; white-space: nowrap; }
 
+.game-forecast-call {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-bottom: 8px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--accent) 13%, var(--border-soft));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--accent) 5%, rgba(0, 0, 0, 0.2));
+}
+
+.game-forecast-call-item {
+  min-width: 0;
+  min-height: 48px;
+  padding: 8px 11px;
+  display: grid;
+  grid-template-columns: 15px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  color: var(--accent);
+}
+
+.game-forecast-call-item + .game-forecast-call-item {
+  border-left: 1px solid var(--border-soft);
+}
+
+.game-forecast-call-item > span:not(.game-forecast-call-evidence) {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.game-forecast-call-item small {
+  color: var(--text-faint);
+  font-size: 7px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.game-forecast-call-item strong {
+  overflow: hidden;
+  color: #fff;
+  font-size: 11px;
+  letter-spacing: 0.035em;
+  line-height: 1;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.game-forecast-call-item > b {
+  padding: 3px 6px;
+  color: var(--accent);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.045);
+  font-size: 9px;
+  white-space: nowrap;
+}
+
+.game-forecast-call-evidence {
+  min-width: 64px;
+  display: grid;
+  gap: 2px;
+  color: var(--accent);
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.game-forecast-call-evidence b { font-size: 9px; }
+.game-forecast-call-evidence em {
+  color: var(--text-faint);
+  font-size: 7px;
+  font-style: normal;
+}
+.game-forecast-call-item.unavailable,
+.game-forecast-call-item.even { color: var(--text-faint); }
+
 .game-forecast-core {
   min-width: 0;
   display: grid;
@@ -24308,6 +24387,24 @@ button.th:focus-visible {
   .game-forecast-head { flex-wrap: wrap; margin-bottom: 7px; }
   .game-forecast-sample { max-width: 145px; overflow: hidden; text-overflow: ellipsis; }
   .game-forecast-state { width: 100%; margin-left: 0; }
+  .game-forecast-call { margin-bottom: 7px; }
+  .game-forecast-call-item {
+    min-height: 52px;
+    padding: 7px 8px;
+    grid-template-columns: 13px minmax(0, 1fr);
+    gap: 6px;
+  }
+  .game-forecast-call-item > b,
+  .game-forecast-call-evidence {
+    grid-column: 2;
+    justify-self: start;
+  }
+  .game-forecast-call-item > b { margin-top: -2px; }
+  .game-forecast-call-evidence {
+    min-width: 0;
+    grid-auto-flow: column;
+    gap: 5px;
+  }
   .game-forecast-core { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .game-forecast-core > div { min-height: 44px; padding: 6px 8px; }
   .game-forecast-projection.home,
@@ -24349,6 +24446,11 @@ button.th:focus-visible {
 }
 
 @media (max-width: 360px) {
+  .game-forecast-call { grid-template-columns: 1fr; }
+  .game-forecast-call-item + .game-forecast-call-item {
+    border-top: 1px solid var(--border-soft);
+    border-left: 0;
+  }
   .game-forecast-projection strong { font-size: 13px; }
 }
 

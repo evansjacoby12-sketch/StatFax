@@ -182,10 +182,25 @@ function GameForecastStrip({ game, projection, evaluation }) {
   const totalMarket = projection.marketComparison?.total
   const winnerSide = projection.projectedWinner === 'home' ? 'home' : 'away'
   const winnerAbbr = winnerSide === 'home' ? homeAbbr : awayAbbr
+  const winnerProbability = winnerSide === 'home' ? homeWin : awayWin
   const sideEdge = moneyline?.[`${winnerSide}ModelEdge`]
-  const totalDelta = Number.isFinite(totalMarket?.line)
+  const hasTotalComparison = Number.isFinite(totalMarket?.line)
+    && Number.isFinite(projection.projectedTotal)
+  const totalDelta = hasTotalComparison
     ? projection.projectedTotal - totalMarket.line
     : null
+  const totalDirection = !hasTotalComparison
+    ? 'unavailable'
+    : totalDelta > 0
+      ? 'over'
+      : totalDelta < 0
+        ? 'under'
+        : 'even'
+  const totalCall = totalDirection === 'unavailable'
+    ? 'No total posted'
+    : totalDirection === 'even'
+      ? `No lean at ${num(totalMarket.line, 1)}`
+      : `${totalDirection.toUpperCase()} ${num(totalMarket.line, 1)}`
   const sample = evaluation?.sample?.games || 0
   const collecting = evaluation?.status !== 'review-ready'
   const frozen = projection.freezeState === 'final-pregame'
@@ -227,6 +242,35 @@ function GameForecastStrip({ game, projection, evaluation }) {
         </span>
         <span className="game-forecast-sample">{collecting ? 'Collecting' : 'Review sample'} · {sample} settled</span>
         <span className="game-forecast-state">{frozen ? 'Frozen pregame' : 'Pregame'} · advisory</span>
+      </div>
+      <div className="game-forecast-call" aria-label="Model game calls">
+        <div className="game-forecast-call-item side">
+          <Icon name="TrendingUp" size={14} />
+          <span>
+            <small>Model call</small>
+            <strong>{winnerAbbr} to win</strong>
+          </span>
+          <b className="mono">{pct(winnerProbability, 1)}</b>
+        </div>
+        <div className={`game-forecast-call-item total ${totalDirection}`}>
+          <Icon name={totalDirection === 'under' ? 'TrendingDown' : totalDirection === 'over' ? 'TrendingUp' : 'Scale'} size={14} />
+          <span>
+            <small>Total call</small>
+            <strong>{totalCall}</strong>
+          </span>
+          <span className="game-forecast-call-evidence">
+            {hasTotalComparison ? (
+              <>
+                <b className="mono">{num(projection.projectedTotal, 1)} proj</b>
+                <em className="mono">
+                  {totalDelta >= 0 ? '+' : ''}{num(totalDelta, 1)} runs
+                </em>
+              </>
+            ) : (
+              <em>Market line unavailable</em>
+            )}
+          </span>
+        </div>
       </div>
       <div className="game-forecast-core">
         <div className="game-forecast-projection away">
