@@ -333,8 +333,8 @@ function validateGameMarketCallSnapshot(prefix, call, errors) {
   if (!call.capturedAt || Number.isNaN(Date.parse(call.capturedAt))) {
     errors.push(`${prefix}.capturedAt: expected an ISO timestamp`)
   }
-  if (![1, 2, 3, 4, 5, 6, 7, 8].includes(call.modelVersion)) {
-    errors.push(`${prefix}.modelVersion: expected 1 through 8`)
+  if (![1, 2, 3, 4, 5, 6, 7, 8, 9].includes(call.modelVersion)) {
+    errors.push(`${prefix}.modelVersion: expected 1 through 9`)
   }
   if (!Number.isInteger(call.projectionRevision) || call.projectionRevision < 1) {
     errors.push(`${prefix}.projectionRevision: expected a positive integer`)
@@ -622,7 +622,7 @@ function validateGameProjectionRecord(prefix, projection, errors, gameIds = null
     errors.push(`${prefix}: expected an object`)
     return
   }
-  if (![1, 2, 3, 4, 5, 6, 7, 8].includes(projection.modelVersion)) errors.push(`${prefix}.modelVersion: expected 1 through 8`)
+  if (![1, 2, 3, 4, 5, 6, 7, 8, 9].includes(projection.modelVersion)) errors.push(`${prefix}.modelVersion: expected 1 through 9`)
   if (projection.advisoryOnly !== true) errors.push(`${prefix}.advisoryOnly: must be true`)
   if (projection.captureState !== 'pregame') errors.push(`${prefix}.captureState: expected pregame`)
   if (!Number.isFinite(projection.gamePk)) errors.push(`${prefix}.gamePk: must be finite`)
@@ -695,6 +695,61 @@ function validateGameProjectionRecord(prefix, projection, errors, gameIds = null
         'opponentRecent14RunsAllowedPerGame',
       ]) {
         validateOptionalMetric(`${at}.teamScoring.${field}`, scoring[field], errors, { min: 0, max: 20 })
+      }
+      if (projection.modelVersion >= 9) {
+        if (!['current-season-only', 'current-season-plus-prior-seasons'].includes(scoring.source)) {
+          errors.push(`${at}.teamScoring.source: unsupported for model v9`)
+        }
+        if (!Number.isFinite(scoring.currentSeasonFactor)) {
+          errors.push(`${at}.teamScoring.currentSeasonFactor: required for model v9`)
+        } else {
+          validateOptionalMetric(
+            `${at}.teamScoring.currentSeasonFactor`,
+            scoring.currentSeasonFactor,
+            errors,
+            { min: 0.92, max: 1.08 },
+          )
+        }
+        validateOptionalMetric(
+          `${at}.teamScoring.historicalFactor`,
+          scoring.historicalFactor,
+          errors,
+          { min: 0.9, max: 1.1 },
+        )
+        validateProbability(`${at}.teamScoring.historicalWeight`, scoring.historicalWeight, errors)
+        validateProbability(
+          `${at}.teamScoring.leagueHistoricalWeight`,
+          scoring.leagueHistoricalWeight,
+          errors,
+        )
+        if (typeof scoring.historicalEnabled !== 'boolean') {
+          errors.push(`${at}.teamScoring.historicalEnabled: expected boolean`)
+        }
+        if (!Array.isArray(scoring.historicalSeasons)) {
+          errors.push(`${at}.teamScoring.historicalSeasons: expected an array`)
+        } else if (scoring.historicalSeasons.some((season) => !Number.isInteger(season))) {
+          errors.push(`${at}.teamScoring.historicalSeasons: expected integer seasons`)
+        }
+        if (!Number.isInteger(scoring.historicalGames) || scoring.historicalGames < 0) {
+          errors.push(`${at}.teamScoring.historicalGames: expected a non-negative integer`)
+        }
+        if (scoring.historicalEnabled === true) {
+          if (scoring.source !== 'current-season-plus-prior-seasons') {
+            errors.push(`${at}.teamScoring.source: must disclose an enabled historical blend`)
+          }
+          if (!Number.isFinite(scoring.historicalFactor)) {
+            errors.push(`${at}.teamScoring.historicalFactor: required when historical blend is enabled`)
+          }
+          if (!scoring.historicalSeasons?.length) {
+            errors.push(`${at}.teamScoring.historicalSeasons: required when historical blend is enabled`)
+          }
+        } else if (
+          scoring.source !== 'current-season-only'
+          || scoring.historicalWeight !== 0
+          || scoring.leagueHistoricalWeight !== 0
+        ) {
+          errors.push(`${at}.teamScoring: disabled historical blend must leave current-season scoring unchanged`)
+        }
       }
     }
   }
@@ -1411,6 +1466,92 @@ function validateGameHistoricalValidation(evaluation, errors) {
   return evaluation.sample?.games || 0
 }
 
+function validateGameRunHistoricalEvaluation(evaluation, errors) {
+  if (evaluation == null) return 0
+  const prefix = 'gameRunHistoricalEvaluation'
+  if (!isObject(evaluation)) {
+    errors.push(`${prefix}: expected an object`)
+    return 0
+  }
+  if (evaluation.version !== 1) errors.push(`${prefix}.version: expected 1`)
+  if (evaluation.advisoryOnly !== true) errors.push(`${prefix}.advisoryOnly: must be true`)
+  if (evaluation.methodology !== 'season-isolated-expanding-date-champion-challenger') {
+    errors.push(`${prefix}.methodology: unsupported`)
+  }
+  if (!['collecting', 'hold', 'eligible'].includes(evaluation.status)) {
+    errors.push(`${prefix}.status: unsupported`)
+  }
+  if (typeof evaluation.eligible !== 'boolean') {
+    errors.push(`${prefix}.eligible: expected boolean`)
+  }
+  for (const field of ['seasons', 'games', 'dates']) {
+    if (!Number.isInteger(evaluation.minimumSample?.[field]) || evaluation.minimumSample[field] < 1) {
+      errors.push(`${prefix}.minimumSample.${field}: expected a positive integer`)
+    }
+  }
+  for (const field of ['seasons', 'games', 'teamRuns', 'dates']) {
+    if (!Number.isInteger(evaluation.sample?.[field]) || evaluation.sample[field] < 0) {
+      errors.push(`${prefix}.sample.${field}: expected a non-negative integer`)
+    }
+  }
+  for (const field of ['fromDate', 'throughDate']) {
+    if (evaluation.sample?.[field] != null && !isValidDate(evaluation.sample[field])) {
+      errors.push(`${prefix}.sample.${field}: expected null or YYYY-MM-DD`)
+    }
+  }
+  for (const section of ['currentSeason', 'multiSeason']) {
+    if (!isObject(evaluation[section])) {
+      errors.push(`${prefix}.${section}: expected an object`)
+      continue
+    }
+    for (const field of ['teamRunMae', 'teamRunRmse', 'totalMae', 'totalRmse']) {
+      validateOptionalMetric(`${prefix}.${section}.${field}`, evaluation[section][field], errors, {
+        min: 0,
+        max: 30,
+      })
+    }
+  }
+  if (!isObject(evaluation.improvement)) {
+    errors.push(`${prefix}.improvement: expected an object`)
+  } else {
+    for (const field of ['teamRunMae', 'teamRunRmse', 'totalMae', 'totalRmse']) {
+      validateOptionalMetric(`${prefix}.improvement.${field}`, evaluation.improvement[field], errors, {
+        min: -30,
+        max: 30,
+      })
+    }
+  }
+  if (!isObject(evaluation.checks) || Object.values(evaluation.checks).some((check) => typeof check !== 'boolean')) {
+    errors.push(`${prefix}.checks: expected boolean checks`)
+  } else if (evaluation.eligible !== Object.values(evaluation.checks).every(Boolean)) {
+    errors.push(`${prefix}.eligible: inconsistent with checks`)
+  }
+  if (evaluation.eligible === true && evaluation.status !== 'eligible') {
+    errors.push(`${prefix}.status: must be eligible when the challenger is enabled`)
+  }
+  if (!Array.isArray(evaluation.seasons)) {
+    errors.push(`${prefix}.seasons: expected an array`)
+  } else {
+    for (const [index, season] of evaluation.seasons.entries()) {
+      const at = `${prefix}.seasons[${index}]`
+      if (!Number.isInteger(season?.season)) errors.push(`${at}.season: expected an integer`)
+      for (const field of ['games', 'teamRuns', 'dates']) {
+        if (!Number.isInteger(season?.sample?.[field]) || season.sample[field] < 0) {
+          errors.push(`${at}.sample.${field}: expected a non-negative integer`)
+        }
+      }
+    }
+    if (
+      Number.isInteger(evaluation.sample?.seasons)
+      && evaluation.sample.seasons !== evaluation.seasons.length
+    ) errors.push(`${prefix}.sample.seasons: must match seasons length`)
+  }
+  if (typeof evaluation.note !== 'string' || !evaluation.note.trim()) {
+    errors.push(`${prefix}.note: expected non-empty text`)
+  }
+  return evaluation.sample?.games || 0
+}
+
 function validateGameMarketPerformanceSummary(prefix, summary, errors) {
   if (!isObject(summary)) {
     errors.push(`${prefix}: expected an object`)
@@ -1686,6 +1827,35 @@ function validateGameScoreData(data, errors, snapshotDate) {
     && Number.isInteger(data.eligibleFinals)
     && data.eligibleFinals > data.archivedFinals
   ) errors.push(`${prefix}.eligibleFinals: cannot exceed archivedFinals`)
+  if (data.multiSeason != null) {
+    const multi = data.multiSeason
+    const at = `${prefix}.multiSeason`
+    if (!isObject(multi)) {
+      errors.push(`${at}: expected an object`)
+    } else {
+      if (multi.version !== 1) errors.push(`${at}.version: expected 1`)
+      if (multi.source !== 'prior-season regular-season final scores') {
+        errors.push(`${at}.source: unsupported`)
+      }
+      if (typeof multi.enabled !== 'boolean') errors.push(`${at}.enabled: expected boolean`)
+      if (!Array.isArray(multi.seasons) || multi.seasons.some((season) => !Number.isInteger(season))) {
+        errors.push(`${at}.seasons: expected integer seasons`)
+      }
+      if (!Number.isInteger(multi.games) || multi.games < 0) {
+        errors.push(`${at}.games: expected a non-negative integer`)
+      }
+      validateOptionalMetric(`${at}.leagueRunsPerTeam`, multi.leagueRunsPerTeam, errors, {
+        min: 0,
+        max: 20,
+      })
+      if (!['collecting', 'hold', 'eligible'].includes(multi.evaluationStatus)) {
+        errors.push(`${at}.evaluationStatus: unsupported`)
+      }
+      if (typeof multi.enabled === 'boolean' && multi.enabled !== (multi.evaluationStatus === 'eligible')) {
+        errors.push(`${at}.enabled: must match the historical evaluation gate`)
+      }
+    }
+  }
   const evaluation = data.evaluation
   if (!isObject(evaluation)) {
     errors.push(`${prefix}.evaluation: expected an object`)
@@ -1821,6 +1991,10 @@ export function validateDailySnapshot(snapshot) {
   const gameProjections = validateGameProjections(snapshot.gameProjections, gameIds, errors)
   const gameProjectionResults = validateGameProjectionEvaluation(snapshot.gameProjectionEvaluation, errors)
   const gameHistoricalValidationGames = validateGameHistoricalValidation(snapshot.gameHistoricalValidation, errors)
+  const gameRunHistoricalEvaluationGames = validateGameRunHistoricalEvaluation(
+    snapshot.gameRunHistoricalEvaluation,
+    errors,
+  )
   const gameMarketEvaluationCalls = validateGameMarketEvaluation(snapshot.gameMarketEvaluation, errors)
   const gameMarketPortfolioSelections = validateGameMarketPortfolio(snapshot.gameMarketPortfolio, gameIds, errors)
   const gameScoreResults = validateGameScoreData(snapshot.gameScoreData, errors, snapshot.date)
@@ -1832,6 +2006,7 @@ export function validateDailySnapshot(snapshot) {
     gameProjections,
     gameProjectionResults,
     gameHistoricalValidationGames,
+    gameRunHistoricalEvaluationGames,
     gameMarketEvaluationCalls,
     gameMarketPortfolioSelections,
     gameScoreResults,

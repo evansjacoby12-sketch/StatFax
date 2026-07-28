@@ -1,11 +1,11 @@
-import { teamScoringMatchupContext } from './teamScoringForm.js'
+import { multiSeasonRunMatchupContext } from './multiSeasonRunPrior.js'
 import { expectedStarterInnings } from './starterIPDistribution.js'
 import {
   buildGameMarketDecision,
   gameMarketDecisionPolicy,
 } from './gameMarketDecision.js'
 
-export const MLB_GAME_PROJECTION_VERSION = 8
+export const MLB_GAME_PROJECTION_VERSION = 9
 export const MLB_GAME_BASE_RUNS_PER_TEAM = 4.42
 export const MLB_GAME_EVALUATION_MIN_GAMES = 100
 export const MLB_GAME_EVALUATION_MIN_DATES = 10
@@ -738,6 +738,7 @@ function teamProjection({
   teamSeasonRunProfiles,
   gameScheduleContexts,
   teamScoringProfiles,
+  multiSeasonRunProfiles,
 }) {
   const lineup = selectTeamLineup(rows, teamId)
   const pitcher = opposingPitcher(lineup, probablePitcherId)
@@ -765,7 +766,12 @@ function teamProjection({
     teamSeasonRunProfiles,
     gameScheduleContexts,
   })
-  const teamScoring = teamScoringMatchupContext(teamScoringProfiles, teamId, opponentTeamId)
+  const teamScoring = multiSeasonRunMatchupContext(
+    teamScoringProfiles,
+    multiSeasonRunProfiles,
+    teamId,
+    opponentTeamId,
+  )
   const baseRunsPerTeam = Number.isFinite(teamScoring.leagueRunsPerTeam)
     ? clamp(teamScoring.leagueRunsPerTeam, 3.80, 5.00)
     : MLB_GAME_BASE_RUNS_PER_TEAM
@@ -885,6 +891,7 @@ export function buildGameProjection({
   marketBlendPolicy = gameMarketBlendPolicy(),
   marketDecisionPolicy = gameMarketDecisionPolicy(),
   teamScoringProfiles = null,
+  multiSeasonRunProfiles = null,
   capturedAt = new Date().toISOString(),
 }) {
   if (!game || game.isLive === true || game.isFinal === true) return null
@@ -902,6 +909,7 @@ export function buildGameProjection({
     teamSeasonRunProfiles,
     gameScheduleContexts,
     teamScoringProfiles,
+    multiSeasonRunProfiles,
   })
   const home = teamProjection({
     game,
@@ -917,6 +925,7 @@ export function buildGameProjection({
     teamSeasonRunProfiles,
     gameScheduleContexts,
     teamScoringProfiles,
+    multiSeasonRunProfiles,
   })
   const blended = applyMarketBlend(
     away.expectedRuns,
@@ -1012,6 +1021,7 @@ export function buildSlateGameProjections({
   marketBlendPolicy = gameMarketBlendPolicy(),
   marketDecisionPolicy = gameMarketDecisionPolicy(),
   teamScoringProfiles = null,
+  multiSeasonRunProfiles = null,
   capturedAt = new Date().toISOString(),
 } = {}) {
   const rows = Object.values(scoredBatters).filter((row, index, all) => (
@@ -1036,6 +1046,7 @@ export function buildSlateGameProjections({
       marketBlendPolicy,
       marketDecisionPolicy,
       teamScoringProfiles,
+      multiSeasonRunProfiles,
       capturedAt,
     }))
     .filter(Boolean)

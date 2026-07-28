@@ -503,6 +503,10 @@ import {
   evaluateGameHistoricalValidation,
   validateMlbGameHistory,
 } from '../src/sports/mlb/logic/gameHistoricalValidation.js';
+import {
+  buildMultiSeasonRunProfiles,
+  evaluateMultiSeasonRunPrior,
+} from '../src/sports/mlb/logic/multiSeasonRunPrior.js';
 import { refreshMlbGameHistory } from './lib/mlbGameHistory.mjs';
 
 // ─── HTTP helpers ────────────────────────────────────────────────────────────
@@ -2382,8 +2386,14 @@ async function main() {
   }
   writeFileSync(MLB_GAME_HISTORY_OUT_PATH, JSON.stringify(mlbGameHistory));
   const gameHistoricalValidation = evaluateGameHistoricalValidation(mlbGameHistory);
+  const gameRunHistoricalEvaluation = evaluateMultiSeasonRunPrior(mlbGameHistory);
 
   const teamScoringProfiles = buildTeamScoringProfiles(mlbGameResults, date);
+  const multiSeasonRunProfiles = buildMultiSeasonRunProfiles(mlbGameHistory, {
+    season: SEASON,
+    cutoffDate: date,
+    enabled: gameRunHistoricalEvaluation.eligible,
+  });
   const teamScoringEvaluation = evaluateTeamScoringForm(mlbGameResults);
   console.log(
     `[game-results] scoring profiles: ${teamScoringProfiles.games} prior games · `
@@ -2401,6 +2411,14 @@ async function main() {
     + `${gameHistoricalValidation.sample.games} walk-forward games · `
     + `winner Brier ${gameHistoricalValidation.forecastBackbone.winnerBrier ?? '—'} · `
     + `total MAE ${gameHistoricalValidation.forecastBackbone.totalMae ?? '—'}`,
+  );
+  console.log(
+    `[game-runs] ${gameRunHistoricalEvaluation.status} prior blend · `
+    + `${gameRunHistoricalEvaluation.sample.games} walk-forward games · `
+    + `team MAE ${gameRunHistoricalEvaluation.multiSeason.teamRunMae ?? '—'} `
+    + `vs ${gameRunHistoricalEvaluation.currentSeason.teamRunMae ?? '—'} current · `
+    + `total MAE ${gameRunHistoricalEvaluation.multiSeason.totalMae ?? '—'} `
+    + `vs ${gameRunHistoricalEvaluation.currentSeason.totalMae ?? '—'} current`,
   );
 
   // Reconcile every still-unsettled, identity-bound pregame forecast against
@@ -4666,6 +4684,7 @@ async function main() {
       marketBlendPolicy,
       marketDecisionPolicy,
       teamScoringProfiles,
+      multiSeasonRunProfiles,
       capturedAt,
     });
     const tracked = updateGameForecastLog(backtestLog, date, current, games, { capturedAt });
@@ -4750,6 +4769,15 @@ async function main() {
       teams: Object.keys(teamScoringProfiles.teams).length,
       leagueRunsPerTeam: teamScoringProfiles.leagueRunsPerTeam,
       evaluation: teamScoringEvaluation,
+      multiSeason: {
+        version: multiSeasonRunProfiles.version,
+        source: multiSeasonRunProfiles.source,
+        enabled: multiSeasonRunProfiles.enabled,
+        seasons: multiSeasonRunProfiles.seasons,
+        games: multiSeasonRunProfiles.games,
+        leagueRunsPerTeam: multiSeasonRunProfiles.leagueRunsPerTeam,
+        evaluationStatus: gameRunHistoricalEvaluation.status,
+      },
     },
     // Aggregate proof layer for the frozen pregame game forecasts. No individual
     // historical rows ship to the browser, and these metrics never feed scoring.
@@ -4757,6 +4785,9 @@ async function main() {
     // Three-season, season-isolated validation of the scoring backbone. This
     // replaces the live-call-count lock for PLAY while live calls monitor drift.
     gameHistoricalValidation,
+    // Champion/challenger proof for the prior-season run stabilizer. The
+    // blend remains off unless its isolated walk-forward comparison is eligible.
+    gameRunHistoricalEvaluation,
     // Exact closing-call validation, segmented performance, drift, and a
     // diversified advisory slate. Neither artifact mutates projections.
     gameMarketEvaluation,

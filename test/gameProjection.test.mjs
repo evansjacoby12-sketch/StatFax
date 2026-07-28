@@ -127,7 +127,7 @@ test('game projection emits run ranges, transparent factors, and market comparis
 
   assert.equal(output.advisoryOnly, true)
   assert.equal(output.captureState, 'pregame')
-  assert.equal(output.modelVersion, 8)
+  assert.equal(output.modelVersion, 9)
   assert.ok(output.projectedTotal > 7 && output.projectedTotal < 11)
   assert.equal(output.estimatedScore.away + output.estimatedScore.home > 0, true)
   assert.deepEqual(output.estimatedScore, {
@@ -470,6 +470,8 @@ test('season scoring form changes only the intended team and discloses its cutof
   assert.equal(withSeasonScores.inputs.away.teamScoring.cutoffDate, '2026-07-27')
   assert.equal(withSeasonScores.inputs.away.teamScoring.teamGames, 90)
   assert.equal(withSeasonScores.inputs.away.baseRunsPerTeam, 4.4)
+  assert.equal(withSeasonScores.inputs.away.teamScoring.source, 'current-season-only')
+  assert.equal(withSeasonScores.inputs.away.teamScoring.historicalEnabled, false)
 })
 
 test('forecast tracker refreshes pregame rows and freezes them when the game starts', () => {

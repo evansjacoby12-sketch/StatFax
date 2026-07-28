@@ -17,6 +17,7 @@ import {
   buildMlbGameHistory,
   evaluateGameHistoricalValidation,
 } from '../src/sports/mlb/logic/gameHistoricalValidation.js'
+import { evaluateMultiSeasonRunPrior } from '../src/sports/mlb/logic/multiSeasonRunPrior.js'
 
 const batter = (playerId = 1, gamePk = 10) => ({
   playerId,
@@ -48,6 +49,31 @@ test('daily contract validates the three-season historical game gate', () => {
   snapshot.gameHistoricalValidation.methodology = 'random-holdout'
   assert.ok(validateDailySnapshot(snapshot).errors.some((error) => (
     error.includes('gameHistoricalValidation.methodology')
+  )))
+})
+
+test('daily contract validates the multi-season run prior gate', () => {
+  const history = buildMlbGameHistory([], {
+    fetchedAt: '2026-07-28T12:00:00.000Z',
+  })
+  const snapshot = {
+    version: 5,
+    date: '2026-07-28',
+    generatedAt: '2026-07-28T12:00:00.000Z',
+    finishedAt: '2026-07-28T12:00:01.000Z',
+    games: [],
+    scoredBatters: {},
+    stats: { scoredBatters: 0 },
+    gameRunHistoricalEvaluation: evaluateMultiSeasonRunPrior(history),
+  }
+
+  const validated = validateDailySnapshot(snapshot)
+  assert.deepEqual(validated.errors, [])
+  assert.equal(validated.metrics.gameRunHistoricalEvaluationGames, 0)
+
+  snapshot.gameRunHistoricalEvaluation.methodology = 'random-holdout'
+  assert.ok(validateDailySnapshot(snapshot).errors.some((error) => (
+    error.includes('gameRunHistoricalEvaluation.methodology')
   )))
 })
 
@@ -483,7 +509,7 @@ test('daily contract validates forecast v4 platoon and run-environment provenanc
   assert.ok(validateDailySnapshot(mismatched).errors.some((error) => error.includes('must match runEnvironment.factor')))
 })
 
-test('daily contract validates forecast v8 distributions, market gate, decision layer, and team context', () => {
+test('daily contract validates forecast v9 distributions, decisions, team context, and run-prior provenance', () => {
   const runEnvironment = {
     factor: 1,
     rawParkFactor: 1,
@@ -566,8 +592,20 @@ test('daily contract validates forecast v8 distributions, market gate, decision 
     gameProjections: { 10: projection },
   }
 
-  assert.equal(projection.modelVersion, 8)
+  assert.equal(projection.modelVersion, 9)
   assert.deepEqual(validateDailySnapshot(snapshot).errors, [])
+
+  const missingRunPriorProvenance = structuredClone(snapshot)
+  delete missingRunPriorProvenance.gameProjections[10].inputs.away.teamScoring.currentSeasonFactor
+  assert.ok(validateDailySnapshot(missingRunPriorProvenance).errors.some((error) => (
+    error.includes('teamScoring.currentSeasonFactor')
+  )))
+
+  const undisclosedRunPrior = structuredClone(snapshot)
+  undisclosedRunPrior.gameProjections[10].inputs.away.teamScoring.historicalEnabled = true
+  assert.ok(validateDailySnapshot(undisclosedRunPrior).errors.some((error) => (
+    error.includes('must disclose an enabled historical blend')
+  )))
 
   const legacyPolicy = structuredClone(snapshot)
   for (const market of ['moneyline', 'total']) {
