@@ -466,7 +466,6 @@ function validateGameMarketDecision(prefix, decision, projection, errors) {
         continue
       }
       if (typeof value.ready !== 'boolean') errors.push(`${at}.ready: expected boolean`)
-      if (typeof value.historicalGate !== 'boolean') errors.push(`${at}.historicalGate: expected boolean`)
       if (value.performanceGate != null && typeof value.performanceGate !== 'boolean') {
         errors.push(`${at}.performanceGate: expected boolean when present`)
       }
@@ -474,36 +473,60 @@ function validateGameMarketDecision(prefix, decision, projection, errors) {
         value.performanceStatus != null
         && !['sample-only', 'collecting', 'hold', 'eligible'].includes(value.performanceStatus)
       ) errors.push(`${at}.performanceStatus: unsupported`)
-      if (!['collecting', 'hold', 'eligible'].includes(value.historicalStatus)) {
-        errors.push(`${at}.historicalStatus: unsupported`)
-      }
-      if (!['collecting', 'watch', 'stable', 'drift'].includes(value.driftStatus)) {
-        errors.push(`${at}.driftStatus: unsupported`)
-      }
-      if (value.evidenceSource !== 'three-season-history-plus-forward-drift') {
-        errors.push(`${at}.evidenceSource: unsupported`)
-      }
-      if (!isObject(value.historicalSample)) {
-        errors.push(`${at}.historicalSample: expected an object`)
-      } else {
-        for (const field of ['seasons', 'games', 'dates']) {
-          if (!Number.isInteger(value.historicalSample[field]) || value.historicalSample[field] < 0) {
-            errors.push(`${at}.historicalSample.${field}: expected a non-negative integer`)
-          }
-        }
-      }
       for (const field of ['sample', 'dates', 'minimumGames', 'minimumDates']) {
         const minimum = field.startsWith('minimum')
         if (!Number.isInteger(value[field]) || value[field] < (minimum ? 1 : 0)) {
           errors.push(`${at}.${field}: expected a ${minimum ? 'positive' : 'non-negative'} integer`)
         }
       }
-      if (
+      const historicalFields = [
+        value.historicalGate,
+        value.historicalStatus,
+        value.driftStatus,
+        value.evidenceSource,
+        value.historicalSample,
+      ]
+      const historicalPolicy = historicalFields.some((field) => field != null)
+      if (historicalPolicy) {
+        if (typeof value.historicalGate !== 'boolean') errors.push(`${at}.historicalGate: expected boolean`)
+        if (!['collecting', 'hold', 'eligible'].includes(value.historicalStatus)) {
+          errors.push(`${at}.historicalStatus: unsupported`)
+        }
+        if (!['collecting', 'watch', 'stable', 'drift'].includes(value.driftStatus)) {
+          errors.push(`${at}.driftStatus: unsupported`)
+        }
+        if (value.evidenceSource !== 'three-season-history-plus-forward-drift') {
+          errors.push(`${at}.evidenceSource: unsupported`)
+        }
+        if (!isObject(value.historicalSample)) {
+          errors.push(`${at}.historicalSample: expected an object`)
+        } else {
+          for (const field of ['seasons', 'games', 'dates']) {
+            if (!Number.isInteger(value.historicalSample[field]) || value.historicalSample[field] < 0) {
+              errors.push(`${at}.historicalSample.${field}: expected a non-negative integer`)
+            }
+          }
+        }
+        if (
+          typeof value.ready === 'boolean'
+          && typeof value.historicalGate === 'boolean'
+          && typeof value.performanceGate === 'boolean'
+          && value.ready !== (value.historicalGate && value.performanceGate)
+        ) errors.push(`${at}.ready: inconsistent with historical and drift gates`)
+      } else if (
         typeof value.ready === 'boolean'
-        && typeof value.historicalGate === 'boolean'
-        && typeof value.performanceGate === 'boolean'
-        && value.ready !== (value.historicalGate && value.performanceGate)
-      ) errors.push(`${at}.ready: inconsistent with historical and drift gates`)
+        && Number.isInteger(value.sample)
+        && Number.isInteger(value.dates)
+        && Number.isInteger(value.minimumGames)
+        && Number.isInteger(value.minimumDates)
+        && value.ready !== (
+          value.sample >= value.minimumGames
+          && value.dates >= value.minimumDates
+          && value.performanceGate !== false
+        )
+      ) {
+        errors.push(`${at}.ready: inconsistent with legacy sample gates`)
+      }
     }
   }
 

@@ -569,6 +569,25 @@ test('daily contract validates forecast v8 distributions, market gate, decision 
   assert.equal(projection.modelVersion, 8)
   assert.deepEqual(validateDailySnapshot(snapshot).errors, [])
 
+  const legacyPolicy = structuredClone(snapshot)
+  for (const market of ['moneyline', 'total']) {
+    const policy = legacyPolicy.gameProjections[10].marketDecision.policy[market]
+    for (const field of [
+      'historicalGate',
+      'historicalStatus',
+      'driftStatus',
+      'evidenceSource',
+      'historicalSample',
+    ]) delete policy[field]
+  }
+  assert.deepEqual(validateDailySnapshot(legacyPolicy).errors, [])
+
+  const incompleteHistoricalPolicy = structuredClone(snapshot)
+  delete incompleteHistoricalPolicy.gameProjections[10].marketDecision.policy.moneyline.evidenceSource
+  assert.ok(validateDailySnapshot(incompleteHistoricalPolicy).errors.some((error) => (
+    error.includes('policy.moneyline.evidenceSource')
+  )))
+
   const tampered = structuredClone(snapshot)
   tampered.gameProjections[10].inputs.away.teamRunContext.schedule.factor = 0.96
   assert.ok(validateDailySnapshot(tampered).errors.some((error) => error.includes('must match teamRunContext.schedule.factor')))
