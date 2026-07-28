@@ -122,6 +122,47 @@ test('daily and backtest contracts validate frozen game projections', () => {
     winnerCorrect: true,
     winnerBrier: 0.2116,
   }
+  const call = {
+    capturedAt: projection.capturedAt,
+    modelVersion: 1,
+    projectionRevision: 1,
+    estimatedScore: projection.estimatedScore,
+    awayExpectedRuns: projection.awayExpectedRuns,
+    homeExpectedRuns: projection.homeExpectedRuns,
+    projectedTotal: projection.projectedTotal,
+    awayWinProbability: projection.awayWinProbability,
+    homeWinProbability: projection.homeWinProbability,
+    projectedWinner: projection.projectedWinner,
+    projectedWinnerProbability: projection.projectedWinnerProbability,
+    marketDecision: null,
+    market: null,
+  }
+  const ungradedOutcome = {
+    version: 1,
+    advisoryOnly: true,
+    moneyline: {
+      selectedSide: null,
+      tier: 'unavailable',
+      rawTier: 'unavailable',
+      provisional: false,
+      american: null,
+      line: null,
+      result: 'ungraded',
+      unitProfit: null,
+      includedInPerformance: false,
+    },
+    total: {
+      selectedSide: null,
+      tier: 'unavailable',
+      rawTier: 'unavailable',
+      provisional: false,
+      american: null,
+      line: null,
+      result: 'ungraded',
+      unitProfit: null,
+      includedInPerformance: false,
+    },
+  }
   const log = {
     dates: [],
     records: {},
@@ -129,9 +170,47 @@ test('daily and backtest contracts validate frozen game projections', () => {
       version: 1,
       predictionsByDate: { '2026-07-14': [projection] },
       resultsByDate: { '2026-07-14': [result] },
+      callsByDate: {
+        '2026-07-14': {
+          10: {
+            gamePk: 10,
+            gameDate: projection.gameDate,
+            awayTeam: { id: 1, name: 'Away', abbr: 'AWY' },
+            homeTeam: { id: 2, name: 'Home', abbr: 'HME' },
+            status: 'frozen',
+            opening: call,
+            current: call,
+            closing: call,
+            firstCapturedAt: projection.capturedAt,
+            lastObservedAt: projection.capturedAt,
+            lastChangedAt: projection.capturedAt,
+            closedAt: projection.gameDate,
+            observationCount: 1,
+            revisionCount: 1,
+            revisions: [call],
+            settlement: {
+              actualAwayRuns: 3,
+              actualHomeRuns: 5,
+              actualTotal: 8,
+              actualWinner: 'home',
+              marketOutcome: ungradedOutcome,
+              settlementSource: 'official-season-results',
+              settledAt: '2026-07-15T12:00:00.000Z',
+            },
+          },
+        },
+      },
     },
   }
-  assert.deepEqual(validateBacktestLog(log).errors, [])
+  const validatedLog = validateBacktestLog(log)
+  assert.deepEqual(validatedLog.errors, [])
+  assert.equal(validatedLog.metrics.gameMarketCallDays, 1)
+  assert.equal(validatedLog.metrics.gameMarketCalls, 1)
+  assert.equal(validatedLog.metrics.gameMarketCallRevisions, 1)
+
+  const badCall = structuredClone(log)
+  badCall.gameForecasts.callsByDate['2026-07-14']['10'].settlement.marketOutcome.total.includedInPerformance = true
+  assert.ok(validateBacktestLog(badCall).errors.some((error) => error.includes('includedInPerformance')))
 
   const badEvaluation = structuredClone(snapshot)
   badEvaluation.gameProjectionEvaluation.status = 'production'

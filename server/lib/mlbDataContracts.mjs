@@ -281,6 +281,167 @@ function validateGameMarketTrackingEntry(prefix, entry, errors) {
   }
 }
 
+function validateGameMarketOutcome(prefix, outcome, errors) {
+  if (!isObject(outcome)) {
+    errors.push(`${prefix}: expected an object`)
+    return
+  }
+  if (outcome.version !== 1) errors.push(`${prefix}.version: expected 1`)
+  if (outcome.advisoryOnly !== true) errors.push(`${prefix}.advisoryOnly: must be true`)
+  for (const market of ['moneyline', 'total']) {
+    const value = outcome[market]
+    const at = `${prefix}.${market}`
+    if (!isObject(value)) {
+      errors.push(`${at}: expected an object`)
+      continue
+    }
+    const allowedSides = market === 'moneyline' ? ['away', 'home'] : ['over', 'under']
+    if (value.selectedSide != null && !allowedSides.includes(value.selectedSide)) {
+      errors.push(`${at}.selectedSide: unsupported`)
+    }
+    for (const field of ['tier', 'rawTier']) {
+      if (!['play', 'lean', 'pass', 'unavailable'].includes(value[field])) {
+        errors.push(`${at}.${field}: unsupported`)
+      }
+    }
+    if (typeof value.provisional !== 'boolean') errors.push(`${at}.provisional: expected boolean`)
+    validateTrackedAmerican(`${at}.american`, value.american, errors)
+    if (market === 'total') validateOptionalMetric(`${at}.line`, value.line, errors, { min: 0.5, max: 30 })
+    if (!['win', 'loss', 'push', 'ungraded'].includes(value.result)) {
+      errors.push(`${at}.result: unsupported`)
+    }
+    validateOptionalMetric(`${at}.unitProfit`, value.unitProfit, errors, { min: -1, max: 100 })
+    if (typeof value.includedInPerformance !== 'boolean') {
+      errors.push(`${at}.includedInPerformance: expected boolean`)
+    }
+    const expectedIncluded = (
+      ['win', 'loss', 'push'].includes(value.result)
+      && ['play', 'lean'].includes(value.tier)
+    )
+    if (
+      typeof value.includedInPerformance === 'boolean'
+      && value.includedInPerformance !== expectedIncluded
+    ) errors.push(`${at}.includedInPerformance: inconsistent with tier and result`)
+  }
+}
+
+function validateGameMarketCallSnapshot(prefix, call, errors) {
+  if (!isObject(call)) {
+    errors.push(`${prefix}: expected an object`)
+    return
+  }
+  if (!call.capturedAt || Number.isNaN(Date.parse(call.capturedAt))) {
+    errors.push(`${prefix}.capturedAt: expected an ISO timestamp`)
+  }
+  if (![1, 2, 3, 4, 5, 6, 7, 8].includes(call.modelVersion)) {
+    errors.push(`${prefix}.modelVersion: expected 1 through 8`)
+  }
+  if (!Number.isInteger(call.projectionRevision) || call.projectionRevision < 1) {
+    errors.push(`${prefix}.projectionRevision: expected a positive integer`)
+  }
+  for (const field of ['awayExpectedRuns', 'homeExpectedRuns', 'projectedTotal']) {
+    if (!Number.isFinite(call[field]) || call[field] < 0 || call[field] > 20) {
+      errors.push(`${prefix}.${field}: expected finite runs in [0,20]`)
+    }
+  }
+  validateProbability(`${prefix}.awayWinProbability`, call.awayWinProbability, errors)
+  validateProbability(`${prefix}.homeWinProbability`, call.homeWinProbability, errors)
+  validateProbability(`${prefix}.projectedWinnerProbability`, call.projectedWinnerProbability, errors)
+  if (!['away', 'home'].includes(call.projectedWinner)) {
+    errors.push(`${prefix}.projectedWinner: expected away or home`)
+  }
+  if (!isObject(call.estimatedScore)) {
+    errors.push(`${prefix}.estimatedScore: expected an object`)
+  } else {
+    for (const side of ['away', 'home']) {
+      if (!Number.isInteger(call.estimatedScore[side]) || call.estimatedScore[side] < 0) {
+        errors.push(`${prefix}.estimatedScore.${side}: expected a non-negative integer`)
+      }
+    }
+  }
+  if (call.marketDecision != null) {
+    validateGameMarketDecision(`${prefix}.marketDecision`, call.marketDecision, call, errors)
+  } else if (call.modelVersion >= 8) {
+    errors.push(`${prefix}.marketDecision: required for model v8`)
+  }
+  if (call.market != null) validateGameMarketSnapshot(`${prefix}.market`, call.market, errors)
+}
+
+function validateGameMarketCallEntry(prefix, entry, errors) {
+  if (!isObject(entry)) {
+    errors.push(`${prefix}: expected an object`)
+    return
+  }
+  if (!Number.isFinite(entry.gamePk)) errors.push(`${prefix}.gamePk: expected a finite game ID`)
+  if (!entry.gameDate || Number.isNaN(Date.parse(entry.gameDate))) {
+    errors.push(`${prefix}.gameDate: expected an ISO timestamp`)
+  }
+  for (const side of ['awayTeam', 'homeTeam']) {
+    const team = entry[side]
+    if (!isObject(team) || !Number.isFinite(team.id)) {
+      errors.push(`${prefix}.${side}: expected a team with a finite ID`)
+    }
+  }
+  if (!['pregame', 'frozen'].includes(entry.status)) errors.push(`${prefix}.status: unsupported`)
+  validateGameMarketCallSnapshot(`${prefix}.opening`, entry.opening, errors)
+  validateGameMarketCallSnapshot(`${prefix}.current`, entry.current, errors)
+  if (entry.closing != null) validateGameMarketCallSnapshot(`${prefix}.closing`, entry.closing, errors)
+  if (entry.status === 'pregame' && entry.closing != null) {
+    errors.push(`${prefix}.closing: must be null while pregame`)
+  }
+  if (entry.status === 'frozen' && entry.closing == null) {
+    errors.push(`${prefix}.closing: required when frozen`)
+  }
+  for (const field of ['firstCapturedAt', 'lastObservedAt', 'lastChangedAt', 'closedAt']) {
+    validateOptionalIso(`${prefix}.${field}`, entry[field], errors)
+  }
+  for (const field of ['firstCapturedAt', 'lastObservedAt', 'lastChangedAt']) {
+    if (entry[field] == null) errors.push(`${prefix}.${field}: required`)
+  }
+  if (entry.status === 'frozen' && entry.closedAt == null) errors.push(`${prefix}.closedAt: required when frozen`)
+  if (entry.status === 'pregame' && entry.closedAt != null) errors.push(`${prefix}.closedAt: must be null while pregame`)
+  for (const field of ['observationCount', 'revisionCount']) {
+    if (!Number.isInteger(entry[field]) || entry[field] < 1) {
+      errors.push(`${prefix}.${field}: expected a positive integer`)
+    }
+  }
+  if (
+    Number.isInteger(entry.observationCount)
+    && Number.isInteger(entry.revisionCount)
+    && entry.revisionCount > entry.observationCount
+  ) errors.push(`${prefix}.revisionCount: cannot exceed observationCount`)
+  if (!Array.isArray(entry.revisions) || !entry.revisions.length || entry.revisions.length > 48) {
+    errors.push(`${prefix}.revisions: expected 1 to 48 call snapshots`)
+  } else {
+    entry.revisions.forEach((call, index) => {
+      validateGameMarketCallSnapshot(`${prefix}.revisions[${index}]`, call, errors)
+    })
+  }
+  if (entry.settlement != null) {
+    const settlement = entry.settlement
+    const at = `${prefix}.settlement`
+    if (!isObject(settlement)) {
+      errors.push(`${at}: expected null or an object`)
+    } else {
+      for (const field of ['actualAwayRuns', 'actualHomeRuns', 'actualTotal']) {
+        if (!Number.isFinite(settlement[field]) || settlement[field] < 0) {
+          errors.push(`${at}.${field}: expected a non-negative number`)
+        }
+      }
+      if (!['away', 'home', 'tie'].includes(settlement.actualWinner)) {
+        errors.push(`${at}.actualWinner: unsupported`)
+      }
+      if (!['daily-snapshot', 'official-season-results'].includes(settlement.settlementSource)) {
+        errors.push(`${at}.settlementSource: unsupported`)
+      }
+      if (!settlement.settledAt || Number.isNaN(Date.parse(settlement.settledAt))) {
+        errors.push(`${at}.settledAt: expected an ISO timestamp`)
+      }
+      validateGameMarketOutcome(`${at}.marketOutcome`, settlement.marketOutcome, errors)
+    }
+  }
+}
+
 function validateGameMarketDecision(prefix, decision, projection, errors) {
   if (!isObject(decision)) {
     errors.push(`${prefix}: expected an object for model v8`)
@@ -1356,6 +1517,9 @@ export function validateBacktestLog(log) {
 
   let gameForecastDays = 0
   let gameForecastResults = 0
+  let gameMarketCallDays = 0
+  let gameMarketCalls = 0
+  let gameMarketCallRevisions = 0
   if (log.gameForecasts != null) {
     const forecasts = log.gameForecasts
     if (!isObject(forecasts)) {
@@ -1387,10 +1551,46 @@ export function validateBacktestLog(log) {
               if (!['away', 'home', 'tie'].includes(projection?.actualWinner)) errors.push(`${prefix}.actualWinner: unsupported`)
               if (projection?.winnerBrier != null) validateProbability(`${prefix}.winnerBrier`, projection.winnerBrier, errors)
               if (projection?.winnerCorrect != null && typeof projection.winnerCorrect !== 'boolean') errors.push(`${prefix}.winnerCorrect: expected boolean or null`)
+              if (projection?.marketOutcome != null) {
+                validateGameMarketOutcome(`${prefix}.marketOutcome`, projection.marketOutcome, errors)
+              }
+              if (
+                projection?.settlementSource != null
+                && !['daily-snapshot', 'official-season-results'].includes(projection.settlementSource)
+              ) errors.push(`${prefix}.settlementSource: unsupported`)
+              validateOptionalIso(`${prefix}.settledAt`, projection?.settledAt, errors)
             }
           }
           if (section === 'predictionsByDate') gameForecastDays++
           else gameForecastResults += records[date].length
+        }
+      }
+      const callsByDate = forecasts.callsByDate
+      const callDates = isObject(callsByDate) ? Object.keys(callsByDate) : []
+      if (callsByDate != null && !isObject(callsByDate)) {
+        errors.push('gameForecasts.callsByDate: expected an object')
+      }
+      if (callDates.length > 180) {
+        errors.push(`gameForecasts.callsByDate: exceeds 180-day cap (${callDates.length})`)
+      }
+      if (!callDates.every(isValidDate)) {
+        errors.push('gameForecasts.callsByDate: every key must use YYYY-MM-DD')
+      }
+      for (const date of callDates) {
+        const entries = callsByDate[date]
+        if (!isObject(entries)) {
+          errors.push(`gameForecasts.callsByDate.${date}: expected an object`)
+          continue
+        }
+        gameMarketCallDays++
+        for (const [gamePk, entry] of Object.entries(entries)) {
+          const prefix = `gameForecasts.callsByDate.${date}.${gamePk}`
+          validateGameMarketCallEntry(prefix, entry, errors)
+          if (Number.isFinite(entry?.gamePk) && String(entry.gamePk) !== String(gamePk)) {
+            errors.push(`${prefix}.gamePk: must match map key`)
+          }
+          gameMarketCalls++
+          gameMarketCallRevisions += Array.isArray(entry?.revisions) ? entry.revisions.length : 0
         }
       }
     }
@@ -1444,6 +1644,9 @@ export function validateBacktestLog(log) {
     kResultDays,
     gameForecastDays,
     gameForecastResults,
+    gameMarketCallDays,
+    gameMarketCalls,
+    gameMarketCallRevisions,
     gameMarketDays,
     gameMarketGames,
   })

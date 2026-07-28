@@ -482,6 +482,7 @@ import {
   evaluateGameForecasts,
   gameMarketBlendPolicy,
   settleGameForecasts,
+  settleGameForecastsFromResults,
   updateGameForecastLog,
 } from '../src/sports/mlb/logic/gameProjection.js';
 import { gameMarketDecisionPolicy } from '../src/sports/mlb/logic/gameMarketDecision.js';
@@ -2242,7 +2243,14 @@ async function main() {
         };
       }
       const lg = local?.gameForecasts, bg = backtestLog?.gameForecasts;
-      if (lg?.predictionsByDate || bg?.predictionsByDate || lg?.resultsByDate || bg?.resultsByDate) {
+      if (
+        lg?.predictionsByDate
+        || bg?.predictionsByDate
+        || lg?.resultsByDate
+        || bg?.resultsByDate
+        || lg?.callsByDate
+        || bg?.callsByDate
+      ) {
         backtestLog.gameForecasts = {
           version: 1,
           predictionsByDate: {
@@ -2252,6 +2260,10 @@ async function main() {
           resultsByDate: {
             ...(bg?.resultsByDate || {}),
             ...(lg?.resultsByDate || {}),
+          },
+          callsByDate: {
+            ...(bg?.callsByDate || {}),
+            ...(lg?.callsByDate || {}),
           },
         };
       }
@@ -2319,6 +2331,24 @@ async function main() {
     + `form MAE ${teamScoringEvaluation.seasonForm.teamRunMae ?? '—'} `
     + `vs ${teamScoringEvaluation.baseline.teamRunMae ?? '—'} baseline`,
   );
+
+  // Reconcile every still-unsettled, identity-bound pregame forecast against
+  // the durable official result archive. This closes the historical gap where
+  // a missed next-day daily snapshot left valid calls ungraded forever.
+  try {
+    const before = Object.values(backtestLog?.gameForecasts?.resultsByDate || {})
+      .reduce((sum, rows) => sum + (Array.isArray(rows) ? rows.length : 0), 0);
+    backtestLog = settleGameForecastsFromResults(backtestLog, mlbGameResults, {
+      settledAt: mlbGameResults.fetchedAt || new Date().toISOString(),
+    });
+    const after = Object.values(backtestLog?.gameForecasts?.resultsByDate || {})
+      .reduce((sum, rows) => sum + (Array.isArray(rows) ? rows.length : 0), 0);
+    if (after > before) {
+      console.log(`[game-projection] durable archive settled ${after - before} forecast(s)`);
+    }
+  } catch (e) {
+    console.warn(`[game-projection] durable settlement skipped: ${e?.message}`);
+  }
 
   const yesterdayCT = ctDateMinusDays(1);
   let reconcilePredictions = null;

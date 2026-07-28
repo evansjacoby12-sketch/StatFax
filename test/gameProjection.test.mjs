@@ -5,11 +5,13 @@ import {
   buildGameProjection,
   detectGameProjectionChanges,
   evaluateGameForecasts,
+  gradeGameMarketDecision,
   gameMarketBlendPolicy,
   gameTotalProbabilities,
   negativeBinomialDistribution,
   scoreDistributionSummary,
   settleGameForecasts,
+  settleGameForecastsFromResults,
   updateGameForecastLog,
   winProbabilities,
 } from '../src/sports/mlb/logic/gameProjection.js'
@@ -482,6 +484,10 @@ test('forecast tracker refreshes pregame rows and freezes them when the game sta
   assert.equal(first.projections[0].freezeState, 'refreshing-pregame')
   assert.equal(first.projections[0].revision.number, 1)
   assert.deepEqual(first.projections[0].revision.reasons, ['initial-capture'])
+  const openingCall = first.log.gameForecasts.callsByDate['2026-07-27']['10']
+  assert.equal(openingCall.status, 'pregame')
+  assert.equal(openingCall.revisionCount, 1)
+  assert.equal(openingCall.opening.projectedTotal, projection.projectedTotal)
 
   const startedGame = { ...game, isLive: true }
   const second = updateGameForecastLog(first.log, '2026-07-27', [], [startedGame], {
@@ -489,6 +495,10 @@ test('forecast tracker refreshes pregame rows and freezes them when the game sta
   })
   assert.equal(second.projections[0].freezeState, 'final-pregame')
   assert.equal(second.projections[0].awayExpectedRuns, projection.awayExpectedRuns)
+  const closingCall = second.log.gameForecasts.callsByDate['2026-07-27']['10']
+  assert.equal(closingCall.status, 'frozen')
+  assert.equal(closingCall.closing.projectedTotal, projection.projectedTotal)
+  assert.equal(closingCall.closedAt, '2026-07-27T23:15:00.000Z')
 })
 
 test('forecast revisions identify material input, projection, and market changes', () => {
@@ -536,6 +546,61 @@ test('forecast revisions identify material input, projection, and market changes
   assert.deepEqual(revision.reasons, reasons)
 })
 
+test('displayed game-call history records distinct pregame revisions without duplicating observations', () => {
+  const firstProjection = buildGameProjection({
+    game,
+    rows: balancedRows(),
+    capturedAt: '2026-07-27T21:00:00.000Z',
+  })
+  const first = updateGameForecastLog({}, '2026-07-27', [firstProjection], [game], {
+    capturedAt: '2026-07-27T21:00:00.000Z',
+  })
+  const sameProjection = {
+    ...firstProjection,
+    capturedAt: '2026-07-27T21:10:00.000Z',
+  }
+  const unchanged = updateGameForecastLog(
+    first.log,
+    '2026-07-27',
+    [sameProjection],
+    [game],
+    { capturedAt: sameProjection.capturedAt },
+  )
+  const sameCall = unchanged.log.gameForecasts.callsByDate['2026-07-27']['10']
+  assert.equal(sameCall.observationCount, 2)
+  assert.equal(sameCall.revisionCount, 1)
+  assert.equal(sameCall.revisions.length, 1)
+  assert.equal(sameCall.current.capturedAt, sameProjection.capturedAt)
+
+  const strongerRows = balancedRows().map((row) => (
+    row.teamId === 1
+      ? batter(row.playerId, 1, 60, {
+          obp: 0.390,
+          slg: 0.560,
+          era: 6.5,
+          order: row.battingOrder,
+        })
+      : row
+  ))
+  const changedProjection = buildGameProjection({
+    game,
+    rows: strongerRows,
+    capturedAt: '2026-07-27T21:20:00.000Z',
+  })
+  const changed = updateGameForecastLog(
+    unchanged.log,
+    '2026-07-27',
+    [changedProjection],
+    [game],
+    { capturedAt: changedProjection.capturedAt },
+  )
+  const changedCall = changed.log.gameForecasts.callsByDate['2026-07-27']['10']
+  assert.equal(changedCall.observationCount, 3)
+  assert.equal(changedCall.revisionCount, 2)
+  assert.equal(changedCall.revisions.length, 2)
+  assert.notEqual(changedCall.current.projectedTotal, changedCall.opening.projectedTotal)
+})
+
 test('settlement uses only an explicitly frozen pregame capture', () => {
   const projection = {
     ...buildGameProjection({
@@ -556,11 +621,115 @@ test('settlement uses only an explicitly frozen pregame capture', () => {
   assert.equal(result.actualTotal, 8)
   assert.equal(result.actualWinner, 'home')
   assert.equal(result.winnerCorrect, projection.projectedWinner === 'home')
+  assert.equal(result.settlementSource, 'daily-snapshot')
+  assert.equal(result.marketOutcome.version, 1)
 
   const leaked = structuredClone(snapshot)
   leaked.gameProjections[10].captureState = 'live'
   const rejected = settleGameForecasts({}, '2026-07-27', leaked)
   assert.equal(rejected.gameForecasts.resultsByDate['2026-07-27'], undefined)
+})
+
+test('durable official results settle a missed freeze and grade the exact closing call', () => {
+  const projection = {
+    ...buildGameProjection({
+      game,
+      rows: balancedRows(),
+      capturedAt: '2026-07-27T22:30:00.000Z',
+    }),
+  }
+  projection.marketDecision.moneyline = {
+    ...projection.marketDecision.moneyline,
+    selectedSide: 'home',
+    tier: 'lean',
+    rawTier: 'play',
+    provisional: true,
+    american: 120,
+  }
+  projection.marketDecision.total = {
+    ...projection.marketDecision.total,
+    selectedSide: 'under',
+    tier: 'lean',
+    rawTier: 'lean',
+    provisional: true,
+    american: -110,
+    line: 9,
+  }
+  const tracked = updateGameForecastLog({}, '2026-07-27', [projection], [game], {
+    capturedAt: projection.capturedAt,
+  })
+  assert.equal(tracked.projections[0].freezeState, 'refreshing-pregame')
+
+  const artifact = {
+    fetchedAt: '2026-07-28T12:00:00.000Z',
+    games: [{
+      gamePk: 10,
+      officialDate: '2026-07-27',
+      gameDate: game.gameDate,
+      awayTeam: game.awayTeam,
+      homeTeam: game.homeTeam,
+      awayRuns: 3,
+      homeRuns: 5,
+    }],
+  }
+  const settled = settleGameForecastsFromResults(tracked.log, artifact)
+  const result = settled.gameForecasts.resultsByDate['2026-07-27'][0]
+  assert.equal(result.freezeState, 'final-pregame')
+  assert.equal(result.settlementSource, 'official-season-results')
+  assert.equal(result.actualTotal, 8)
+  assert.equal(result.marketOutcome.moneyline.result, 'win')
+  assert.equal(result.marketOutcome.moneyline.unitProfit, 1.2)
+  assert.equal(result.marketOutcome.moneyline.includedInPerformance, true)
+  assert.equal(result.marketOutcome.total.result, 'win')
+  assert.equal(result.marketOutcome.total.unitProfit, 0.9091)
+  const call = settled.gameForecasts.callsByDate['2026-07-27']['10']
+  assert.equal(call.status, 'frozen')
+  assert.equal(call.settlement.marketOutcome.total.result, 'win')
+  assert.equal(call.closing.marketDecision.total.line, 9)
+
+  const repeated = settleGameForecastsFromResults(settled, artifact)
+  assert.equal(repeated.gameForecasts.resultsByDate['2026-07-27'].length, 1)
+  assert.equal(
+    repeated.gameForecasts.resultsByDate['2026-07-27'][0].settledAt,
+    result.settledAt,
+  )
+  assert.equal(
+    repeated.gameForecasts.callsByDate['2026-07-27']['10'].settlement.settledAt,
+    call.settlement.settledAt,
+  )
+
+  const wrongDate = structuredClone(tracked.log)
+  const rejected = settleGameForecastsFromResults(wrongDate, {
+    ...artifact,
+    games: [{ ...artifact.games[0], officialDate: '2026-07-28' }],
+  })
+  assert.equal(rejected.gameForecasts.resultsByDate['2026-07-27'], undefined)
+})
+
+test('market call grading handles total pushes and excludes PASS from performance', () => {
+  const outcome = gradeGameMarketDecision({
+    moneyline: {
+      selectedSide: 'away',
+      tier: 'pass',
+      rawTier: 'pass',
+      provisional: true,
+      american: 140,
+    },
+    total: {
+      selectedSide: 'over',
+      tier: 'lean',
+      rawTier: 'lean',
+      provisional: true,
+      american: -110,
+      line: 8,
+    },
+  }, { awayRuns: 3, homeRuns: 5 })
+  assert.equal(outcome.moneyline.result, 'loss')
+  assert.equal(outcome.moneyline.unitProfit, -1)
+  assert.equal(outcome.moneyline.includedInPerformance, false)
+  assert.equal(outcome.total.result, 'push')
+  assert.equal(outcome.total.unitProfit, 0)
+  assert.equal(outcome.total.includedInPerformance, true)
 })
 
 test('forward evaluation reports winner calibration and total error against simple and market baselines', () => {

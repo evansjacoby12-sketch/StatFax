@@ -1156,6 +1156,136 @@ export function buildGameProjectionRevision(
   }
 }
 
+const cloneJson = (value) => (
+  value == null ? null : JSON.parse(JSON.stringify(value))
+)
+
+export function gameMarketCallSnapshot(
+  projection,
+  capturedAt = projection?.capturedAt || new Date().toISOString(),
+) {
+  if (!projection || !Number.isFinite(projection.gamePk)) return null
+  return {
+    capturedAt,
+    modelVersion: projection.modelVersion,
+    projectionRevision: projection.revision?.number || 1,
+    estimatedScore: cloneJson(projection.estimatedScore),
+    awayExpectedRuns: projection.awayExpectedRuns,
+    homeExpectedRuns: projection.homeExpectedRuns,
+    projectedTotal: projection.projectedTotal,
+    awayWinProbability: projection.awayWinProbability,
+    homeWinProbability: projection.homeWinProbability,
+    projectedWinner: projection.projectedWinner,
+    projectedWinnerProbability: projection.projectedWinnerProbability,
+    marketDecision: cloneJson(projection.marketDecision),
+    market: cloneJson(projection.marketTracking?.current),
+  }
+}
+
+function gameMarketCallFingerprint(call) {
+  if (!call) return null
+  return JSON.stringify({
+    modelVersion: call.modelVersion,
+    estimatedScore: call.estimatedScore,
+    awayExpectedRuns: call.awayExpectedRuns,
+    homeExpectedRuns: call.homeExpectedRuns,
+    projectedTotal: call.projectedTotal,
+    awayWinProbability: call.awayWinProbability,
+    homeWinProbability: call.homeWinProbability,
+    projectedWinner: call.projectedWinner,
+    projectedWinnerProbability: call.projectedWinnerProbability,
+    marketDecision: call.marketDecision,
+    market: call.market,
+  })
+}
+
+function compactCallRevisions(revisions) {
+  if (revisions.length <= 48) return revisions
+  return [revisions[0], ...revisions.slice(-47)]
+}
+
+function updateGameMarketCallEntry(
+  prior,
+  projection,
+  {
+    capturedAt = projection?.capturedAt || new Date().toISOString(),
+    frozen = false,
+  } = {},
+) {
+  const call = gameMarketCallSnapshot(projection, capturedAt)
+  if (!call) return prior || null
+  if (prior?.status === 'frozen') return prior
+  if (!prior) {
+    return {
+      gamePk: projection.gamePk,
+      gameDate: projection.gameDate,
+      awayTeam: cloneJson(projection.awayTeam),
+      homeTeam: cloneJson(projection.homeTeam),
+      status: frozen ? 'frozen' : 'pregame',
+      opening: call,
+      current: call,
+      closing: frozen ? call : null,
+      firstCapturedAt: capturedAt,
+      lastObservedAt: capturedAt,
+      lastChangedAt: capturedAt,
+      closedAt: frozen ? capturedAt : null,
+      observationCount: 1,
+      revisionCount: 1,
+      revisions: [call],
+      settlement: null,
+    }
+  }
+  const changed = (
+    gameMarketCallFingerprint(prior.current)
+    !== gameMarketCallFingerprint(call)
+  )
+  const current = frozen ? prior.current : call
+  const revisions = changed && !frozen
+    ? compactCallRevisions([...(prior.revisions || [prior.opening]), call])
+    : prior.revisions || [prior.opening]
+  return {
+    ...prior,
+    gamePk: projection.gamePk,
+    gameDate: projection.gameDate,
+    awayTeam: cloneJson(projection.awayTeam),
+    homeTeam: cloneJson(projection.homeTeam),
+    status: frozen ? 'frozen' : 'pregame',
+    current,
+    closing: frozen ? (prior.closing || prior.current) : null,
+    lastObservedAt: capturedAt,
+    lastChangedAt: changed && !frozen ? capturedAt : prior.lastChangedAt,
+    closedAt: frozen ? (prior.closedAt || capturedAt) : null,
+    observationCount: (prior.observationCount || 0) + 1,
+    revisionCount: (prior.revisionCount || 1) + (changed && !frozen ? 1 : 0),
+    revisions,
+  }
+}
+
+function updateGameMarketCalls(callsByDate, date, projections, games, capturedAt) {
+  const byDate = { ...(callsByDate || {}) }
+  const priorDay = byDate[date] && typeof byDate[date] === 'object'
+    ? byDate[date]
+    : {}
+  const nextDay = { ...priorDay }
+  const projectionsByGame = new Map(
+    projections.map((projection) => [Number(projection.gamePk), projection]),
+  )
+  for (const game of games || []) {
+    const gamePk = Number(game?.gamePk)
+    const projection = projectionsByGame.get(gamePk)
+    if (!projection) continue
+    const key = String(gamePk)
+    const entry = updateGameMarketCallEntry(priorDay[key], projection, {
+      capturedAt,
+      frozen: game.isLive === true || game.isFinal === true,
+    })
+    if (entry) nextDay[key] = entry
+  }
+  byDate[date] = nextDay
+  for (const key of Object.keys(byDate).sort().slice(0, -180)) delete byDate[key]
+  return byDate
+}
+
 export function updateGameForecastLog(log = {}, date, current = [], games = [], { capturedAt = new Date().toISOString() } = {}) {
   const priorForecasts = log?.gameForecasts || {}
   const next = {
@@ -1165,6 +1295,7 @@ export function updateGameForecastLog(log = {}, date, current = [], games = [], 
       version: 1,
       predictionsByDate: { ...(priorForecasts.predictionsByDate || {}) },
       resultsByDate: { ...(priorForecasts.resultsByDate || {}) },
+      callsByDate: { ...(priorForecasts.callsByDate || {}) },
     },
   }
 
@@ -1195,13 +1326,155 @@ export function updateGameForecastLog(log = {}, date, current = [], games = [], 
     }
   }
   next.gameForecasts.predictionsByDate[date] = merged
+  next.gameForecasts.callsByDate = updateGameMarketCalls(
+    next.gameForecasts.callsByDate,
+    date,
+    merged,
+    games,
+    capturedAt,
+  )
   for (const key of Object.keys(next.gameForecasts.predictionsByDate).sort().slice(0, -180)) {
     delete next.gameForecasts.predictionsByDate[key]
   }
   for (const key of Object.keys(next.gameForecasts.resultsByDate).sort().slice(0, -180)) {
     delete next.gameForecasts.resultsByDate[key]
   }
+  for (const key of Object.keys(next.gameForecasts.callsByDate).sort().slice(0, -180)) {
+    delete next.gameForecasts.callsByDate[key]
+  }
   return { log: next, projections: merged }
+}
+
+const americanUnitProfit = (american) => {
+  if (!Number.isFinite(american)) return null
+  if (american >= 100) return american / 100
+  if (american <= -100) return 100 / Math.abs(american)
+  return null
+}
+
+function settledSelection(decision, result, { line = null } = {}) {
+  const tier = decision?.tier || 'unavailable'
+  const selectedSide = decision?.selectedSide || null
+  const american = Number.isFinite(decision?.american) ? decision.american : null
+  const graded = ['win', 'loss', 'push'].includes(result)
+  const unitProfit = !graded
+    ? null
+    : result === 'win'
+      ? americanUnitProfit(american)
+      : result === 'loss'
+        ? -1
+        : 0
+  return {
+    selectedSide,
+    tier,
+    rawTier: decision?.rawTier || tier,
+    provisional: decision?.provisional === true,
+    american,
+    line: Number.isFinite(line) ? line : null,
+    result: graded ? result : 'ungraded',
+    unitProfit: Number.isFinite(unitProfit) ? round(unitProfit, 4) : null,
+    includedInPerformance: graded && ['play', 'lean'].includes(tier),
+  }
+}
+
+export function gradeGameMarketDecision(decision, {
+  awayRuns,
+  homeRuns,
+} = {}) {
+  const actualTotal = Number.isFinite(awayRuns) && Number.isFinite(homeRuns)
+    ? awayRuns + homeRuns
+    : null
+  const actualWinner = Number.isFinite(awayRuns) && Number.isFinite(homeRuns)
+    ? homeRuns > awayRuns
+      ? 'home'
+      : awayRuns > homeRuns
+        ? 'away'
+        : 'tie'
+    : null
+  const moneylineSide = decision?.moneyline?.selectedSide
+  const moneylineResult = !['away', 'home'].includes(moneylineSide) || actualWinner == null
+    ? 'ungraded'
+    : actualWinner === 'tie'
+      ? 'push'
+      : moneylineSide === actualWinner
+        ? 'win'
+        : 'loss'
+  const totalSide = decision?.total?.selectedSide
+  const totalLine = decision?.total?.line
+  let totalResult = 'ungraded'
+  if (
+    ['over', 'under'].includes(totalSide)
+    && Number.isFinite(actualTotal)
+    && Number.isFinite(totalLine)
+  ) {
+    if (actualTotal === totalLine) totalResult = 'push'
+    else if (totalSide === 'over') totalResult = actualTotal > totalLine ? 'win' : 'loss'
+    else totalResult = actualTotal < totalLine ? 'win' : 'loss'
+  }
+  return {
+    version: 1,
+    advisoryOnly: true,
+    moneyline: settledSelection(decision?.moneyline, moneylineResult),
+    total: settledSelection(decision?.total, totalResult, { line: totalLine }),
+  }
+}
+
+function settledGameProjection(projection, game, {
+  settledAt,
+  settlementSource,
+} = {}) {
+  const actualAwayRuns = Number(game?.awayRuns)
+  const actualHomeRuns = Number(game?.homeRuns)
+  if (!Number.isFinite(actualAwayRuns) || !Number.isFinite(actualHomeRuns)) return null
+  const actualTotal = actualAwayRuns + actualHomeRuns
+  const homeWon = actualHomeRuns > actualAwayRuns
+  const awayWon = actualAwayRuns > actualHomeRuns
+  return {
+    ...projection,
+    freezeState: 'final-pregame',
+    frozenAt: projection.frozenAt || game.gameDate || settledAt,
+    actualAwayRuns,
+    actualHomeRuns,
+    actualTotal,
+    actualWinner: homeWon ? 'home' : awayWon ? 'away' : 'tie',
+    totalError: round(projection.projectedTotal - actualTotal, 2),
+    absoluteTotalError: round(Math.abs(projection.projectedTotal - actualTotal), 2),
+    winnerCorrect: homeWon || awayWon
+      ? projection.projectedWinner === (homeWon ? 'home' : 'away')
+      : null,
+    winnerBrier: homeWon || awayWon
+      ? round((projection.homeWinProbability - (homeWon ? 1 : 0)) ** 2, 6)
+      : null,
+    marketOutcome: gradeGameMarketDecision(projection.marketDecision, {
+      awayRuns: actualAwayRuns,
+      homeRuns: actualHomeRuns,
+    }),
+    settlementSource,
+    settledAt,
+  }
+}
+
+function settleGameMarketCallEntry(prior, projection, game, settledProjection, {
+  settledAt,
+  settlementSource,
+}) {
+  const frozen = updateGameMarketCallEntry(prior, projection, {
+    capturedAt: game.gameDate || settledAt,
+    frozen: true,
+  })
+  if (!frozen) return prior || null
+  return {
+    ...frozen,
+    settlement: {
+      actualAwayRuns: settledProjection.actualAwayRuns,
+      actualHomeRuns: settledProjection.actualHomeRuns,
+      actualTotal: settledProjection.actualTotal,
+      actualWinner: settledProjection.actualWinner,
+      marketOutcome: cloneJson(settledProjection.marketOutcome),
+      settlementSource,
+      settledAt,
+    },
+  }
 }
 
 export function settleGameForecasts(log = {}, date, snapshot) {
@@ -1214,6 +1487,7 @@ export function settleGameForecasts(log = {}, date, snapshot) {
       version: 1,
       predictionsByDate: { ...(priorForecasts.predictionsByDate || {}) },
       resultsByDate: { ...(priorForecasts.resultsByDate || {}) },
+      callsByDate: { ...(priorForecasts.callsByDate || {}) },
     },
   }
   const existing = new Map((next.gameForecasts.resultsByDate[date] || []).map((row) => [Number(row.gamePk), row]))
@@ -1226,28 +1500,128 @@ export function settleGameForecasts(log = {}, date, snapshot) {
       || projection.freezeState !== 'final-pregame'
       || Number.isNaN(Date.parse(projection.capturedAt))
     ) continue
-    const actualTotal = game.awayScore + game.homeScore
-    const homeWon = game.homeScore > game.awayScore
-    const awayWon = game.awayScore > game.homeScore
-    existing.set(Number(game.gamePk), {
-      ...projection,
-      freezeState: 'final-pregame',
-      actualAwayRuns: game.awayScore,
-      actualHomeRuns: game.homeScore,
-      actualTotal,
-      actualWinner: homeWon ? 'home' : awayWon ? 'away' : 'tie',
-      totalError: round(projection.projectedTotal - actualTotal, 2),
-      absoluteTotalError: round(Math.abs(projection.projectedTotal - actualTotal), 2),
-      winnerCorrect: homeWon || awayWon ? projection.projectedWinner === (homeWon ? 'home' : 'away') : null,
-      winnerBrier: homeWon || awayWon
-        ? round((projection.homeWinProbability - (homeWon ? 1 : 0)) ** 2, 6)
-        : null,
-      settledAt: snapshot.finishedAt || snapshot.generatedAt || new Date().toISOString(),
+    const settledAt = snapshot.finishedAt || snapshot.generatedAt || new Date().toISOString()
+    const normalizedGame = {
+      ...game,
+      awayRuns: game.awayScore,
+      homeRuns: game.homeScore,
+    }
+    const settled = settledGameProjection(projection, normalizedGame, {
+      settledAt,
+      settlementSource: 'daily-snapshot',
     })
+    if (!settled) continue
+    existing.set(Number(game.gamePk), settled)
+    const callDay = next.gameForecasts.callsByDate[date] || {}
+    next.gameForecasts.callsByDate[date] = {
+      ...callDay,
+      [game.gamePk]: settleGameMarketCallEntry(
+        callDay[game.gamePk],
+        projection,
+        normalizedGame,
+        settled,
+        { settledAt, settlementSource: 'daily-snapshot' },
+      ),
+    }
   }
   if (existing.size) next.gameForecasts.resultsByDate[date] = [...existing.values()]
   for (const key of Object.keys(next.gameForecasts.resultsByDate).sort().slice(0, -180)) {
     delete next.gameForecasts.resultsByDate[key]
+  }
+  return next
+}
+
+export function settleGameForecastsFromResults(
+  log = {},
+  artifact,
+  { settledAt = artifact?.fetchedAt || new Date().toISOString() } = {},
+) {
+  if (!Array.isArray(artifact?.games)) return log
+  const priorForecasts = log?.gameForecasts || {}
+  const next = {
+    ...(log || {}),
+    gameForecasts: {
+      ...priorForecasts,
+      version: 1,
+      predictionsByDate: { ...(priorForecasts.predictionsByDate || {}) },
+      resultsByDate: { ...(priorForecasts.resultsByDate || {}) },
+      callsByDate: { ...(priorForecasts.callsByDate || {}) },
+    },
+  }
+  const finals = new Map(
+    artifact.games
+      .filter((game) => Number.isFinite(Number(game?.gamePk)))
+      .map((game) => [Number(game.gamePk), game]),
+  )
+  for (const [date, predictions] of Object.entries(next.gameForecasts.predictionsByDate)) {
+    if (!Array.isArray(predictions)) continue
+    const existing = new Map(
+      (next.gameForecasts.resultsByDate[date] || [])
+        .map((row) => [Number(row.gamePk), row]),
+    )
+    const updatedPredictions = []
+    const callDay = { ...(next.gameForecasts.callsByDate[date] || {}) }
+    for (const projection of predictions) {
+      const game = finals.get(Number(projection?.gamePk))
+      const captureTime = Date.parse(projection?.capturedAt)
+      const firstPitch = Date.parse(game?.gameDate)
+      const teamMatch = (
+        Number(projection?.awayTeam?.id) === Number(game?.awayTeam?.id)
+        && Number(projection?.homeTeam?.id) === Number(game?.homeTeam?.id)
+      )
+      const eligible = (
+        game?.officialDate === date
+        && projection?.captureState === 'pregame'
+        && ['refreshing-pregame', 'final-pregame'].includes(projection?.freezeState)
+        && !Number.isNaN(captureTime)
+        && !Number.isNaN(firstPitch)
+        && captureTime < firstPitch
+        && teamMatch
+      )
+      if (!eligible) {
+        updatedPredictions.push(projection)
+        continue
+      }
+      const priorSettled = existing.get(Number(game.gamePk))
+      const alreadySettled = (
+        priorSettled?.settlementSource === 'official-season-results'
+        && Number(priorSettled.actualAwayRuns) === Number(game.awayRuns)
+        && Number(priorSettled.actualHomeRuns) === Number(game.homeRuns)
+      )
+      const settled = alreadySettled
+        ? priorSettled
+        : settledGameProjection(projection, game, {
+            settledAt,
+            settlementSource: 'official-season-results',
+          })
+      if (!settled) {
+        updatedPredictions.push(projection)
+        continue
+      }
+      updatedPredictions.push({
+        ...projection,
+        freezeState: 'final-pregame',
+        frozenAt: projection.frozenAt || game.gameDate,
+      })
+      existing.set(Number(game.gamePk), settled)
+      if (!alreadySettled || !callDay[game.gamePk]?.settlement) {
+        callDay[game.gamePk] = settleGameMarketCallEntry(
+          callDay[game.gamePk],
+          projection,
+          game,
+          settled,
+          { settledAt, settlementSource: 'official-season-results' },
+        )
+      }
+    }
+    next.gameForecasts.predictionsByDate[date] = updatedPredictions
+    if (existing.size) next.gameForecasts.resultsByDate[date] = [...existing.values()]
+    if (Object.keys(callDay).length) next.gameForecasts.callsByDate[date] = callDay
+  }
+  for (const section of ['predictionsByDate', 'resultsByDate', 'callsByDate']) {
+    for (const key of Object.keys(next.gameForecasts[section]).sort().slice(0, -180)) {
+      delete next.gameForecasts[section][key]
+    }
   }
   return next
 }
