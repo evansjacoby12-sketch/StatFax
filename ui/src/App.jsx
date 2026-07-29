@@ -735,6 +735,9 @@ export default function App() {
           <ResultsView
             meta={data.meta}
             batters={all}
+            games={data.games}
+            gameProjections={data.raw?.gameProjections || {}}
+            generatedAt={data.meta?.generatedAt}
             onSelect={(b) => setSelectedId(b.id)}
             favorConsistency={favorConsistency}
             initialTab={view === 'combos' ? 'combos' : 'overview'}

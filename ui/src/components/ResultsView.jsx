@@ -12,6 +12,7 @@ import { useTickets } from '../lib/tickets.js'
 import { gradeTicket, summarizeTickets } from '../lib/ticketMath.js'
 import { loadBacktestLog } from '../lib/backtestLog.js'
 import { GRADE_FORM_WINDOWS, summarizeGradeForm } from '../lib/gradeForm.js'
+import ModelTrackingResults from './ModelTrackingResults.jsx'
 
 function computeAuc(rows) {
   const y = rows.map((r) => (r.homered ? 1 : 0))
@@ -39,7 +40,16 @@ const RESULTS_TABS = [
 
 // Results hub: the model track record and the parlay-combo record share one tab
 // now (combos was folded back in here), switched by a sub-toggle.
-export default function ResultsView({ meta, batters, onSelect, favorConsistency = false, initialTab = 'model' }) {
+export default function ResultsView({
+  meta,
+  batters,
+  games = [],
+  gameProjections = {},
+  generatedAt = null,
+  onSelect,
+  favorConsistency = false,
+  initialTab = 'model',
+}) {
   const normalizedInitial = initialTab === 'combos' ? 'tickets' : initialTab === 'model' ? 'model' : 'overview'
   const [tab, setTab] = useState(normalizedInitial)
   useEffect(() => setTab(initialTab === 'combos' ? 'tickets' : initialTab === 'model' ? 'model' : 'overview'), [initialTab])
@@ -59,7 +69,16 @@ export default function ResultsView({ meta, batters, onSelect, favorConsistency 
       />
       {tab === 'overview' && <AccountabilityOverview meta={meta} batters={batters} onSelect={onSelect} onOpenTickets={() => setTab('tickets')} />}
       {tab === 'tickets' && <CombosView batters={batters} onSelect={onSelect} favorConsistency={favorConsistency} initialSection="tickets" />}
-      {tab === 'model' && <ModelResults meta={meta} />}
+      {tab === 'model' && (
+        <div className="results-model-section">
+          <ModelTrackingResults
+            games={games}
+            gameProjections={gameProjections}
+            generatedAt={generatedAt}
+          />
+          <ModelResults meta={meta} />
+        </div>
+      )}
     </div>
   )
 }
