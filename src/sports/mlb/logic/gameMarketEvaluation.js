@@ -3,6 +3,8 @@ export const MLB_GAME_MARKET_EVALUATION_MIN_GAMES = 100
 export const MLB_GAME_MARKET_EVALUATION_MIN_DATES = 10
 export const MLB_GAME_MARKET_PORTFOLIO_VERSION = 1
 
+const clamp = (value, min, max) => Math.max(min, Math.min(max, value))
+
 const round = (value, digits = 4) => {
   if (!Number.isFinite(value)) return null
   const scale = 10 ** digits
@@ -143,10 +145,10 @@ function summarize(rows) {
     unitProfit: round(profits.reduce((sum, value) => sum + value, 0), 3),
     roi: round(profitMean),
     roiLower95: Number.isFinite(profitMean) && Number.isFinite(roiStandardError)
-      ? round(profitMean - 1.96 * roiStandardError)
+      ? round(clamp(profitMean - 1.96 * roiStandardError, -1, 100))
       : null,
     roiUpper95: Number.isFinite(profitMean) && Number.isFinite(roiStandardError)
-      ? round(profitMean + 1.96 * roiStandardError)
+      ? round(clamp(profitMean + 1.96 * roiStandardError, -1, 100))
       : null,
     modelBrier: round(modelBrier),
     marketBrier: round(marketBrier),

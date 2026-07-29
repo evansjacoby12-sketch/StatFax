@@ -156,6 +156,30 @@ test('market evaluation reports exact call ROI, segments, and favorable movement
   assert.equal(evaluation.markets.moneyline.calibration.methodology, 'strict-prior-date-empirical-shrinkage')
 })
 
+test('ROI confidence bounds stay inside physically possible contract limits', () => {
+  const longshotWin = resultRow({
+    gamePk: 50,
+    date: '2026-07-25',
+    moneylineResult: 'win',
+    totalResult: 'win',
+  })
+  longshotWin.marketOutcome.total.unitProfit = 9
+  const evaluation = evaluateGameMarketPerformance(logFromRows({
+    '2026-07-25': [
+      longshotWin,
+      resultRow({
+        gamePk: 51,
+        date: '2026-07-25',
+        moneylineResult: 'loss',
+        totalResult: 'loss',
+      }),
+    ],
+  }))
+
+  assert.equal(evaluation.markets.total.actionable.roiLower95, -1)
+  assert.ok(evaluation.markets.total.actionable.roiUpper95 <= 100)
+})
+
 test('walk-forward calibration never uses same-date results', () => {
   const rowsByDate = {}
   let gamePk = 1
