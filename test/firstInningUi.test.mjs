@@ -3,12 +3,13 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 
 test('BetLab replaces the MLB custom builder with a priced-honest NRFI/YRFI zone and Results owns live tracking', async () => {
-  const [app, lab, zone, results, trackingUi, tracking, css] = await Promise.all([
+  const [app, lab, zone, results, trackingUi, ledgerUi, tracking, css] = await Promise.all([
     readFile(new URL('../ui/src/App.jsx', import.meta.url), 'utf8'),
     readFile(new URL('../ui/src/components/BetLab.jsx', import.meta.url), 'utf8'),
     readFile(new URL('../ui/src/components/FirstInningZone.jsx', import.meta.url), 'utf8'),
     readFile(new URL('../ui/src/components/ResultsView.jsx', import.meta.url), 'utf8'),
     readFile(new URL('../ui/src/components/ModelTrackingResults.jsx', import.meta.url), 'utf8'),
+    readFile(new URL('../ui/src/components/ModelTrackingLedger.jsx', import.meta.url), 'utf8'),
     readFile(new URL('../ui/src/lib/modelTracking.js', import.meta.url), 'utf8'),
     readFile(new URL('../ui/src/app.css', import.meta.url), 'utf8'),
   ])
@@ -29,6 +30,15 @@ test('BetLab replaces the MLB custom builder with a priced-honest NRFI/YRFI zone
   assert.match(trackingUi, /resultsByDate: history\?\.gameForecasts\?\.resultsByDate/)
   assert.match(trackingUi, /finals form the record/)
   assert.match(trackingUi, /active leads stay live/)
+  assert.match(trackingUi, /onOpenDetails/)
+  assert.match(results, /modelDetailsOpen/)
+  assert.match(results, /!modelDetailsOpen && <ModelResults/)
+  assert.match(ledgerUi, /Seven-day game results/)
+  assert.match(ledgerUi, /Moneyline/)
+  assert.match(ledgerUi, /O\/U total/)
+  assert.match(ledgerUi, /NRFI \/ YRFI/)
+  assert.match(ledgerUi, /Checks and Xs appear only after that market settles/)
+  assert.match(ledgerUi, /PASS and WATCH remain visible/)
   assert.match(tracking, /PLAY \+ LEAN/)
   assert.match(tracking, /STRONG \+ LEAN/)
   assert.match(tracking, /diagnosticLabel: 'PASS'/)
@@ -44,6 +54,8 @@ test('BetLab replaces the MLB custom builder with a priced-honest NRFI/YRFI zone
   assert.match(css, /\.fi-game-main/)
   assert.match(css, /\.fi-model-results-grid/)
   assert.match(css, /\.fi-track-card\.is-first-inning/)
+  assert.match(css, /\.model-ledger-row/)
+  assert.match(css, /@media \(max-width: 700px\)[\s\S]*?\.model-ledger-row/)
   assert.match(css, /\.fi-half/)
   assert.match(css, /\.fi-case-caution/)
   assert.match(css, /@media \(max-width: 700px\)[\s\S]*?\.fi-game-main/)

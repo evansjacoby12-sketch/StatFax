@@ -255,4 +255,126 @@ test('today current-slate settlement overrides the same archived game', () => {
   assert.equal(tracking.moneyline.primary.losses, 0)
   assert.equal(tracking.total.diagnostic.wins, 1)
   assert.equal(tracking.firstInning.primary.wins, 1)
+  assert.equal(tracking.details.length, 1)
+  assert.equal(tracking.details[0].moneyline.tracking.outcome, 'win')
+  assert.equal(tracking.details[0].total.tracking.outcome, 'win')
+  assert.equal(tracking.details[0].firstInning.tracking.outcome, 'win')
+})
+
+test('game ledger preserves diagnostic calls, no-calls, and archived identities', () => {
+  const tracking = buildModelTracking([], {}, {
+    asOfDate: '2026-07-29',
+    windowDays: 7,
+    resultsByDate: {
+      '2026-07-28': [{
+        gamePk: 824243,
+        gameDate: '2026-07-28T22:40:00Z',
+        gameNumber: 1,
+        awayTeam: { id: 110, name: 'Baltimore Orioles', abbr: 'BAL' },
+        homeTeam: { id: 116, name: 'Detroit Tigers', abbr: 'DET' },
+        actualAwayRuns: 0,
+        actualHomeRuns: 14,
+        actualAwayFirstInningRuns: 0,
+        actualHomeFirstInningRuns: 1,
+        actualYrfi: true,
+        marketOutcome: {
+          moneyline: {
+            tier: 'play',
+            selectedSide: 'home',
+            result: 'win',
+            american: -143,
+          },
+          total: {
+            tier: 'pass',
+            selectedSide: 'under',
+            line: 9,
+            result: 'loss',
+            american: 100,
+          },
+        },
+        firstInning: {
+          tier: 'watch',
+          qualified: false,
+          lean: 'nrfi',
+        },
+      }, {
+        gamePk: 824244,
+        gameDate: '2026-07-28T23:10:00Z',
+        gameNumber: 2,
+        doubleHeader: 'Y',
+        awayTeam: { id: 110, name: 'Baltimore Orioles', abbr: 'BAL' },
+        homeTeam: { id: 116, name: 'Detroit Tigers', abbr: 'DET' },
+        actualAwayRuns: 2,
+        actualHomeRuns: 1,
+        actualYrfi: false,
+        marketOutcome: {
+          moneyline: {
+            tier: 'unavailable',
+            selectedSide: null,
+            result: 'ungraded',
+          },
+          total: {
+            tier: 'unavailable',
+            selectedSide: null,
+            result: 'ungraded',
+          },
+        },
+      }],
+    },
+  })
+
+  assert.equal(tracking.detailGames, 2)
+  assert.equal(tracking.detailCalls, 3)
+  const firstGame = tracking.details.find((row) => row.gamePk === 824243)
+  const secondGame = tracking.details.find((row) => row.gamePk === 824244)
+  assert.equal(firstGame.away.abbr, 'BAL')
+  assert.equal(firstGame.home.abbr, 'DET')
+  assert.equal(firstGame.moneyline.selectedTeam.abbr, 'DET')
+  assert.equal(firstGame.moneyline.tracking.outcome, 'win')
+  assert.equal(firstGame.total.tier, 'pass')
+  assert.equal(firstGame.total.tracking.outcome, 'loss')
+  assert.equal(firstGame.firstInning.tier, 'watch')
+  assert.equal(firstGame.firstInning.tracking.outcome, 'loss')
+  assert.equal(secondGame.gameNumber, 2)
+  assert.equal(secondGame.moneyline.available, false)
+  assert.equal(secondGame.total.available, false)
+  assert.equal(secondGame.firstInning.available, false)
+})
+
+test('ledger never marks live moneyline or total calls as settled early', () => {
+  const tracking = buildModelTracking([
+    game(501, {
+      gameDate: '2026-07-29T18:00:00Z',
+      awayTeam: { id: 1, name: 'Away', abbr: 'AWY' },
+      homeTeam: { id: 2, name: 'Home', abbr: 'HME' },
+      isLive: true,
+      currentInning: 5,
+      awayScore: 6,
+      homeScore: 1,
+      awayFirstInningRuns: 0,
+      homeFirstInningRuns: 0,
+    }),
+  ], {
+    501: projection({
+      mlTier: 'play',
+      mlSide: 'away',
+      totalTier: 'play',
+      totalSide: 'over',
+      totalLine: 4.5,
+      firstTier: 'strong',
+      firstLean: 'nrfi',
+      firstQualified: true,
+    }),
+  }, {
+    asOfDate: '2026-07-29',
+    windowDays: 7,
+  })
+
+  const [row] = tracking.details
+  assert.equal(row.state, 'live')
+  assert.equal(row.moneyline.tracking.outcome, null)
+  assert.equal(row.moneyline.tracking.liveState.kind, 'leading')
+  assert.equal(row.total.tracking.outcome, null)
+  assert.equal(row.total.tracking.liveState.kind, 'clinched-win')
+  assert.equal(row.firstInning.tracking.outcome, 'win')
 })

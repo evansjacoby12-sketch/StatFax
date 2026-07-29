@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import Icon from './Icon.jsx'
 import CommandTabs from './CommandTabs.jsx'
+import CallKey from './CallKey.jsx'
 import { pct } from '../lib/format.js'
 
 const SIDE_TABS = [
@@ -256,6 +257,8 @@ export default function FirstInningZone({
           <span><Icon name="Activity" size={11} /> Pitcher micro active · team L30 shadow-tested</span>
         </div>
       </section>
+
+      <CallKey className="fi-call-key" />
 
       <section className="fi-controls" aria-label="First inning filters">
         <CommandTabs

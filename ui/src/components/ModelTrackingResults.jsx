@@ -3,6 +3,7 @@ import Icon from './Icon.jsx'
 import { timeAgo } from '../lib/format.js'
 import { buildModelTracking } from '../lib/modelTracking.js'
 import { loadBacktestLog } from '../lib/backtestLog.js'
+import ModelTrackingLedger from './ModelTrackingLedger.jsx'
 
 const WINDOW_DAYS = 7
 
@@ -50,13 +51,19 @@ function ModelTrackingCard({
   market,
   tracking,
   pricesAvailable = true,
+  onOpen,
 }) {
   const { primary, diagnostic, actionLabel, diagnosticLabel } = tracking
   return (
-    <article className={`fi-track-card is-${market}`}>
+    <button
+      type="button"
+      className={`fi-track-card is-${market}`}
+      onClick={onOpen}
+      aria-label={`View game-by-game ${title} results`}
+    >
       <header>
         <span><Icon name={icon} size={12} /><b>{title}</b></span>
-        <em>{actionLabel}</em>
+        <em>{actionLabel}<Icon name="ChevronRight" size={9} /></em>
       </header>
       <div className="fi-track-score">
         <span>
@@ -73,7 +80,7 @@ function ModelTrackingCard({
         <span><small>{diagnosticLabel}</small><b className="mono">{recordLabel(diagnostic)}</b></span>
         <span>{diagnostic.pending ? `${diagnostic.pending} pending` : 'Diagnostic only'}</span>
       </footer>
-    </article>
+    </button>
   )
 }
 
@@ -81,6 +88,9 @@ export default function ModelTrackingResults({
   games = [],
   gameProjections = {},
   generatedAt = null,
+  detailOpen = false,
+  onOpenDetails,
+  onCloseDetails,
 }) {
   const [history, setHistory] = useState(null)
   const [historyFailed, setHistoryFailed] = useState(false)
@@ -117,13 +127,24 @@ export default function ModelTrackingResults({
       ? 'Loading seven-day history'
       : `${tracking.settledDays} of ${tracking.windowDays} days settled`
 
+  if (detailOpen) {
+    return (
+      <ModelTrackingLedger
+        tracking={tracking}
+        historyStatus={historyStatus}
+        onBack={onCloseDetails}
+      />
+    )
+  }
+
   return (
     <section className="fi-model-results results-model-tracking" aria-label="Seven-day model results">
       <header className="fi-model-results-head">
-        <span>
+        <button type="button" className="fi-model-results-link" onClick={onOpenDetails}>
           <Icon name="Activity" size={12} />
           <b>Seven-day model tracking</b>
-        </span>
+          <Icon name="ChevronRight" size={11} />
+        </button>
         <span className={tracking.anyLive ? 'is-live' : ''}>
           {tracking.anyLive && <i />}
           {tracking.anyLive ? 'Live' : 'Pregame'}
@@ -137,12 +158,14 @@ export default function ModelTrackingResults({
           icon="Trophy"
           market="moneyline"
           tracking={tracking.moneyline}
+          onOpen={onOpenDetails}
         />
         <ModelTrackingCard
           title="O/U totals"
           icon="ArrowUpDown"
           market="total"
           tracking={tracking.total}
+          onOpen={onOpenDetails}
         />
         <ModelTrackingCard
           title="NRFI / YRFI"
@@ -150,6 +173,7 @@ export default function ModelTrackingResults({
           market="first-inning"
           tracking={tracking.firstInning}
           pricesAvailable={false}
+          onOpen={onOpenDetails}
         />
       </div>
     </section>

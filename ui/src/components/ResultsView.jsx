@@ -52,7 +52,11 @@ export default function ResultsView({
 }) {
   const normalizedInitial = initialTab === 'combos' ? 'tickets' : initialTab === 'model' ? 'model' : 'overview'
   const [tab, setTab] = useState(normalizedInitial)
+  const [modelDetailsOpen, setModelDetailsOpen] = useState(false)
   useEffect(() => setTab(initialTab === 'combos' ? 'tickets' : initialTab === 'model' ? 'model' : 'overview'), [initialTab])
+  useEffect(() => {
+    if (tab !== 'model') setModelDetailsOpen(false)
+  }, [tab])
   return (
     <div className="results-wrap">
       <div className="mobile-page-kicker results-mobile-kicker">
@@ -75,8 +79,11 @@ export default function ResultsView({
             games={games}
             gameProjections={gameProjections}
             generatedAt={generatedAt}
+            detailOpen={modelDetailsOpen}
+            onOpenDetails={() => setModelDetailsOpen(true)}
+            onCloseDetails={() => setModelDetailsOpen(false)}
           />
-          <ModelResults meta={meta} />
+          {!modelDetailsOpen && <ModelResults meta={meta} />}
         </div>
       )}
     </div>

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Icon from './Icon.jsx'
 import GameFilterBar from './GameFilterBar.jsx'
+import CallKey from './CallKey.jsx'
 import { GradeChip, BadgeRow, ProbBar, ProbRing } from './atoms.jsx'
 import { teamColor, teamLogo, hexToRgba, readableOn, playerHeadshot } from '../lib/teams.js'
 import { american, pct, num, gameTime, signedPct } from '../lib/format.js'
@@ -532,6 +533,7 @@ export default function GamesView({
         filtersActive={filtersActive}
         onClear={clearGameFilters}
       />
+      <CallKey className="games-call-key" />
       {ordered.length ? (
         <section className="games-accordion" aria-label="Game matchups">
           <div className="games-accordion-head">
