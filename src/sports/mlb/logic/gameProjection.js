@@ -1844,6 +1844,12 @@ export function evaluateGameForecasts(log = {}) {
   const firstInningRecent30Briers = firstInningRecent30Rows.map((row) => (
     (row.firstInning.shadow.recent30YrfiProbability - (row.actualYrfi ? 1 : 0)) ** 2
   ))
+  const firstInningRecentLeagueRows = firstInningRows.filter((row) => (
+    Number.isFinite(row.firstInning?.shadow?.recentLeagueYrfiProbability)
+  ))
+  const firstInningRecentLeagueBriers = firstInningRecentLeagueRows.map((row) => (
+    (row.firstInning.shadow.recentLeagueYrfiProbability - (row.actualYrfi ? 1 : 0)) ** 2
+  ))
   const qualifiedFirstInningRows = firstInningRows.filter((row) => row.firstInning?.qualified === true)
 
   const winnerBrier = mean(winnerBriers)
@@ -1942,6 +1948,17 @@ export function evaluateGameForecasts(log = {}) {
           && firstInningRows.length > 0
         )
           ? roundedMetric(mean(firstInningBriers) - mean(firstInningRecent30Briers))
+          : null,
+      },
+      recentLeagueShadow: {
+        applied: false,
+        sample: firstInningRecentLeagueRows.length,
+        brier: roundedMetric(mean(firstInningRecentLeagueBriers)),
+        improvementVsBackbone: (
+          firstInningRecentLeagueRows.length === firstInningRows.length
+          && firstInningRows.length > 0
+        )
+          ? roundedMetric(mean(firstInningBriers) - mean(firstInningRecentLeagueBriers))
           : null,
       },
       calibration: firstInningCalibration(firstInningRows),

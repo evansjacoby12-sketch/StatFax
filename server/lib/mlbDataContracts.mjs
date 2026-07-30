@@ -691,6 +691,39 @@ function validateGameProjectionRecord(prefix, projection, errors, gameIds = null
           if (typeof first.shadow.reason !== 'string' || !first.shadow.reason.trim()) {
             errors.push(`${at}.shadow.reason: expected non-empty text`)
           }
+          if (first.shadow.recentLeagueApplied != null) {
+            if (first.shadow.recentLeagueApplied !== false) {
+              errors.push(`${at}.shadow.recentLeagueApplied: must remain false until validated`)
+            }
+            validateProbability(
+              `${at}.shadow.recentLeagueYrfiProbability`,
+              first.shadow.recentLeagueYrfiProbability,
+              errors,
+            )
+            validateProbability(
+              `${at}.shadow.recentLeagueNrfiProbability`,
+              first.shadow.recentLeagueNrfiProbability,
+              errors,
+            )
+            for (const field of ['recentLeagueYrfiRate', 'recentLeagueNrfiRate']) {
+              validateOptionalMetric(`${at}.shadow.${field}`, first.shadow[field], errors, {
+                min: 0,
+                max: 1,
+              })
+            }
+            if (
+              !Number.isInteger(first.shadow.recentLeagueGames)
+              || first.shadow.recentLeagueGames < 0
+            ) {
+              errors.push(`${at}.shadow.recentLeagueGames: expected a non-negative integer`)
+            }
+            if (
+              typeof first.shadow.recentLeagueReason !== 'string'
+              || !first.shadow.recentLeagueReason.trim()
+            ) {
+              errors.push(`${at}.shadow.recentLeagueReason: expected non-empty text`)
+            }
+          }
         }
       }
       for (const side of ['away', 'home']) {
@@ -1615,6 +1648,27 @@ function validateFirstInningHistoricalValidation(evaluation, errors) {
     )
     validateOptionalMetric(
       `${prefix}.challengers.recent30Team.improvementVsBackbone`,
+      challenger.improvementVsBackbone,
+      errors,
+      { min: -1, max: 1 },
+    )
+  }
+  if (evaluation.challengers?.recentLeague != null) {
+    const challenger = evaluation.challengers.recentLeague
+    if (challenger.applied !== false) {
+      errors.push(`${prefix}.challengers.recentLeague.applied: must remain false`)
+    }
+    if (!Number.isInteger(challenger.windowDays) || challenger.windowDays < 1) {
+      errors.push(`${prefix}.challengers.recentLeague.windowDays: expected a positive integer`)
+    }
+    validateOptionalMetric(
+      `${prefix}.challengers.recentLeague.brier`,
+      challenger.brier,
+      errors,
+      { min: 0, max: 1 },
+    )
+    validateOptionalMetric(
+      `${prefix}.challengers.recentLeague.improvementVsBackbone`,
       challenger.improvementVsBackbone,
       errors,
       { min: -1, max: 1 },

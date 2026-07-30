@@ -69,6 +69,10 @@ test('first-inning profiles are leakage-safe and combine offense with opponent a
   assert.ok(matchup.expectedRuns > 0)
   assert.ok(matchup.offenseGames > 0)
   assert.ok(matchup.defenseGames > 0)
+  assert.equal(profiles.recentLeague.windowDays, 30)
+  assert.ok(profiles.recentLeague.games > 0)
+  assert.ok(Number.isFinite(profiles.recentLeague.nrfiRate))
+  assert.ok(Number.isFinite(profiles.recentLeague.adjustedNrfiRate))
 })
 
 test('NRFI and YRFI use independently calibrated action thresholds', () => {
@@ -186,6 +190,15 @@ test('Forecast V9 first-inning layer emits complementary NRFI and YRFI probabili
   assert.ok(projection.halves.home.pitcherFirstInning.factor < 1)
   assert.equal(projection.shadow.recent30Applied, false)
   assert.ok(Number.isFinite(projection.shadow.recent30YrfiProbability))
+  assert.equal(projection.shadow.recentLeagueApplied, false)
+  assert.ok(Number.isFinite(projection.shadow.recentLeagueYrfiProbability))
+  assert.ok(
+    Math.abs(
+      projection.shadow.recentLeagueNrfiProbability
+        + projection.shadow.recentLeagueYrfiProbability
+        - 1,
+    ) < 0.001,
+  )
   assert.ok(['nrfi', 'yrfi'].includes(projection.lean))
   assert.ok(['strong', 'lean', 'watch', 'limited'].includes(projection.tier))
   assert.equal(projection.tierPolicy.side, projection.lean)
@@ -213,5 +226,8 @@ test('first-inning history evaluation is expanding-date and reports honest eligi
   assert.ok(Number.isFinite(evaluation.model.improvementLowerBound90))
   assert.equal(evaluation.challengers.recent30Team.applied, false)
   assert.ok(Number.isFinite(evaluation.challengers.recent30Team.brier))
+  assert.equal(evaluation.challengers.recentLeague.applied, false)
+  assert.equal(evaluation.challengers.recentLeague.windowDays, 30)
+  assert.ok(Number.isFinite(evaluation.challengers.recentLeague.brier))
   assert.ok(['eligible', 'hold'].includes(evaluation.status))
 })

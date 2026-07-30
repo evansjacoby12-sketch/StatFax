@@ -62,6 +62,29 @@ function shrunkRate(value, sample, prior, priorSample) {
   return ((value * sample) + (prior * priorSample)) / (sample + priorSample)
 }
 
+function dateEpoch(date) {
+  const matched = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(date || ''))
+  if (!matched) return null
+  return Date.UTC(Number(matched[1]), Number(matched[2]) - 1, Number(matched[3]))
+}
+
+function recentLeagueWindow(games, cutoffDate, days = 30) {
+  if (!games.length) return []
+  const lastGameEpoch = dateEpoch(games.at(-1)?.officialDate)
+  const cutoffEpoch = dateEpoch(cutoffDate)
+  const endExclusive = Number.isFinite(cutoffEpoch)
+    ? cutoffEpoch
+    : Number.isFinite(lastGameEpoch)
+      ? lastGameEpoch + 86_400_000
+      : null
+  if (!Number.isFinite(endExclusive)) return []
+  const startInclusive = endExclusive - (days * 86_400_000)
+  return games.filter((game) => {
+    const epoch = dateEpoch(game.officialDate)
+    return Number.isFinite(epoch) && epoch >= startInclusive && epoch < endExclusive
+  })
+}
+
 function teamFirstInningProfile(teamId, rows, leagueScoreRate, leagueRuns) {
   const ordered = [...rows].sort((left, right) => (
     left.officialDate.localeCompare(right.officialDate)
@@ -130,6 +153,16 @@ export function buildFirstInningProfiles(history, {
     ?? MLB_FIRST_INNING_FALLBACK_HALF_SCORE_RATE
   const leagueHalfRuns = mean(halfRuns) ?? MLB_FIRST_INNING_FALLBACK_HALF_RUNS
   const leagueYrfiRate = 1 - ((1 - leagueHalfScoreRate) ** 2)
+  const recentLeagueGames = recentLeagueWindow(games, cutoffDate)
+  const recentLeagueYrfiRate = mean(recentLeagueGames.map((game) => (
+    game.awayFirstInningRuns + game.homeFirstInningRuns > 0 ? 1 : 0
+  )))
+  const recentLeagueAdjustedYrfiRate = shrunkRate(
+    recentLeagueYrfiRate,
+    recentLeagueGames.length,
+    leagueYrfiRate,
+    120,
+  )
   const offenseRows = new Map()
   const defenseRows = new Map()
   const gameRows = new Map()
@@ -188,6 +221,16 @@ export function buildFirstInningProfiles(history, {
     leagueHalfScoreRate: round(leagueHalfScoreRate),
     leagueHalfRuns: round(leagueHalfRuns),
     leagueYrfiRate: round(leagueYrfiRate),
+    recentLeague: {
+      windowDays: 30,
+      games: recentLeagueGames.length,
+      yrfiRate: round(recentLeagueYrfiRate),
+      nrfiRate: Number.isFinite(recentLeagueYrfiRate) ? round(1 - recentLeagueYrfiRate) : null,
+      adjustedYrfiRate: round(recentLeagueAdjustedYrfiRate),
+      adjustedNrfiRate: Number.isFinite(recentLeagueAdjustedYrfiRate)
+        ? round(1 - recentLeagueAdjustedYrfiRate)
+        : null,
+    },
     teams,
   }
 }
@@ -273,6 +316,18 @@ function applyMatchupYrfiContext(probability, awayHistorical, homeHistorical) {
   )
   if (!Number.isFinite(contextRate) || !Number.isFinite(leagueRate)) return probability
   const shift = 0.28 * contextCoverage * (logit(contextRate) - logit(leagueRate))
+  return clamp(logistic(logit(probability) + shift), 0.25, 0.75)
+}
+
+function applyRecentLeagueRegime(probability, profiles) {
+  const stableRate = finite(profiles?.leagueYrfiRate)
+  const recentRate = finite(profiles?.recentLeague?.adjustedYrfiRate)
+  const recentGames = finite(profiles?.recentLeague?.games, 0)
+  if (!Number.isFinite(stableRate) || !Number.isFinite(recentRate) || !(recentGames > 0)) {
+    return probability
+  }
+  const coverage = clamp(recentGames / 300, 0, 1)
+  const shift = 0.35 * coverage * (logit(recentRate) - logit(stableRate))
   return clamp(logistic(logit(probability) + shift), 0.25, 0.75)
 }
 
@@ -579,6 +634,10 @@ export function buildFirstInningProjection({
     awayHistorical,
     homeHistorical,
   )
+  const recentLeagueShadowProbability = applyRecentLeagueRegime(
+    yrfiProbability,
+    profiles,
+  )
   const nrfiProbability = 1 - yrfiProbability
   const lean = nrfiProbability >= yrfiProbability ? 'nrfi' : 'yrfi'
   const selectedProbability = Math.max(nrfiProbability, yrfiProbability)
@@ -637,7 +696,14 @@ export function buildFirstInningProjection({
     shadow: {
       recent30Applied: false,
       recent30YrfiProbability: round(recent30ShadowProbability),
+      recentLeagueApplied: false,
+      recentLeagueYrfiProbability: round(recentLeagueShadowProbability),
+      recentLeagueNrfiProbability: round(1 - recentLeagueShadowProbability),
+      recentLeagueGames: profiles?.recentLeague?.games || 0,
+      recentLeagueYrfiRate: profiles?.recentLeague?.yrfiRate ?? null,
+      recentLeagueNrfiRate: profiles?.recentLeague?.nrfiRate ?? null,
       reason: 'The strict last-30 team challenger remains shadow-only until it beats the stable history backbone.',
+      recentLeagueReason: 'The rolling 30-day league NRFI/YRFI regime is tracked as a shadow challenger and cannot change calls.',
     },
     halves: { away, home },
     evidence: {
@@ -715,12 +781,17 @@ export function evaluateFirstInningHistory(history, {
         away,
         home,
       )
+      const recentLeagueProbability = applyRecentLeagueRegime(
+        probability,
+        profiles,
+      )
       const outcome = game.awayFirstInningRuns + game.homeFirstInningRuns > 0 ? 1 : 0
       rows.push({
         date,
         season: Number(date.slice(0, 4)),
         probability,
         recent30Probability,
+        recentLeagueProbability,
         baselineProbability,
         outcome,
       })
@@ -728,6 +799,9 @@ export function evaluateFirstInningHistory(history, {
   }
   const modelBrier = mean(rows.map((row) => (row.probability - row.outcome) ** 2))
   const recent30Brier = mean(rows.map((row) => (row.recent30Probability - row.outcome) ** 2))
+  const recentLeagueBrier = mean(rows.map((row) => (
+    (row.recentLeagueProbability - row.outcome) ** 2
+  )))
   const baselineBrier = mean(rows.map((row) => (row.baselineProbability - row.outcome) ** 2))
   const accuracy = mean(rows.map((row) => ((row.probability >= 0.5) === Boolean(row.outcome) ? 1 : 0)))
   const seasons = new Set(rows.map((row) => row.season))
@@ -800,6 +874,15 @@ export function evaluateFirstInningHistory(history, {
           ? round(modelBrier - recent30Brier)
           : null,
         note: 'Strict last-30 offense and team YRFI form remains shadow-only unless it beats the stable backbone.',
+      },
+      recentLeague: {
+        applied: false,
+        windowDays: 30,
+        brier: round(recentLeagueBrier),
+        improvementVsBackbone: Number.isFinite(recentLeagueBrier) && Number.isFinite(modelBrier)
+          ? round(modelBrier - recentLeagueBrier)
+          : null,
+        note: 'The league-wide rolling 30-day NRFI/YRFI regime remains shadow-only until it proves a stable Brier improvement.',
       },
     },
     note: status === 'eligible'
