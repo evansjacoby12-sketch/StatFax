@@ -2,6 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   applyFirstInningQualificationGate,
+  applyWatchNrfiPromotion,
   buildFirstInningProfiles,
   buildFirstInningProjection,
   evaluateFirstInningHistory,
@@ -122,6 +123,57 @@ test('YRFI qualification is held unless its own calibration is eligible', () => 
   })
   assert.equal(nrfi.tier, 'lean')
   assert.equal(nrfi.qualified, true)
+})
+
+test('borderline WATCH NRFI cannot promote before operational evidence clears', () => {
+  const collecting = applyWatchNrfiPromotion({
+    side: 'nrfi',
+    tier: 'watch',
+    probability: 0.55,
+    coverage: 0.9,
+    evidence: {
+      status: 'collecting',
+      sample: 10,
+      wins: 8,
+      losses: 2,
+      dates: 3,
+      hitRate: 0.8,
+      lowerBound90: 0.54,
+    },
+  })
+  assert.equal(collecting.promotion.candidate, true)
+  assert.equal(collecting.promotion.promoted, false)
+  assert.equal(collecting.tier, 'watch')
+  assert.match(collecting.promotion.reason, /10\/20/)
+
+  const eligible = applyWatchNrfiPromotion({
+    side: 'nrfi',
+    tier: 'watch',
+    probability: 0.55,
+    coverage: 0.9,
+    evidence: {
+      status: 'eligible',
+      sample: 20,
+      wins: 16,
+      losses: 4,
+      dates: 5,
+      hitRate: 0.8,
+      lowerBound90: 0.61,
+    },
+  })
+  assert.equal(eligible.promotion.promoted, true)
+  assert.equal(eligible.tier, 'lean')
+  assert.equal(eligible.qualified, true)
+
+  const weakerWatch = applyWatchNrfiPromotion({
+    side: 'nrfi',
+    tier: 'watch',
+    probability: 0.53,
+    coverage: 0.9,
+    evidence: { status: 'eligible' },
+  })
+  assert.equal(weakerWatch.promotion.candidate, false)
+  assert.equal(weakerWatch.tier, 'watch')
 })
 
 test('Forecast V9 first-inning layer emits complementary NRFI and YRFI probabilities', () => {

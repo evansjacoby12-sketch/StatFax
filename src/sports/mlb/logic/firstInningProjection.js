@@ -2,6 +2,15 @@ export const MLB_FIRST_INNING_PROJECTION_VERSION = 1
 export const MLB_FIRST_INNING_HISTORY_VERSION = 1
 export const MLB_FIRST_INNING_FALLBACK_HALF_SCORE_RATE = 0.267
 export const MLB_FIRST_INNING_FALLBACK_HALF_RUNS = 0.49
+export const MLB_WATCH_NRFI_PROMOTION_POLICY = Object.freeze({
+  candidateProbability: 0.54,
+  candidateCoverage: 0.72,
+  minimumSettled: 20,
+  targetSettled: 30,
+  minimumDates: 5,
+  minimumHitRate: 0.6,
+  minimumLowerBound90: 0.5,
+})
 export const MLB_FIRST_INNING_SIDE_TIER_POLICY = Object.freeze({
   nrfi: Object.freeze({
     limitedCoverage: 0.62,
@@ -589,6 +598,52 @@ export function applyFirstInningQualificationGate({
   }
 }
 
+export function applyWatchNrfiPromotion({
+  side,
+  tier,
+  probability,
+  coverage,
+  evidence = null,
+} = {}) {
+  const policy = MLB_WATCH_NRFI_PROMOTION_POLICY
+  const candidate = (
+    side === 'nrfi'
+    && tier === 'watch'
+    && probability >= policy.candidateProbability
+    && coverage >= policy.candidateCoverage
+  )
+  const status = evidence?.status || 'collecting'
+  const sample = Number.isInteger(evidence?.sample) ? evidence.sample : 0
+  const wins = Number.isInteger(evidence?.wins) ? evidence.wins : 0
+  const losses = Number.isInteger(evidence?.losses) ? evidence.losses : 0
+  const promoted = candidate && status === 'eligible'
+  const progress = Math.min(sample, policy.minimumSettled)
+
+  return {
+    tier: promoted ? 'lean' : tier,
+    qualified: promoted,
+    promotion: {
+      candidate,
+      promoted,
+      status,
+      sample,
+      wins,
+      losses,
+      dates: Number.isInteger(evidence?.dates) ? evidence.dates : 0,
+      hitRate: Number.isFinite(evidence?.hitRate) ? evidence.hitRate : null,
+      lowerBound90: Number.isFinite(evidence?.lowerBound90) ? evidence.lowerBound90 : null,
+      minimumSettled: policy.minimumSettled,
+      targetSettled: policy.targetSettled,
+      progress,
+      reason: promoted
+        ? `Promoted from WATCH after ${sample} settled WATCH NRFIs cleared every evidence gate.`
+        : candidate
+          ? `WATCH NRFI promotion is ${status.toUpperCase()}: ${progress}/${policy.minimumSettled} minimum settled (${wins}-${losses}).`
+          : 'This matchup does not meet the borderline WATCH NRFI promotion profile.',
+    },
+  }
+}
+
 function buildDecisionNotes({ lean, away, home, nrfiProbability, yrfiProbability }) {
   const strongerHalf = away.scoringProbability >= home.scoringProbability ? away : home
   const weakerHalf = strongerHalf === away ? home : away
@@ -617,6 +672,7 @@ export function buildFirstInningProjection({
   gameProjection,
   profiles = null,
   historicalValidation = null,
+  operationalEvidence = null,
 } = {}) {
   if (!game || !gameProjection) return null
   const awayHistorical = firstInningMatchupContext(
@@ -675,6 +731,15 @@ export function buildFirstInningProjection({
     tier: rawTier,
     sideCalibrationStatus,
   })
+  const watchNrfiPromotion = applyWatchNrfiPromotion({
+    side: lean,
+    tier: qualification.tier,
+    probability: selectedProbability,
+    coverage,
+    evidence: operationalEvidence?.watchNrfiPromotion,
+  })
+  const finalTier = watchNrfiPromotion.tier
+  const qualified = qualification.qualified || watchNrfiPromotion.qualified
 
   const away = {
     team: gameProjection.awayTeam,
@@ -708,9 +773,10 @@ export function buildFirstInningProjection({
     model: 'Forecast V9 + 1st Inning Layer',
     status: coverage >= 0.62 ? 'ready' : 'limited',
     lean,
-    tier: qualification.tier,
-    qualified: qualification.qualified,
+    tier: finalTier,
+    qualified,
     qualificationGate: qualification.gate,
+    watchNrfiPromotion: watchNrfiPromotion.promotion,
     tierPolicy: {
       side: lean,
       leanProbability: tierPolicy.leanProbability,
@@ -740,7 +806,11 @@ export function buildFirstInningProjection({
     halves: { away, home },
     evidence: {
       case: notes.caseText,
-      caution: qualification.gate.applied ? qualification.gate.reason : notes.cautionText,
+      caution: qualification.gate.applied
+        ? qualification.gate.reason
+        : watchNrfiPromotion.promotion.candidate
+          ? watchNrfiPromotion.promotion.reason
+          : notes.cautionText,
     },
     validation: {
       status: historicalValidation?.status || 'collecting',
@@ -749,7 +819,7 @@ export function buildFirstInningProjection({
       historicalBrier: historicalValidation?.model?.brier ?? null,
       baselineBrier: historicalValidation?.baseline?.brier ?? null,
       sideCalibration: historicalValidation?.sides?.[lean] || null,
-      forwardStatus: 'collecting',
+      forwardStatus: operationalEvidence?.watchNrfiPromotion?.status || 'collecting',
     },
   }
 }

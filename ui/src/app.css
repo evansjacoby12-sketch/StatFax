@@ -25375,6 +25375,9 @@ button.th:focus-visible {
   color: var(--text-faint);
   font-size: 9px;
 }
+.fi-method-model .fi-promotion.collecting { color: var(--text-dim); }
+.fi-method-model .fi-promotion.hold { color: var(--warn); }
+.fi-method-model .fi-promotion.eligible { color: var(--strong); }
 .fi-model-results {
   min-width: 0;
   display: grid;

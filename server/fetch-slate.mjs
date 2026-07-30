@@ -4876,6 +4876,7 @@ async function main() {
       multiSeasonRunProfiles,
       firstInningProfiles,
       firstInningHistoricalValidation,
+      firstInningOperationalEvidence: gameProjectionEvaluation.firstInning,
       capturedAt,
     });
     const tracked = updateGameForecastLog(backtestLog, date, current, games, { capturedAt });

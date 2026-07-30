@@ -4,7 +4,10 @@ import {
   buildGameMarketDecision,
   gameMarketDecisionPolicy,
 } from './gameMarketDecision.js'
-import { buildFirstInningProjection } from './firstInningProjection.js'
+import {
+  buildFirstInningProjection,
+  MLB_WATCH_NRFI_PROMOTION_POLICY,
+} from './firstInningProjection.js'
 
 export const MLB_GAME_PROJECTION_VERSION = 9
 export const MLB_GAME_BASE_RUNS_PER_TEAM = 4.42
@@ -895,6 +898,7 @@ export function buildGameProjection({
   multiSeasonRunProfiles = null,
   firstInningProfiles = null,
   firstInningHistoricalValidation = null,
+  firstInningOperationalEvidence = null,
   capturedAt = new Date().toISOString(),
 }) {
   if (!game || game.isLive === true || game.isFinal === true) return null
@@ -1014,6 +1018,7 @@ export function buildGameProjection({
     gameProjection: projection,
     profiles: firstInningProfiles,
     historicalValidation: firstInningHistoricalValidation,
+    operationalEvidence: firstInningOperationalEvidence,
   })
   return projection
 }
@@ -1035,6 +1040,7 @@ export function buildSlateGameProjections({
   multiSeasonRunProfiles = null,
   firstInningProfiles = null,
   firstInningHistoricalValidation = null,
+  firstInningOperationalEvidence = null,
   capturedAt = new Date().toISOString(),
 } = {}) {
   const rows = Object.values(scoredBatters).filter((row, index, all) => (
@@ -1062,6 +1068,7 @@ export function buildSlateGameProjections({
       multiSeasonRunProfiles,
       firstInningProfiles,
       firstInningHistoricalValidation,
+      firstInningOperationalEvidence,
       capturedAt,
     }))
     .filter(Boolean)
@@ -1764,6 +1771,61 @@ function firstInningCalibration(rows) {
   }).filter((bin) => bin.sample > 0)
 }
 
+function wilsonLowerBound(successes, sample, z = 1.645) {
+  if (!(sample > 0) || successes < 0 || successes > sample) return null
+  const rate = successes / sample
+  const z2 = z ** 2
+  const denominator = 1 + (z2 / sample)
+  const center = rate + (z2 / (2 * sample))
+  const margin = z * Math.sqrt(((rate * (1 - rate)) + (z2 / (4 * sample))) / sample)
+  return (center - margin) / denominator
+}
+
+function watchNrfiPromotionEvidence(rows) {
+  const policy = MLB_WATCH_NRFI_PROMOTION_POLICY
+  const matched = rows.filter((row) => (
+    row.firstInning?.lean === 'nrfi'
+    && (
+      row.firstInning?.tier === 'watch'
+      || row.firstInning?.watchNrfiPromotion?.promoted === true
+    )
+    && typeof row.firstInningCorrect === 'boolean'
+  ))
+  const wins = matched.filter((row) => row.firstInningCorrect).length
+  const losses = matched.length - wins
+  const dates = new Set(matched.map((row) => row.resultDate)).size
+  const hitRate = matched.length ? wins / matched.length : null
+  const lowerBound90 = wilsonLowerBound(wins, matched.length)
+  const sampleReady = matched.length >= policy.minimumSettled && dates >= policy.minimumDates
+  const eligible = (
+    sampleReady
+    && hitRate >= policy.minimumHitRate
+    && lowerBound90 > policy.minimumLowerBound90
+  )
+  const status = !sampleReady ? 'collecting' : eligible ? 'eligible' : 'hold'
+
+  return {
+    status,
+    eligible,
+    sample: matched.length,
+    wins,
+    losses,
+    dates,
+    hitRate: roundedMetric(hitRate),
+    lowerBound90: roundedMetric(lowerBound90),
+    maturity: matched.length >= policy.targetSettled
+      ? 'mature'
+      : matched.length >= policy.minimumSettled
+        ? 'provisional'
+        : 'collecting',
+    policy: { ...policy },
+  }
+}
+
+export function evaluateWatchNrfiPromotion(log = {}) {
+  return watchNrfiPromotionEvidence(gameForecastResultRows(log))
+}
+
 // Evaluation summarizes frozen, settled pregame forecasts. Only its aggregate
 // paired base-vs-market metrics can unlock the capped game-market blend; no
 // individual result or market input ever feeds the HR engine.
@@ -1782,6 +1844,7 @@ export function evaluateGameForecasts(log = {}) {
     Number.isFinite(row.firstInning?.yrfiProbability)
     && typeof row.actualYrfi === 'boolean'
   ))
+  const watchNrfiPromotion = watchNrfiPromotionEvidence(firstInningRows)
   const marketWinnerRows = winnerRows.filter((row) => (
     Number.isFinite(row.marketComparison?.moneyline?.homeMarketProbability)
   ))
@@ -1961,6 +2024,7 @@ export function evaluateGameForecasts(log = {}) {
           ? roundedMetric(mean(firstInningBriers) - mean(firstInningRecentLeagueBriers))
           : null,
       },
+      watchNrfiPromotion,
       calibration: firstInningCalibration(firstInningRows),
     },
     note: status === 'collecting'

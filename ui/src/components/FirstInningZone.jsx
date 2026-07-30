@@ -242,6 +242,9 @@ export default function FirstInningZone({
   const strongestYrfi = allRows.find((row) => row.first.lean === 'yrfi' && row.first.qualified)
     || allRows.find((row) => row.first.lean === 'yrfi')
   const historicalStatus = historicalValidation?.status || 'collecting'
+  const watchNrfiPromotion = gameProjectionEvaluation?.firstInning?.watchNrfiPromotion || null
+  const promotionMinimum = watchNrfiPromotion?.policy?.minimumSettled || 20
+  const promotionTarget = watchNrfiPromotion?.policy?.targetSettled || 30
 
   return (
     <div className="fi-zone">
@@ -253,6 +256,17 @@ export default function FirstInningZone({
         <div className="fi-method-model">
           <small>Model engine</small>
           <b>Forecast V9 + 1st Inning Layer</b>
+          {watchNrfiPromotion && (
+            <span
+              className={`fi-promotion ${watchNrfiPromotion.status}`}
+              title={`WATCH NRFI needs ${promotionMinimum} settled calls to be considered and ${promotionTarget} for a mature sample.`}
+            >
+              <Icon name={watchNrfiPromotion.status === 'eligible' ? 'CircleCheck' : 'Lock'} size={11} />
+              WATCH NRFI gate · {watchNrfiPromotion.wins}-{watchNrfiPromotion.losses}
+              {' '}· {watchNrfiPromotion.sample}/{promotionMinimum} settled
+              {' '}· {watchNrfiPromotion.status.toUpperCase()}
+            </span>
+          )}
           <span><Icon name="Shield" size={11} /> Advisory only · {historicalStatus} history gate</span>
           <span><Icon name="Activity" size={11} /> Pitcher micro active · team L30 shadow-tested</span>
         </div>

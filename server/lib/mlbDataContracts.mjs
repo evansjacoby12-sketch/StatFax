@@ -698,6 +698,50 @@ function validateGameProjectionRecord(prefix, projection, errors, gameIds = null
           }
         }
       }
+      if (first.watchNrfiPromotion != null) {
+        const promotion = first.watchNrfiPromotion
+        const promotionAt = `${at}.watchNrfiPromotion`
+        if (!isObject(promotion)) {
+          errors.push(`${promotionAt}: expected an object`)
+        } else {
+          for (const field of ['candidate', 'promoted']) {
+            if (typeof promotion[field] !== 'boolean') {
+              errors.push(`${promotionAt}.${field}: expected boolean`)
+            }
+          }
+          if (!['collecting', 'hold', 'eligible'].includes(promotion.status)) {
+            errors.push(`${promotionAt}.status: unsupported`)
+          }
+          for (const field of [
+            'sample',
+            'wins',
+            'losses',
+            'dates',
+            'minimumSettled',
+            'targetSettled',
+            'progress',
+          ]) {
+            if (!Number.isInteger(promotion[field]) || promotion[field] < 0) {
+              errors.push(`${promotionAt}.${field}: expected a non-negative integer`)
+            }
+          }
+          for (const field of ['hitRate', 'lowerBound90']) {
+            validateOptionalMetric(`${promotionAt}.${field}`, promotion[field], errors, {
+              min: 0,
+              max: 1,
+            })
+          }
+          if (promotion.wins + promotion.losses !== promotion.sample) {
+            errors.push(`${promotionAt}.sample: must equal wins plus losses`)
+          }
+          if (promotion.promoted && (first.lean !== 'nrfi' || first.tier !== 'lean')) {
+            errors.push(`${promotionAt}.promoted: must produce an NRFI LEAN`)
+          }
+          if (typeof promotion.reason !== 'string' || !promotion.reason.trim()) {
+            errors.push(`${promotionAt}.reason: expected non-empty text`)
+          }
+        }
+      }
       if (first.pricesAvailable !== false) errors.push(`${at}.pricesAvailable: expected false until prices are modeled`)
       for (const field of ['selectedProbability', 'nrfiProbability', 'yrfiProbability', 'coverage']) {
         validateProbability(`${at}.${field}`, first[field], errors)
@@ -1434,10 +1478,24 @@ function validateGameProjectionEvaluation(evaluation, errors) {
       errors.push(`${prefix}.minimumSample.${field}: expected a positive integer`)
     }
   }
-  for (const field of ['games', 'dates', 'winnerGames', 'totalGames', 'marketMoneylineGames', 'marketTotalGames']) {
+  for (const field of [
+    'games',
+    'dates',
+    'winnerGames',
+    'totalGames',
+    'marketMoneylineGames',
+    'marketTotalGames',
+  ]) {
     if (!Number.isInteger(evaluation.sample?.[field]) || evaluation.sample[field] < 0) {
       errors.push(`${prefix}.sample.${field}: expected a non-negative integer`)
     }
+  }
+  if (
+    evaluation.version >= 2
+    && (!Number.isInteger(evaluation.sample?.firstInningGames)
+      || evaluation.sample.firstInningGames < 0)
+  ) {
+    errors.push(`${prefix}.sample.firstInningGames: expected a non-negative integer`)
   }
   validateProbability(`${prefix}.sample.progress`, evaluation.sample?.progress, errors)
 
@@ -1467,6 +1525,52 @@ function validateGameProjectionEvaluation(evaluation, errors) {
       errors,
       { min: -1, max: 1 },
     )
+  }
+  if (evaluation.firstInning != null) {
+    const first = evaluation.firstInning
+    const at = `${prefix}.firstInning`
+    if (!isObject(first)) {
+      errors.push(`${at}: expected an object`)
+    } else {
+      if (!['collecting', 'review-ready'].includes(first.status)) {
+        errors.push(`${at}.status: unsupported`)
+      }
+      for (const field of ['sample', 'qualifiedSample']) {
+        if (!Number.isInteger(first[field]) || first[field] < 0) {
+          errors.push(`${at}.${field}: expected a non-negative integer`)
+        }
+      }
+      for (const field of ['brier', 'coinFlipBrier', 'accuracy', 'qualifiedAccuracy']) {
+        validateOptionalMetric(`${at}.${field}`, first[field], errors, { min: 0, max: 1 })
+      }
+      const promotion = first.watchNrfiPromotion
+      if (!isObject(promotion)) {
+        errors.push(`${at}.watchNrfiPromotion: expected an object`)
+      } else {
+        if (!['collecting', 'hold', 'eligible'].includes(promotion.status)) {
+          errors.push(`${at}.watchNrfiPromotion.status: unsupported`)
+        }
+        if (promotion.eligible !== (promotion.status === 'eligible')) {
+          errors.push(`${at}.watchNrfiPromotion.eligible: must match status`)
+        }
+        for (const field of ['sample', 'wins', 'losses', 'dates']) {
+          if (!Number.isInteger(promotion[field]) || promotion[field] < 0) {
+            errors.push(`${at}.watchNrfiPromotion.${field}: expected a non-negative integer`)
+          }
+        }
+        for (const field of ['hitRate', 'lowerBound90']) {
+          validateOptionalMetric(
+            `${at}.watchNrfiPromotion.${field}`,
+            promotion[field],
+            errors,
+            { min: 0, max: 1 },
+          )
+        }
+        if (!['collecting', 'provisional', 'mature'].includes(promotion.maturity)) {
+          errors.push(`${at}.watchNrfiPromotion.maturity: unsupported`)
+        }
+      }
+    }
   }
   if (!Array.isArray(evaluation.winner?.calibration)) {
     errors.push(`${prefix}.winner.calibration: expected an array`)

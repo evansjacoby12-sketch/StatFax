@@ -5,6 +5,7 @@ import {
   buildGameProjection,
   detectGameProjectionChanges,
   evaluateGameForecasts,
+  evaluateWatchNrfiPromotion,
   gradeGameMarketDecision,
   gameMarketBlendPolicy,
   gameTotalProbabilities,
@@ -818,4 +819,52 @@ test('empty forward evaluation stays null-safe while results collect', () => {
   assert.equal(evaluation.total.rmse, null)
   assert.equal(evaluation.status, 'collecting')
   assert.equal(gameMarketBlendPolicy(evaluation).status, 'collecting')
+})
+
+test('WATCH NRFI promotion requires 20 settled calls across enough dates', () => {
+  const watchResult = (gamePk, date, correct) => ({
+    captureState: 'pregame',
+    freezeState: 'final-pregame',
+    gamePk,
+    actualWinner: 'away',
+    firstInning: {
+      lean: 'nrfi',
+      tier: 'watch',
+      qualified: false,
+      yrfiProbability: 0.45,
+      nrfiProbability: 0.55,
+    },
+    actualYrfi: !correct,
+    firstInningCorrect: correct,
+  })
+  const logFor = (sample, wins, dateCount) => {
+    const resultsByDate = {}
+    for (let index = 0; index < sample; index += 1) {
+      const date = `2026-07-${String(20 + (index % dateCount)).padStart(2, '0')}`
+      if (!resultsByDate[date]) resultsByDate[date] = []
+      resultsByDate[date].push(watchResult(index + 1, date, index < wins))
+    }
+    return { gameForecasts: { resultsByDate } }
+  }
+
+  const early = evaluateWatchNrfiPromotion(logFor(10, 8, 3))
+  assert.equal(early.status, 'collecting')
+  assert.equal(early.sample, 10)
+  assert.equal(early.wins, 8)
+  assert.equal(early.eligible, false)
+
+  const cleared = evaluateWatchNrfiPromotion(logFor(20, 16, 5))
+  assert.equal(cleared.status, 'eligible')
+  assert.equal(cleared.sample, 20)
+  assert.equal(cleared.dates, 5)
+  assert.equal(cleared.maturity, 'provisional')
+  assert.ok(cleared.lowerBound90 > 0.5)
+  assert.equal(
+    evaluateGameForecasts(logFor(20, 16, 5)).firstInning.watchNrfiPromotion.status,
+    'eligible',
+  )
+
+  const failed = evaluateWatchNrfiPromotion(logFor(20, 11, 5))
+  assert.equal(failed.status, 'hold')
+  assert.equal(failed.eligible, false)
 })
