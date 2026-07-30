@@ -50,24 +50,27 @@ function ModelTrackingCard({
   icon,
   market,
   tracking,
+  actionLabel,
+  diagnosticLabel,
+  category,
   pricesAvailable = true,
   onOpen,
 }) {
-  const { primary, diagnostic, actionLabel, diagnosticLabel } = tracking
+  const { primary, diagnostic } = tracking
   return (
     <button
       type="button"
-      className={`fi-track-card is-${market}`}
+      className={`fi-track-card is-${market} is-directional`}
       onClick={onOpen}
       aria-label={`View game-by-game ${title} results`}
     >
       <header>
         <span><Icon name={icon} size={12} /><b>{title}</b></span>
-        <em>{actionLabel}<Icon name="ChevronRight" size={9} /></em>
+        <em>{category}<Icon name="ChevronRight" size={9} /></em>
       </header>
       <div className="fi-track-score">
         <span>
-          <small>Settled W-L-P</small>
+          <small>{actionLabel}</small>
           <strong className={`mono ${recordTone(primary)}`}>{recordLabel(primary)}</strong>
         </span>
         <span className="fi-track-economics">{economicsLabel(primary, pricesAvailable)}</span>
@@ -158,20 +161,50 @@ export default function ModelTrackingResults({
           icon="Trophy"
           market="moneyline"
           tracking={tracking.moneyline}
+          actionLabel={tracking.moneyline.actionLabel}
+          diagnosticLabel={tracking.moneyline.diagnosticLabel}
+          category="Side"
           onOpen={onOpenDetails}
         />
         <ModelTrackingCard
-          title="O/U totals"
-          icon="ArrowUpDown"
-          market="total"
-          tracking={tracking.total}
+          title="Over"
+          icon="ArrowUp"
+          market="over"
+          tracking={tracking.total.over}
+          actionLabel={tracking.total.actionLabel}
+          diagnosticLabel={tracking.total.diagnosticLabel}
+          category="Total"
           onOpen={onOpenDetails}
         />
         <ModelTrackingCard
-          title="NRFI / YRFI"
+          title="Under"
+          icon="ArrowDown"
+          market="under"
+          tracking={tracking.total.under}
+          actionLabel={tracking.total.actionLabel}
+          diagnosticLabel={tracking.total.diagnosticLabel}
+          category="Total"
+          onOpen={onOpenDetails}
+        />
+        <ModelTrackingCard
+          title="NRFI"
           icon="TimerReset"
-          market="first-inning"
-          tracking={tracking.firstInning}
+          market="nrfi"
+          tracking={tracking.firstInning.nrfi}
+          actionLabel={tracking.firstInning.actionLabel}
+          diagnosticLabel={tracking.firstInning.diagnosticLabel}
+          category="Inn 1"
+          pricesAvailable={false}
+          onOpen={onOpenDetails}
+        />
+        <ModelTrackingCard
+          title="YRFI"
+          icon="Zap"
+          market="yrfi"
+          tracking={tracking.firstInning.yrfi}
+          actionLabel={tracking.firstInning.actionLabel}
+          diagnosticLabel={tracking.firstInning.diagnosticLabel}
+          category="Inn 1"
           pricesAvailable={false}
           onOpen={onOpenDetails}
         />

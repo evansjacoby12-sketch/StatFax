@@ -316,6 +316,14 @@ function splitRows(rows, primary, diagnostic) {
   }
 }
 
+function directionalSplit(rows, side, primary, diagnostic) {
+  return splitRows(
+    rows.filter((row) => row.selectedSide === side),
+    primary,
+    diagnostic,
+  )
+}
+
 export function buildModelTracking(games = [], projections = {}, options = {}) {
   const windowDays = Math.max(1, Math.min(7, Math.trunc(options.windowDays) || 1))
   const asOfDate = dateKey(options.asOfDate)
@@ -338,6 +346,7 @@ export function buildModelTracking(games = [], projections = {}, options = {}) {
         moneylineRows.set(key, {
           date,
           tier: moneyline.tier,
+          selectedSide: moneyline.selectedSide,
           tracking: archivedTracking(moneyline.result, moneyline.american),
         })
       }
@@ -345,6 +354,7 @@ export function buildModelTracking(games = [], projections = {}, options = {}) {
         totalRows.set(key, {
           date,
           tier: total.tier,
+          selectedSide: total.selectedSide,
           tracking: archivedTracking(total.result, total.american),
         })
       }
@@ -352,6 +362,7 @@ export function buildModelTracking(games = [], projections = {}, options = {}) {
         firstInningRows.set(key, {
           date,
           tier: first.tier,
+          selectedSide: first.lean,
           qualified: first.qualified === true,
           tracking: archivedTracking(archivedFirstInningOutcome(record, first)),
         })
@@ -372,6 +383,7 @@ export function buildModelTracking(games = [], projections = {}, options = {}) {
       moneylineRows.set(key, {
         date: currentDate,
         tier: moneyline.tier,
+        selectedSide: moneyline.selectedSide,
         tracking: rowForMarket(game, moneyline, 'moneyline'),
       })
     }
@@ -379,6 +391,7 @@ export function buildModelTracking(games = [], projections = {}, options = {}) {
       totalRows.set(key, {
         date: currentDate,
         tier: total.tier,
+        selectedSide: total.selectedSide,
         tracking: rowForMarket(game, total, 'total'),
       })
     }
@@ -386,6 +399,7 @@ export function buildModelTracking(games = [], projections = {}, options = {}) {
       firstInningRows.set(key, {
         date: currentDate,
         tier: first.tier,
+        selectedSide: first.lean,
         qualified: first.qualified === true,
         tracking: rowForFirstInning(game, first),
       })
@@ -432,12 +446,36 @@ export function buildModelTracking(games = [], projections = {}, options = {}) {
         (row) => ACTIONABLE_MARKET_TIERS.has(row.tier),
         (row) => row.tier === 'pass',
       ),
+      over: directionalSplit(
+        totalValues,
+        'over',
+        (row) => ACTIONABLE_MARKET_TIERS.has(row.tier),
+        (row) => row.tier === 'pass',
+      ),
+      under: directionalSplit(
+        totalValues,
+        'under',
+        (row) => ACTIONABLE_MARKET_TIERS.has(row.tier),
+        (row) => row.tier === 'pass',
+      ),
       actionLabel: 'PLAY + LEAN',
       diagnosticLabel: 'PASS',
     },
     firstInning: {
       ...splitRows(
         firstInningValues,
+        (row) => row.qualified,
+        (row) => row.tier === 'watch',
+      ),
+      nrfi: directionalSplit(
+        firstInningValues,
+        'nrfi',
+        (row) => row.qualified,
+        (row) => row.tier === 'watch',
+      ),
+      yrfi: directionalSplit(
+        firstInningValues,
+        'yrfi',
         (row) => row.qualified,
         (row) => row.tier === 'watch',
       ),

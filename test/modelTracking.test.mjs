@@ -129,11 +129,17 @@ test('live model tracking keeps settled calls, active leads, and diagnostics sep
   assert.equal(tracking.total.primary.clinchedWins, 1)
   assert.equal(tracking.total.primary.pending, 1)
   assert.equal(tracking.total.primary.settled, 1)
+  assert.equal(tracking.total.over.primary.wins, 1)
+  assert.equal(tracking.total.over.primary.clinchedWins, 1)
+  assert.equal(tracking.total.under.diagnostic.live, 1)
 
   assert.equal(tracking.firstInning.primary.losses, 1)
   assert.equal(tracking.firstInning.primary.pending, 1)
   assert.equal(tracking.firstInning.diagnostic.wins, 2)
   assert.equal(tracking.firstInning.diagnostic.losses, 0)
+  assert.equal(tracking.firstInning.nrfi.diagnostic.wins, 1)
+  assert.equal(tracking.firstInning.yrfi.primary.losses, 1)
+  assert.equal(tracking.firstInning.yrfi.diagnostic.wins, 1)
 })
 
 test('active leads and clinched totals never enter the settled record early', () => {
@@ -163,6 +169,8 @@ test('active leads and clinched totals never enter the settled record early', ()
   assert.equal(tracking.total.primary.settled, 0)
   assert.equal(tracking.total.primary.clinchedWins, 1)
   assert.equal(tracking.firstInning.diagnostic.wins, 1)
+  assert.equal(tracking.total.over.primary.clinchedWins, 1)
+  assert.equal(tracking.firstInning.nrfi.diagnostic.wins, 1)
 })
 
 test('seven-day tracking combines archived settlements with today and excludes older dates', () => {

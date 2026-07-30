@@ -25440,7 +25440,7 @@ button.th:focus-visible {
 .fi-model-results-grid {
   min-width: 0;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 8px;
 }
 .fi-track-card {
@@ -26189,7 +26189,7 @@ button.th:focus-visible {
   .fi-model-results-head > small { display: none; }
   .fi-model-results-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
   .fi-track-card { padding: 8px; gap: 5px; }
-  .fi-track-card.is-first-inning { grid-column: 1 / -1; }
+  .fi-track-card.is-moneyline { grid-column: 1 / -1; }
   .fi-track-card > header em { padding-inline: 4px; font-size: 6.5px; }
   .fi-track-score strong { font-size: 15px; }
   .fi-track-economics { max-width: 92px; font-size: 7px; }
