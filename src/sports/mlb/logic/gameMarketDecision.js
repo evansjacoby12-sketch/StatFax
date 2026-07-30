@@ -130,6 +130,14 @@ function expectedRoi(probability, american, loseProbability = 1 - probability) {
   return probability * (decimal - 1) - loseProbability
 }
 
+function fairAmerican(probability) {
+  if (!Number.isFinite(probability) || probability <= 0 || probability >= 1) return null
+  const decimal = 1 / probability
+  return Math.round(decimal >= 2
+    ? (decimal - 1) * 100
+    : -100 / (decimal - 1))
+}
+
 function capUnvalidatedPlay(rawTier, policy) {
   if (rawTier === 'play' && !policy.ready) return 'lean'
   return rawTier
@@ -213,6 +221,7 @@ function moneylineDecision({
         : null,
       american,
       expectedRoi: expectedRoi(modelProbability, american),
+      modelFairAmerican: fairAmerican(modelProbability),
     }
   }).filter((row) => (
     Number.isFinite(row.modelProbability)
@@ -249,6 +258,12 @@ function moneylineDecision({
     marketFairProbability: round(selected?.marketProbability),
     modelEdge: round(selected?.modelEdge),
     american: Number.isFinite(selected?.american) ? selected.american : null,
+    modelFairAmerican: Number.isFinite(selected?.modelFairAmerican)
+      ? selected.modelFairAmerican
+      : null,
+    priceBetterThanFair: Number.isFinite(selected?.expectedRoi)
+      ? selected.expectedRoi > 0
+      : null,
     expectedRoi: round(selected?.expectedRoi),
     books: Number.isInteger(books) ? books : 0,
     coverage: round(coverage),
@@ -316,6 +331,7 @@ function totalDecision({
         : null,
       american,
       expectedRoi: expectedRoi(modelWinProbability, american, modelLoseProbability),
+      modelFairAmerican: fairAmerican(conditionalModelProbability),
       projectionSeparation,
     }
   }).filter((row) => (
@@ -356,6 +372,12 @@ function totalDecision({
     marketFairProbability: round(selected?.marketProbability),
     modelEdge: round(selected?.modelEdge),
     american: Number.isFinite(selected?.american) ? selected.american : null,
+    modelFairAmerican: Number.isFinite(selected?.modelFairAmerican)
+      ? selected.modelFairAmerican
+      : null,
+    priceBetterThanFair: Number.isFinite(selected?.expectedRoi)
+      ? selected.expectedRoi > 0
+      : null,
     expectedRoi: round(selected?.expectedRoi),
     runSeparation: round(selected?.projectionSeparation, 2),
     books: Number.isInteger(books) ? books : 0,

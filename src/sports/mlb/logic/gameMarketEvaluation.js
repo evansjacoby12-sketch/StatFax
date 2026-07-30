@@ -1,3 +1,5 @@
+import { MLB_GAME_PROJECTION_VERSION } from './gameProjection.js'
+
 export const MLB_GAME_MARKET_EVALUATION_VERSION = 1
 export const MLB_GAME_MARKET_EVALUATION_MIN_GAMES = 100
 export const MLB_GAME_MARKET_EVALUATION_MIN_DATES = 10
@@ -62,6 +64,12 @@ export function gameMarketResultRows(log = {}) {
       const callEntry = callsByDate?.[date]?.[gamePk] || callsByDate?.[date]?.[String(gamePk)]
       const closingCall = callEntry?.closing || callEntry?.current || null
       const openingCall = callEntry?.opening || null
+      const modelVersion = closingCall?.modelVersion || result?.modelVersion
+      const pricingContract = closingCall?.pricingContract || result?.pricingContract
+      if (
+        modelVersion !== MLB_GAME_PROJECTION_VERSION
+        || pricingContract?.version !== 1
+      ) continue
       const marketDecision = closingCall?.marketDecision || result?.marketDecision
       const marketOutcome = result?.marketOutcome || callEntry?.settlement?.marketOutcome
       for (const market of ['moneyline', 'total']) {

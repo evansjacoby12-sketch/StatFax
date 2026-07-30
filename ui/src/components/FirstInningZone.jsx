@@ -255,7 +255,7 @@ export default function FirstInningZone({
         </div>
         <div className="fi-method-model">
           <small>Model engine</small>
-          <b>Forecast V9 + 1st Inning Layer</b>
+          <b>Forecast V10 + 1st Inning Layer</b>
           {watchNrfiPromotion && (
             <span
               className={`fi-promotion ${watchNrfiPromotion.status}`}
@@ -334,7 +334,7 @@ export default function FirstInningZone({
         <section className="fi-empty">
           <Icon name="TimerReset" size={24} />
           <b>{allRows.length ? 'No matchups clear these filters.' : 'First-inning projections are not in this slate yet.'}</b>
-          <span>{allRows.length ? 'Relax one filter to restore games.' : 'Build a fresh slate to generate Forecast V9 first-inning probabilities.'}</span>
+          <span>{allRows.length ? 'Relax one filter to restore games.' : 'Build a fresh slate to generate Forecast V10 first-inning probabilities.'}</span>
         </section>
       )}
 

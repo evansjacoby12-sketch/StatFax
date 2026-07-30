@@ -57,6 +57,8 @@ test('market decision keeps the forecast favorite separate from the value side',
   assert.equal(decision.moneyline.rawTier, 'play')
   assert.equal(decision.moneyline.tier, 'play')
   assert.ok(decision.moneyline.expectedRoi > 0)
+  assert.equal(decision.moneyline.modelFairAmerican, 122)
+  assert.equal(decision.moneyline.priceBetterThanFair, true)
 })
 
 test('tiny total separation is a PASS even when one side has the better probability', () => {
@@ -116,6 +118,7 @@ test('totals use push-adjusted probability and price EV instead of mean directio
   assert.equal(decision.total.selectedSide, 'over')
   assert.ok(decision.total.conditionalModelProbability > decision.total.modelWinProbability)
   assert.ok(decision.total.expectedRoi < 0)
+  assert.equal(decision.total.priceBetterThanFair, false)
   assert.equal(decision.total.tier, 'pass')
 })
 

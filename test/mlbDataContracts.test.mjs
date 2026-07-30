@@ -509,7 +509,7 @@ test('daily contract validates forecast v4 platoon and run-environment provenanc
   assert.ok(validateDailySnapshot(mismatched).errors.some((error) => error.includes('must match runEnvironment.factor')))
 })
 
-test('daily contract validates forecast v9 distributions, decisions, team context, and run-prior provenance', () => {
+test('daily contract validates forecast v10 pricing, distributions, decisions, team context, and run-prior provenance', () => {
   const runEnvironment = {
     factor: 1,
     rawParkFactor: 1,
@@ -592,7 +592,7 @@ test('daily contract validates forecast v9 distributions, decisions, team contex
     gameProjections: { 10: projection },
   }
 
-  assert.equal(projection.modelVersion, 9)
+  assert.equal(projection.modelVersion, 10)
   assert.deepEqual(validateDailySnapshot(snapshot).errors, [])
 
   const missingRunPriorProvenance = structuredClone(snapshot)

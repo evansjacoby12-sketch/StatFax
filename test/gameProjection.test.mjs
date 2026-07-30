@@ -9,7 +9,9 @@ import {
   gradeGameMarketDecision,
   gameMarketBlendPolicy,
   gameTotalProbabilities,
+  MLB_GAME_WIN_LOGISTIC_SLOPE,
   negativeBinomialDistribution,
+  poissonDistribution,
   scoreDistributionSummary,
   settleGameForecasts,
   settleGameForecastsFromResults,
@@ -68,7 +70,7 @@ const balancedRows = () => [
   ...Array.from({ length: 9 }, (_, index) => batter(index + 11, 2, 50, { order: index + 1 })),
 ]
 
-test('overdispersed run and win distributions are normalized and respond to scoring strength', () => {
+test('score uncertainty stays overdispersed while market pricing uses logistic and Poisson', () => {
   const runDistribution = negativeBinomialDistribution(4.5)
   const runMean = runDistribution.reduce((sum, probability, runs) => sum + probability * runs, 0)
   const runVariance = runDistribution.reduce(
@@ -80,11 +82,18 @@ test('overdispersed run and win distributions are normalized and respond to scor
   assert.ok(runVariance > runMean * 2)
 
   const even = winProbabilities(4.4, 4.4)
-  assert.ok(even.home > 0.5)
+  assert.equal(even.home, 0.5)
   assert.ok(Math.abs(even.home + even.away - 1) < 1e-12)
-  const strongerHome = winProbabilities(3.5, 5.5)
-  assert.ok(strongerHome.home > even.home)
+  assert.equal(even.method, 'logistic-run-differential')
+  assert.equal(even.slope, MLB_GAME_WIN_LOGISTIC_SLOPE)
+  assert.ok(Math.abs(winProbabilities(4, 5).home - 0.6106) < 0.001)
+  assert.ok(Math.abs(winProbabilities(4, 6).home - 0.7109) < 0.001)
+  assert.ok(Math.abs(winProbabilities(4, 7).home - 0.7941) < 0.001)
 
+  const poisson = poissonDistribution(8.8)
+  const poissonMean = poisson.reduce((sum, probability, runs) => sum + probability * runs, 0)
+  assert.ok(Math.abs(poisson.reduce((sum, probability) => sum + probability, 0) - 1) < 1e-12)
+  assert.ok(Math.abs(poissonMean - 8.8) < 0.01)
   const totals = gameTotalProbabilities(8.8, 8.5)
   assert.ok(Math.abs(totals.over + totals.under + totals.push - 1) < 1e-12)
   assert.equal(totals.push, 0)
@@ -128,7 +137,7 @@ test('game projection emits run ranges, transparent factors, and market comparis
 
   assert.equal(output.advisoryOnly, true)
   assert.equal(output.captureState, 'pregame')
-  assert.equal(output.modelVersion, 9)
+  assert.equal(output.modelVersion, 10)
   assert.ok(output.projectedTotal > 7 && output.projectedTotal < 11)
   assert.equal(output.estimatedScore.away + output.estimatedScore.home > 0, true)
   assert.deepEqual(output.estimatedScore, {
@@ -138,7 +147,7 @@ test('game projection emits run ranges, transparent factors, and market comparis
   assert.equal(output.scoreDistribution.family, 'negative-binomial')
   assert.equal(output.scoreDistribution.dispersion, 3.5)
   assert.ok(output.scoreDistribution.total.high > output.scoreDistribution.total.low)
-  assert.equal(output.marketBlend.policyStatus, 'collecting')
+  assert.equal(output.marketBlend.policyStatus, 'inactive')
   assert.equal(output.marketBlend.applied, false)
   assert.ok(Math.abs(output.awayWinProbability + output.homeWinProbability - 1) < 0.0002)
   assert.equal(output.inputs.away.lineupSource, 'confirmed')
@@ -146,6 +155,27 @@ test('game projection emits run ranges, transparent factors, and market comparis
   assert.ok(output.inputs.away.expectedStarterIP > 4)
   assert.ok(Math.abs(output.inputs.away.starterShare + output.inputs.away.bullpenShare - 1) < 0.001)
   assert.ok(Number.isFinite(output.inputs.away.pitchingFactor))
+  assert.ok(Number.isFinite(output.inputs.away.starterProjectedER))
+  assert.ok(Number.isFinite(output.inputs.away.bullpenProjectedER))
+  assert.ok(Math.abs(
+    output.inputs.away.starterProjectedER
+      + output.inputs.away.bullpenProjectedER
+      - output.inputs.away.pitchingBaseRuns,
+  ) < 0.01)
+  assert.equal(output.inputs.away.homeFieldRunEdge, -0.09)
+  assert.equal(output.inputs.home.homeFieldRunEdge, 0.09)
+  assert.ok(Math.abs(
+    output.inputs.away.pitchingBaseRuns
+      * output.inputs.away.lineupStrengthFactor
+      * output.inputs.away.runEnvironmentFactor
+      + output.inputs.away.homeFieldRunEdge
+      - output.inputs.away.expectedRunsBeforeCap,
+  ) < 0.01)
+  assert.equal(output.pricingContract.moneyline, 'logistic-run-differential')
+  assert.equal(output.pricingContract.moneylineSlope, 0.45)
+  assert.equal(output.pricingContract.total, 'poisson-projected-total')
+  assert.equal(output.pricingContract.marketProbability, 'consensus-no-vig')
+  assert.equal(output.pricingContract.marketInputsAffectProjection, false)
   assert.equal(output.marketComparison.total.line, 8.5)
   assert.ok(Number.isFinite(output.marketComparison.moneyline.homeModelEdge))
   assert.equal(output.marketDecision.version, 1)
@@ -154,7 +184,7 @@ test('game projection emits run ranges, transparent factors, and market comparis
   assert.equal(output.marketDecision.total.rawTier, 'unavailable')
 })
 
-test('market blend stays off without evidence and applies only cleared components', () => {
+test('market evidence remains diagnostic and never feeds the fair projection', () => {
   const market = {
     consensus: {
       moneyline: {
@@ -202,15 +232,15 @@ test('market blend stays off without evidence and applies only cleared component
     gameOdds: market,
     marketBlendPolicy: policy,
   })
-  assert.equal(blended.marketBlend.applied, true)
-  assert.equal(blended.marketBlend.side.applied, true)
-  assert.equal(blended.marketBlend.total.applied, true)
-  assert.ok(blended.projectedTotal > baseline.projectedTotal)
-  assert.ok(blended.projectedTotal < market.consensus.total.line)
-  assert.ok(
-    blended.homeWinProbability > blended.marketBlend.side.preBlendHomeWinProbability
-    && blended.homeWinProbability < market.consensus.moneyline.home.fairProbability,
-  )
+  assert.equal(blended.marketBlend.policyStatus, 'inactive')
+  assert.equal(blended.marketBlend.applied, false)
+  assert.equal(blended.marketBlend.side.applied, false)
+  assert.equal(blended.marketBlend.total.applied, false)
+  assert.equal(blended.marketBlend.side.weight, 0)
+  assert.equal(blended.marketBlend.total.weight, 0)
+  assert.equal(blended.projectedTotal, baseline.projectedTotal)
+  assert.equal(blended.homeWinProbability, baseline.homeWinProbability)
+  assert.match(blended.marketBlend.side.reason, /comparison-only/)
 })
 
 test('handed lineup production adds a bounded matchup adjustment', () => {
@@ -746,7 +776,17 @@ test('forward evaluation reports winner calibration and total error against simp
     marketHomeProbability,
     marketTotal,
   }) => ({
-    modelVersion: 1,
+    modelVersion: 10,
+    pricingContract: {
+      version: 1,
+      projectedRuns: 'starter-bullpen-er-times-lineup-park-weather-plus-home-edge',
+      moneyline: 'logistic-run-differential',
+      moneylineSlope: 0.45,
+      total: 'poisson-projected-total',
+      marketProbability: 'consensus-no-vig',
+      sportsbookPrice: 'posted-american',
+      marketInputsAffectProjection: false,
+    },
     advisoryOnly: true,
     captureState: 'pregame',
     freezeState: 'final-pregame',

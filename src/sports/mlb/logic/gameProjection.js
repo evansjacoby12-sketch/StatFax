@@ -9,17 +9,19 @@ import {
   MLB_WATCH_NRFI_PROMOTION_POLICY,
 } from './firstInningProjection.js'
 
-export const MLB_GAME_PROJECTION_VERSION = 9
+export const MLB_GAME_PROJECTION_VERSION = 10
 export const MLB_GAME_BASE_RUNS_PER_TEAM = 4.42
 export const MLB_GAME_EVALUATION_MIN_GAMES = 100
 export const MLB_GAME_EVALUATION_MIN_DATES = 10
-// Calibrated on a chronological 70/30 split of 1,586 completed 2026 games
-// through 2026-07-27. Held-out team-run log loss improved 9.4% vs Poisson.
+// Retained for descriptive score uncertainty only. Market totals use the
+// Forecast V10 Poisson pricing contract below.
 export const MLB_GAME_SCORE_DISPERSION = 3.5
 export const MLB_GAME_SCORE_INTERVAL_LEVEL = 0.8
 export const MLB_GAME_MARKET_SIDE_MIN_ADVANTAGE = 0.005
 export const MLB_GAME_MARKET_TOTAL_MIN_ADVANTAGE = 0.15
 export const MLB_GAME_MARKET_MAX_WEIGHT = 0.2
+export const MLB_GAME_WIN_LOGISTIC_SLOPE = 0.45
+export const MLB_GAME_HOME_FIELD_RUN_EDGE = 0.09
 
 const clamp = (value, lo, hi) => Math.max(lo, Math.min(hi, value))
 const round = (value, digits = 3) => {
@@ -356,6 +358,18 @@ export function negativeBinomialDistribution(
   return probabilities.map((probability) => probability / sum)
 }
 
+export function poissonDistribution(mean, max = 50) {
+  if (!Number.isFinite(mean) || mean < 0) throw new TypeError('mean must be a non-negative finite number')
+  if (!Number.isInteger(max) || max < 1) throw new TypeError('max must be a positive integer')
+  if (mean === 0) return [1, ...Array.from({ length: max }, () => 0)]
+  const probabilities = [Math.exp(-mean)]
+  for (let runs = 1; runs <= max; runs++) {
+    probabilities[runs] = probabilities[runs - 1] * mean / runs
+  }
+  const sum = probabilities.reduce((total, probability) => total + probability, 0)
+  return probabilities.map((probability) => probability / sum)
+}
+
 function convolveDistributions(left, right) {
   const distribution = Array.from({ length: left.length + right.length - 1 }, () => 0)
   for (let leftRuns = 0; leftRuns < left.length; leftRuns++) {
@@ -451,26 +465,33 @@ export function scoreDistributionSummary(
 export function winProbabilities(
   awayExpectedRuns,
   homeExpectedRuns,
-  { dispersion = MLB_GAME_SCORE_DISPERSION } = {},
+  {
+    slope = MLB_GAME_WIN_LOGISTIC_SLOPE,
+    dispersion = MLB_GAME_SCORE_DISPERSION,
+  } = {},
 ) {
+  if (
+    !Number.isFinite(awayExpectedRuns)
+    || !Number.isFinite(homeExpectedRuns)
+    || !Number.isFinite(slope)
+    || slope <= 0
+  ) return null
+  const homeWin = 1 / (1 + Math.exp(-slope * (homeExpectedRuns - awayExpectedRuns)))
   const away = negativeBinomialDistribution(awayExpectedRuns, dispersion)
   const home = negativeBinomialDistribution(homeExpectedRuns, dispersion)
-  let homeWin = 0
-  let awayWin = 0
   let tie = 0
   for (let awayRuns = 0; awayRuns < away.length; awayRuns++) {
     for (let homeRuns = 0; homeRuns < home.length; homeRuns++) {
-      const probability = away[awayRuns] * home[homeRuns]
-      if (homeRuns > awayRuns) homeWin += probability
-      else if (awayRuns > homeRuns) awayWin += probability
-      else tie += probability
+      if (homeRuns === awayRuns) tie += away[awayRuns] * home[homeRuns]
     }
   }
-  // A tied nine-inning state slightly favors the home club in extras.
-  homeWin += tie * 0.54
-  awayWin += tie * 0.46
-  const total = homeWin + awayWin
-  return { away: awayWin / total, home: homeWin / total, tieAfterNine: tie }
+  return {
+    away: 1 - homeWin,
+    home: homeWin,
+    tieAfterNine: tie,
+    method: 'logistic-run-differential',
+    slope,
+  }
 }
 
 export function gameTotalProbabilities(
@@ -479,16 +500,13 @@ export function gameTotalProbabilities(
   {
     awayExpectedRuns = null,
     homeExpectedRuns = null,
-    dispersion = MLB_GAME_SCORE_DISPERSION,
   } = {},
 ) {
   if (!Number.isFinite(line) || line <= 0) return null
-  const distribution = Number.isFinite(awayExpectedRuns) && Number.isFinite(homeExpectedRuns)
-    ? convolveDistributions(
-      negativeBinomialDistribution(awayExpectedRuns, dispersion),
-      negativeBinomialDistribution(homeExpectedRuns, dispersion),
-    )
-    : negativeBinomialDistribution(projectedTotal, dispersion * 2, 50)
+  const totalMean = Number.isFinite(awayExpectedRuns) && Number.isFinite(homeExpectedRuns)
+    ? awayExpectedRuns + homeExpectedRuns
+    : projectedTotal
+  const distribution = poissonDistribution(totalMean, 50)
   let over = 0
   let under = 0
   let push = 0
@@ -516,6 +534,8 @@ function marketComparison(gameOdds, win, projectedTotal, awayExpectedRuns, homeE
       awayAmerican: consensus.moneyline.away?.american ?? null,
       homeModelEdge: Number.isFinite(homeMarket) ? round(win.home - homeMarket, 4) : null,
       awayModelEdge: Number.isFinite(awayMarket) ? round(win.away - awayMarket, 4) : null,
+      pricingMethod: 'logistic-run-differential',
+      marketProbabilityMethod: 'consensus-no-vig',
     }
   }
   if (consensus.total) {
@@ -525,18 +545,41 @@ function marketComparison(gameOdds, win, projectedTotal, awayExpectedRuns, homeE
     })
     const overMarket = consensus.total.over?.fairProbability
     const underMarket = consensus.total.under?.fairProbability
+    const nonPushProbability = distribution ? 1 - distribution.push : null
+    const modelOverFairProbability = (
+      distribution
+      && Number.isFinite(nonPushProbability)
+      && nonPushProbability > 0
+    ) ? distribution.over / nonPushProbability : null
+    const modelUnderFairProbability = (
+      distribution
+      && Number.isFinite(nonPushProbability)
+      && nonPushProbability > 0
+    ) ? distribution.under / nonPushProbability : null
     comparison.total = {
       line: consensus.total.line,
       books: consensus.total.books,
       modelOverProbability: distribution ? round(distribution.over, 4) : null,
       modelUnderProbability: distribution ? round(distribution.under, 4) : null,
       modelPushProbability: distribution ? round(distribution.push, 4) : null,
+      modelOverFairProbability: Number.isFinite(modelOverFairProbability)
+        ? round(modelOverFairProbability, 4)
+        : null,
+      modelUnderFairProbability: Number.isFinite(modelUnderFairProbability)
+        ? round(modelUnderFairProbability, 4)
+        : null,
       marketOverProbability: overMarket,
       marketUnderProbability: underMarket,
       overAmerican: consensus.total.over?.american ?? null,
       underAmerican: consensus.total.under?.american ?? null,
-      overModelEdge: distribution && Number.isFinite(overMarket) ? round(distribution.over - overMarket, 4) : null,
-      underModelEdge: distribution && Number.isFinite(underMarket) ? round(distribution.under - underMarket, 4) : null,
+      overModelEdge: Number.isFinite(modelOverFairProbability) && Number.isFinite(overMarket)
+        ? round(modelOverFairProbability - overMarket, 4)
+        : null,
+      underModelEdge: Number.isFinite(modelUnderFairProbability) && Number.isFinite(underMarket)
+        ? round(modelUnderFairProbability - underMarket, 4)
+        : null,
+      pricingMethod: 'poisson-projected-total',
+      marketProbabilityMethod: 'consensus-no-vig',
     }
   }
   return comparison
@@ -648,25 +691,18 @@ function applyMarketBlend(
   const consensus = gameOdds?.consensus
   const marketTotal = consensus?.total?.line
   const marketHome = consensus?.moneyline?.home?.fairProbability
-  const marketAway = consensus?.moneyline?.away?.fairProbability
   const baseProjectedTotal = baseAwayExpectedRuns + baseHomeExpectedRuns
-  const totalApplied = policy.total.active && Number.isFinite(marketTotal)
-  const projectedTotal = totalApplied
-    ? baseProjectedTotal * (1 - policy.total.weight) + marketTotal * policy.total.weight
-    : baseProjectedTotal
-  const totalScale = baseProjectedTotal > 0 ? projectedTotal / baseProjectedTotal : 1
-  const awayExpectedRuns = baseAwayExpectedRuns * totalScale
-  const homeExpectedRuns = baseHomeExpectedRuns * totalScale
+  // Sportsbook markets are comparators, never projection inputs. This keeps
+  // the model's fair probability independent from the price used to grade EV.
+  const totalApplied = false
+  const sideApplied = false
+  const projectedTotal = baseProjectedTotal
+  const awayExpectedRuns = baseAwayExpectedRuns
+  const homeExpectedRuns = baseHomeExpectedRuns
   const runModelWin = winProbabilities(awayExpectedRuns, homeExpectedRuns)
-  const sideApplied = (
-    policy.side.active
-    && Number.isFinite(marketHome)
-    && Number.isFinite(marketAway)
-  )
-  const homeWinProbability = sideApplied
-    ? runModelWin.home * (1 - policy.side.weight) + marketHome * policy.side.weight
-    : runModelWin.home
+  const homeWinProbability = runModelWin.home
   const awayWinProbability = 1 - homeWinProbability
+  const comparatorReason = 'Market prices are comparison-only; they do not alter projected runs or fair probabilities.'
 
   return {
     awayExpectedRuns,
@@ -680,12 +716,12 @@ function applyMarketBlend(
     disclosure: {
       version: 1,
       evidenceGated: true,
-      policyStatus: policy.status,
-      applied: sideApplied || totalApplied,
+      policyStatus: 'inactive',
+      applied: false,
       side: {
-        eligible: policy.side.active,
+        eligible: false,
         applied: sideApplied,
-        weight: policy.side.weight,
+        weight: 0,
         sample: policy.side.sample,
         dates: policy.side.dates,
         minimumGames: policy.minimumGames,
@@ -699,14 +735,12 @@ function applyMarketBlend(
         preBlendHomeWinProbability: round(runModelWin.home, 4),
         marketHomeWinProbability: Number.isFinite(marketHome) ? round(marketHome, 4) : null,
         finalHomeWinProbability: round(homeWinProbability, 4),
-        reason: policy.side.active && !sideApplied
-          ? 'Evidence gate passed, but this game has no consensus moneyline.'
-          : policy.side.reason,
+        reason: comparatorReason,
       },
       total: {
-        eligible: policy.total.active,
+        eligible: false,
         applied: totalApplied,
-        weight: policy.total.weight,
+        weight: 0,
         sample: policy.total.sample,
         dates: policy.total.dates,
         minimumGames: policy.minimumGames,
@@ -720,9 +754,7 @@ function applyMarketBlend(
         finalAwayExpectedRuns: round(awayExpectedRuns, 2),
         finalHomeExpectedRuns: round(homeExpectedRuns, 2),
         finalProjectedTotal: round(projectedTotal, 2),
-        reason: policy.total.active && !totalApplied
-          ? 'Evidence gate passed, but this game has no consensus total.'
-          : policy.total.reason,
+        reason: comparatorReason,
       },
     },
   }
@@ -756,12 +788,6 @@ function teamProjection({
   )
   const starterShare = clamp(starter.expectedIP / 9, 0.12, 0.89)
   const bullpenShare = 1 - starterShare
-  const pitchingFactor = clamp(
-    starterShare * starter.factor
-      + bullpenShare * bullpen.factor * bullpen.availabilityFactor,
-    0.82,
-    1.24,
-  )
   const environment = environmentFactor(lineup, gameRunEnvironment)
   const situational = teamRunContext({
     gamePk: game.gamePk,
@@ -779,15 +805,28 @@ function teamProjection({
   const baseRunsPerTeam = Number.isFinite(teamScoring.leagueRunsPerTeam)
     ? clamp(teamScoring.leagueRunsPerTeam, 3.80, 5.00)
     : MLB_GAME_BASE_RUNS_PER_TEAM
-  const homeField = isHome ? 1.02 : 0.98
+  const starterRunsAllowed9 = Number.isFinite(starter.estimatedEra)
+    ? clamp(starter.estimatedEra, baseRunsPerTeam * 0.72, baseRunsPerTeam * 1.35)
+    : baseRunsPerTeam * starter.factor
+  const bullpenRunsAllowed9 = Number.isFinite(bullpen.estimatedRunsAllowed9)
+    ? clamp(bullpen.estimatedRunsAllowed9, baseRunsPerTeam * 0.78, baseRunsPerTeam * 1.28)
+    : baseRunsPerTeam * bullpen.factor
+  const starterProjectedER = starterRunsAllowed9 * starterShare
+  const bullpenProjectedER = bullpenRunsAllowed9 * bullpenShare * bullpen.availabilityFactor
+  const pitchingBaseRuns = starterProjectedER + bullpenProjectedER
+  const pitchingFactor = pitchingBaseRuns / baseRunsPerTeam
+  const lineupStrengthFactor = offense.factor * teamScoring.factor * situational.factor
+  const homeFieldRunEdge = isHome
+    ? MLB_GAME_HOME_FIELD_RUN_EDGE
+    : -MLB_GAME_HOME_FIELD_RUN_EDGE
+  const expectedRunsBeforeCap = (
+    pitchingBaseRuns
+    * lineupStrengthFactor
+    * environment.factor
+    + homeFieldRunEdge
+  )
   const expectedRuns = clamp(
-    baseRunsPerTeam
-      * offense.factor
-      * pitchingFactor
-      * environment.factor
-      * teamScoring.factor
-      * situational.factor
-      * homeField,
+    expectedRunsBeforeCap,
     2.35,
     7.25,
   )
@@ -818,6 +857,14 @@ function teamProjection({
       bullpenFactor: round(bullpen.factor),
       bullpenAvailabilityFactor: round(bullpen.availabilityFactor, 4),
       pitchingFactor: round(pitchingFactor, 4),
+      starterProjectedER: round(starterProjectedER, 3),
+      bullpenProjectedER: round(bullpenProjectedER, 3),
+      pitchingBaseRuns: round(pitchingBaseRuns, 3),
+      starterRunsAllowed9: round(starterRunsAllowed9, 3),
+      bullpenRunsAllowed9: round(bullpenRunsAllowed9, 3),
+      lineupStrengthFactor: round(lineupStrengthFactor, 4),
+      expectedRunsBeforeCap: round(expectedRunsBeforeCap, 3),
+      runProjectionCapped: expectedRuns !== expectedRunsBeforeCap,
       expectedStarterIP: round(starter.expectedIP, 2),
       starterWorkloadSource: starter.workloadSource,
       starterWorkloadCoverage: round(starter.workloadCoverage, 4),
@@ -825,7 +872,7 @@ function teamProjection({
       bullpenShare: round(bullpenShare, 4),
       environmentFactor: round(environment.factor),
       teamScoringFactor: round(teamScoring.factor),
-      homeFieldFactor: homeField,
+      homeFieldRunEdge,
       baseRunsPerTeam: round(baseRunsPerTeam, 4),
       lineupObp: round(offense.obp),
       lineupSlg: round(offense.slg),
@@ -996,6 +1043,16 @@ export function buildGameProjection({
     tieAfterNineProbability: round(win.tieAfterNine, 4),
     projectedWinner,
     projectedWinnerProbability: round(Math.max(win.away, win.home), 4),
+    pricingContract: {
+      version: 1,
+      projectedRuns: 'starter-bullpen-er-times-lineup-park-weather-plus-home-edge',
+      moneyline: 'logistic-run-differential',
+      moneylineSlope: MLB_GAME_WIN_LOGISTIC_SLOPE,
+      total: 'poisson-projected-total',
+      marketProbability: 'consensus-no-vig',
+      sportsbookPrice: 'posted-american',
+      marketInputsAffectProjection: false,
+    },
     confidence,
     inputs: { away: away.inputs, home: home.inputs },
     marketBlend: blended.disclosure,
@@ -1092,6 +1149,10 @@ const changedNames = (left = [], right = []) => (
 export function detectGameProjectionChanges(previous, current) {
   if (!previous || !current) return []
   const changes = []
+  if (
+    previous.modelVersion !== current.modelVersion
+    || JSON.stringify(previous.pricingContract || null) !== JSON.stringify(current.pricingContract || null)
+  ) changes.push('model-contract')
   for (const side of ['away', 'home']) {
     if (
       Number(previous.probablePitchers?.[side]?.id || 0)
@@ -1201,6 +1262,7 @@ export function gameMarketCallSnapshot(
   return {
     capturedAt,
     modelVersion: projection.modelVersion,
+    pricingContract: cloneJson(projection.pricingContract),
     projectionRevision: projection.revision?.number || 1,
     estimatedScore: cloneJson(projection.estimatedScore),
     awayExpectedRuns: projection.awayExpectedRuns,
@@ -1220,6 +1282,7 @@ function gameMarketCallFingerprint(call) {
   if (!call) return null
   return JSON.stringify({
     modelVersion: call.modelVersion,
+    pricingContract: call.pricingContract,
     estimatedScore: call.estimatedScore,
     awayExpectedRuns: call.awayExpectedRuns,
     homeExpectedRuns: call.homeExpectedRuns,
@@ -1826,17 +1889,21 @@ export function evaluateWatchNrfiPromotion(log = {}) {
   return watchNrfiPromotionEvidence(gameForecastResultRows(log))
 }
 
-// Evaluation summarizes frozen, settled pregame forecasts. Only its aggregate
-// paired base-vs-market metrics can unlock the capped game-market blend; no
-// individual result or market input ever feeds the HR engine.
+// Evaluation summarizes frozen, settled pregame forecasts. Markets remain
+// comparison-only under V10; no market price feeds the run or HR projections.
 export function evaluateGameForecasts(log = {}) {
   const rows = gameForecastResultRows(log)
-  const dates = new Set(rows.map((row) => row.resultDate))
-  const winnerRows = rows.filter((row) => (
+  const pricingRows = rows.filter((row) => (
+    row.modelVersion === MLB_GAME_PROJECTION_VERSION
+    && row.pricingContract?.version === 1
+  ))
+  const dates = new Set(pricingRows.map((row) => row.resultDate))
+  const firstInningDates = new Set(rows.map((row) => row.resultDate))
+  const winnerRows = pricingRows.filter((row) => (
     Number.isFinite(row.homeWinProbability)
     && typeof row.winnerCorrect === 'boolean'
   ))
-  const totalRows = rows.filter((row) => (
+  const totalRows = pricingRows.filter((row) => (
     Number.isFinite(row.projectedTotal)
     && Number.isFinite(row.actualTotal)
   ))
@@ -1923,7 +1990,7 @@ export function evaluateGameForecasts(log = {}) {
   const marketTotalMae = mean(marketTotalErrors)
   const pairedModelTotalMae = mean(pairedModelTotalErrors)
   const pairedBaseTotalMae = mean(pairedBaseTotalErrors)
-  const status = rows.length >= MLB_GAME_EVALUATION_MIN_GAMES && dates.size >= MLB_GAME_EVALUATION_MIN_DATES
+  const status = pricingRows.length >= MLB_GAME_EVALUATION_MIN_GAMES && dates.size >= MLB_GAME_EVALUATION_MIN_DATES
     ? 'review-ready'
     : 'collecting'
   const updatedAt = rows
@@ -1942,7 +2009,7 @@ export function evaluateGameForecasts(log = {}) {
       dates: MLB_GAME_EVALUATION_MIN_DATES,
     },
     sample: {
-      games: rows.length,
+      games: pricingRows.length,
       dates: dates.size,
       winnerGames: winnerRows.length,
       totalGames: totalRows.length,
@@ -1950,7 +2017,7 @@ export function evaluateGameForecasts(log = {}) {
       marketTotalGames: marketTotalRows.length,
       firstInningGames: firstInningRows.length,
       progress: round(Math.min(
-        rows.length / MLB_GAME_EVALUATION_MIN_GAMES,
+        pricingRows.length / MLB_GAME_EVALUATION_MIN_GAMES,
         dates.size / MLB_GAME_EVALUATION_MIN_DATES,
         1,
       ), 3),
@@ -1993,7 +2060,7 @@ export function evaluateGameForecasts(log = {}) {
         : null,
     },
     firstInning: {
-      status: firstInningRows.length >= MLB_GAME_EVALUATION_MIN_GAMES && dates.size >= MLB_GAME_EVALUATION_MIN_DATES
+      status: firstInningRows.length >= MLB_GAME_EVALUATION_MIN_GAMES && firstInningDates.size >= MLB_GAME_EVALUATION_MIN_DATES
         ? 'review-ready'
         : 'collecting',
       sample: firstInningRows.length,
@@ -2028,7 +2095,7 @@ export function evaluateGameForecasts(log = {}) {
       calibration: firstInningCalibration(firstInningRows),
     },
     note: status === 'collecting'
-      ? 'Forward results are still collecting; the market blend remains evidence-gated.'
-      : 'The market blend reads only paired, unblended model evidence from prior settled games.',
+      ? 'Forecast V10 moneyline and total results are collecting under the independent logistic and Poisson pricing contract.'
+      : 'Forecast V10 evaluation uses only model-independent fair prices; sportsbook markets remain comparison inputs.',
   }
 }

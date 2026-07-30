@@ -316,14 +316,19 @@ function GameForecastStrip({
     sideBlend?.applied ? `side ${pct(sideBlend.weight, 0)}` : null,
     totalBlend?.applied ? `total ${pct(totalBlend.weight, 0)}` : null,
   ].filter(Boolean)
-  const blendHeadline = marketBlend?.applied
-    ? `Applied · ${appliedBlendParts.join(' · ')}`
-    : marketBlend?.policyStatus === 'inactive'
-      ? 'Inactive · no proven edge'
-      : 'Collecting · no influence'
-  const blendReason = marketBlend?.applied
-    ? 'Only evidence-cleared market components influence this forecast.'
-    : [sideBlend?.reason, totalBlend?.reason].filter(Boolean).join(' ')
+  const independentPricing = projection.pricingContract?.marketInputsAffectProjection === false
+  const blendHeadline = independentPricing
+    ? 'Comparison only · 0% influence'
+    : marketBlend?.applied
+      ? `Applied · ${appliedBlendParts.join(' · ')}`
+      : marketBlend?.policyStatus === 'inactive'
+        ? 'Inactive · no proven edge'
+        : 'Collecting · no influence'
+  const blendReason = independentPricing
+    ? 'Sportsbook prices grade value only; they do not change projected runs or fair probabilities.'
+    : marketBlend?.applied
+      ? 'Only evidence-cleared market components influence this forecast.'
+      : [sideBlend?.reason, totalBlend?.reason].filter(Boolean).join(' ')
 
   return (
     <section
@@ -419,7 +424,7 @@ function GameForecastStrip({
           </em>
         </div>
         <div>
-          <small>Market influence</small>
+          <small>Market input</small>
           <strong className={`mono ${marketBlend?.applied ? 'good' : ''}`}>
             {marketBlend ? blendHeadline : 'Unavailable'}
           </strong>

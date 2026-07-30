@@ -770,7 +770,7 @@ export function buildFirstInningProjection({
   return {
     version: MLB_FIRST_INNING_PROJECTION_VERSION,
     advisoryOnly: true,
-    model: 'Forecast V9 + 1st Inning Layer',
+    model: 'Forecast V10 + 1st Inning Layer',
     status: coverage >= 0.62 ? 'ready' : 'limited',
     lean,
     tier: finalTier,

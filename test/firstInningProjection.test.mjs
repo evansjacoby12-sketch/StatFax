@@ -176,7 +176,7 @@ test('borderline WATCH NRFI cannot promote before operational evidence clears', 
   assert.equal(weakerWatch.tier, 'watch')
 })
 
-test('Forecast V9 first-inning layer emits complementary NRFI and YRFI probabilities', () => {
+test('Forecast V10 first-inning layer emits complementary NRFI and YRFI probabilities', () => {
   const game = {
     gamePk: 99,
     gameDate: '2026-07-28T23:10:00.000Z',
@@ -269,7 +269,7 @@ test('Forecast V9 first-inning layer emits complementary NRFI and YRFI probabili
   })
 
   assert.equal(projection.version, 1)
-  assert.equal(projection.model, 'Forecast V9 + 1st Inning Layer')
+  assert.equal(projection.model, 'Forecast V10 + 1st Inning Layer')
   assert.ok(Math.abs(projection.nrfiProbability + projection.yrfiProbability - 1) < 0.001)
   assert.equal(projection.pricesAvailable, false)
   assert.equal(projection.halves.away.topOrder.length, 3)

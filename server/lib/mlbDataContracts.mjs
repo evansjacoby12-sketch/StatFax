@@ -101,6 +101,39 @@ function validateMarketPrice(prefix, price, errors) {
   }
 }
 
+function validateGamePricingContract(prefix, pricing, errors, { required = false } = {}) {
+  if (pricing == null) {
+    if (required) errors.push(`${prefix}: required`)
+    return
+  }
+  if (!isObject(pricing)) {
+    errors.push(`${prefix}: expected an object`)
+    return
+  }
+  if (pricing.version !== 1) errors.push(`${prefix}.version: expected 1`)
+  if (pricing.projectedRuns !== 'starter-bullpen-er-times-lineup-park-weather-plus-home-edge') {
+    errors.push(`${prefix}.projectedRuns: unsupported`)
+  }
+  if (pricing.moneyline !== 'logistic-run-differential') {
+    errors.push(`${prefix}.moneyline: unsupported`)
+  }
+  if (pricing.total !== 'poisson-projected-total') errors.push(`${prefix}.total: unsupported`)
+  if (pricing.marketProbability !== 'consensus-no-vig') {
+    errors.push(`${prefix}.marketProbability: unsupported`)
+  }
+  if (pricing.sportsbookPrice !== 'posted-american') {
+    errors.push(`${prefix}.sportsbookPrice: unsupported`)
+  }
+  if (!Number.isFinite(pricing.moneylineSlope)) {
+    errors.push(`${prefix}.moneylineSlope: required`)
+  } else if (Math.abs(pricing.moneylineSlope - 0.45) > 0.001) {
+    errors.push(`${prefix}.moneylineSlope: expected 0.45`)
+  }
+  if (pricing.marketInputsAffectProjection !== false) {
+    errors.push(`${prefix}.marketInputsAffectProjection: must be false`)
+  }
+}
+
 function validateGameOdds(gameOdds, gameIds, errors) {
   if (gameOdds == null) return 0
   if (!isObject(gameOdds)) {
@@ -333,9 +366,15 @@ function validateGameMarketCallSnapshot(prefix, call, errors) {
   if (!call.capturedAt || Number.isNaN(Date.parse(call.capturedAt))) {
     errors.push(`${prefix}.capturedAt: expected an ISO timestamp`)
   }
-  if (![1, 2, 3, 4, 5, 6, 7, 8, 9].includes(call.modelVersion)) {
-    errors.push(`${prefix}.modelVersion: expected 1 through 9`)
+  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10].includes(call.modelVersion)) {
+    errors.push(`${prefix}.modelVersion: expected 1 through 10`)
   }
+  validateGamePricingContract(
+    `${prefix}.pricingContract`,
+    call.pricingContract,
+    errors,
+    { required: call.modelVersion >= 10 },
+  )
   if (!Number.isInteger(call.projectionRevision) || call.projectionRevision < 1) {
     errors.push(`${prefix}.projectionRevision: expected a positive integer`)
   }
@@ -554,6 +593,16 @@ function validateGameMarketDecision(prefix, decision, projection, errors) {
     if (value.american != null && (!Number.isFinite(value.american) || (value.american > -100 && value.american < 100))) {
       errors.push(`${at}.american: expected null or valid American odds`)
     }
+    if (
+      value.modelFairAmerican != null
+      && (!Number.isFinite(value.modelFairAmerican)
+        || (value.modelFairAmerican > -100 && value.modelFairAmerican < 100))
+    ) {
+      errors.push(`${at}.modelFairAmerican: expected null or valid American odds`)
+    }
+    if (value.priceBetterThanFair != null && typeof value.priceBetterThanFair !== 'boolean') {
+      errors.push(`${at}.priceBetterThanFair: expected null or boolean`)
+    }
     if (!isObject(value.gates)) {
       errors.push(`${at}.gates: expected an object`)
     } else {
@@ -622,7 +671,7 @@ function validateGameProjectionRecord(prefix, projection, errors, gameIds = null
     errors.push(`${prefix}: expected an object`)
     return
   }
-  if (![1, 2, 3, 4, 5, 6, 7, 8, 9].includes(projection.modelVersion)) errors.push(`${prefix}.modelVersion: expected 1 through 9`)
+  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10].includes(projection.modelVersion)) errors.push(`${prefix}.modelVersion: expected 1 through 10`)
   if (projection.advisoryOnly !== true) errors.push(`${prefix}.advisoryOnly: must be true`)
   if (projection.captureState !== 'pregame') errors.push(`${prefix}.captureState: expected pregame`)
   if (!Number.isFinite(projection.gamePk)) errors.push(`${prefix}.gamePk: must be finite`)
@@ -647,6 +696,12 @@ function validateGameProjectionRecord(prefix, projection, errors, gameIds = null
   validateProbability(`${prefix}.homeWinProbability`, projection.homeWinProbability, errors)
   validateProbability(`${prefix}.tieAfterNineProbability`, projection.tieAfterNineProbability, errors)
   validateProbability(`${prefix}.projectedWinnerProbability`, projection.projectedWinnerProbability, errors)
+  validateGamePricingContract(
+    `${prefix}.pricingContract`,
+    projection.pricingContract,
+    errors,
+    { required: projection.modelVersion >= 10 },
+  )
   if (
     Number.isFinite(projection.awayWinProbability)
     && Number.isFinite(projection.homeWinProbability)
@@ -665,7 +720,7 @@ function validateGameProjectionRecord(prefix, projection, errors, gameIds = null
     } else {
       if (first.version !== 1) errors.push(`${at}.version: expected 1`)
       if (first.advisoryOnly !== true) errors.push(`${at}.advisoryOnly: must be true`)
-      if (first.model !== 'Forecast V9 + 1st Inning Layer') errors.push(`${at}.model: unsupported`)
+      if (!['Forecast V9 + 1st Inning Layer', 'Forecast V10 + 1st Inning Layer'].includes(first.model)) errors.push(`${at}.model: unsupported`)
       if (!['ready', 'limited'].includes(first.status)) errors.push(`${at}.status: unsupported`)
       if (!['nrfi', 'yrfi'].includes(first.lean)) errors.push(`${at}.lean: unsupported`)
       if (!['strong', 'lean', 'watch', 'limited'].includes(first.tier)) errors.push(`${at}.tier: unsupported`)
@@ -957,7 +1012,7 @@ function validateGameProjectionRecord(prefix, projection, errors, gameIds = null
         ['starterFactor', 0.72, 1.35],
         ['bullpenFactor', 0.78, 1.28],
         ['bullpenAvailabilityFactor', 1, 1.07],
-        ['pitchingFactor', 0.82, 1.24],
+        ['pitchingFactor', projection.modelVersion >= 10 ? 0.70 : 0.82, projection.modelVersion >= 10 ? 1.38 : 1.24],
         ['expectedStarterIP', 1, 8],
         ['starterWorkloadCoverage', 0, 1],
         ['starterShare', 0.12, 0.89],
@@ -1074,6 +1129,74 @@ function validateGameProjectionRecord(prefix, projection, errors, gameIds = null
         && Number.isFinite(environment.weatherFactor)
         && Math.abs(input.weatherRunFactor - environment.weatherFactor) > 0.001
       ) errors.push(`${at}.weatherRunFactor: must match runEnvironment.weatherFactor`)
+    }
+  }
+  if (projection.modelVersion >= 10) {
+    for (const side of ['away', 'home']) {
+      const input = projection.inputs?.[side]
+      const at = `${prefix}.inputs.${side}`
+      if (!isObject(input)) continue
+      for (const field of [
+        'starterProjectedER',
+        'bullpenProjectedER',
+        'pitchingBaseRuns',
+        'starterRunsAllowed9',
+        'bullpenRunsAllowed9',
+        'lineupStrengthFactor',
+        'expectedRunsBeforeCap',
+      ]) {
+        if (!Number.isFinite(input[field])) errors.push(`${at}.${field}: required for model v10`)
+        else validateOptionalMetric(`${at}.${field}`, input[field], errors, { min: 0, max: 20 })
+      }
+      if (!Number.isFinite(input.homeFieldRunEdge)) {
+        errors.push(`${at}.homeFieldRunEdge: required for model v10`)
+      } else {
+        const expectedEdge = side === 'home' ? 0.09 : -0.09
+        if (Math.abs(input.homeFieldRunEdge - expectedEdge) > 0.001) {
+          errors.push(`${at}.homeFieldRunEdge: expected ${expectedEdge}`)
+        }
+      }
+      if (typeof input.runProjectionCapped !== 'boolean') {
+        errors.push(`${at}.runProjectionCapped: expected boolean`)
+      }
+      if (
+        Number.isFinite(input.starterProjectedER)
+        && Number.isFinite(input.bullpenProjectedER)
+        && Number.isFinite(input.pitchingBaseRuns)
+        && Math.abs(input.starterProjectedER + input.bullpenProjectedER - input.pitchingBaseRuns) > 0.015
+      ) errors.push(`${at}.pitchingBaseRuns: must equal starter plus bullpen projected ER`)
+      if (
+        Number.isFinite(input.pitchingBaseRuns)
+        && Number.isFinite(input.baseRunsPerTeam)
+        && Number.isFinite(input.pitchingFactor)
+        && Math.abs(input.pitchingBaseRuns / input.baseRunsPerTeam - input.pitchingFactor) > 0.002
+      ) errors.push(`${at}.pitchingFactor: must match pitchingBaseRuns divided by baseRunsPerTeam`)
+      const expectedBeforeCap = (
+        input.pitchingBaseRuns
+        * input.lineupStrengthFactor
+        * input.runEnvironmentFactor
+        + input.homeFieldRunEdge
+      )
+      if (
+        Number.isFinite(expectedBeforeCap)
+        && Number.isFinite(input.expectedRunsBeforeCap)
+        && Math.abs(expectedBeforeCap - input.expectedRunsBeforeCap) > 0.015
+      ) errors.push(`${at}.expectedRunsBeforeCap: inconsistent run-formula arithmetic`)
+      const cappedRuns = Number.isFinite(input.expectedRunsBeforeCap)
+        ? Math.max(2.35, Math.min(7.25, input.expectedRunsBeforeCap))
+        : null
+      if (
+        Number.isFinite(cappedRuns)
+        && Number.isFinite(projection[`${side}ExpectedRuns`])
+        && Math.abs(cappedRuns - projection[`${side}ExpectedRuns`]) > 0.03
+      ) errors.push(`${at}.expectedRunsBeforeCap: does not produce ${side}ExpectedRuns`)
+      if (
+        Number.isFinite(input.expectedRunsBeforeCap)
+        && typeof input.runProjectionCapped === 'boolean'
+        && input.runProjectionCapped !== (
+          input.expectedRunsBeforeCap < 2.35 || input.expectedRunsBeforeCap > 7.25
+        )
+      ) errors.push(`${at}.runProjectionCapped: inconsistent with forecast bounds`)
     }
   }
   if (projection.modelVersion >= 5) {
