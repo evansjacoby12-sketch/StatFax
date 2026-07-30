@@ -4,7 +4,9 @@ import {
   buildFirstInningProfiles,
   buildFirstInningProjection,
   evaluateFirstInningHistory,
+  firstInningStrengthTier,
   firstInningMatchupContext,
+  MLB_FIRST_INNING_SIDE_TIER_POLICY,
 } from '../src/sports/mlb/logic/firstInningProjection.js'
 import { buildMlbGameHistory } from '../src/sports/mlb/logic/gameHistoricalValidation.js'
 import { parseMlbSeasonResults } from '../src/sports/mlb/logic/teamScoringForm.js'
@@ -67,6 +69,19 @@ test('first-inning profiles are leakage-safe and combine offense with opponent a
   assert.ok(matchup.expectedRuns > 0)
   assert.ok(matchup.offenseGames > 0)
   assert.ok(matchup.defenseGames > 0)
+})
+
+test('NRFI and YRFI use independently calibrated action thresholds', () => {
+  assert.equal(firstInningStrengthTier('nrfi', 0.57, 0.8), 'lean')
+  assert.equal(firstInningStrengthTier('yrfi', 0.57, 0.8), 'watch')
+  assert.equal(firstInningStrengthTier('nrfi', 0.63, 0.83), 'strong')
+  assert.equal(firstInningStrengthTier('yrfi', 0.63, 0.83), 'lean')
+  assert.equal(firstInningStrengthTier('yrfi', 0.65, 0.85), 'strong')
+  assert.equal(firstInningStrengthTier('unknown', 0.9, 1), 'limited')
+  assert.ok(
+    MLB_FIRST_INNING_SIDE_TIER_POLICY.yrfi.leanProbability
+      > MLB_FIRST_INNING_SIDE_TIER_POLICY.nrfi.leanProbability,
+  )
 })
 
 test('Forecast V9 first-inning layer emits complementary NRFI and YRFI probabilities', () => {
@@ -173,6 +188,11 @@ test('Forecast V9 first-inning layer emits complementary NRFI and YRFI probabili
   assert.ok(Number.isFinite(projection.shadow.recent30YrfiProbability))
   assert.ok(['nrfi', 'yrfi'].includes(projection.lean))
   assert.ok(['strong', 'lean', 'watch', 'limited'].includes(projection.tier))
+  assert.equal(projection.tierPolicy.side, projection.lean)
+  assert.equal(
+    projection.tierPolicy.leanProbability,
+    MLB_FIRST_INNING_SIDE_TIER_POLICY[projection.lean].leanProbability,
+  )
   assert.match(projection.evidence.case, /%/)
 })
 

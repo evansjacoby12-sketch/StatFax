@@ -2,6 +2,22 @@ export const MLB_FIRST_INNING_PROJECTION_VERSION = 1
 export const MLB_FIRST_INNING_HISTORY_VERSION = 1
 export const MLB_FIRST_INNING_FALLBACK_HALF_SCORE_RATE = 0.267
 export const MLB_FIRST_INNING_FALLBACK_HALF_RUNS = 0.49
+export const MLB_FIRST_INNING_SIDE_TIER_POLICY = Object.freeze({
+  nrfi: Object.freeze({
+    limitedCoverage: 0.62,
+    leanProbability: 0.56,
+    leanCoverage: 0.72,
+    strongProbability: 0.62,
+    strongCoverage: 0.82,
+  }),
+  yrfi: Object.freeze({
+    limitedCoverage: 0.64,
+    leanProbability: 0.58,
+    leanCoverage: 0.76,
+    strongProbability: 0.64,
+    strongCoverage: 0.84,
+  }),
+})
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value))
 const round = (value, digits = 4) => {
@@ -484,10 +500,12 @@ function adjustedHalfProjection({
   }
 }
 
-function strengthTier(probability, coverage) {
-  if (!(coverage >= 0.62)) return 'limited'
-  if (probability >= 0.62 && coverage >= 0.82) return 'strong'
-  if (probability >= 0.56 && coverage >= 0.72) return 'lean'
+export function firstInningStrengthTier(side, probability, coverage) {
+  const policy = MLB_FIRST_INNING_SIDE_TIER_POLICY[side]
+  if (!policy) return 'limited'
+  if (!(coverage >= policy.limitedCoverage)) return 'limited'
+  if (probability >= policy.strongProbability && coverage >= policy.strongCoverage) return 'strong'
+  if (probability >= policy.leanProbability && coverage >= policy.leanCoverage) return 'lean'
   return 'watch'
 }
 
@@ -565,7 +583,8 @@ export function buildFirstInningProjection({
   const lean = nrfiProbability >= yrfiProbability ? 'nrfi' : 'yrfi'
   const selectedProbability = Math.max(nrfiProbability, yrfiProbability)
   const coverage = (awayHalf.coverage + homeHalf.coverage) / 2
-  const tier = strengthTier(selectedProbability, coverage)
+  const tier = firstInningStrengthTier(lean, selectedProbability, coverage)
+  const tierPolicy = MLB_FIRST_INNING_SIDE_TIER_POLICY[lean]
 
   const away = {
     team: gameProjection.awayTeam,
@@ -601,6 +620,13 @@ export function buildFirstInningProjection({
     lean,
     tier,
     qualified: ['strong', 'lean'].includes(tier),
+    tierPolicy: {
+      side: lean,
+      leanProbability: tierPolicy.leanProbability,
+      leanCoverage: tierPolicy.leanCoverage,
+      strongProbability: tierPolicy.strongProbability,
+      strongCoverage: tierPolicy.strongCoverage,
+    },
     selectedProbability: round(selectedProbability),
     nrfiProbability: round(nrfiProbability),
     yrfiProbability: round(yrfiProbability),
