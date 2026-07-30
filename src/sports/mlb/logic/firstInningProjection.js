@@ -564,6 +564,31 @@ export function firstInningStrengthTier(side, probability, coverage) {
   return 'watch'
 }
 
+export function applyFirstInningQualificationGate({
+  side,
+  tier,
+  sideCalibrationStatus = 'collecting',
+} = {}) {
+  const actionable = ['strong', 'lean'].includes(tier)
+  const applied = side === 'yrfi' && actionable && sideCalibrationStatus !== 'eligible'
+  return {
+    tier: applied ? 'watch' : tier,
+    qualified: actionable && !applied,
+    gate: {
+      applied,
+      side,
+      rawTier: tier,
+      requiredStatus: side === 'yrfi' ? 'eligible' : null,
+      observedStatus: sideCalibrationStatus,
+      reason: applied
+        ? `YRFI ${tier.toUpperCase()} is held at WATCH because YRFI calibration is ${String(sideCalibrationStatus).toUpperCase()}.`
+        : side === 'yrfi'
+          ? 'YRFI qualification is allowed only after its side-specific calibration is eligible.'
+          : 'NRFI is not subject to the YRFI calibration hold.',
+    },
+  }
+}
+
 function buildDecisionNotes({ lean, away, home, nrfiProbability, yrfiProbability }) {
   const strongerHalf = away.scoringProbability >= home.scoringProbability ? away : home
   const weakerHalf = strongerHalf === away ? home : away
@@ -642,8 +667,14 @@ export function buildFirstInningProjection({
   const lean = nrfiProbability >= yrfiProbability ? 'nrfi' : 'yrfi'
   const selectedProbability = Math.max(nrfiProbability, yrfiProbability)
   const coverage = (awayHalf.coverage + homeHalf.coverage) / 2
-  const tier = firstInningStrengthTier(lean, selectedProbability, coverage)
+  const rawTier = firstInningStrengthTier(lean, selectedProbability, coverage)
   const tierPolicy = MLB_FIRST_INNING_SIDE_TIER_POLICY[lean]
+  const sideCalibrationStatus = historicalValidation?.sides?.[lean]?.status || 'collecting'
+  const qualification = applyFirstInningQualificationGate({
+    side: lean,
+    tier: rawTier,
+    sideCalibrationStatus,
+  })
 
   const away = {
     team: gameProjection.awayTeam,
@@ -677,8 +708,9 @@ export function buildFirstInningProjection({
     model: 'Forecast V9 + 1st Inning Layer',
     status: coverage >= 0.62 ? 'ready' : 'limited',
     lean,
-    tier,
-    qualified: ['strong', 'lean'].includes(tier),
+    tier: qualification.tier,
+    qualified: qualification.qualified,
+    qualificationGate: qualification.gate,
     tierPolicy: {
       side: lean,
       leanProbability: tierPolicy.leanProbability,
@@ -708,7 +740,7 @@ export function buildFirstInningProjection({
     halves: { away, home },
     evidence: {
       case: notes.caseText,
-      caution: notes.cautionText,
+      caution: qualification.gate.applied ? qualification.gate.reason : notes.cautionText,
     },
     validation: {
       status: historicalValidation?.status || 'collecting',
@@ -716,6 +748,7 @@ export function buildFirstInningProjection({
       historicalSeasons: historicalValidation?.sample?.seasons || profiles?.seasons?.length || 0,
       historicalBrier: historicalValidation?.model?.brier ?? null,
       baselineBrier: historicalValidation?.baseline?.brier ?? null,
+      sideCalibration: historicalValidation?.sides?.[lean] || null,
       forwardStatus: 'collecting',
     },
   }
@@ -744,11 +777,71 @@ function calibration(rows) {
   }).filter((row) => row.sample > 0)
 }
 
+function sideCalibration(rows, side, {
+  minimumGames,
+  minimumDates,
+} = {}) {
+  const threshold = MLB_FIRST_INNING_SIDE_TIER_POLICY[side].leanProbability
+  const selected = rows
+    .map((row) => {
+      const predictedSide = row.probability >= 0.5 ? 'yrfi' : 'nrfi'
+      const selectedProbability = predictedSide === 'yrfi'
+        ? row.probability
+        : 1 - row.probability
+      return {
+        ...row,
+        predictedSide,
+        selectedProbability,
+        correct: predictedSide === 'yrfi' ? row.outcome : 1 - row.outcome,
+      }
+    })
+    .filter((row) => row.predictedSide === side && row.selectedProbability >= threshold)
+  const briers = selected.map((row) => (row.selectedProbability - row.correct) ** 2)
+  const brier = mean(briers)
+  const improvements = briers.map((value) => 0.25 - value)
+  const improvement = mean(improvements)
+  const variance = improvements.length > 1 && Number.isFinite(improvement)
+    ? improvements.reduce((sum, value) => sum + ((value - improvement) ** 2), 0)
+      / (improvements.length - 1)
+    : null
+  const standardError = Number.isFinite(variance)
+    ? Math.sqrt(variance / improvements.length)
+    : null
+  const lowerBound = Number.isFinite(improvement) && Number.isFinite(standardError)
+    ? improvement - (1.645 * standardError)
+    : null
+  const dates = new Set(selected.map((row) => row.date))
+  const sampleReady = selected.length >= minimumGames && dates.size >= minimumDates
+  const status = !sampleReady
+    ? 'collecting'
+    : Number.isFinite(lowerBound) && lowerBound > 0
+      ? 'eligible'
+      : 'hold'
+
+  return {
+    status,
+    actionThreshold: threshold,
+    sample: selected.length,
+    dates: dates.size,
+    brier: round(brier),
+    coinFlipBrier: selected.length ? 0.25 : null,
+    accuracy: round(mean(selected.map((row) => row.correct))),
+    improvementVsCoinFlip: round(improvement),
+    improvementLowerBound90: round(lowerBound, 6),
+    calibration: calibration(selected.map((row) => ({
+      probability: row.selectedProbability,
+      outcome: row.correct,
+    }))),
+  }
+}
+
 export function evaluateFirstInningHistory(history, {
   minimumPriorGames = 300,
   minimumSeasons = 3,
   minimumGames = 3000,
   minimumDates = 250,
+  minimumSideGames = 100,
+  minimumSideDates = 30,
 } = {}) {
   const games = historyGames(history)
   const byDate = new Map()
@@ -847,6 +940,8 @@ export function evaluateFirstInningHistory(history, {
       games: minimumGames,
       dates: minimumDates,
       priorGames: minimumPriorGames,
+      sideGames: minimumSideGames,
+      sideDates: minimumSideDates,
     },
     sample: {
       seasons: seasons.size,
@@ -865,6 +960,16 @@ export function evaluateFirstInningHistory(history, {
       pairedStandardError: round(pairedStandardError, 6),
       improvementLowerBound90: round(improvementLowerBound, 6),
       calibration: calibration(rows),
+    },
+    sides: {
+      nrfi: sideCalibration(rows, 'nrfi', {
+        minimumGames: minimumSideGames,
+        minimumDates: minimumSideDates,
+      }),
+      yrfi: sideCalibration(rows, 'yrfi', {
+        minimumGames: minimumSideGames,
+        minimumDates: minimumSideDates,
+      }),
     },
     challengers: {
       recent30Team: {

@@ -1,6 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
+  applyFirstInningQualificationGate,
   buildFirstInningProfiles,
   buildFirstInningProjection,
   evaluateFirstInningHistory,
@@ -86,6 +87,41 @@ test('NRFI and YRFI use independently calibrated action thresholds', () => {
     MLB_FIRST_INNING_SIDE_TIER_POLICY.yrfi.leanProbability
       > MLB_FIRST_INNING_SIDE_TIER_POLICY.nrfi.leanProbability,
   )
+})
+
+test('YRFI qualification is held unless its own calibration is eligible', () => {
+  const held = applyFirstInningQualificationGate({
+    side: 'yrfi',
+    tier: 'strong',
+    sideCalibrationStatus: 'hold',
+  })
+  assert.equal(held.tier, 'watch')
+  assert.equal(held.qualified, false)
+  assert.equal(held.gate.applied, true)
+
+  const collecting = applyFirstInningQualificationGate({
+    side: 'yrfi',
+    tier: 'lean',
+    sideCalibrationStatus: 'collecting',
+  })
+  assert.equal(collecting.tier, 'watch')
+  assert.equal(collecting.gate.applied, true)
+
+  const cleared = applyFirstInningQualificationGate({
+    side: 'yrfi',
+    tier: 'lean',
+    sideCalibrationStatus: 'eligible',
+  })
+  assert.equal(cleared.tier, 'lean')
+  assert.equal(cleared.qualified, true)
+
+  const nrfi = applyFirstInningQualificationGate({
+    side: 'nrfi',
+    tier: 'lean',
+    sideCalibrationStatus: 'hold',
+  })
+  assert.equal(nrfi.tier, 'lean')
+  assert.equal(nrfi.qualified, true)
 })
 
 test('Forecast V9 first-inning layer emits complementary NRFI and YRFI probabilities', () => {
@@ -229,5 +265,9 @@ test('first-inning history evaluation is expanding-date and reports honest eligi
   assert.equal(evaluation.challengers.recentLeague.applied, false)
   assert.equal(evaluation.challengers.recentLeague.windowDays, 30)
   assert.ok(Number.isFinite(evaluation.challengers.recentLeague.brier))
+  assert.ok(['collecting', 'hold', 'eligible'].includes(evaluation.sides.nrfi.status))
+  assert.ok(['collecting', 'hold', 'eligible'].includes(evaluation.sides.yrfi.status))
+  assert.ok(Number.isInteger(evaluation.sides.nrfi.sample))
+  assert.ok(Number.isInteger(evaluation.sides.yrfi.sample))
   assert.ok(['eligible', 'hold'].includes(evaluation.status))
 })

@@ -670,6 +670,34 @@ function validateGameProjectionRecord(prefix, projection, errors, gameIds = null
       if (!['nrfi', 'yrfi'].includes(first.lean)) errors.push(`${at}.lean: unsupported`)
       if (!['strong', 'lean', 'watch', 'limited'].includes(first.tier)) errors.push(`${at}.tier: unsupported`)
       if (typeof first.qualified !== 'boolean') errors.push(`${at}.qualified: expected boolean`)
+      if (first.qualificationGate != null) {
+        const gate = first.qualificationGate
+        if (!isObject(gate)) {
+          errors.push(`${at}.qualificationGate: expected an object`)
+        } else {
+          if (typeof gate.applied !== 'boolean') {
+            errors.push(`${at}.qualificationGate.applied: expected boolean`)
+          }
+          if (gate.side !== first.lean) {
+            errors.push(`${at}.qualificationGate.side: must match firstInning.lean`)
+          }
+          if (!['strong', 'lean', 'watch', 'limited'].includes(gate.rawTier)) {
+            errors.push(`${at}.qualificationGate.rawTier: unsupported`)
+          }
+          if (!['collecting', 'hold', 'eligible'].includes(gate.observedStatus)) {
+            errors.push(`${at}.qualificationGate.observedStatus: unsupported`)
+          }
+          if (gate.requiredStatus != null && gate.requiredStatus !== 'eligible') {
+            errors.push(`${at}.qualificationGate.requiredStatus: unsupported`)
+          }
+          if (typeof gate.reason !== 'string' || !gate.reason.trim()) {
+            errors.push(`${at}.qualificationGate.reason: expected non-empty text`)
+          }
+          if (gate.applied && (first.tier !== 'watch' || first.qualified !== false)) {
+            errors.push(`${at}.qualificationGate: an applied gate must hold the call at WATCH`)
+          }
+        }
+      }
       if (first.pricesAvailable !== false) errors.push(`${at}.pricesAvailable: expected false until prices are modeled`)
       for (const field of ['selectedProbability', 'nrfiProbability', 'yrfiProbability', 'coverage']) {
         validateProbability(`${at}.${field}`, first[field], errors)
@@ -1634,6 +1662,34 @@ function validateFirstInningHistoricalValidation(evaluation, errors) {
   )
   if (!Array.isArray(evaluation.model?.calibration)) {
     errors.push(`${prefix}.model.calibration: expected an array`)
+  }
+  if (evaluation.sides != null) {
+    for (const side of ['nrfi', 'yrfi']) {
+      const calibration = evaluation.sides?.[side]
+      const at = `${prefix}.sides.${side}`
+      if (!isObject(calibration)) {
+        errors.push(`${at}: expected an object`)
+        continue
+      }
+      if (!['collecting', 'hold', 'eligible'].includes(calibration.status)) {
+        errors.push(`${at}.status: unsupported`)
+      }
+      if (!Number.isInteger(calibration.sample) || calibration.sample < 0) {
+        errors.push(`${at}.sample: expected a non-negative integer`)
+      }
+      if (!Number.isInteger(calibration.dates) || calibration.dates < 0) {
+        errors.push(`${at}.dates: expected a non-negative integer`)
+      }
+      for (const field of ['actionThreshold', 'brier', 'coinFlipBrier', 'accuracy']) {
+        validateOptionalMetric(`${at}.${field}`, calibration[field], errors, { min: 0, max: 1 })
+      }
+      for (const field of ['improvementVsCoinFlip', 'improvementLowerBound90']) {
+        validateOptionalMetric(`${at}.${field}`, calibration[field], errors, { min: -1, max: 1 })
+      }
+      if (!Array.isArray(calibration.calibration)) {
+        errors.push(`${at}.calibration: expected an array`)
+      }
+    }
   }
   if (evaluation.challengers?.recent30Team != null) {
     const challenger = evaluation.challengers.recent30Team
