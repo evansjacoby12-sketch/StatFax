@@ -58,6 +58,8 @@ jobs:
           npm --prefix ui install
       - name: Test NFL engine and pipeline
         run: npm test
+      - name: Verify operational wiring
+        run: npm run doctor -- --offline
       - name: Build current NFL snapshot and walk-forward baseline
         env:
           NFL_TARGET_SEASON: ${{ vars.NFL_TARGET_SEASON }}
@@ -243,6 +245,9 @@ jobs:
 
       - name: Tests
         run: npm test
+
+      - name: Verify operational wiring
+        run: npm run doctor -- --offline
 
       # ODDS_API_KEY (the-odds-api.com) unlocks HR prop prices: board odds,
       # +EV chips, parlay EV, and the reconcile log's vig field. Optional —

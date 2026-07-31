@@ -6,6 +6,8 @@
   "scripts": {
     "test": "node --test test/*.test.mjs",
     "serve": "node server/serve.mjs",
+    "doctor": "node server/doctor.mjs",
+    "doctor:json": "node server/doctor.mjs --json",
     "build-model": "node server/build-model.mjs",
     "slate": "node server/fetch-slate.mjs",
     "validate:mlb-data": "node server/tools/validate-mlb-data.mjs",

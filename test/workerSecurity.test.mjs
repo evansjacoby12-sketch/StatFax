@@ -45,3 +45,25 @@ test('Worker rate limit blocks a paid AI request with a retry hint', async () =>
   assert.equal(response.headers.get('access-control-allow-origin'), origin)
   assert.equal(response.headers.get('retry-after'), '60')
 })
+
+test('Worker health endpoint is read-only and reports configured dependencies', async () => {
+  const response = await worker.fetch(new Request('https://worker.example/health'), {
+    GITHUB_TOKEN: 'configured',
+    GITHUB_REPO: 'owner/repo',
+    OPENAI_API_KEY: 'configured',
+    AI_RATE_LIMITER: { limit: async () => ({ success: true }) },
+    DATA_RATE_LIMITER: { limit: async () => ({ success: true }) },
+  }, {})
+  const payload = await response.json()
+
+  assert.equal(response.status, 200)
+  assert.equal(payload.ok, true)
+  assert.deepEqual(payload.checks, {
+    dispatchConfigured: true,
+    aiConfigured: true,
+    aiRateLimitConfigured: true,
+    dataRateLimitConfigured: true,
+  })
+  assert.equal(JSON.stringify(payload).includes('owner/repo'), false)
+  assert.equal(JSON.stringify(payload).includes('GITHUB_TOKEN'), false)
+})

@@ -42,6 +42,22 @@ export default {
    */
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+    if (url.pathname === '/health') {
+      return new Response(JSON.stringify({
+        ok: Boolean(env.GITHUB_TOKEN),
+        service: 'statfax-cron',
+        generatedAt: new Date().toISOString(),
+        checks: {
+          dispatchConfigured: Boolean(env.GITHUB_TOKEN && env.GITHUB_REPO),
+          aiConfigured: Boolean(env.OPENAI_API_KEY),
+          aiRateLimitConfigured: Boolean(env.AI_RATE_LIMITER?.limit),
+          dataRateLimitConfigured: Boolean(env.DATA_RATE_LIMITER?.limit),
+        },
+      }), {
+        status: env.GITHUB_TOKEN ? 200 : 503,
+        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+      });
+    }
     // Natural-language → backtest-filter parser (used by the Signal Backtest UI).
     if (url.pathname === '/parse') {
       return protectBrowserEndpoint(request, env, url.pathname, handleParse, 'AI_RATE_LIMITER');
