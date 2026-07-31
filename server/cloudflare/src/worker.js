@@ -44,19 +44,19 @@ export default {
     const url = new URL(request.url);
     // Natural-language → backtest-filter parser (used by the Signal Backtest UI).
     if (url.pathname === '/parse') {
-      return handleParse(request, env);
+      return protectBrowserEndpoint(request, env, url.pathname, handleParse, 'AI_RATE_LIMITER');
     }
     if (url.pathname === '/list-builder') {
-      return handleListBuilder(request, env);
+      return protectBrowserEndpoint(request, env, url.pathname, handleListBuilder, 'AI_RATE_LIMITER');
     }
     if (url.pathname === '/list-builder-analyst') {
-      return handleListBuilderAnalyst(request, env);
+      return protectBrowserEndpoint(request, env, url.pathname, handleListBuilderAnalyst, 'AI_RATE_LIMITER');
     }
     if (url.pathname === '/explain') {
-      return handleExplain(request, env);
+      return protectBrowserEndpoint(request, env, url.pathname, handleExplain, 'AI_RATE_LIMITER');
     }
     if (url.pathname === '/savant-bip') {
-      return handleSavantBip(request, env);
+      return protectBrowserEndpoint(request, env, url.pathname, handleSavantBip, 'DATA_RATE_LIMITER');
     }
     if (url.pathname !== '/' && url.pathname !== '/trigger') {
       return new Response('Not found', { status: 404 });
@@ -138,6 +138,77 @@ async function triggerSlateRefresh(env) {
  * Optional Worker var:     ALLOW_ORIGIN       (default "*"; set to your site)
  */
 const OPENAI_MODEL = 'gpt-5.6-luna';
+const DEFAULT_ALLOWED_ORIGINS = Object.freeze([
+  'https://statfax.online',
+  'https://www.statfax.online',
+  'http://localhost:5180',
+  'http://127.0.0.1:4174',
+  'http://127.0.0.1:5180',
+]);
+
+function allowedOrigins(env) {
+  const configured = String(env.ALLOW_ORIGINS || env.ALLOW_ORIGIN || '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+  return new Set(configured.length ? configured : DEFAULT_ALLOWED_ORIGINS);
+}
+
+function requestOrigin(request) {
+  return String(request.headers.get('Origin') || '').trim();
+}
+
+function corsHeaders(env, origin = '') {
+  const allowed = allowedOrigins(env);
+  const reflected = origin && allowed.has(origin) ? origin : [...allowed][0];
+  return {
+    'Access-Control-Allow-Origin': reflected,
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Vary': 'Origin',
+  };
+}
+
+function withCors(response, env, origin) {
+  const wrapped = new Response(response.body, response);
+  for (const [key, value] of Object.entries(corsHeaders(env, origin))) {
+    wrapped.headers.set(key, value);
+  }
+  return wrapped;
+}
+
+async function protectBrowserEndpoint(request, env, pathname, handler, limiterName) {
+  const origin = requestOrigin(request);
+  if (!origin || !allowedOrigins(env).has(origin)) {
+    return new Response(JSON.stringify({ error: 'Origin not allowed.' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+    });
+  }
+
+  if (request.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: corsHeaders(env, origin) });
+  }
+
+  const limiter = env[limiterName];
+  if (limiter?.limit) {
+    const actor = request.headers.get('CF-Connecting-IP') || 'unknown';
+    const { success } = await limiter.limit({ key: `${actor}:${pathname}` });
+    if (!success) {
+      return new Response(JSON.stringify({ error: 'Too many requests. Try again shortly.' }), {
+        status: 429,
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-store',
+          'Retry-After': '60',
+          ...corsHeaders(env, origin),
+        },
+      });
+    }
+  }
+
+  return withCors(await handler(request, env), env, origin);
+}
 
 function openAiOutputText(payload) {
   if (typeof payload?.output_text === 'string') return payload.output_text.trim();
@@ -176,13 +247,6 @@ async function callOpenAiStructured(env, { instructions, input, schema, schemaNa
   return JSON.parse(text);
 }
 
-function corsHeaders(env) {
-  return {
-    'Access-Control-Allow-Origin': env.ALLOW_ORIGIN || '*',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
-  };
-}
 function jsonResponse(obj, status, env) {
   return new Response(JSON.stringify(obj), {
     status,

@@ -151,7 +151,7 @@ test('worker uses a strict advisory schema and can select only a supplied safe r
   try {
     const response = await worker.fetch(new Request('https://worker.example/list-builder-analyst', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { Origin: 'https://statfax.online', 'Content-Type': 'application/json' },
       body: JSON.stringify({ context: requestContext }),
     }), { OPENAI_API_KEY: 'test-key' }, {})
     assert.equal(response.status, 200)
@@ -180,7 +180,7 @@ test('worker rejects malformed analyst guardrails before calling OpenAI', async 
   context.guardrails.projectionsMutable = true
   const response = await worker.fetch(new Request('https://worker.example/list-builder-analyst', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { Origin: 'https://statfax.online', 'Content-Type': 'application/json' },
     body: JSON.stringify({ context }),
   }), { OPENAI_API_KEY: 'test-key' }, {})
   assert.equal(response.status, 400)
@@ -189,7 +189,7 @@ test('worker rejects malformed analyst guardrails before calling OpenAI', async 
 test('worker reports unconfigured analyst after validating aggregate context', async () => {
   const response = await worker.fetch(new Request('https://worker.example/list-builder-analyst', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { Origin: 'https://statfax.online', 'Content-Type': 'application/json' },
     body: JSON.stringify({ context: toListBuilderAnalystRequest(analystContext()) }),
   }), {}, {})
   assert.equal(response.status, 503)

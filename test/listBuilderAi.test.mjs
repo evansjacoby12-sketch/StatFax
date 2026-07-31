@@ -60,7 +60,7 @@ test('worker returns strict visible criteria without receiving slate data', asyn
   try {
     const response = await worker.fetch(new Request('https://worker.example/list-builder', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { Origin: 'https://statfax.online', 'Content-Type': 'application/json' },
       body: JSON.stringify({ query: 'confirmed hot power bats against HR-prone pitching' }),
     }), { OPENAI_API_KEY: 'test-key' }, {})
     assert.equal(response.status, 200)
@@ -91,7 +91,7 @@ test('worker returns strict visible criteria without receiving slate data', asyn
 test('worker rejects an empty List Builder prompt before calling OpenAI', async () => {
   const response = await worker.fetch(new Request('https://worker.example/list-builder', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { Origin: 'https://statfax.online', 'Content-Type': 'application/json' },
     body: JSON.stringify({ query: '   ' }),
   }), { OPENAI_API_KEY: 'test-key' }, {})
   assert.equal(response.status, 400)

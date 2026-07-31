@@ -141,7 +141,7 @@ test('worker schema permits only supplied evidence IDs and repairs a hostile res
     const requestPayload = { ...playerExplainPayload(batter), probabilityBoost: 0.9, hiddenScore: 100 }
     const response = await worker.fetch(new Request('https://worker.example/explain', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { Origin: 'https://statfax.online', 'Content-Type': 'application/json' },
       body: JSON.stringify(requestPayload),
     }), { OPENAI_API_KEY: 'test-key' }, {})
     assert.equal(response.status, 200)
@@ -168,7 +168,7 @@ test('worker schema permits only supplied evidence IDs and repairs a hostile res
 test('worker rejects a structured player request without allow-listed case evidence', async () => {
   const response = await worker.fetch(new Request('https://worker.example/explain', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { Origin: 'https://statfax.online', 'Content-Type': 'application/json' },
     body: JSON.stringify({ kind: 'player', version: 2, name: 'Test Player', signals: [] }),
   }), { OPENAI_API_KEY: 'test-key' }, {})
   assert.equal(response.status, 400)
@@ -183,7 +183,7 @@ test('legacy combo explanations retain the paragraph contract', async () => {
   try {
     const response = await worker.fetch(new Request('https://worker.example/explain', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { Origin: 'https://statfax.online', 'Content-Type': 'application/json' },
       body: JSON.stringify({ kind: 'combo', name: 'Two-leg combo', grade: 'A', reasons: ['Engine reason one', 'Engine reason two'] }),
     }), { OPENAI_API_KEY: 'test-key' }, {})
     assert.equal(response.status, 200)

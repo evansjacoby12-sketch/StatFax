@@ -12,9 +12,13 @@
  * API credits once per session, not on every render.
  */
 
-const API_KEY = '8c5857f301ddcc8b6ac7540ec5370402';
 const BASE    = 'https://api.the-odds-api.com/v4';
 const BOOKS   = ['draftkings', 'fanduel', 'betmgm'];
+
+// This legacy device-side service is intentionally disabled. Shipping an API
+// key in a browser/mobile bundle exposes it to every user. The production slate
+// fetches odds server-side with the ODDS_API_KEY GitHub secret instead.
+const API_KEY = null;
 
 // Day-scoped in-memory cache so we don't hammer the API on every tab switch
 let _cache     = null;   // Map<normalizedName, { draftkings?, fanduel?, betmgm? }>
@@ -35,6 +39,7 @@ export const OddsService = {
 
   /** Fetch today's MLB event list (game IDs, team names, start times). */
   async getEvents() {
+    if (!API_KEY) return [];
     const day  = todayStr();
     const from = `${day}T00:00:00Z`;
     const to   = `${day}T23:59:59Z`;
@@ -46,6 +51,7 @@ export const OddsService = {
 
   /** Fetch HR prop odds for one Odds-API event ID. */
   async getEventProps(eventId) {
+    if (!API_KEY) return null;
     return apiFetch(
       `${BASE}/sports/baseball_mlb/events/${eventId}/odds` +
       `?apiKey=${API_KEY}&regions=us&markets=batter_home_runs` +

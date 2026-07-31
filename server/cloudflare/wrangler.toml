@@ -18,6 +18,25 @@ crons = ["*/10 * * * *"]
 [vars]
 GITHUB_REPO = "evansjacoby12-sketch/StatFax"
 EVENT_TYPE  = "slate-refresh"
+ALLOW_ORIGINS = "https://statfax.online,https://www.statfax.online,http://localhost:5180,http://127.0.0.1:4174,http://127.0.0.1:5180"
+
+# Paid AI routes: 12 requests per minute per visitor and route, enforced before
+# the OpenAI subrequest. Savant proxy traffic gets a separate, wider bucket.
+[[ratelimits]]
+name = "AI_RATE_LIMITER"
+namespace_id = "1001"
+
+  [ratelimits.simple]
+  limit = 12
+  period = 60
+
+[[ratelimits]]
+name = "DATA_RATE_LIMITER"
+namespace_id = "1002"
+
+  [ratelimits.simple]
+  limit = 30
+  period = 60
 
 # Secrets (set via `wrangler secret put` — NEVER commit values here):
 #   GITHUB_TOKEN  — fine-grained PAT with Actions: write on this repo
