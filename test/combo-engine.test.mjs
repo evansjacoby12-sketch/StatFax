@@ -179,6 +179,13 @@ test('size filtering: no combos larger than the eligible game count', () => {
   assert.ok(!combos.some((c) => c.size > 2))
 })
 
+test('slate throttle can cap combo sizes and cards per size', () => {
+  const combos = buildCombos(slateRows(), { sizes: [2], maxCombosPerSize: 2 })
+  assert.ok(combos.length > 0)
+  assert.ok(combos.length <= 2)
+  assert.ok(combos.every((combo) => combo.size === 2))
+})
+
 test('exposure caps: no bat anchors more than maxPerBat combos per size', () => {
   const combos = buildCombos(slateRows(), { maxPerBat: 2, globalMaxPerBat: 4 })
   const perSize = {}
@@ -260,6 +267,7 @@ function syntheticBatter(over = {}) {
     bullpenLegend: over.bullpenLegend ?? false,
     cold: false,
     hrStreak: 0,
+    shortTermFormWeight: over.shortTermFormWeight ?? 1,
     season: over.season ?? { ab: 300, bb: 30, k: 60, slg: 0.45, avg: 0.25 },
     recent: over.recent ?? { ab: 40, hr: 3, slg: 0.5, avg: 0.27 },
     recent7: over.recent7 ?? null,
@@ -313,6 +321,19 @@ test('client buildGroups ≡ server buildComboRecords on aligned data', () => {
 })
 
 // ─── grading ──────────────────────────────────────────────────────────────────
+
+test('post-gap form decay stays aligned between client and server combo adapters', () => {
+  const batters = variedSlate().map((b) => ({ ...b, shortTermFormWeight: 0.35 }))
+  const client = buildGroups(batters)
+  const clientSigs = Object.values(client)
+    .flat()
+    .map((group) => sig(group.strategy, group.size, group.legs.map((leg) => leg.playerId)))
+    .sort()
+  const serverSigs = buildComboRecords(batters.map(comboRowFromSnapshot))
+    .map((combo) => sig(combo.strategy, combo.size, combo.legs.map((leg) => leg.playerId)))
+    .sort()
+  assert.deepEqual(clientSigs, serverSigs)
+})
 
 test('gradeCombos marks allHit only when every leg homered', () => {
   const combos = [

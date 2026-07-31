@@ -11,13 +11,15 @@ function rowKey(row) {
   return `${row.playerId}-${row.gamePk ?? 'unknown'}`;
 }
 
-export function primeCapForGames(gameCount) {
+export function primeCapForGames(gameCount, { multiplier = 1, minimum = PRIME_CAP_MIN } = {}) {
   const games = Math.max(0, Math.trunc(Number(gameCount) || 0));
   if (!games) return 0;
-  return Math.max(PRIME_CAP_MIN, Math.round(games * PRIME_CAP_PER_GAME));
+  const safeMultiplier = Math.max(0.25, Math.min(1.25, Number(multiplier) || 1));
+  const safeMinimum = Math.max(0, Math.trunc(Number(minimum) || 0));
+  return Math.max(safeMinimum, Math.round(games * PRIME_CAP_PER_GAME * safeMultiplier));
 }
 
-export function planGameNormalizedPrimeCap(scoredBatters = {}, gameCount = 0) {
+export function planGameNormalizedPrimeCap(scoredBatters = {}, gameCount = 0, options = {}) {
   const seen = new Set();
   const uniqueRows = [];
 
@@ -28,7 +30,7 @@ export function planGameNormalizedPrimeCap(scoredBatters = {}, gameCount = 0) {
     uniqueRows.push(row);
   }
 
-  const cap = primeCapForGames(gameCount);
+  const cap = primeCapForGames(gameCount, options);
   const rawPrime = uniqueRows.filter((row) => gradeOf(row) === 'PRIME');
   const eligiblePrime = rawPrime
     .filter((row) => Number.isFinite(row.score) && row.score >= PRIME_CAP_SCORE_FLOOR)
@@ -41,6 +43,8 @@ export function planGameNormalizedPrimeCap(scoredBatters = {}, gameCount = 0) {
 
   return {
     cap,
+    multiplier: Math.max(0.25, Math.min(1.25, Number(options?.multiplier) || 1)),
+    minimum: Math.max(0, Math.trunc(Number(options?.minimum ?? PRIME_CAP_MIN) || 0)),
     gameCount: Math.max(0, Math.trunc(Number(gameCount) || 0)),
     rawPrimeCount: rawPrime.length,
     eligiblePrimeCount: eligiblePrime.length,
@@ -55,8 +59,13 @@ export function planGameNormalizedPrimeCap(scoredBatters = {}, gameCount = 0) {
  * Apply the final PRIME label cap in place. Scores and probabilities are never
  * changed, and non-PRIME rows are never promoted just to fill the allowance.
  */
-export function applyGameNormalizedPrimeCap(scoredBatters = {}, gameCount = 0, strongGrade = 'STRONG') {
-  const plan = planGameNormalizedPrimeCap(scoredBatters, gameCount);
+export function applyGameNormalizedPrimeCap(
+  scoredBatters = {},
+  gameCount = 0,
+  strongGrade = 'STRONG',
+  options = {},
+) {
+  const plan = planGameNormalizedPrimeCap(scoredBatters, gameCount, options);
   if (!plan.demotedCount) return plan;
 
   for (const row of Object.values(scoredBatters || {})) {

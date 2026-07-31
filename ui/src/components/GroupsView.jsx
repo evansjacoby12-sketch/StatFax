@@ -278,7 +278,7 @@ function spreadPick(groups, n = 4) {
   return picked
 }
 
-export default function GroupsView({ batters, onSelect, selectedId, scorecard, generatedAt, windowMode = false, comboConf = 'off', favorConsistency = false, lockedBoard = null, slipSet = null, onToggleSlip = null, comboLock = false }) {
+export default function GroupsView({ batters, onSelect, selectedId, scorecard, resiliencePolicy = null, generatedAt, windowMode = false, comboConf = 'off', favorConsistency = false, lockedBoard = null, slipSet = null, onToggleSlip = null, comboLock = false }) {
   const [size, setSize] = useState(2)
   const [games, setGames] = useState(() => new Set()) // empty = all games
   // Hide started defaults ON: HR props can't be bet pregame once the game is
@@ -376,8 +376,8 @@ export default function GroupsView({ batters, onSelect, selectedId, scorecard, g
 
   const betaCeil = store.load('betaCeil', false)   // beta switch → include the POWER READY (beta) combo
   const bySize = useMemo(
-    () => buildGroups(pool, { favorConsistency, incumbents: incRef.current[poolSig] || null, scorecard, applyComboLock: comboLock, includeBeta: betaCeil }),
-    [pool, favorConsistency, scorecard, poolSig, comboLock, betaCeil],
+    () => buildGroups(pool, { favorConsistency, incumbents: incRef.current[poolSig] || null, scorecard, applyComboLock: comboLock, includeBeta: betaCeil, resiliencePolicy }),
+    [pool, favorConsistency, scorecard, poolSig, comboLock, betaCeil, resiliencePolicy],
   )
 
   // Persist this build's legs as next build's incumbents (for this pool only).

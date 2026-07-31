@@ -860,6 +860,7 @@ export default function App() {
           selectedId={selectedId}
           onSelect={(b) => setSelectedId(b.id)}
           scorecard={data.meta?.comboScorecard}
+          resiliencePolicy={data.meta?.hrResilience}
           generatedAt={data.meta?.generatedAt}
           windowMode={windowMode}
           comboConf={comboConf}

@@ -1205,7 +1205,14 @@ export function scoreBatter(
   opposingCatcherFramingRuns = null, // opposing catcher's Statcast framing runs (season total)
   recentBarrel       = null,   // { recentBarrelPct, recentEV, recentBBE } — batter's last ~14d batted-ball quality
   pitcherVeloTrend   = null,   // { recentFastballVelo, seasonFastballVelo, veloDelta } — opposing starter velo trend
+  runtimeContext     = null,   // slate-safe controls after a calendar gap
 ) {
+  const shortTermFormWeight = Math.max(
+    0.25,
+    Math.min(1, Number.isFinite(runtimeContext?.shortTermFormWeight)
+      ? runtimeContext.shortTermFormWeight
+      : 1),
+  );
   // ── Bayesian shrinkage — collapse small samples toward league prior ────
   //
   // A September call-up with 5 AB and 2 HR has a raw HR rate of 40% — pure
@@ -1241,10 +1248,10 @@ export function scoreBatter(
   const hrRate = parkAdjustStat(rawHrRate,  batterHomeParkFactor);
   // Hot bat: continuous 0–15 scale. Prefer 7-game window (catches current streaks);
   // fall back to 15-game when 7-game data unavailable.
-  const hotScore = hotBatScore(season, recent7 ?? recent15);
+  const hotScore = hotBatScore(season, recent7 ?? recent15) * shortTermFormWeight;
   const hot      = hotScore > 0;
   // Cold bat: graduated penalty (0–18 pts) based on severity of the slump
-  const coldPenalty = coldBatPenalty(season, recent15, recent7);
+  const coldPenalty = coldBatPenalty(season, recent15, recent7) * shortTermFormWeight;
   const cold        = coldPenalty > 0;
 
   // Who's Due: use 30-game window when available, fall back to 15-game
@@ -1435,7 +1442,7 @@ export function scoreBatter(
     + orderAdj
     + platoonAdj
     + homeAwayAdj
-    + recentBarrelAdj * RECENCY_BOOST
+    + recentBarrelAdj * RECENCY_BOOST * shortTermFormWeight
   ));
 
   // ── Matchup (30%) ────────────────────────────────────────────────────────
@@ -1560,7 +1567,7 @@ export function scoreBatter(
   // get an edge today (he's trending in the wrong direction). Also captures
   // the reverse — a pitcher rounding into form should be tougher than his
   // season ERA suggests.
-  const recentFormFactor = computeRecentFormFactor(pitcherRecentForm, pitcherSeason);
+  const recentFormFactor = computeRecentFormFactor(pitcherRecentForm, pitcherSeason) * shortTermFormWeight;
 
   // ── Pitch-type × ISO mismatch (−3 to +4) ──────────────────────────────────
   // Fine-grained complement to arsenalEdge: arsenalEdge buckets pitches into
@@ -1760,6 +1767,7 @@ export function scoreBatter(
     expected30,
     deficit,
     cold,
+    shortTermFormWeight,
     batterScore:  Math.round(batterScore),
     matchupScore: Math.round(matchupScore),
     envScore:     Math.round(envScore),

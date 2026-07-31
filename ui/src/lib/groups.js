@@ -159,6 +159,13 @@ const STRAT_META = {
 // it differently. `consistency` feeds the optional favor-consistency lean.
 function toComboRow(b, applyLock = false) {
   const barrel = barrelOf(b)
+  const formWeight = Number.isFinite(b.shortTermFormWeight)
+    ? Math.max(0.25, Math.min(1, b.shortTermFormWeight))
+    : 1
+  const rawRecentBarrel = recentBarrelOf(b)
+  const adjustedRecentBarrel = Number.isFinite(rawRecentBarrel) && Number.isFinite(barrel)
+    ? barrel + (rawRecentBarrel - barrel) * formWeight
+    : rawRecentBarrel
   // Lineup facts — stay LIVE (never frozen): drop benched bats, and scale the
   // pick + HR prob by the batting-order PA weight so the board isn't order-blind.
   const pw = paWeight(b.battingOrder)
@@ -173,10 +180,12 @@ function toComboRow(b, applyLock = false) {
     score: b.score,
     grade: b.grade?.label || b.grade || null,
     hrProb: rawProb != null ? rawProb * pw : null,
-    heat: Number.isFinite(b.heatIndex) ? b.heatIndex : 0,
-    heatMult: Number.isFinite(b.hotnessMultiplier) ? b.hotnessMultiplier : 1,
+    heat: Number.isFinite(b.heatIndex) ? 45 + (b.heatIndex - 45) * formWeight : 0,
+    heatMult: Number.isFinite(b.hotnessMultiplier)
+      ? 1 + (b.hotnessMultiplier - 1) * formWeight
+      : 1,
     barrel,
-    recentBarrel: recentBarrelOf(b),
+    recentBarrel: adjustedRecentBarrel,
     blast: blastRate(b),
     pitcherHr9: Number.isFinite(b.pitcher?.season?.hrPer9)
       ? b.pitcher.season.hrPer9
@@ -185,7 +194,7 @@ function toComboRow(b, applyLock = false) {
     // Market edge (model HR prob − de-vigged fair line) — the Value strategy
     // ranks on this to pair the bats the market most underprices. Null pre-odds.
     edge: Number.isFinite(b.edge) ? b.edge : null,
-    hot: b.hot === true,
+    hot: b.hot === true && formWeight >= 0.75,
     powerReady: b.powerReady === true,
     barrelReady: b.barrelReady === true,
     homeEdge: b.homeEdge === true,
@@ -296,9 +305,22 @@ export function mergeGroups(a, b) {
 // straight through to the engine (see buildCombos). `includeFinals` keeps
 // finished games in the pool — used by the Live tracker (not the betting board)
 // so a combo can be followed all day, not dropped the moment a game ends.
-export function buildGroups(batters, { maxPerBat = 2, globalMaxPerBat = 4, favorConsistency = false, incumbents = null, stickMargin = 0.05, includeFinals = false, scorecard = null, applyComboLock = false, includeBeta = false } = {}) {
+export function buildGroups(batters, { maxPerBat = 2, globalMaxPerBat = 4, favorConsistency = false, incumbents = null, stickMargin = 0.05, includeFinals = false, scorecard = null, applyComboLock = false, includeBeta = false, resiliencePolicy = null } = {}) {
   const rows = (batters || []).filter((b) => includeFinals || !b.game?.isFinal).map((b) => toComboRow(b, applyComboLock))
-  const combos = buildCombos(rows, { sizes: SIZES, maxPerBat, globalMaxPerBat, favorConsistency, incumbents, stickMargin, includeBeta })
+  const throttle = resiliencePolicy?.throttle?.combos || {}
+  const sizes = Array.isArray(throttle.allowedSizes)
+    ? SIZES.filter((size) => throttle.allowedSizes.includes(size))
+    : SIZES
+  const combos = buildCombos(rows, {
+    sizes,
+    maxPerBat: Number.isFinite(throttle.maxPerBat) ? throttle.maxPerBat : maxPerBat,
+    globalMaxPerBat: Number.isFinite(throttle.globalMaxPerBat) ? throttle.globalMaxPerBat : globalMaxPerBat,
+    maxCombosPerSize: Number.isFinite(throttle.maxCombosPerSize) ? throttle.maxCombosPerSize : Infinity,
+    favorConsistency,
+    incumbents,
+    stickMargin,
+    includeBeta,
+  })
   const out = {}
   for (const c of combos) {
     ;(out[c.size] ||= []).push(makeGroup(c))

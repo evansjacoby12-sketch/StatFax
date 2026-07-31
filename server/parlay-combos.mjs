@@ -60,6 +60,14 @@ export function comboRowFromSnapshot(row) {
   const score = Number.isFinite(row.preGameScore) ? row.preGameScore : row.score;
   const grade = row.preGameGrade?.label || row.preGameGrade || row.grade?.label || row.grade || null;
   const barrel = barrelOf(row);
+  const formWeight = Number.isFinite(row.shortTermFormWeight)
+    ? Math.max(0.25, Math.min(1, row.shortTermFormWeight))
+    : 1;
+  const rawRecentBarrel = recentBarrelOf(row);
+  const adjustedRecentBarrel = Number.isFinite(rawRecentBarrel) && Number.isFinite(barrel)
+    ? barrel + (rawRecentBarrel - barrel) * formWeight
+    : rawRecentBarrel;
+  const rawHeat = heatIndex(row);
   // Lineup facts — stay LIVE (never part of comboFreeze): drop benched bats and
   // scale the pick + HR prob by the batting-order PA weight. Mirrors groups
   // .toComboRow so the graded board and the displayed board treat lineups the same.
@@ -87,7 +95,7 @@ export function comboRowFromSnapshot(row) {
     barrel,
     // Recent (L14) barrel%, when a real sample — blended into the power rank so
     // it isn't always the same season-barrel leaders. null => fall back to season.
-    recentBarrel: recentBarrelOf(row),
+    recentBarrel: adjustedRecentBarrel,
     // park × weather × hand — the Park & Air strategy ranks on this.
     air: Number.isFinite(row.parkWeatherHandFactor) ? row.parkWeatherHandFactor : null,
     // Market edge (Value strategy) — null server-side: no live prices at freeze
@@ -108,10 +116,12 @@ export function comboRowFromSnapshot(row) {
     // BARREL READY (beta) signal — the hot-form combo strategy requires this.
     barrelReady: row.barrelReady === true,
     // Heat signals the `hot` strategy ranks on: heatIndex × recent-form multiplier.
-    heat: heatIndex(row),
-    heatMult: Number.isFinite(row.hotnessMultiplier) ? row.hotnessMultiplier : 1,
+    heat: 45 + (rawHeat - 45) * formWeight,
+    heatMult: Number.isFinite(row.hotnessMultiplier)
+      ? 1 + (row.hotnessMultiplier - 1) * formWeight
+      : 1,
     // Boolean signals (static — not decayed) for the Signal Stack strategy.
-    hot:           row.hot === true,
+    hot:           row.hot === true && formWeight >= 0.75,
     homeEdge:      row.homeEdge === true,
     awayEdge:      row.awayEdge === true,
     bullpenLegend: row.bullpenLegend === true,

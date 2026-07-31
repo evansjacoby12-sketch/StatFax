@@ -19,6 +19,7 @@ export default function BetLab({
   selectedId,
   onSelect,
   scorecard,
+  resiliencePolicy = null,
   generatedAt,
   windowMode,
   comboConf,
@@ -72,6 +73,7 @@ export default function BetLab({
           onSelect={onSelect}
           selectedId={selectedId}
           scorecard={scorecard}
+          resiliencePolicy={resiliencePolicy}
           generatedAt={generatedAt}
           windowMode={windowMode}
           comboConf={comboConf}

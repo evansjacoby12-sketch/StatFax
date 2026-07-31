@@ -291,6 +291,7 @@ export async function loadSlate() {
     comboScorecard: d.comboScorecard || null,
     sgpScorecard: d.sgpScorecard || null,
     dayRating: d.dayRating || null,
+    hrResilience: d.hrResilience || null,
     morningLockAt: d.morningLockAt || null,
     ensembleMeta: d.ensembleMeta || null,
     aiHrProduction: d.aiHrProduction || null,

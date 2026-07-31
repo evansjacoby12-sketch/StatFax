@@ -23,6 +23,7 @@ test('PRIME game cap follows slate size and keeps the absolute score floor', () 
   assert.equal(primeCapForGames(10), 15);
   assert.equal(primeCapForGames(1), 2);
   assert.equal(primeCapForGames(0), 0);
+  assert.equal(primeCapForGames(10, { multiplier: 0.5, minimum: 1 }), 8);
 });
 
 test('PRIME game cap retains only the highest scores without changing projections', () => {
@@ -83,4 +84,21 @@ test('PRIME game cap enforces the floor and demotes every alias of an overflow r
   assert.equal(rows.overflow.grade.label, 'STRONG');
   assert.equal(rows.overflowAlias.grade.label, 'STRONG');
   assert.equal(rows.belowFloor.grade.label, 'STRONG');
+});
+
+test('PRIME cap accepts the resilience multiplier without changing projections', () => {
+  const rows = Object.fromEntries(Array.from({ length: 20 }, (_, index) => {
+    const row = primeRow(index + 1, 100 - index, 500 + index);
+    return [`${row.playerId}-${row.gamePk}`, row];
+  }));
+  const probabilities = Object.values(rows).map((row) => row.hrProbability);
+  const result = applyGameNormalizedPrimeCap(
+    rows,
+    10,
+    { label: 'STRONG' },
+    { multiplier: 0.5, minimum: 1 },
+  );
+  assert.equal(result.cap, 8);
+  assert.equal(result.retainedCount, 8);
+  assert.deepEqual(Object.values(rows).map((row) => row.hrProbability), probabilities);
 });

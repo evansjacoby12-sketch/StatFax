@@ -13,7 +13,7 @@ function signalFor(stars) {
 
 export default function DayRating({ rating, estHRs }) {
   if (!rating || !rating.stars) return null
-  const { stars, score, verdict, factors = {}, primePerGame, softArmPct, favGames, games } = rating
+  const { stars, score, verdict, factors = {}, primePerGame, softArmPct, favGames, games, resilience = null } = rating
   const signal = signalFor(stars)
   const pct = (x) => `${Math.round(Math.max(0, Math.min(1, x ?? 0)) * 100)}%`
   const scoreValue = Math.round(Math.max(0, Math.min(100, score ?? 0)))
@@ -47,6 +47,12 @@ export default function DayRating({ rating, estHRs }) {
         <p className="dr-cap">
           The slate scores <b>{scoreValue}/100</b> from pitching, run environment, and qualified power bats.
         </p>
+        {resilience && resilience.level !== 'normal' && (
+          <p className="dr-projection">
+            <b>{resilience.level.toUpperCase()} exposure:</b> PRIME supply and auto-combos were reduced because
+            {' '}{resilience.powerStatus} league power and {resilience.rankingStatus} ranking confidence did not both clear.
+          </p>
+        )}
         <div className="dr-bars">
           <Factor icon="Crosshair" label="Soft pitching" value={factors.pitching} sub={`${softArmPct ?? 0}% of starters HR-prone`} />
           <Factor icon="Wind" label="Park & weather" value={factors.environment} sub={`${favGames ?? 0}/${games ?? 0} games favorable`} />

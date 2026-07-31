@@ -396,6 +396,7 @@ export function buildCombos(rows, {
   sizes = SIZES,
   maxPerBat = 2,
   globalMaxPerBat = 4,
+  maxCombosPerSize = Infinity,
   favorConsistency = false,
   incumbents = null,
   stickMargin = 0.05,
@@ -466,5 +467,13 @@ export function buildCombos(rows, {
       out.push({ strategy: strat.key, size, legs })
     }
   }
-  return out
+  if (!Number.isFinite(maxCombosPerSize)) return out
+  const cap = Math.max(0, Math.trunc(maxCombosPerSize))
+  const kept = {}
+  return out.filter((combo) => {
+    kept[combo.size] = kept[combo.size] || 0
+    if (kept[combo.size] >= cap) return false
+    kept[combo.size]++
+    return true
+  })
 }

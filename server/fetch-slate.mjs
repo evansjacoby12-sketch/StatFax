@@ -302,7 +302,7 @@ function comboRowsFromScoredBatters(scoredBatters, include = null) {
   return rows;
 }
 
-function appendBoardSnapshot(scoredBatters, games, date) {
+function appendBoardSnapshot(scoredBatters, games, date, comboOptions = {}) {
   try {
     const liveOrFinal = new Set((games || []).filter(g => g.isLive || g.isFinal).map(g => g.gamePk));
     const rows = Object.values(scoredBatters || {});
@@ -316,7 +316,7 @@ function appendBoardSnapshot(scoredBatters, games, date) {
       if (r.gamePk == null || liveOrFinal.has(r.gamePk)) continue;
       gconf.set(r.gamePk, (gconf.get(r.gamePk) || false) || r.lineupConfirmed === true);
     }
-    const records = buildComboRecords(pool);
+    const records = buildComboRecords(pool, comboOptions);
     const combos = records.map(c => ({ s: c.strategy, n: c.size, legs: c.legs }));
     let hist = { date, snapshots: [] };
     if (existsSync(BOARD_HISTORY_OUT_PATH)) {
@@ -345,7 +345,7 @@ function appendBoardSnapshot(scoredBatters, games, date) {
 // actually bet in each window (early vs late), not just the idealized all-slate
 // board. Returns null when the day doesn't split (one window == the full board).
 const WINDOW_SPAN_MS = 2.5 * 3600e3;
-function buildWindowBoards(scoredBatters, games) {
+function buildWindowBoards(scoredBatters, games, comboOptions = {}) {
   const sorted = (games || [])
     .filter((g) => g.gameDate)
     .map((g) => ({ pk: g.gamePk, t: new Date(g.gameDate).getTime() }))
@@ -364,7 +364,7 @@ function buildWindowBoards(scoredBatters, games) {
     label: w.minT === w.maxT ? short(w.minT) : `${short(w.minT)}–${short(w.maxT)}`,
     minT: w.minT,
     games: w.pks.size,
-    combos: buildComboRecords(cr.filter((r) => w.pks.has(r.gamePk))),
+    combos: buildComboRecords(cr.filter((r) => w.pks.has(r.gamePk)), comboOptions),
   }));
 }
 
@@ -468,7 +468,13 @@ import { applyZonePowerProbabilityInflation } from './lib/zonePowerInflation.mjs
 import { fetchGameOdds, fetchHROdds, pruneOddsToGames } from './lib/theOddsApi.mjs';
 import { advisoryBarrel } from './lib/barrelScore.mjs';
 import { powerReadySignal, barrelReadySignal } from '../ui/src/lib/powerReady.js';
-import { pitchMixScore } from '../ui/src/lib/scout.js';
+import { heatIndex, hrSetup, pitchMixScore } from '../ui/src/lib/scout.js';
+import {
+  applyCoreRankingEmphasis,
+  buildCalendarGapFormDecay,
+  buildHrResiliencePolicy,
+  comboOptionsFromHrPolicy,
+} from './lib/hrResilience.mjs';
 import { buildPitcherContactLeak } from '../src/sports/mlb/logic/pitcherContactLeak.js';
 import {
   buildBullpenAvailability,
@@ -3361,6 +3367,9 @@ async function main() {
   // argument-for-argument so behavior is byte-identical to the per-device
   // path (which still exists as a fallback when the snapshot is missing).
   console.log(`[slate] scoring ${allBatterIds.size} batters…`);
+  const hrFormDecay = buildCalendarGapFormDecay(backtestLog, date);
+  console.log(`[hr-resilience] short-term form weight ${hrFormDecay.weight.toFixed(2)} ` +
+    `(${hrFormDecay.status}; latest settled ${hrFormDecay.latestSettledDate || 'none'})`);
   const scoreStart = Date.now();
   const scoredBatters = {};
   // Collected during the scoring loop — one entry per batter that tripped
@@ -3542,6 +3551,7 @@ async function main() {
           oppCatcherFramingRuns,  // opposing catcher's framing runs (HR suppression)
           recentBarrelForBatter,  // batter's last ~14d batted-ball quality
           veloTrendForPitcher,    // opposing starter fastball velo trend
+          { shortTermFormWeight: hrFormDecay.weight },
         ];
         const result = scoreBatter(...scoreArgs);
         // Freeze inputs for every scored batter (NaN rows included — they're the
@@ -4008,7 +4018,7 @@ async function main() {
         const mult = hotnessMultiplier(hot.posterior, { neutralBand: HOTNESS_NEUTRAL_BAND });
         if (mult !== 1.0) {
           const beforeHot = row.score;
-          const rawDelta  = Math.round(beforeHot * (mult - 1));
+          const rawDelta  = Math.round(beforeHot * (mult - 1) * hrFormDecay.weight);
           const capped    = Math.max(-HOTNESS_MAX_DELTA, Math.min(HOTNESS_MAX_DELTA, rawDelta));
           row.hotnessMultiplier = mult;
           row.hotnessDelta      = capped;
@@ -4172,6 +4182,36 @@ async function main() {
   }
   // Score-distribution diagnostic so we can spot inflation regressions
   // before they ship. PRIME = score >= 72 by SCORE_TIERS.
+  const freshHrResiliencePolicy = buildHrResiliencePolicy({
+    backtestLog,
+    scoredBatters,
+    slateDate: date,
+    formDecay: hrFormDecay,
+  });
+  const lockedHrResiliencePolicy = backtestLog?.morningLock?.date === date
+    ? backtestLog.morningLock.hrResilience
+    : null;
+  const hrResiliencePolicy = lockedHrResiliencePolicy?.version === 1
+    ? structuredClone(lockedHrResiliencePolicy)
+    : freshHrResiliencePolicy;
+  hrResiliencePolicy.source = lockedHrResiliencePolicy?.version === 1
+    ? 'morning-lock'
+    : 'live-pregame';
+  const hrCoreEmphasis = applyCoreRankingEmphasis(
+    scoredBatters,
+    hrResiliencePolicy,
+    gradeFromScore,
+    { heatIndex, hrSetup },
+  );
+  const hrComboOptions = comboOptionsFromHrPolicy(hrResiliencePolicy);
+  console.log(`[hr-resilience] power=${hrResiliencePolicy.power.status}` +
+    ` (${hrResiliencePolicy.power.powerIndex ?? 'n/a'} index; prob ×${hrResiliencePolicy.power.probabilityFactor})` +
+    ` ranking=${hrResiliencePolicy.ranking.status}` +
+    ` (AUC ${hrResiliencePolicy.ranking.auc ?? 'n/a'}; top-10 ${hrResiliencePolicy.ranking.topTen.hitRate ?? 'n/a'}; lift ${hrResiliencePolicy.ranking.topTen.lift ?? 'n/a'})` +
+    ` context=${hrResiliencePolicy.ranking.context.status}` +
+    ` throttle=${hrResiliencePolicy.throttle.level}` +
+    ` core-emphasis=${hrCoreEmphasis.applied}`);
+
   const tierCounts = { PRIME: 0, STRONG: 0, LEAN: 0, SKIP: 0 };
   for (const key of composedKeysForPost) {
     const r = scoredBatters[key];
@@ -4299,6 +4339,13 @@ async function main() {
   console.log(`[contact-leak] attached ${contactLeakCount} rows; ${contactLeakQualified} at 55+`);
 
   const preCapDayRating = computeDayRating(scoredBatters, games);
+  preCapDayRating.resilience = {
+    level: hrResiliencePolicy.throttle.level,
+    reason: hrResiliencePolicy.throttle.reason,
+    powerStatus: hrResiliencePolicy.power.status,
+    rankingStatus: hrResiliencePolicy.ranking.status,
+    formWeight: hrResiliencePolicy.formDecay.weight,
+  };
 
   // ─── PRIME game-normalized cap ──────────────────────────────────────────────
   // Runs AFTER all pregame score/grade passes and BEFORE the live-decay freeze
@@ -4309,8 +4356,25 @@ async function main() {
   // score + probability remain untouched, overflow becomes STRONG, and the cap
   // never promotes a lower grade merely to fill the allowance.
   {
-    const primeCap = applyGameNormalizedPrimeCap(scoredBatters, games.length, gradeFromScore(60));
-    console.log(`[slate] PRIME game cap: ${primeCap.rawPrimeCount} raw → ${primeCap.retainedCount} retained (cap ${primeCap.cap}; ${games.length} games × 1.5, min 2; demoted ${primeCap.demotedCount} to STRONG)`);
+    const primeCap = applyGameNormalizedPrimeCap(
+      scoredBatters,
+      games.length,
+      gradeFromScore(60),
+      {
+        multiplier: hrResiliencePolicy.throttle.primeCapMultiplier,
+        minimum: hrResiliencePolicy.throttle.primeCapMinimum,
+      },
+    );
+    hrResiliencePolicy.primeCap = {
+      cap: primeCap.cap,
+      rawPrimeCount: primeCap.rawPrimeCount,
+      retainedCount: primeCap.retainedCount,
+      demotedCount: primeCap.demotedCount,
+      multiplier: primeCap.multiplier,
+      minimum: primeCap.minimum,
+    };
+    console.log(`[slate] PRIME game cap: ${primeCap.rawPrimeCount} raw → ${primeCap.retainedCount} retained ` +
+      `(cap ${primeCap.cap}; resilience ×${primeCap.multiplier}, min ${primeCap.minimum}; demoted ${primeCap.demotedCount} to STRONG)`);
   }
 
   // 8.68) Live in-game context (Tier-1 live signals — display only)
@@ -4565,6 +4629,32 @@ async function main() {
   // settling). Disable with MORNING_LOCK=0; move the cutoff with
   // MORNING_LOCK_HOUR. Live/final rows are skipped — the live-decay and
   // per-batter pregame-freeze passes own those.
+  // League power regime is a slate-level calibration layer, not a ranking
+  // feature: it moves every still-bettable HR probability by the same bounded
+  // factor, preserving player order while recent HR/PA and barrels agree on the
+  // direction of the league environment.
+  {
+    const factor = hrResiliencePolicy.power.probabilityFactor ?? 1;
+    const gameByPk = new Map((games || []).map((game) => [game.gamePk, game]));
+    let adjusted = 0;
+    for (const key of Object.keys(scoredBatters)) {
+      if (!key.includes('-')) continue;
+      const row = scoredBatters[key];
+      const game = gameByPk.get(row?.gamePk);
+      if (!row || game?.isLive === true || game?.isFinal === true || !Number.isFinite(row.hrProbability)) continue;
+      row.hrResilience = {
+        ...(row.hrResilience || {}),
+        leaguePowerFactor: factor,
+      };
+      if (factor === 1) continue;
+      row.leaguePowerBaselineProbability = row.hrProbability;
+      row.hrProbability = Math.max(0.005, Math.min(0.40, row.hrProbability * factor));
+      adjusted++;
+    }
+    hrResiliencePolicy.power.adjustedRows = adjusted;
+    console.log(`[hr-resilience] league power probability factor ×${factor} applied to ${adjusted} pregame rows`);
+  }
+
   const MORNING_LOCK_ON = (process.env.MORNING_LOCK ?? '1') !== '0';
   const MORNING_LOCK_HOUR = +(process.env.MORNING_LOCK_HOUR ?? 14);
   // parkWeatherHandFactor is in the lock because it feeds the combo engine's
@@ -4612,7 +4702,12 @@ async function main() {
         rows[id] = f;
       }
       if (Object.keys(rows).length) {
-        backtestLog.morningLock = { date, at: new Date().toISOString(), rows };
+        backtestLog.morningLock = {
+          date,
+          at: new Date().toISOString(),
+          rows,
+          hrResilience: structuredClone(hrResiliencePolicy),
+        };
         console.log(`[lock] morning board locked at ${backtestLog.morningLock.at} (${Object.keys(rows).length} batters)`);
       }
     }
@@ -5037,6 +5132,10 @@ async function main() {
     sgpScorecard: sgpScorecard(backtestLog),      // { days, overall, bySize }
     // Day Rating (1-5★) — "should I bet HR props today?" gauge.
     dayRating: preCapDayRating,
+    // Leakage-safe HR resilience policy: post-gap form decay, recent league
+    // power regime, ranking health, context-overlay lift, and the exact
+    // PRIME/combo throttle applied to this slate.
+    hrResilience: hrResiliencePolicy,
 
     // ensembleMeta: out-of-sample holdout comparison of the ML stacker vs the
     // rule model, and the gated blend weight actually applied to scores.
@@ -5187,7 +5286,7 @@ async function main() {
     const anyStarted = (payload.games || []).some((g) => g.isLive || g.isFinal);
     if (!anyStarted) {
       const lockCr = comboRowsFromScoredBatters(payload.scoredBatters);
-      const board = buildComboRecords(lockCr);
+      const board = buildComboRecords(lockCr, hrComboOptions);
       if (board.length) lbMap[date] = { at: new Date().toISOString(), final: false, combos: board };
     } else if (lbMap[date] && !lbMap[date].final) {
       lbMap[date] = { ...lbMap[date], final: true };
@@ -5212,7 +5311,7 @@ async function main() {
   // Overwrites each run, so by EOD it holds the last (latest) bettable board; it
   // lives in the persisted log so it survives the daily board-history rollover
   // and reaches the Results page (graded next day vs actual HRs).
-  const liveBoard = appendBoardSnapshot(payload.scoredBatters, payload.games, date);
+  const liveBoard = appendBoardSnapshot(payload.scoredBatters, payload.games, date, hrComboOptions);
   if (liveBoard && liveBoard.gameCount >= 2 && liveBoard.combos.length) {
     backtestLog.combos = backtestLog.combos || {};
     backtestLog.combos.lateByDate = backtestLog.combos.lateByDate || {};
@@ -5222,7 +5321,7 @@ async function main() {
   }
   // Per-start-window boards (early / late / …) so Results can grade the board you
   // actually bet in each confirmable window — not just the all-slate board.
-  const windowBoards = buildWindowBoards(payload.scoredBatters, payload.games);
+  const windowBoards = buildWindowBoards(payload.scoredBatters, payload.games, hrComboOptions);
   if (windowBoards) {
     backtestLog.combos = backtestLog.combos || {};
     backtestLog.combos.windowsByDate = backtestLog.combos.windowsByDate || {};
@@ -5237,7 +5336,7 @@ async function main() {
   // rollover. The canonical record the scorecard + Results Full board read.
   try {
     const allCr = comboRowsFromScoredBatters(payload.scoredBatters);
-    const fullBoard = buildComboRecords(allCr);
+    const fullBoard = buildComboRecords(allCr, hrComboOptions);
     if (fullBoard.length) {
       backtestLog.combos = backtestLog.combos || {};
       backtestLog.combos.fullByDate = backtestLog.combos.fullByDate || {};
@@ -5266,7 +5365,8 @@ async function main() {
         .filter((g) => !g.isLive && !g.isFinal && !/postponed|cancelled|suspended/i.test(g.status || ''))
         .map((g) => g.gamePk),
     );
-    const sgps = buildSGPRecords(sgpCr, { sizes: [2, 3] })
+    const sgpSizes = hrComboOptions.sizes.filter((size) => size === 2 || size === 3);
+    const sgps = buildSGPRecords(sgpCr, { sizes: sgpSizes })
       .filter((s) => pregameGames.has(s.gamePk));
     backtestLog.combos = backtestLog.combos || {};
     backtestLog.combos.sgpByDate = backtestLog.combos.sgpByDate || {};
