@@ -24784,6 +24784,10 @@ button.th:focus-visible {
   color: var(--text-faint);
 }
 
+/* Live/explanation preferences now live in Settings; keep the header focused. */
+.header-actions > .live-btn,
+.header-actions > .eli-btn { display: none; }
+
 /* The legend is reference material, so keep it one-line until requested. */
 .call-key { display: block; padding: 0; }
 .call-key > summary { min-height: 42px; padding: 10px 12px; cursor: pointer; list-style: none; }

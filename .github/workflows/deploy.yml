@@ -461,6 +461,7 @@ jobs:
           # Worker base URL for the Spray tab's /savant-bip proxy endpoint.
           VITE_WORKER_URL: ${{ vars.VITE_WORKER_URL || 'https://statfax-cron.evansjacoby12.workers.dev' }}
         run: |
+          npm run mlb:browser-history
           npm --prefix ui install
           npm --prefix ui run smoke   # headless-render every view against the slate; fails the deploy on a crash
           npm --prefix ui run build

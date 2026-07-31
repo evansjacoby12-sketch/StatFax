@@ -1,4 +1,6 @@
-const BACKTEST_LOG_URL = `${import.meta.env?.BASE_URL ?? '/'}data/backtest-log.json`
+const DATA_BASE = `${import.meta.env?.BASE_URL ?? '/'}data/`
+const HISTORY_URL = `${DATA_BASE}browser-history.json`
+const FALLBACK_URL = `${DATA_BASE}backtest-log.json`
 
 let cachedLog = null
 let pendingLog = null
@@ -9,9 +11,10 @@ export function loadBacktestLog() {
   if (cachedLog) return Promise.resolve(cachedLog)
   if (pendingLog) return pendingLog
 
-  pendingLog = fetch(BACKTEST_LOG_URL, { cache: 'no-store' })
+  pendingLog = fetch(HISTORY_URL, { cache: 'no-store' })
+    .then((response) => response.ok ? response : fetch(FALLBACK_URL, { cache: 'no-store' }))
     .then((response) => {
-      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      if (!response.ok) throw new Error(`History HTTP ${response.status}`)
       return response.json()
     })
     .then((log) => {

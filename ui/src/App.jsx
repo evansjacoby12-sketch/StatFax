@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState, useCallback, useRef, useLayoutEffect } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import { loadSlate, loadBrief, forceSlateRefresh, normName, projectedSlateHRs } from './lib/data.js'
 import { GRADE_ORDER, BADGES } from './lib/badges.js'
 import { HOT_HEAT, DESC_BY_DEFAULT, DEFAULT_FILTERS, SORTS } from './lib/constants.js'
@@ -113,31 +113,31 @@ export default function App() {
   const [betLabTab, setBetLabTab] = useState(null)
   const [findPlaysTab, setFindPlaysTab] = useState(null)
   const [showSettings, setShowSettings] = useState(false)
-  // Default ON: same-window grouping is the default combos view — those are the
+  // Same-window grouping is the combos contract — those are the
   // combos you can actually bet as one ticket (every leg's lineup confirms before
   // the earliest locks). The full board is an idealized benchmark (it grades each
   // leg at its own confirmed pregame state, a ticket that never existed at one
-  // bettable moment), so it's opt-in. Toggle in Settings.
-  const [windowMode, setWindowMode] = useState(() => store.load('windowMode', true))
-  const [showDayRating, setShowDayRating] = useState(() => store.load('showDayRating', true))
-  const [comboConf, setComboConf] = useState(() => store.load('comboConf', 'off')) // 'off' | 'stars' | 'percent'
+  // bettable moment). All-hit probability stays visible so every combo exposes risk.
+  const windowMode = true
+  const showDayRating = true
+  const comboConf = 'percent'
   // Favor-consistency lean removed from the UI — kept as a constant so the combo
   // builders' `favorConsistency` prop stays wired (always off) without churn.
   const favorConsistency = false
-  // Morning combo lock: apply the server's comboFreeze bundle so the parlay board's
-  // leg selection is pinned at the morning lock. Toggle (default OFF for now while
-  // testing) — off = the board re-ranks live from current heat/park/edge signals.
-  const [comboLock, setComboLock] = useState(() => store.load('comboLock', false))
-  const [betaCeil, setBetaCeil] = useState(() => store.load('betaCeil', false)) // private beta: advisory Ceiling/Form in the player drawer
+  // Keep the visible board live. The server's frozen bundle remains evidence,
+  // not a device-specific ranking mode.
+  const comboLock = false
+  const betaCeil = false
   const [watchlist, setWatchlist] = useState(() => new Set(store.load('watchlist', [])))
   const [slipIds, setSlipIds] = useState(() => store.load('slip', []))
-  const [autoRefresh, setAutoRefresh] = useState(() => store.load('autoRefresh', false))
+  const [liveUpdates, setLiveUpdates] = useState(() => store.load('liveUpdates', store.load('liveScores', true)))
+  const autoRefresh = liveUpdates
   const [sport, setSport] = useState(() => (store.load('sport', 'mlb') === 'nfl' ? 'nfl' : 'mlb'))
   const [nflSnapshot, setNflSnapshot] = useState(null)
   const [nflRefreshing, setNflRefreshing] = useState(false)
   const [nflView, setNflView] = useState('signals')
   const [view, setView] = useState(() => (staleReturn ? 'board' : (viewFromHash() || store.load('view', 'board'))))
-  const [liveScores, setLiveScores] = useState(() => store.load('liveScores', true))
+  const liveScores = liveUpdates
   const [eliLevel, setEliLevel] = useState(() => store.load('eliLevel', 'eli5')) // 'eli5' | 'eli15'
   // Dismissed Pick of the Day, keyed by batter id (which embeds the gamePk, so
   // it's inherently scoped to that day). Persisted, so a dismiss survives reloads
@@ -160,15 +160,9 @@ export default function App() {
   }, [filters])
   useEffect(() => store.save('watchlist', [...watchlist]), [watchlist])
   useEffect(() => store.save('slip', slipIds), [slipIds])
-  useEffect(() => store.save('autoRefresh', autoRefresh), [autoRefresh])
+  useEffect(() => store.save('liveUpdates', liveUpdates), [liveUpdates])
   useEffect(() => store.save('sport', sport), [sport])
-  useEffect(() => store.save('windowMode', windowMode), [windowMode])
-  useEffect(() => store.save('showDayRating', showDayRating), [showDayRating])
-  useEffect(() => store.save('comboConf', comboConf), [comboConf])
-  useEffect(() => store.save('comboLock', comboLock), [comboLock])
-  useEffect(() => store.save('betaCeil', betaCeil), [betaCeil])
   useEffect(() => {
-    if (betaCeil) return
     setFilters((current) => {
       if (!current.badges.has('powerReady') && !current.badges.has('barrelReady')) return current
       return {
@@ -176,7 +170,7 @@ export default function App() {
         badges: new Set([...current.badges].filter((key) => key !== 'powerReady' && key !== 'barrelReady')),
       }
     })
-  }, [betaCeil])
+  }, [])
   useEffect(() => store.save('eliLevel', eliLevel), [eliLevel])
   useEffect(() => store.save('podDismissed', podDismissedId), [podDismissedId])
   useEffect(() => {
@@ -192,7 +186,6 @@ export default function App() {
     window.addEventListener('hashchange', onHash)
     return () => window.removeEventListener('hashchange', onHash)
   }, [])
-  useEffect(() => store.save('liveScores', liveScores), [liveScores])
 
   const refreshNFL = useCallback(async () => {
     setNflRefreshing(true)
@@ -214,7 +207,7 @@ export default function App() {
 
   // Publish the sticky chrome height so the board column-header can stick right
   // below it — robust to the filter bar wrapping at any width.
-  useLayoutEffect(() => {
+  useEffect(() => {
     const el = topbarRef.current
     if (!el) return
     const apply = () => document.documentElement.style.setProperty('--chrome-h', `${el.offsetHeight}px`)
@@ -682,10 +675,8 @@ export default function App() {
           onHoldBuild={buildSlate}
           onOpenModel={() => setView('results')}
           onOpenLegend={() => setLearnTab('glossary')}
-          autoRefresh={autoRefresh}
-          onToggleAuto={() => setAutoRefresh((v) => !v)}
           liveScores={liveScores}
-          onToggleLive={() => setLiveScores((v) => !v)}
+          onToggleLive={() => setLiveUpdates((v) => !v)}
           eliLevel={eliLevel}
           onCycleEli={() => setEliLevel((v) => nextEliLevel(v))}
           refreshing={refreshing || slateBuilding}
@@ -928,25 +919,13 @@ export default function App() {
       )}
       {learnTab && <LearnCenter key={learnTab} initialTab={learnTab} onClose={() => setLearnTab(null)} />}
       {showSettings && (
-        <WorkspaceShell icon="SlidersHorizontal" eyebrow="Control center" title="Settings" description="Optional behavior and display preferences. Every change is saved locally on this device." onClose={() => setShowSettings(false)} size="settings" status="Saved automatically">
+        <WorkspaceShell icon="SlidersHorizontal" eyebrow="Control center" title="Settings" description="Live-update and explanation preferences saved on this device." onClose={() => setShowSettings(false)} size="settings" status="Saved automatically">
           <Settings
             embedded
-            liveScores={liveScores}
-            onToggleLive={() => setLiveScores((v) => !v)}
-            autoRefresh={autoRefresh}
-            onToggleAuto={() => setAutoRefresh((v) => !v)}
-            windowMode={windowMode}
-            onToggleWindows={() => setWindowMode((v) => !v)}
-            showDayRating={showDayRating}
-            onToggleDayRating={() => setShowDayRating((v) => !v)}
-            comboConf={comboConf}
-            onSetComboConf={setComboConf}
+            liveUpdates={liveUpdates}
+            onToggleLiveUpdates={() => setLiveUpdates((v) => !v)}
             eliLevel={eliLevel}
             onSetEli={setEliLevel}
-            comboLock={comboLock}
-            onToggleComboLock={() => setComboLock((v) => !v)}
-            betaCeil={betaCeil}
-            onToggleBetaCeil={() => setBetaCeil((v) => !v)}
             onClose={() => setShowSettings(false)}
           />
         </WorkspaceShell>

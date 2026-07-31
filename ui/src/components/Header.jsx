@@ -154,7 +154,7 @@ function HelpMenu({ sport, onOpenWeather, onOpenGroups, onOpenSplits, onOpenHowT
         { label: liveScores ? 'Live Scores On' : 'Pregame View', desc: liveScores ? 'Tap to pause live scores and innings' : 'Tap to enable live scores and innings', icon: liveScores ? 'RadioTower' : 'Clock3', fn: onToggleLive, mobileOnly: true },
         { label: eliLevel === 'eli5' ? 'Plain Explanations' : 'Stats Explanations', desc: 'Switch explanation depth', icon: eliLevel === 'eli5' ? 'Sparkles' : 'BarChart3', fn: onCycleEli, mobileOnly: true },
         { label: refreshing ? 'Refreshing Slate…' : 'Refresh Slate', desc: 'Reload the latest model board', icon: refreshing ? 'Loader' : 'RefreshCw', fn: onRefresh, mobileOnly: true },
-        { label: 'Settings', desc: 'Display, updates, parlays and experimental controls', icon: 'SlidersHorizontal', fn: onOpenSettings },
+        { label: 'Settings', desc: 'Live updates and explanation preferences', icon: 'SlidersHorizontal', fn: onOpenSettings },
       ],
     },
   ]
@@ -454,8 +454,6 @@ export default function Header({
   onHoldBuild,
   onOpenModel,
   onOpenLegend,
-  autoRefresh,
-  onToggleAuto,
   liveScores = true,
   onToggleLive,
   eliLevel = 'eli5',

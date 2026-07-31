@@ -6,7 +6,6 @@ import { pct, surname } from '../lib/format.js'
 import { legStatus } from '../lib/live.js'
 import LiveCombosView from './LiveCombosView.jsx'
 import MyTickets from './MyTickets.jsx'
-import * as store from '../lib/storage.js'
 import { loadBacktestLog } from '../lib/backtestLog.js'
 
 // Dedicated Combos page: live combo tracking (today, in progress) + the settled
@@ -23,7 +22,7 @@ export default function CombosView({ batters, onSelect, favorConsistency = false
   // Ready-signal combos are built + logged for forward testing, but only surface
   // (list AND scorecard tallies) when the beta
   // switch is on, so non-beta users see zero influence from an unvalidated signal.
-  const betaCeil = store.load('betaCeil', false)
+  const betaCeil = false
   const showCombo = (c) => betaCeil || !['powerReady', 'barrelReady'].includes(c?.strategy)
   const [log, setLog] = useState(null)
   const [err, setErr] = useState(null)

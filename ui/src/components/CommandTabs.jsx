@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import Icon from './Icon.jsx'
 
 /**
@@ -18,7 +18,7 @@ export default function CommandTabs({
   const wrapRef = useRef(null)
   const indicatorRef = useRef(null)
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     const wrap = wrapRef.current
     const indicator = indicatorRef.current
     if (!wrap || !indicator) return undefined

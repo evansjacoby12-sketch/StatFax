@@ -1,4 +1,4 @@
-import { useEffect, useRef, useLayoutEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import BatterRow from './BatterRow.jsx'
 import Icon from './Icon.jsx'
 
@@ -9,7 +9,7 @@ import Icon from './Icon.jsx'
 // glide only helps when the eye can actually follow it.
 function useFlipRows(bodyRef, deps) {
   const prevTops = useRef(new Map())
-  useLayoutEffect(() => {
+  useEffect(() => {
     const body = bodyRef.current
     if (!body) return
     const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
