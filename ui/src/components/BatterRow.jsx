@@ -5,7 +5,7 @@ import { gradeColor } from '../lib/badges.js'
 import { useLiveMode } from '../lib/liveMode.js'
 import { risingForm } from '../lib/groups.js'
 import { useSwipeActions } from '../lib/useSwipeActions.js'
-import { hrSetup, pitchMixScore } from '../lib/scout.js'
+import { pitchMixScore } from '../lib/scout.js'
 import { playerHeadshot } from '../lib/teams.js'
 import { lineupActionability } from '../lib/actionability.js'
 
@@ -35,7 +35,6 @@ export default function BatterRow({
   const live = liveMode && b.game?.isLive
   const isFinal = b.game?.isFinal
   const pmScore = pitchMixScore(b)
-  const dueSetup = hrSetup(b)
   const air = Number.isFinite(b.parkWeatherHandFactor) ? b.parkWeatherHandFactor : null
   const aiDelta = b.aiHr?.applied === true && Number.isFinite(b.baselineHrProbability) && Number.isFinite(b.hrProbability)
     ? b.hrProbability - b.baselineHrProbability
@@ -57,17 +56,13 @@ export default function BatterRow({
       ? { label: 'Barrel Ready', tone: 'warn', icon: 'CircleDotDashed', beta: true }
       : pmScore >= 7
         ? { label: `Pitch ${pmScore.toFixed(1)}`, tone: 'good', icon: 'ChartSpline' }
-        : dueSetup.n >= 4
-          ? { label: `Due ${dueSetup.n}/${dueSetup.checks.length}`, tone: 'warn', icon: 'TimerReset' }
-          : airTone === 'good'
-            ? { label: `Air ${signedPct(air - 1, 0)}`, tone: 'good', icon: 'CloudSun' }
-            : momentum
-              ? { label: momentum.label, tone: momentum.cls, icon: momentum.icon }
-              : null
+      : airTone === 'good'
+        ? { label: `Air ${signedPct(air - 1, 0)}`, tone: 'good', icon: 'CloudSun' }
+        : momentum
+          ? { label: momentum.label, tone: momentum.cls, icon: momentum.icon }
+          : null
 
-  const mobileContext = dueSetup.n > 0 && !strongestSignal?.label.startsWith('Due')
-    ? { label: 'DUE', value: `${dueSetup.n}/${dueSetup.checks.length}`, tone: 'warn' }
-    : air != null && !strongestSignal?.label.startsWith('Air')
+  const mobileContext = air != null && !strongestSignal?.label.startsWith('Air')
       ? { label: 'AIR', value: signedPct(air - 1, 0), tone: airTone }
       : pmScore != null && !strongestSignal?.label.startsWith('Pitch')
         ? { label: 'PITCH', value: pmScore.toFixed(1), tone: pmScore >= 7 ? 'good' : '' }
@@ -192,12 +187,10 @@ export default function BatterRow({
             </span>
           )}
           <span className="mobile-dl-proof-metrics">
-            <span><b className="mono">{num(b.expectedHRs, 3)}</b><small>xHR</small></span>
-            <i />
-            <span><b className="mono">{b.heatIndex ?? '—'}</b><small>HEAT</small></span>
+            {!momentum && <span><b className="mono">{b.heatIndex ?? '—'}</b><small>HEAT</small></span>}
             {mobileContext && (
               <>
-                <i />
+                {!momentum && <i />}
                 <span className={mobileContext.tone}><b className="mono">{mobileContext.value}</b><small>{mobileContext.label}</small></span>
               </>
             )}
@@ -262,16 +255,13 @@ export default function BatterRow({
         <div className="dl-proof">
           <div className="dl-evidence-strip">
             {pmScore != null && <span className={pmScore >= 7 ? 'good' : ''}>PITCH {pmScore.toFixed(1)}</span>}
-            {dueSetup.n > 0 && <span className="warn">DUE {dueSetup.n}/{dueSetup.checks.length}</span>}
             {air != null && <span className={airTone}>AIR {signedPct(air - 1, 0)}</span>}
           </div>
           <div className="dl-proof-metrics">
-            <span><b className="mono">{num(b.expectedHRs, 3)}</b><small>xHR</small></span>
-            <i />
-            <span><b className="mono">{b.heatIndex ?? '—'}</b><small>HEAT</small></span>
+            {!momentum && <span><b className="mono">{b.heatIndex ?? '—'}</b><small>HEAT</small></span>}
             {strongestSignal && (
               <>
-                <i />
+                {!momentum && <i />}
                 <span className={`dl-proof-signal ${strongestSignal.tone}`}>
                   <Icon name={strongestSignal.icon} size={11} />
                   <b>{strongestSignal.beta ? 'BETA' : strongestSignal.label}</b>

@@ -44,8 +44,8 @@ function lineupLabel(first) {
   return 'Projected'
 }
 
-function tierLabel(first) {
-  if (first?.tier === 'strong') return `Strong ${first.lean.toUpperCase()}`
+function tierLabel(first, researchOnly = false) {
+  if (first?.tier === 'strong') return `${researchOnly ? 'Top lean' : 'Strong'} ${first.lean.toUpperCase()}`
   if (first?.tier === 'lean') return `Lean ${first.lean.toUpperCase()}`
   if (first?.tier === 'limited') return `Limited ${first.lean.toUpperCase()}`
   return `Watch ${first?.lean?.toUpperCase() || ''}`.trim()
@@ -146,7 +146,7 @@ function HalfPanel({ label, half }) {
   )
 }
 
-function MatchupRow({ row, rank, expanded, onToggle, evaluation }) {
+function MatchupRow({ row, rank, expanded, onToggle, evaluation, researchOnly = false }) {
   const { game, projection, first } = row
   const lineups = lineupLabel(first)
   const isReady = lineups === 'Confirmed'
@@ -182,7 +182,7 @@ function MatchupRow({ row, rank, expanded, onToggle, evaluation }) {
         </span>
         <span className={`fi-decision is-${first.lean}`}>
           <small>Model lean</small>
-          <b>{tierLabel(first)}</b>
+          <b>{tierLabel(first, researchOnly)}</b>
           <span className="mono">{pct(leanProbability, 1)}</span>
         </span>
         <span className="fi-coverage">
@@ -252,6 +252,7 @@ export default function FirstInningZone({
   const strongestYrfi = allRows.find((row) => row.first.lean === 'yrfi' && row.first.qualified)
     || allRows.find((row) => row.first.lean === 'yrfi')
   const historicalStatus = historicalValidation?.status || 'collecting'
+  const researchOnly = historicalStatus !== 'eligible' && historicalStatus !== 'promoted'
   const watchNrfiPromotion = gameProjectionEvaluation?.firstInning?.watchNrfiPromotion || null
   const promotionMinimum = watchNrfiPromotion?.policy?.minimumSettled || 20
   const promotionTarget = watchNrfiPromotion?.policy?.targetSettled || 30
@@ -260,8 +261,8 @@ export default function FirstInningZone({
     <div className="fi-zone">
       <section className="fi-method">
         <div className="fi-method-highlights">
-          <Highlight label="Strongest NRFI lean" row={strongestNrfi} />
-          <Highlight label="Strongest YRFI lean" row={strongestYrfi} />
+          <Highlight label="Top NRFI lean" row={strongestNrfi} />
+          <Highlight label="Top YRFI lean" row={strongestYrfi} />
         </div>
         <div className="fi-method-model">
           <small>Model engine</small>
@@ -337,6 +338,7 @@ export default function FirstInningZone({
                 current === row.game.gamePk ? null : row.game.gamePk
               ))}
               evaluation={gameProjectionEvaluation}
+              researchOnly={researchOnly}
             />
           ))}
         </section>

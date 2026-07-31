@@ -384,7 +384,7 @@ export default function PlayerDrawer({ batter: b, batters, scoreToProb, onClose,
               {tab === 'matchup'   && <MatchupTab   b={b} batters={batters} onOpenZone={onOpenZone} onOpenPitcher={onOpenPitcher} />}
               {tab === 'form'      && <FormTab      b={b} />}
               {tab === 'splits'    && <SplitsTab    b={b} />}
-              {tab === 'statcast'  && <StatcastTab  b={b} />}
+              {tab === 'statcast'  && <StatcastTab  b={b} scoreToProb={scoreToProb} />}
               {tab === 'signals'   && <AllSignalsTab b={b} />}
               {tab === 'spray'     && <SprayTab     b={b} />}
             </div>
@@ -401,15 +401,12 @@ export default function PlayerDrawer({ batter: b, batters, scoreToProb, onClose,
 // Tab panels
 // ---------------------------------------------------------------------------
 
-function OverviewTab({ b, color, scoreToProb, onOpenZone, liveMode }) {
+function OverviewTab({ b, onOpenZone, liveMode }) {
   return (
     <>
       <ResearchThesis b={b} />
-      <PlateMatchup b={b} onOpenZone={onOpenZone} />
-      <ModelBreakdown b={b} scoreToProb={scoreToProb} />
       <CaseVsCaution b={b} />
-      <PaCurve b={b} color={color} />
-      <EnvSection b={b} />
+      <PlateMatchup b={b} onOpenZone={onOpenZone} />
       <OddsSection b={b} />
       {liveMode && b.game?.isLive && <LiveSection b={b} />}
     </>
@@ -422,6 +419,7 @@ function MatchupTab({ b, batters, onOpenZone, onOpenPitcher }) {
       <PitchMixAdvantage b={b} />
       <PitcherSection b={b} batters={batters} onOpenPitcher={onOpenPitcher} />
       <ZoneTeaser b={b} onOpen={onOpenZone} />
+      <EnvSection b={b} />
     </>
   )
 }
@@ -447,9 +445,10 @@ function SplitsTab({ b }) {
   return <BatterSplitsTable b={b} platoon={splits} loading={loading} />
 }
 
-function StatcastTab({ b }) {
+function StatcastTab({ b, scoreToProb }) {
   return (
     <>
+      <ModelBreakdown b={b} scoreToProb={scoreToProb} />
       <BetaCeiling b={b} />
       <StatcastSection b={b} />
       <RollingWindows b={b} />
@@ -1267,7 +1266,6 @@ function HeroNumbers({ b, color }) {
       </div>
       <ScoreRing score={shownScore} color={color} size={48} />
       <div style={{ display: 'flex', gap: '14px', rowGap: '8px', flexWrap: 'wrap', flex: 1, justifyContent: 'flex-end', alignItems: 'center' }}>
-        <HeroMini k="xHR" v={num(b.expectedHRs, 3)} title="Expected HRs this game" />
         <HeroMini k="PAs" v={num(b.expectedPAs, 1)} title="Expected plate appearances" />
         <HeroMini k="Sim" v={pct(b.simHRProb, 1)} title="AB-by-AB simulated HR probability" />
         <HeroMini k="Ens" v={num(b.ensembleScore)} title="Ensemble model score" />
@@ -1462,45 +1460,6 @@ function ModelBreakdown({ b, scoreToProb }) {
             </div>
           )
         })}
-      </div>
-    </Section>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// PaCurve
-// ---------------------------------------------------------------------------
-
-function PaCurve({ b, color }) {
-  const pa = b.paBreakdown
-  if (!Array.isArray(pa) || !pa.length) return null
-  const max = Math.max(0.02, ...pa.map(x => x.p || 0))
-  return (
-    <Section title="Opportunity path" icon="BarChart3" className="scout-report-section scout-pa-section">
-      <div className="scout-story-lead">
-        <div>
-          <small>Plate appearance model</small>
-          <strong>Each trip adds another chance</strong>
-          <p>Projected home-run opportunity across tonight&apos;s expected plate appearances.</p>
-        </div>
-        <div className="scout-story-metric" style={{ color }}>
-          <b>{num(b.expectedHRs, 3)}</b>
-          <span>xHR tonight</span>
-        </div>
-      </div>
-      <div className="scout-pa-curve">
-        {pa.map((x, i) => (
-          <div key={i} className={`scout-pa-step${x.partial ? ' partial' : ''}`} title={`PA ${x.pa}: ${pct(x.p, 1)} HR chance`}>
-            <span className="scout-pa-rate mono">{pct(x.p, 1)}</span>
-            <div className="scout-pa-track">
-              <div className="scout-pa-fill" style={{ height: `${Math.max(4, (x.p / max) * 100)}%`, background: color, boxShadow: `0 0 10px ${hexA(color, 0.28)}` }} />
-            </div>
-            <span className="scout-pa-label">PA {x.pa}</span>
-          </div>
-        ))}
-      </div>
-      <div className="scout-section-foot">
-        <Icon name="Info" size={12} /> The model expects <b className="mono">{num(b.expectedPAs, 1)} PA</b>; faded steps represent partial appearance probability.
       </div>
     </Section>
   )
@@ -2403,7 +2362,7 @@ function LiveSection({ b }) {
 // reason lines to narrate.
 // ---------------------------------------------------------------------------
 
-export function PlayerCaseVsCaution({ b, explanation }) {
+export function PlayerCaseVsCaution({ b, explanation, aiGenerated = false }) {
   const grade = String(b.grade?.label || b.grade || 'SKIP').toUpperCase()
   return (
     <div className="explain-decision">
@@ -2446,10 +2405,10 @@ export function PlayerCaseVsCaution({ b, explanation }) {
       </div>
 
       <p className="explain-bottom-line">
-        <span>Bottom line</span>{explanation.bottomLine}
+        <span>Bottom line</span>{' '}{explanation.bottomLine}
       </p>
       <div className="explain-advisory">
-        <Icon name="Shield" size={9} /> Engine projection unchanged · advisory only
+        <Icon name="Shield" size={9} /> {aiGenerated ? 'AI wording only · engine projection unchanged' : 'Deterministic model explanation · not a guarantee'}
       </div>
     </div>
   )
@@ -2484,7 +2443,7 @@ function CaseVsCaution({ b }) {
   return (
     <Section title="Case vs Caution" icon="Shield" className="explain-pick-card">
       {structured && (
-        <PlayerCaseVsCaution b={b} explanation={explanation} />
+        <PlayerCaseVsCaution b={b} explanation={explanation} aiGenerated />
       )}
       {status === 'done' && !structured && explanation?.text && (
         <p className="explain-legacy">{explanation.text}</p>

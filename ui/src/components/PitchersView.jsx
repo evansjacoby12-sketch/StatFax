@@ -279,10 +279,9 @@ function KBrainView({ pitchers, liveKsByPitcher = {} }) {
                   <div className="kbrain-projection-meta">
                     <span style={{ color: CONF_COLOR[ek.conf] }}>{ek.conf} confidence</span>
                     <span>{Number.isFinite(ek.expIP) ? `${ek.expIP.toFixed(1)} expected IP` : 'Workload unavailable'}</span>
-                    {(Number.isFinite(ek.baselineK) || Number.isFinite(ek.baselineHR)) && (
-                      <span title="Simple formula benchmarks; neither changes the advanced model projection">
-                        base {Number.isFinite(ek.baselineK) ? `${ek.baselineK.toFixed(1)} K` : 'K —'}
-                        {Number.isFinite(ek.baselineHR) ? ` · ${ek.baselineHR.toFixed(2)} starter HR` : ''}
+                    {Number.isFinite(ek.baselineK) && (
+                      <span title="Simple K benchmark; it does not change the advanced model projection">
+                        simple baseline {ek.baselineK.toFixed(1)} K
                       </span>
                     )}
                   </div>
@@ -294,10 +293,10 @@ function KBrainView({ pitchers, liveKsByPitcher = {} }) {
                   </div>
                 )}
               </div>
-              <div className="kbrain-projection" title={`80% uncertainty interval: ${ek.lo}–${ek.hi} K`}>
+              <div className="kbrain-projection">
                 <strong>{Number.isFinite(projection) ? projection.toFixed(1) : '—'}</strong>
                 <span>Projected K</span>
-                <small>{Number.isFinite(ek.lo) && Number.isFinite(ek.hi) ? `80% range ${ek.lo}–${ek.hi}` : 'Point estimate'}</small>
+                <small>Point estimate</small>
               </div>
             </header>
 
@@ -435,11 +434,6 @@ function KBrainView({ pitchers, liveKsByPitcher = {} }) {
                     Simple K baseline {ek.baselineK.toFixed(1)}
                   </span>
                 )}
-                {Number.isFinite(ek.baselineHR) && (
-                  <span title="(HR/9 × expected IP/9) × (lineup ISO ÷ .165) × park × weather. Starter-only benchmark; it does not change batter HR probabilities.">
-                    Starter HR baseline {ek.baselineHR.toFixed(2)}
-                  </span>
-                )}
                 {ek.tempF != null && (
                   <span style={{ color: ek.tempAdj < 0.97 ? 'var(--bad)' : ek.tempAdj > 1.02 ? 'var(--strong)' : 'var(--text-faint)' }}>
                     {Math.round(ek.tempF)}°F{ek.tempAdj < 0.97 ? ' · cold' : ek.tempAdj > 1.02 ? ' · warm' : ''}
@@ -543,11 +537,6 @@ function KBrainView({ pitchers, liveKsByPitcher = {} }) {
                 Legacy baseline only. v{K_MODEL_VERSION} tracking begins with its first graded slate. Exact and ±1 use the rounded projected total; MAE uses the decimal projection.
               </div>
             )}
-            {projectionSummary.baselineHRMae != null && (
-              <div style={{ fontSize: '10px', color: 'var(--text-faint)', margin: '-4px 0 10px' }}>
-                Starter HR formula · MAE {projectionSummary.baselineHRMae.toFixed(2)} HR across {projectionSummary.baselineHRN} settled starts. Tracked separately from batter HR probabilities.
-              </div>
-            )}
             <div className="kbrain-record-body">
               {displayDates.map((d) => {
                 const rows = (resultsByDate[d] || []).filter((e) => (
@@ -569,7 +558,6 @@ function KBrainView({ pitchers, liveKsByPitcher = {} }) {
                           <span className="mono" style={{ color: 'var(--text-faint)', flexShrink: 0 }}>proj {Number.isFinite(projection) ? `${projection.toFixed(1)} → ${pointProjection}` : '—'} K</span>
                           {Number.isFinite(e.baselineK) && <span className="mono" style={{ color: 'var(--text-faint)', flexShrink: 0 }}>base {e.baselineK.toFixed(1)}</span>}
                           <span className="mono" style={{ color: '#fff', fontWeight: '700', flexShrink: 0 }}>actual {e.actualK}</span>
-                          {Number.isFinite(e.baselineHR) && Number.isFinite(e.actualHR) && <span className="mono" style={{ color: 'var(--text-faint)', flexShrink: 0 }} title="Simple starter HR projection versus actual starter home runs allowed">HR {e.baselineHR.toFixed(2)} → {e.actualHR}</span>}
                           {Number.isFinite(pointError) && <span className="mono" style={{ color: hit ? 'var(--strong)' : 'var(--bad)', flexShrink: 0 }}>{pointError >= 0 ? '+' : ''}{pointError}</span>}
                           <Icon name={hit ? 'Check' : 'X'} size={13} style={{ flexShrink: 0, color: hit ? 'var(--strong)' : 'var(--bad)' }} aria-label={hit ? 'within one strikeout' : 'more than one strikeout off'} />
                         </div>

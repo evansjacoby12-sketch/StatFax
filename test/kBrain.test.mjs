@@ -279,6 +279,7 @@ test('K Brain UI is projection-first and does not invent betting value without o
   assert.match(source, /chance to go over/)
   assert.match(source, /Why this projection/)
   assert.match(source, /Simple K baseline/)
-  assert.match(source, /Starter HR baseline/)
+  assert.match(source, /Point estimate/)
+  assert.doesNotMatch(source, /Starter HR baseline|80% range/)
   assert.doesNotMatch(source, /value ✓|fade ✗|neutral/)
 })
