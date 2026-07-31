@@ -3,11 +3,9 @@ import WorkspaceShell from './WorkspaceShell.jsx'
 import GroupsView from './GroupsView.jsx'
 import FirstInningZone from './FirstInningZone.jsx'
 import SameGameView from './SameGameView.jsx'
-import TopStraightsView from './TopStraightsView.jsx'
 
 const TABS = [
   { id: 'explore', label: 'Explore combos', icon: 'GitMerge' },
-  { id: 'straights', label: 'Top 10 straights', icon: 'ListOrdered' },
   { id: 'first-inning', label: 'NRFI / YRFI zone', icon: 'TimerReset' },
   { id: 'same-game', label: 'Same game', icon: 'MapPinHouse' },
 ]
@@ -44,7 +42,7 @@ export default function BetLab({
       icon="Beaker"
       eyebrow="Decision workspace"
       title="Bet Lab"
-      description="Explore model-built combinations, rank first-inning outcomes, or isolate one game—without hiding the probability tradeoffs."
+      description="Explore model-built combinations, rank first-inning outcomes, or isolate one game—without duplicating the ranked Board."
       tabs={TABS}
       activeTab={tab}
       onTabChange={setTab}
@@ -60,7 +58,7 @@ export default function BetLab({
           <span><b>Decision rule</b> Rank NRFI and YRFI by modeled probability, input coverage, and decision separation.</span>
           <span><b>Pricing</b> These are directional model leans. No value or EV claim is made without a sportsbook price.</span>
         </div>
-      ) : tab !== 'straights' && (
+      ) : (
         <div className="workspace-brief">
           <span><b>Decision rule</b> Build from confirmed, individually defensible legs. More legs increase payout—not reliability.</span>
           <span><b>Probability</b> All-hit is the independent product; StatFax applies no unproven same-game uplift.</span>
@@ -82,14 +80,6 @@ export default function BetLab({
           slipSet={slipSet}
           onToggleSlip={onToggleSlip}
           comboLock={comboLock}
-        />
-      )}
-      {tab === 'straights' && (
-        <TopStraightsView
-          batters={batters}
-          onSelect={onSelect}
-          slipSet={slipSet}
-          onToggleSlip={onToggleSlip}
         />
       )}
       {tab === 'first-inning' && (

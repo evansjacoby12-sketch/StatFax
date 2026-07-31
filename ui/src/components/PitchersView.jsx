@@ -19,25 +19,9 @@ import { useLiveMode } from '../lib/liveMode.js'
 import { gradeColor } from '../lib/badges.js'
 import { hexA } from './atoms.jsx'
 
-const PSORT = [
-  { k: 'vuln', label: 'Most hittable' },
-  { k: 'time', label: 'Game time' },
-]
-
-export default function PitchersView({ batters, kDistByPitcher = {}, liveKsByPitcher = {}, onSelect, selectedId, watchlist, slip, focusKey, onFocusDone }) {
-  const [sort, setSort] = useState('vuln')
+export default function PitchersView({ batters, kDistByPitcher = {}, liveKsByPitcher = {}, onSelect, focusKey, onFocusDone }) {
   const [view, setView] = useState('preview')
-  const [kOpen, setKOpen] = useState(false)
   const grouped = useMemo(() => groupPitchers(batters, kDistByPitcher), [batters, kDistByPitcher])
-  
-  const pitchers = useMemo(() => {
-    if (sort !== 'time') return grouped
-    return [...grouped].sort(
-      (a, b) =>
-        (a.game?.gameDate || '').localeCompare(b.game?.gameDate || '') ||
-        (b.vuln?.score ?? 0) - (a.vuln?.score ?? 0),
-    )
-  }, [grouped, sort])
 
   useEffect(() => {
     if (!focusKey) return
@@ -52,16 +36,16 @@ export default function PitchersView({ batters, kDistByPitcher = {}, liveKsByPit
       return () => clearTimeout(t)
     }
     onFocusDone?.()
-  }, [focusKey, pitchers, onFocusDone])
+  }, [focusKey, grouped, onFocusDone])
 
-  if (!pitchers.length) {
+  if (!grouped.length) {
     return <div className="empty-note" style={{ padding: '64px', textAlign: 'center', color: 'var(--text-faint)' }}>No pitchers match the current filters.</div>
   }
   return (
     <>
       <div className="mobile-page-kicker pitchers-mobile-kicker">
         <span><Icon name="CircleDot" size={14} /> Pitcher board</span>
-        <small className="mono">{pitchers.length} starters</small>
+        <small className="mono">{grouped.length} starters</small>
       </div>
       <div className="pitchers-controls">
         <span className="pitchers-controls-k dim">View Mode</span>
@@ -73,51 +57,15 @@ export default function PitchersView({ batters, kDistByPitcher = {}, liveKsByPit
           ariaPressed
           tabs={[
             { id: 'preview', label: 'Vulnerability', icon: 'Swords' },
-            { id: 'detail', label: <><span className="pitcher-detail-label">Detail Cards</span><span className="pitcher-cards-label">Cards</span></>, icon: 'Rows3' },
             { id: 'kbrain', label: 'K Brain', icon: 'Radar', iconSize: 11 },
           ]}
         />
-        
-        {view === 'detail' && (
-          <div className="pitcher-sort-row">
-            <span className="pitchers-controls-k dim" style={{ marginLeft: 12, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Sort:</span>
-            {PSORT.map((t) => (
-              <button 
-                key={t.k} 
-                className={`badge-toggle ${sort === t.k ? 'on' : ''}`} 
-                onClick={() => setSort(t.k)}
-                style={{
-                  borderColor: sort === t.k ? 'var(--accent)' : 'var(--border-soft)',
-                  background: sort === t.k ? 'var(--hover)' : 'transparent',
-                  color: sort === t.k ? '#fff' : 'var(--text-faint)'
-                }}
-              >
-                {t.label}
-              </button>
-            ))}
-          </div>
-        )}
       </div>
-
-      <KParlaySection pitchers={grouped} open={kOpen} onToggle={() => setKOpen((v) => !v)} />
 
       {view === 'kbrain' ? (
         <KBrainView pitchers={grouped} liveKsByPitcher={liveKsByPitcher} />
-      ) : view === 'preview' ? (
-        <PitcherPreview pitchers={grouped} onSelect={onSelect} />
       ) : (
-        <div className="pitchers" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(420px, 100%), 1fr))', gap: '20px' }}>
-          {pitchers.map((e) => (
-            <PitcherCard
-              key={e.key}
-              entry={e}
-              onSelect={onSelect}
-              selectedId={selectedId}
-              watchlist={watchlist}
-              slip={slip}
-            />
-          ))}
-        </div>
+        <PitcherPreview pitchers={grouped} onSelect={onSelect} />
       )}
     </>
   )
@@ -663,75 +611,6 @@ function KBrainH2H({ targets, open, onToggle }) {
           <div style={{ fontSize: '9px', color: 'var(--text-faint)', marginTop: '4px', paddingLeft: '4px' }}>
             H2H K% vs season PA K rate · min 5 AB · sorted high→low
           </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// Build K-prop parlay combos across pitchers. Ranks pitchers by estimated K
-// count, then builds 2-leg and 3-leg combos with a suggested line below the
-// single-number K projection so the target is realistic.
-function buildKParlays(pitchers) {
-  const pool = pitchers
-    .filter((e) => e.estK && Number.isFinite(e.estK.k) && e.estK.k >= 4)
-    .sort((a, b) => (b.estK.k - a.estK.k) || (b.vuln?.score ?? 0) - (a.vuln?.score ?? 0))
-  if (pool.length < 2) return []
-  const combos = []
-  for (const size of [2, 3]) {
-    if (pool.length < size) continue
-    const legs = pool.slice(0, size)
-    combos.push({ size, legs })
-  }
-  return combos
-}
-
-// Suggest a K line: floor to nearest 0.5 below the projected total so the line
-// is hittable (e.g. est 7.2 → offer 6.5+, not 7.5+).
-function kLine(estK) {
-  return Math.floor(estK.k * 2) / 2  // floor to nearest 0.5
-}
-
-function KParlaySection({ pitchers, open, onToggle }) {
-  const combos = useMemo(() => buildKParlays(pitchers), [pitchers])
-  if (!combos.length) return null
-  return (
-    <div className="k-parlay-section" style={{ marginBottom: '16px', background: 'rgba(16,24,48,0.35)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '12px', overflow: 'hidden' }}>
-      <button
-        className="k-parlay-trigger"
-        onClick={onToggle}
-        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', color: open ? '#fff' : 'var(--text-dim)', textAlign: 'left' }}
-      >
-        <Icon name="Zap" size={13} style={{ color: 'var(--accent)', flexShrink: 0 }} />
-        <span style={{ fontWeight: '800', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>K-Prop Parlays</span>
-        <span style={{ fontSize: '11px', color: 'var(--text-faint)', fontWeight: '400' }}>· {combos.length} combo{combos.length !== 1 ? 's' : ''} · top strikeout arms</span>
-        <Icon name={open ? 'ChevronUp' : 'ChevronDown'} size={13} style={{ marginLeft: 'auto', color: 'var(--text-faint)' }} />
-      </button>
-      {open && (
-        <div style={{ padding: '0 16px 14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {combos.map((c) => (
-            <div key={c.size} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <span style={{ fontSize: '10px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-faint)' }}>{c.size}-leg parlay</span>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
-                {c.legs.map((e, i) => {
-                  const line = kLine(e.estK)
-                  const oppTeam = e.targets[0]?.team || '?'
-                  return (
-                    <span key={e.key} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                      <span style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', padding: '5px 10px', fontSize: '12px', display: 'flex', flexDirection: 'column', gap: '1px', lineHeight: 1.3 }}>
-                        <span style={{ fontWeight: '700', color: '#fff' }}>{e.pitcher.name}</span>
-                        <span style={{ fontSize: '10px', color: 'var(--accent)' }}>
-                          <b>{line}+ K</b>
-                          <span style={{ color: 'var(--text-faint)', marginLeft: '4px' }}>proj {projectedK(e.estK)?.toFixed(1)} K vs {oppTeam}</span>
-                        </span>
-                      </span>
-                      {i < c.legs.length - 1 && <span style={{ color: 'var(--text-faint)', fontSize: '11px', fontWeight: '700' }}>+</span>}
-                    </span>
-                  )
-                })}
-              </div>
-            </div>
-          ))}
         </div>
       )}
     </div>

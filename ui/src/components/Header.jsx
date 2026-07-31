@@ -61,7 +61,7 @@ function SportSwitcher({ sport = 'mlb', onChange }) {
 }
 
 // Help dropdown anchored to the header info button
-function HelpMenu({ sport, onOpenWeather, onOpenGroups, onOpenSplits, onOpenBacktest, onOpenHowTo, onOpenSettings, onOpenModel, liveScores, onToggleLive, eliLevel, onCycleEli, refreshing, onRefresh }) {
+function HelpMenu({ sport, onOpenWeather, onOpenGroups, onOpenSplits, onOpenHowTo, onOpenSettings, onOpenModel, liveScores, onToggleLive, eliLevel, onCycleEli, refreshing, onRefresh }) {
   const [open, setOpen] = useState(false)
   const [toolQuery, setToolQuery] = useState('')
   const ref = useRef(null)
@@ -138,13 +138,7 @@ function HelpMenu({ sport, onOpenWeather, onOpenGroups, onOpenSplits, onOpenBack
     {
       title: 'Discover',
       items: [
-        { label: 'Find Plays', desc: 'Weather, cheat sheets and your own filtered lists', icon: 'ScanSearch', fn: onOpenWeather },
-      ],
-    },
-    {
-      title: 'Validate',
-      items: [
-        { label: 'Proof', desc: 'Test grades and signals against historical outcomes', icon: 'ChartNoAxesCombined', fn: onOpenBacktest },
+        { label: 'Find Plays', desc: 'Cheat sheets and your own evidence-backed lists', icon: 'ScanSearch', fn: onOpenWeather },
       ],
     },
     {
@@ -176,14 +170,13 @@ function HelpMenu({ sport, onOpenWeather, onOpenGroups, onOpenSplits, onOpenBack
     desc: 'Analyze first innings and parlay combos',
     icon: 'Beaker',
     fn: onOpenGroups,
-    keywords: 'nrfi yrfi first inning same game top straights combos',
+    keywords: 'nrfi yrfi first inning same game combos',
   }
   const quickTools = isNFL ? [
     { label: 'Cheat Sheet', meta: 'NFL leaders', icon: 'LayoutGrid', fn: onOpenSplits, keywords: 'nfl football ranked props touchdown receiving rushing passing' },
     { label: 'Learn', meta: 'NFL guide', icon: 'GraduationCap', fn: onOpenHowTo, keywords: 'nfl football learn center playbook glossary guide' },
   ] : [
-    { label: 'Find Plays', meta: 'Discovery', icon: 'ScanSearch', fn: onOpenWeather, keywords: 'weather cheat sheets filtered lists' },
-    { label: 'Proof', meta: 'Backtests', icon: 'ChartNoAxesCombined', fn: onOpenBacktest, keywords: 'validate grades signals historical outcomes' },
+    { label: 'Find Plays', meta: 'Discovery', icon: 'ScanSearch', fn: onOpenWeather, keywords: 'cheat sheets filtered lists' },
     { label: 'Learn', meta: 'Guide', icon: 'GraduationCap', fn: onOpenHowTo, keywords: 'learn center playbook glossary help' },
   ]
   const utilityTools = isNFL ? [
@@ -479,7 +472,6 @@ export default function Header({
   onOpenGroups,
   onOpenSGP,
   onOpenSplits,
-  onOpenBacktest,
   onOpenListBuilder,
   onOpenSettings,
 }) {
@@ -671,7 +663,6 @@ export default function Header({
             onOpenGroups={onOpenGroups}
             onOpenSGP={onOpenSGP}
             onOpenSplits={onOpenSplits}
-            onOpenBacktest={onOpenBacktest}
             onOpenListBuilder={onOpenListBuilder}
             onOpenGuide={onOpenGuide}
             onOpenHowTo={onOpenHowTo}

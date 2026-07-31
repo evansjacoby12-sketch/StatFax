@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import Icon from './Icon.jsx'
 import ListBuilderGuide from './ListBuilderGuide.jsx'
-import ListBuilderParlayEngine from './ListBuilderParlayEngine.jsx'
 import { GradeChip } from './atoms.jsx'
 import ListBuilderAnalystPanel from './ListBuilderAnalystPanel.jsx'
 import { toast } from './Toast.jsx'
@@ -39,7 +38,6 @@ import {
   normalizeListBuilderTrackingLedger,
   settleListBuilderRecipePicks,
 } from '../lib/list-builder-tracking.js'
-import { normalizeListBuilderParlayEvidence } from '../lib/list-builder-parlays.js'
 
 const ALL_LIST_BUILDER_PRESETS = Object.freeze([
   ...PRIMARY_LIST_BUILDER_PRESETS,
@@ -138,10 +136,6 @@ function savedRecipesFromStorage() {
 
 function trackingLedgerFromStorage() {
   return normalizeListBuilderTrackingLedger(store.load('listBuilderTrackingLedger', {}))
-}
-
-function criteriaSignature(criteria) {
-  return JSON.stringify(sanitizeListBuilderCriteria(criteria))
 }
 
 function sameTrackingLedger(left, right) {
@@ -417,7 +411,7 @@ function ResultCard({ item, index, nearMiss = false, onRelax, onSelect, watched,
 }
 
 export default function ListBuilderView({
-  batters = [], slateDate = null, onSelect, watchlist = new Set(), slip = new Set(), onToggleWatch, onToggleSlip, onUseParlay,
+  batters = [], slateDate = null, onSelect, watchlist = new Set(), slip = new Set(), onToggleWatch, onToggleSlip,
 }) {
   const [form, setForm] = useState(() => createListBuilderCriteria())
   const [activePreset, setActivePreset] = useState(null)
@@ -518,34 +512,6 @@ export default function ListBuilderView({
       ? rollingEvidence.recipes?.[activePresetDefinition.id]?.windows?.[evidenceWindow]
       : { ...activePresetDefinition.evidence, fallback: true }
     : null
-  const currentCriteriaSignature = useMemo(() => criteriaSignature(form), [form])
-  const evidencePresetDefinition = useMemo(() => (
-    activePresetDefinition
-      || ALL_LIST_BUILDER_PRESETS.find((preset) => criteriaSignature(preset.criteria) === currentCriteriaSignature)
-      || null
-  ), [activePresetDefinition, currentCriteriaSignature])
-  const evidenceRecipe = useMemo(() => (
-    savedRecipes.find((recipe) => criteriaSignature(recipe.criteria) === currentCriteriaSignature) || null
-  ), [savedRecipes, currentCriteriaSignature])
-  const parlayEvidence = useMemo(() => {
-    if (evidencePresetDefinition) {
-      const liveEvidence = rollingEvidence?.recipes?.[evidencePresetDefinition.id]?.windows?.[evidenceWindow]
-      return normalizeListBuilderParlayEvidence(
-        liveEvidence || { ...evidencePresetDefinition.evidence, fallback: true },
-        {
-          label: evidencePresetDefinition.title,
-          source: liveEvidence ? 'rolling preset' : 'verified preset snapshot',
-        },
-      )
-    }
-    if (evidenceRecipe) {
-      return normalizeListBuilderParlayEvidence(trackingByRecipe.get(String(evidenceRecipe.id))?.historical, {
-        label: evidenceRecipe.name,
-        source: 'historical replay',
-      })
-    }
-    return normalizeListBuilderParlayEvidence(null)
-  }, [evidencePresetDefinition, evidenceRecipe, rollingEvidence, evidenceWindow, trackingByRecipe])
   const analystContext = useMemo(() => buildListBuilderAnalystContext({
     batters,
     built,
@@ -989,13 +955,6 @@ export default function ListBuilderView({
           <span>Fit measures criteria closeness, not HR probability. Missing data and multi-gate failures stay excluded.</span>
         </div>
 
-        {resultMode === 'exact' && (
-          <ListBuilderParlayEngine
-            items={built.results}
-            evidence={parlayEvidence}
-            onUseParlay={onUseParlay}
-          />
-        )}
 
         {visibleResults.length ? (
           <div className="lbv-result-list">

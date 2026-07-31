@@ -95,7 +95,7 @@ test('NFL Bet Lab shares the core MLB workspace modes without a Saved destinatio
   assert.match(mlbLab, /label: 'NRFI \/ YRFI zone'/)
   assert.doesNotMatch(mlbLab, /label: 'Custom builder'/)
   assert.match(nflLab, /label: 'Custom builder'/)
-  assert.match(mlbLab, /label: 'Top 10 straights'/)
+  assert.doesNotMatch(mlbLab, /label: 'Top 10 straights'/)
   assert.doesNotMatch(mlbLab, /label: 'Saved'/)
   assert.doesNotMatch(nflLab, /label: 'Saved'/)
   assert.match(nflLab, /<WorkspaceShell[\s\S]*?embedded[\s\S]*?title="TD Bet Lab"/)

@@ -43,7 +43,6 @@ const Settings = lazy(() => import('./components/Settings.jsx'))
 const BetLab = lazy(() => import('./components/BetLab.jsx'))
 const FindPlays = lazy(() => import('./components/FindPlays.jsx'))
 const LearnCenter = lazy(() => import('./components/LearnCenter.jsx'))
-const BacktestView = lazy(() => import('./components/BacktestView.jsx'))
 const NFLBoard = lazy(() => import('./components/NFLBoard.jsx'))
 const NFLLearnCenter = lazy(() => import('./components/NFLLearnCenter.jsx'))
 const NFLCheatSheet = lazy(() => import('./components/NFLCheatSheet.jsx'))
@@ -111,7 +110,6 @@ export default function App() {
   const [showNFLCheatSheet, setShowNFLCheatSheet] = useState(false)
   const [betLabTab, setBetLabTab] = useState(null)
   const [findPlaysTab, setFindPlaysTab] = useState(null)
-  const [showBacktest, setShowBacktest] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   // Default ON: same-window grouping is the default combos view — those are the
   // combos you can actually bet as one ticket (every leg's lineup confirms before
@@ -392,7 +390,6 @@ export default function App() {
         if (pitcherKey) setPitcherKey(null)
         else if (zoneId) setZoneId(null)
         else if (selectedId) setSelectedId(null) // drawer stacks above the modals — close it first
-        else if (showBacktest) setShowBacktest(false)
         else if (findPlaysTab) setFindPlaysTab(null)
         else if (betLabTab) setBetLabTab(null)
         else if (nflLearnTab) setNflLearnTab(null)
@@ -403,7 +400,7 @@ export default function App() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [selectedId, zoneId, findPlaysTab, betLabTab, nflLearnTab, showNFLCheatSheet, learnTab, showBacktest, showSettings, pitcherKey, sport])
+  }, [selectedId, zoneId, findPlaysTab, betLabTab, nflLearnTab, showNFLCheatSheet, learnTab, showSettings, pitcherKey, sport])
 
   const patch = useCallback((p) => setFilters((f) => ({ ...f, ...p })), [])
 
@@ -457,15 +454,6 @@ export default function App() {
   const clearSlip = useCallback(() => setSlipIds([]), [])
   // Replace the whole slip (auto-build / load a saved slip) — dedupes + ignores blanks.
   const replaceSlip = useCallback((ids) => setSlipIds([...new Set((ids || []).filter((x) => x != null))]), [])
-  const useListBuilderParlay = useCallback((ids) => {
-    const legs = [...new Set((ids || []).filter((id) => id != null))]
-    if (legs.length < 2) return
-    buzz()
-    replaceSlip(legs)
-    setFindPlaysTab(null)
-    toast.success(`${legs.length}-leg curated parlay loaded`)
-  }, [replaceSlip])
-
   // Attach the RISING signal (recent L14 barrel surging above season) as a real
   // boolean flag so every consumer — board badges, filters, counts, backtest —
   // reads it the same way as the engine's server-side flags.
@@ -706,12 +694,11 @@ export default function App() {
           onOpenGuide={() => setLearnTab('guide')}
           onOpenHowTo={() => setLearnTab('playbook')}
           onOpenBuilder={() => setBetLabTab('first-inning')}
-          onOpenWeather={() => setFindPlaysTab('weather')}
+          onOpenWeather={() => setFindPlaysTab('cheat-sheet')}
           onOpenListBuilder={() => setFindPlaysTab('list-builder')}
           onOpenGroups={() => setBetLabTab('explore')}
           onOpenSGP={() => setBetLabTab('same-game')}
           onOpenSplits={() => setFindPlaysTab('cheat-sheet')}
-          onOpenBacktest={() => setShowBacktest(true)}
           onOpenSettings={() => setShowSettings(true)}
         />
 
@@ -935,21 +922,7 @@ export default function App() {
           slip={slipSet}
           onToggleWatch={toggleWatch}
           onToggleSlip={toggleSlip}
-          onUseParlay={useListBuilderParlay}
         />
-      )}
-      {showBacktest && (
-        <WorkspaceShell icon="Activity" eyebrow="Evidence workspace" title="Signal Backtest" description="Test a grade-and-signal hypothesis against reconciled historical outcomes before applying it to tonight's board." onClose={() => setShowBacktest(false)} status="Descriptive evidence">
-          <div className="workspace-truth"><Icon name="Info" size={14} /><span><b>Truth disclosure</b> Historical hit-rate lift describes the recorded sample. It does not guarantee the next slate.</span></div>
-            <BacktestView
-              batters={all}
-              onApply={(g, s) => {
-                patch({ grades: new Set(g.length ? g : GRADE_ORDER), badges: new Set(s) })
-                setShowBacktest(false)
-                setView('board')
-              }}
-            />
-        </WorkspaceShell>
       )}
       {learnTab && <LearnCenter key={learnTab} initialTab={learnTab} onClose={() => setLearnTab(null)} />}
       {showSettings && (
