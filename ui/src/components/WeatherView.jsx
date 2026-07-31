@@ -48,14 +48,17 @@ export default function WeatherView({ batters, onSelect, selectedId }) {
   const [parkSort, setParkSort] = useState('overall')
   const [outdoorOnly, setOutdoorOnly] = useState(false)
   const [favorableOnly, setFavorableOnly] = useState(false)
+  const [showAllGames, setShowAllGames] = useState(false)
 
   const allGames = useMemo(() => groupWeather(batters), [batters])
   const games = useMemo(() => {
-    let list = allGames
+    let list = showAllGames
+      ? allGames
+      : allGames.filter((game) => !['neutral', 'unrated', 'dome'].includes(classifyWeatherGame(game).key))
     if (outdoorOnly) list = list.filter((g) => !g.closed && g.roofStatus !== 'pending')
     if (favorableOnly) list = list.filter(isFavorableWeatherGame)
     return sortGames(list, sort)
-  }, [allGames, sort, outdoorOnly, favorableOnly])
+  }, [allGames, sort, outdoorOnly, favorableOnly, showAllGames])
 
   const summary = useMemo(() => {
     const outdoor = allGames.filter((g) => !g.closed && g.roofStatus !== 'pending')
@@ -130,7 +133,7 @@ export default function WeatherView({ batters, onSelect, selectedId }) {
             <span><Icon name="ListFilter" size={15} /></span>
             <div>
               <h2>Weather decision board</h2>
-              <p>{games.length} of {allGames.length} games · strongest carry first</p>
+              <p>{games.length} of {allGames.length} games · {showAllGames ? 'all conditions' : 'decision-changing conditions'}</p>
             </div>
           </div>
 
@@ -150,6 +153,9 @@ export default function WeatherView({ batters, onSelect, selectedId }) {
               ))}
             </div>
             <div className="wxboard-filters" role="group" aria-label="Filter weather games">
+              <button className={showAllGames ? 'on' : ''} onClick={() => setShowAllGames((value) => !value)} aria-pressed={showAllGames}>
+                <Icon name="Rows3" size={13} /> {showAllGames ? 'Key games' : 'All games'}
+              </button>
               <button className={outdoorOnly ? 'on' : ''} onClick={() => setOutdoorOnly((value) => !value)} aria-pressed={outdoorOnly}>
                 <Icon name="Sun" size={13} /> Outdoor
               </button>
@@ -170,7 +176,7 @@ export default function WeatherView({ batters, onSelect, selectedId }) {
             ))}
           </div>
         ) : (
-          <WeatherEmpty message="No games match these weather filters." compact />
+          <WeatherEmpty message={showAllGames ? 'No games match these weather filters.' : 'No decision-changing weather is active. Use All games to inspect neutral and closed-roof matchups.'} compact />
         )}
       </section>
     </div>

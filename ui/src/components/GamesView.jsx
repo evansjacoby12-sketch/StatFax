@@ -224,18 +224,18 @@ function MarketDecisionCard({
         </span>
       </div>
       <div className="game-decision-stats">
-        <span>
+        {Number.isFinite(modelProbability) && <span>
           <small>Model chance</small>
           <b className="mono">{pct(modelProbability, 1)}</b>
-        </span>
-        <span>
+        </span>}
+        {Number.isFinite(decision?.modelEdge) && <span>
           <small>Edge</small>
           <b className="mono">{signedPct(decision?.modelEdge, 1)}</b>
-        </span>
-        <span>
+        </span>}
+        {Number.isFinite(decision?.expectedRoi) && <span>
           <small>Est. ROI</small>
           <b className="mono">{signedPct(decision?.expectedRoi, 1)}</b>
-        </span>
+        </span>}
       </div>
       <div className="game-decision-context">
         {market === 'moneyline' ? (
@@ -254,9 +254,7 @@ function MarketDecisionCard({
       </div>
       <div className="game-decision-proof">
         <span>
-          {validation.historicalGames} historical games
-          {' · '}
-          {validation.historicalSeasons}/3 seasons
+          3-season validation · {validation.historicalGames} games
         </span>
         <span>
           Forward monitor: {validation.decisions} settled calls

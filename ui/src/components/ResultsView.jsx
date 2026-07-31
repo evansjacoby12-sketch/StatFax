@@ -34,9 +34,8 @@ function computeAuc(rows) {
 }
 
 const RESULTS_TABS = [
-  { id: 'overview', label: 'Overview', icon: 'Rows3' },
-  { id: 'tickets', label: 'My Tickets', icon: 'Bookmark' },
   { id: 'model', label: 'Model', icon: 'ChartNoAxesCombined' },
+  { id: 'tickets', label: 'My Tickets', icon: 'Bookmark' },
 ]
 
 // Results hub: the model track record and the parlay-combo record share one tab
@@ -51,10 +50,10 @@ export default function ResultsView({
   favorConsistency = false,
   initialTab = 'model',
 }) {
-  const normalizedInitial = initialTab === 'combos' ? 'tickets' : initialTab === 'model' ? 'model' : 'overview'
+  const normalizedInitial = initialTab === 'combos' ? 'tickets' : 'model'
   const [tab, setTab] = useState(normalizedInitial)
   const [modelDetailsOpen, setModelDetailsOpen] = useState(false)
-  useEffect(() => setTab(initialTab === 'combos' ? 'tickets' : initialTab === 'model' ? 'model' : 'overview'), [initialTab])
+  useEffect(() => setTab(initialTab === 'combos' ? 'tickets' : 'model'), [initialTab])
   useEffect(() => {
     if (tab !== 'model') setModelDetailsOpen(false)
   }, [tab])
@@ -72,7 +71,6 @@ export default function ResultsView({
         tabs={RESULTS_TABS}
         ariaPressed
       />
-      {tab === 'overview' && <AccountabilityOverview meta={meta} batters={batters} onSelect={onSelect} onOpenTickets={() => setTab('tickets')} />}
       {tab === 'tickets' && <CombosView batters={batters} onSelect={onSelect} favorConsistency={favorConsistency} initialSection="tickets" />}
       {tab === 'model' && (
         <div className="results-model-section">

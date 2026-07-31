@@ -63,24 +63,27 @@ function TierItem({ item }) {
 
 export default function CallKey({ className = '' }) {
   return (
-    <aside className={`call-key ${className}`.trim()} aria-label="Model call key">
-      <header className="call-key-intro">
+    <details className={`call-key ${className}`.trim()} aria-label="Model call key">
+      <summary className="call-key-intro">
         <Icon name="Info" size={16} />
         <span>
           <b>Call key</b>
-          <small>Advisory recommendations</small>
+          <small>What PLAY, LEAN, PASS, STRONG and WATCH mean</small>
         </span>
-      </header>
-      {GROUPS.map((group) => (
-        <section className="call-key-group" key={group.title}>
-          <h3>{group.title}</h3>
-          <div className="call-key-list">
-            {group.items.map((item) => (
-              <TierItem key={`${group.title}-${item.tier}`} item={item} />
-            ))}
-          </div>
-        </section>
-      ))}
-    </aside>
+        <Icon className="call-key-chevron" name="ChevronDown" size={15} />
+      </summary>
+      <div className="call-key-body">
+        {GROUPS.map((group) => (
+          <section className="call-key-group" key={group.title}>
+            <h3>{group.title}</h3>
+            <div className="call-key-list">
+              {group.items.map((item) => (
+                <TierItem key={`${group.title}-${item.tier}`} item={item} />
+              ))}
+            </div>
+          </section>
+        ))}
+      </div>
+    </details>
   )
 }

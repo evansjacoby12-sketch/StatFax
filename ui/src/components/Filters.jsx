@@ -41,7 +41,8 @@ export default function Filters({ value, onChange, gradeCounts, games, badgeCoun
   const [showAllSignals, setShowAllSignals] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const searchInputRef = useRef(null)
-  const showFilters = view === 'board' || view === 'games'
+  // Games owns its matchup/time/status controls. Board filters belong only to Board.
+  const showFilters = view === 'board'
 
   useEffect(() => {
     if (searchOpen) searchInputRef.current?.focus()
