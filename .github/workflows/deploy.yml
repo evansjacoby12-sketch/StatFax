@@ -200,6 +200,13 @@ jobs:
           key: inputs-corpus-${{ github.run_id }}
           restore-keys: inputs-corpus-
 
+      # GitHub caches are acceleration only. Recover any missing optional MLB
+      # ledgers from the public durable store before the slate mutates state.
+      - name: Recover missing MLB state from R2
+        env:
+          MLB_R2_PUBLIC_BASE_URL: https://pub-f7f0c61cfc5840ce8b07ddb42902aa48.r2.dev
+        run: npm run mlb:recover -- --missing-only
+
       - name: Restore NFL history
         uses: actions/cache@v4
         with:
@@ -313,7 +320,7 @@ jobs:
             exit 0
           fi
           ENDPOINT="https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com"
-          for f in calibration.json backtest-log.json mlb-game-results.json mlb-game-history.json first-inning-pitcher-cache.json list-builder-evidence.json board-history.json zone-cache.json zone-evaluation.json; do
+          for f in calibration.json backtest-log.json mlb-game-results.json mlb-game-history.json first-inning-pitcher-cache.json pregame-freeze.json list-builder-evidence.json board-history.json zone-cache.json zone-evaluation.json; do
             if [ -f "dist/$f" ]; then
               aws s3 cp "dist/$f" "s3://$R2_BUCKET/$f" --endpoint-url "$ENDPOINT" \
                 --content-type application/json --cache-control no-cache \
@@ -403,7 +410,6 @@ jobs:
       # Publish the adjusted slate and its complete AI audit trail together.
       # The UI build below reads this same adjusted dist/daily.json.
       - name: Publish production slate and AI HR artifacts to R2
-        continue-on-error: true
         env:
           AWS_ACCESS_KEY_ID:     ${{ secrets.R2_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
@@ -424,6 +430,18 @@ jobs:
                 && echo "R2: published $f"
             fi
           done
+          ARCHIVE_DATE=$(node -e "const d=require('./dist/daily.json');if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(d.date||''))process.exit(1);process.stdout.write(d.date)")
+          for f in daily.json backtest-log.json calibration.json mlb-game-results.json mlb-game-history.json first-inning-pitcher-cache.json pregame-freeze.json list-builder-evidence.json board-history.json zone-evaluation.json mlb-data-health-history.json ai-hr-shadow.json; do
+            if [ -f "dist/$f" ]; then
+              aws s3 cp "dist/$f" "s3://$R2_BUCKET/mlb/archive/$ARCHIVE_DATE/$f" --endpoint-url "$ENDPOINT" \
+                --content-type application/json --cache-control no-cache
+            fi
+          done
+          if [ -f "dist/inputs-$ARCHIVE_DATE.json" ]; then
+            aws s3 cp "dist/inputs-$ARCHIVE_DATE.json" "s3://$R2_BUCKET/mlb/archive/$ARCHIVE_DATE/inputs-$ARCHIVE_DATE.json" --endpoint-url "$ENDPOINT" \
+              --content-type application/json --cache-control no-cache
+          fi
+          echo "R2: archived MLB state for $ARCHIVE_DATE"
 
       # Structured Decision Brief → dist/brief.json. OpenAI selects only from
       # allow-listed engine facts and adds narrative; it never supplies or

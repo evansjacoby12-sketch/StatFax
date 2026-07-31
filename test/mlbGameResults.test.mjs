@@ -233,7 +233,15 @@ test('deployment restores, validates, publishes, and bundles game score archives
   assert.match(workflow, /Restore first-inning pitcher cache/)
   assert.match(workflow, /npm run validate:mlb-game-results/)
   assert.match(workflow, /npm run validate:mlb-game-history/)
-  assert.match(workflow, /backtest-log\.json mlb-game-results\.json mlb-game-history\.json first-inning-pitcher-cache\.json list-builder-evidence\.json/)
+  for (const artifact of [
+    'backtest-log.json',
+    'mlb-game-results.json',
+    'mlb-game-history.json',
+    'first-inning-pitcher-cache.json',
+    'list-builder-evidence.json',
+  ]) {
+    assert.match(workflow, new RegExp(artifact.replace('.', '\\.')))
+  }
   assert.match(packageJson, /"validate:mlb-game-results"/)
   assert.match(packageJson, /"validate:mlb-game-history"/)
   assert.match(vite, /mlb-game-results\.json/)
