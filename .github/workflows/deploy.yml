@@ -495,3 +495,23 @@ jobs:
       - name: Retry deploy 2 (final)
         if: steps.deploy.outcome == 'failure' && steps.deploy-retry1.outcome == 'failure'
         uses: actions/deploy-pages@v4
+
+  notify-production-failure:
+    if: always() && github.event_name != 'pull_request' && needs.build-deploy.result == 'failure'
+    needs: build-deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send optional failure webhook
+        env:
+          ALERT_WEBHOOK_URL: ${{ secrets.ALERT_WEBHOOK_URL }}
+          RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "$ALERT_WEBHOOK_URL" ]; then
+            echo "ALERT_WEBHOOK_URL is not configured; GitHub's built-in failure notification remains active."
+            exit 0
+          fi
+          MESSAGE="StatFax production build failed: $RUN_URL"
+          jq -n --arg message "$MESSAGE" '{content:$message,text:$message}' > alert.json
+          curl --fail --silent --show-error --retry 2 \
+            -H 'Content-Type: application/json' \
+            --data @alert.json "$ALERT_WEBHOOK_URL"

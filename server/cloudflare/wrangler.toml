@@ -19,6 +19,8 @@ crons = ["*/10 * * * *"]
 GITHUB_REPO = "evansjacoby12-sketch/StatFax"
 EVENT_TYPE  = "slate-refresh"
 ALLOW_ORIGINS = "https://statfax.online,https://www.statfax.online,http://localhost:5180,http://127.0.0.1:4174,http://127.0.0.1:5180"
+MLB_HEALTH_URL = "https://pub-f7f0c61cfc5840ce8b07ddb42902aa48.r2.dev/mlb-data-health.json"
+MAX_SLATE_AGE_MINUTES = "50"
 
 # Paid AI routes: 12 requests per minute per visitor and route, enforced before
 # the OpenAI subrequest. Savant proxy traffic gets a separate, wider bucket.
@@ -51,3 +53,6 @@ namespace_id = "1002"
 #
 #   AI narration endpoints also require:
 #     wrangler secret put OPENAI_API_KEY
+#
+#   Optional operational alerts (Discord/Slack-compatible JSON webhook):
+#     wrangler secret put ALERT_WEBHOOK_URL

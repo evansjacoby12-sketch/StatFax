@@ -51,6 +51,7 @@ test('Worker health endpoint is read-only and reports configured dependencies', 
     GITHUB_TOKEN: 'configured',
     GITHUB_REPO: 'owner/repo',
     OPENAI_API_KEY: 'configured',
+    MLB_HEALTH_URL: 'https://data.example/mlb-data-health.json',
     AI_RATE_LIMITER: { limit: async () => ({ success: true }) },
     DATA_RATE_LIMITER: { limit: async () => ({ success: true }) },
   }, {})
@@ -63,7 +64,9 @@ test('Worker health endpoint is read-only and reports configured dependencies', 
     aiConfigured: true,
     aiRateLimitConfigured: true,
     dataRateLimitConfigured: true,
+    monitorConfigured: true,
   })
+  assert.deepEqual(payload.optional, { alertsConfigured: false })
   assert.equal(JSON.stringify(payload).includes('owner/repo'), false)
   assert.equal(JSON.stringify(payload).includes('GITHUB_TOKEN'), false)
 })

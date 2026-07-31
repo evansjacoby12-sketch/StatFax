@@ -32,7 +32,10 @@ export default {
    * repository_dispatch` trigger picks it up and runs.
    */
   async scheduled(event, env, ctx) {
-    ctx.waitUntil(triggerSlateRefresh(env));
+    ctx.waitUntil(Promise.allSettled([
+      triggerSlateRefresh(env),
+      monitorOperationalHealth(env, { cache: globalThis.caches?.default }),
+    ]));
   },
 
   /**
@@ -52,7 +55,9 @@ export default {
           aiConfigured: Boolean(env.OPENAI_API_KEY),
           aiRateLimitConfigured: Boolean(env.AI_RATE_LIMITER?.limit),
           dataRateLimitConfigured: Boolean(env.DATA_RATE_LIMITER?.limit),
+          monitorConfigured: Boolean(env.MLB_HEALTH_URL),
         },
+        optional: { alertsConfigured: Boolean(env.ALERT_WEBHOOK_URL) },
       }), {
         status: env.GITHUB_TOKEN ? 200 : 503,
         headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
@@ -168,6 +173,130 @@ function allowedOrigins(env) {
     .map((value) => value.trim())
     .filter(Boolean);
   return new Set(configured.length ? configured : DEFAULT_ALLOWED_ORIGINS);
+}
+
+const DEFAULT_MLB_HEALTH_URL = 'https://pub-f7f0c61cfc5840ce8b07ddb42902aa48.r2.dev/mlb-data-health.json';
+
+function parsedTime(value) {
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? timestamp : null;
+}
+
+export function evaluateOperationalHealth({ health, workflowRuns = [], now = new Date(), maxSlateAgeMinutes = 50 } = {}) {
+  const incidents = [];
+  const generatedAt = parsedTime(health?.slateGeneratedAt);
+  const currentTime = now instanceof Date ? now.getTime() : parsedTime(now);
+  const ageMinutes = generatedAt == null || currentTime == null
+    ? null
+    : Math.max(0, (currentTime - generatedAt) / 60_000);
+  const hardFailures = Number(health?.counts?.hardFailures || 0);
+
+  if (ageMinutes == null) {
+    incidents.push({ id: 'slate-timestamp', detail: 'MLB slate health has no valid generated timestamp.' });
+  } else if (ageMinutes > maxSlateAgeMinutes) {
+    incidents.push({ id: 'slate-stale', detail: `MLB slate is ${ageMinutes.toFixed(1)} minutes old (limit ${maxSlateAgeMinutes}).` });
+  }
+  if (hardFailures > 0) {
+    incidents.push({ id: 'slate-blocked', detail: `MLB data health reports ${hardFailures} hard failure${hardFailures === 1 ? '' : 's'}.` });
+  }
+
+  const completed = workflowRuns.filter((run) =>
+    run?.status === 'completed' && !['cancelled', 'skipped', 'neutral'].includes(run?.conclusion)
+  );
+  if (completed[0] && completed[0].conclusion !== 'success') {
+    incidents.push({
+      id: 'workflow-failed',
+      detail: `Latest completed production workflow concluded ${completed[0].conclusion}.`,
+      url: completed[0].html_url || null,
+    });
+  }
+
+  return {
+    ok: incidents.length === 0,
+    checkedAt: new Date(currentTime ?? Date.now()).toISOString(),
+    ageMinutes: ageMinutes == null ? null : Math.round(ageMinutes * 10) / 10,
+    incidents,
+  };
+}
+
+async function incidentFingerprint(incidents) {
+  const input = incidents.map((incident) => incident.id).sort().join('|');
+  const bytes = new TextEncoder().encode(input || 'healthy');
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return [...new Uint8Array(digest)].slice(0, 12).map((value) => value.toString(16).padStart(2, '0')).join('');
+}
+
+async function sendOperationalAlert(env, report, { fetchImpl = globalThis.fetch, cache } = {}) {
+  if (!env.ALERT_WEBHOOK_URL || report.ok) return { sent: false, reason: report.ok ? 'healthy' : 'not-configured' };
+
+  const fingerprint = await incidentFingerprint(report.incidents);
+  const cacheKey = new Request(`https://statfax-alert.internal/${fingerprint}`);
+  if (cache && await cache.match(cacheKey)) return { sent: false, reason: 'deduplicated' };
+
+  const message = [
+    '⚠️ StatFax operational alert',
+    ...report.incidents.map((incident) => `- ${incident.detail}${incident.url ? ` ${incident.url}` : ''}`),
+    `Checked ${report.checkedAt}`,
+  ].join('\n');
+  const response = await fetchImpl(env.ALERT_WEBHOOK_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content: message, text: message }),
+  });
+  if (!response.ok) throw new Error(`Alert webhook returned HTTP ${response.status}`);
+  if (cache) {
+    await cache.put(cacheKey, new Response('sent', { headers: { 'Cache-Control': 'max-age=3600' } }));
+  }
+  return { sent: true, reason: 'incident' };
+}
+
+export async function monitorOperationalHealth(env, {
+  fetchImpl = globalThis.fetch,
+  cache,
+  now = new Date(),
+} = {}) {
+  const healthUrl = env.MLB_HEALTH_URL || DEFAULT_MLB_HEALTH_URL;
+  const repo = env.GITHUB_REPO || 'evansjacoby12-sketch/StatFax';
+  const headers = { Accept: 'application/json', 'User-Agent': 'statfax-monitor/1' };
+  if (env.GITHUB_TOKEN) headers.Authorization = `Bearer ${env.GITHUB_TOKEN}`;
+
+  let health;
+  let workflowRuns = [];
+  const incidents = [];
+  try {
+    const response = await fetchImpl(`${healthUrl}?monitor=${now.getTime()}`, { cache: 'no-store', headers });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    health = await response.json();
+  } catch (error) {
+    incidents.push({ id: 'slate-unreachable', detail: `MLB data health is unreachable: ${error.message}` });
+  }
+  try {
+    const response = await fetchImpl(`https://api.github.com/repos/${repo}/actions/workflows/deploy.yml/runs?per_page=5`, { cache: 'no-store', headers });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    workflowRuns = (await response.json()).workflow_runs || [];
+  } catch (error) {
+    incidents.push({ id: 'workflow-unreachable', detail: `GitHub workflow status is unreachable: ${error.message}` });
+  }
+
+  const report = evaluateOperationalHealth({
+    health,
+    workflowRuns,
+    now,
+    maxSlateAgeMinutes: Number(env.MAX_SLATE_AGE_MINUTES || 50),
+  });
+  report.incidents = [...incidents, ...report.incidents.filter((incident) =>
+    !(incident.id === 'slate-timestamp' && incidents.some((current) => current.id === 'slate-unreachable'))
+  )];
+  report.ok = report.incidents.length === 0;
+
+  try {
+    report.alert = await sendOperationalAlert(env, report, { fetchImpl, cache });
+  } catch (error) {
+    report.alert = { sent: false, reason: error.message };
+    console.error(`Operational alert failed: ${error.message}`);
+  }
+  if (!report.ok) console.error(`Operational health failed: ${report.incidents.map((incident) => incident.id).join(', ')}`);
+  return report;
 }
 
 function requestOrigin(request) {
