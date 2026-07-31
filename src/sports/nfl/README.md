@@ -107,3 +107,49 @@ The NFL UI stores watchlists, active slips, and up to 50 settled tickets in
 local storage. Tickets settle from live/final player stats; First TD legs use
 the scorer identifier when the live feed supplies it and void safely when a
 final feed cannot identify the scorer.
+# NFL operations and launch readiness
+
+The public NFL board automatically follows the active regular-season week. During preseason it keeps Week 1 on the board while `preseason.json` separately records depth movement, projected deployment, carries, targets and box-score participation. Preseason results are explicitly excluded from regular-season calibration.
+
+## Normal cycle
+
+```bash
+npm run nfl:backtest
+npm run nfl:slate
+npm run nfl:audit
+npm run nfl:rehearse
+```
+
+`daily.json` contains the board plus feed alarms and kickoff-sensitive readiness gates. `readiness.json` is the small operations artifact. The gates tighten inside 24 hours for availability/weather and inside two hours for confirmed roles. A missing historical market, empty slate or missing player-team coverage is never silently treated as ready.
+
+The deploy restores `tracking.json`, `preseason.json`, `history.json`, `backtest.json`, and `readiness.json` from R2 whenever the Actions cache is absent or invalid. Every successful run writes the current artifacts back to R2 and stores a timestamped copy of `daily.json` under `nfl/archive/YYYY/MM/DD/`. An R2 upload error fails the publish step instead of being hidden.
+
+## Recovery and rollback
+
+Set `NFL_R2_PUBLIC_BASE_URL` to the public bucket origin, then run:
+
+```bash
+npm run nfl:recover
+npm run nfl:backtest
+npm run nfl:slate
+npm run nfl:audit
+```
+
+For a local rollback, `npm run nfl:archive` creates a dated snapshot and `npm run nfl:rollback -- <snapshot-id>` restores it. Omitting the ID restores the latest local archive. R2 is the durable authority; the local archive is a fast safety net.
+
+## Required repository configuration
+
+- Secrets: `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_ACCOUNT_ID`
+- Variable: `R2_BUCKET`
+- GitHub Pages source: GitHub Actions
+- Cloudflare worker dispatch token/target for the scheduled refresh
+
+`NFL_TARGET_SEASON`, `NFL_TARGET_SEASON_TYPE`, and `NFL_TARGET_WEEK` are emergency override variables only. Leave them unset for automatic rollover. Sportsbook odds are optional and intentionally outside the current launch gate.
+
+## Game-day response
+
+1. Run `npm run nfl:audit` and read `dist/nfl/readiness.json`.
+2. If state disappeared, run `npm run nfl:recover` and regenerate the slate.
+3. If the latest feed is bad, roll back the last local archive or copy the desired dated R2 archive to `nfl/daily.json`.
+4. If roles, injuries, or weather are blocked, keep the board published but do not treat projections as bet-ready until those gates clear.
+5. Run `npm run nfl:rehearse` after pipeline changes; it verifies week rollover, January season mapping, pregame freezing, live updates, and final settlement.

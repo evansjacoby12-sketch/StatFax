@@ -182,6 +182,7 @@ export function buildNFLComboBoard(snapshot, { legs = 2, strategy = 'scorer-core
 
   const calibration = stackCalibration(snapshot, strategy, scope, legCount)
   const calibrationReady = Number(calibration?.samples || 0) >= 100
+  const bucketCalibrationReady = (calibration?.buckets || []).some((bucket) => Number(bucket.samples || 0) >= 25)
   const combos = combinationRows(candidates, legCount)
     .filter((combo) => new Set(combo.map((leg) => leg.playerId)).size === combo.length)
     .filter((combo) => {
@@ -193,7 +194,12 @@ export function buildNFLComboBoard(snapshot, { legs = 2, strategy = 'scorer-core
       : new Set(combo.map((leg) => leg.gameKey)).size === combo.length)
     .map((combo) => {
       const independentProbability = combo.reduce((product, leg) => product * leg.probability, 1)
-      const probability = calibrationReady ? calibrateNFLProbability(independentProbability, calibration) : independentProbability
+      const jointFactor = Number(calibration?.jointFactor)
+      const probability = calibrationReady
+        ? bucketCalibrationReady
+          ? calibrateNFLProbability(independentProbability, calibration)
+          : Math.max(.002, Math.min(.98, independentProbability * (Number.isFinite(jointFactor) ? jointFactor : 1)))
+        : independentProbability
       const prices = combo.map((leg) => decimalOdds(leg.odds))
       const decimal = prices.every(Number.isFinite) ? prices.reduce((product, price) => product * price, 1) : null
       const avgScore = combo.reduce((sum, leg) => sum + leg.model.score, 0) / combo.length
@@ -235,7 +241,7 @@ export function buildNFLComboBoard(snapshot, { legs = 2, strategy = 'scorer-core
     combos: diversified.selected,
     coverage: { status: !diversified.selected.length ? 'unavailable' : limitations.length ? 'limited' : 'ready', candidates: candidates.length, possibleBuilds: unique.length, selectedBuilds: diversified.selected.length, requestedBuilds: limit, limitations },
     exposure: { caps: diversified.caps, ...diversified.exposure },
-    calibration: { ready: calibrationReady, samples: Number(calibration?.samples || 0), method: calibrationReady ? 'stack-calibrated-joint' : 'independent-baseline' },
+    calibration: { ready: calibrationReady, samples: Number(calibration?.samples || 0), jointFactor: Number.isFinite(Number(calibration?.jointFactor)) ? Number(calibration.jointFactor) : null, method: calibrationReady ? bucketCalibrationReady ? 'stack-calibrated-buckets' : 'stack-calibrated-shrunk-joint' : 'independent-baseline' },
   }
 }
 

@@ -13,7 +13,10 @@ const EPS = 1e-6
 const MARKET_SPECS = {
   passing_yards: { positions: ['QB'], value: (g) => +g.passingYards || 0, min: 150 },
   receptions: { positions: ['RB', 'WR', 'TE'], value: (g) => +g.receptions || 0, min: 3 },
-  receiving_yards: { positions: ['RB', 'WR', 'TE'], value: (g) => +g.receivingYards || 0, min: 150 },
+  // Board eligibility remains 150+ as requested. Calibration needs the full
+  // role-bearing receiver population or it produces zero samples, so the
+  // walk-forward training floor is intentionally lower than the display gate.
+  receiving_yards: { positions: ['RB', 'WR', 'TE'], value: (g) => +g.receivingYards || 0, min: 15 },
   rushing_yards: { positions: ['QB', 'RB', 'WR'], value: (g) => +g.rushingYards || 0, min: 40 },
   rushing_receiving_yards: { positions: ['RB', 'WR', 'TE'], value: (g) => (+g.rushingYards || 0) + (+g.receivingYards || 0), min: 40 },
   passing_rushing_yards: { positions: ['QB'], value: (g) => (+g.passingYards || 0) + (+g.rushingYards || 0), min: 150 },
@@ -155,7 +158,10 @@ export function evaluateNFLStackHistory(history) {
         const metrics = probabilityMetrics(rows)
         const predicted = rows.length ? rows.reduce((sum, row) => sum + row.probability, 0) / rows.length : null
         const observed = rows.length ? rows.reduce((sum, row) => sum + row.outcome, 0) / rows.length : null
-        return [legs, { ...metrics, predicted, observed, jointFactor: predicted ? Math.max(.5, Math.min(1.5, observed / predicted)) : null }]
+        const rawFactor = predicted ? observed / predicted : null
+        const shrinkage = 75
+        const jointFactor = rawFactor == null ? null : Math.max(.2, Math.min(1.25, (rawFactor * rows.length + shrinkage) / (rows.length + shrinkage)))
+        return [legs, { ...metrics, predicted, observed, rawJointFactor: rawFactor, jointFactor, shrinkageSamples: shrinkage }]
       })),
     }]))
   }]))
@@ -197,7 +203,7 @@ export function evaluateNFLHistory(history) {
     sport: 'nfl',
     generatedAt: new Date().toISOString(),
     seasons: history?.seasons || [],
-    methodology: 'Rolling player-level walk-forward baseline; every forecast uses only earlier games. Probability buckets and projection bias corrections are consumed by the current slate.',
+    methodology: 'Rolling player-level walk-forward baseline; every forecast uses only earlier regular-season games. Probability buckets and projection bias corrections are consumed by the current slate. Preseason observations are excluded from calibration.',
     markets: {
       ...Object.fromEntries(Object.entries(numeric).map(([id, records]) => [id, { type: 'projection', ...regressionMetrics(records) }])),
       ...Object.fromEntries(Object.entries(touchdown).map(([id, records]) => [id, { type: 'probability', ...probabilityMetrics(records) }])),

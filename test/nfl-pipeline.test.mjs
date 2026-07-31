@@ -1,8 +1,10 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import path from 'node:path'
+import os from 'node:os'
+import { promises as fs } from 'node:fs'
 
-import { fetchESPNDepthChart, fetchESPNRoster, parseESPNDepthChart, parseESPNDepthChartHTML, parseESPNRoster, parseESPNScoreboard, parseESPNSummary, selectCurrentNFLSlate } from '../server/sports/nfl/providers/espn.mjs'
+import { fetchESPNDepthChart, fetchESPNRoster, nflSeasonYear, parseESPNDepthChart, parseESPNDepthChartHTML, parseESPNRoster, parseESPNScoreboard, parseESPNSummary, parseESPNTeamDepthContext, selectCurrentNFLSlate } from '../server/sports/nfl/providers/espn.mjs'
 import { nearestHourlyForecast } from '../server/sports/nfl/providers/weather.mjs'
 import { parseSportsGameOdds } from '../server/sports/nfl/providers/odds.mjs'
 import { enrichNFLTeamOpportunityShares, indexNFLHistory, matchHistoryPlayer, projectNFLPlayer } from '../server/sports/nfl/projections.mjs'
@@ -11,9 +13,12 @@ import { assessPlayerAvailability, indexAvailability, externalAvailabilityFor } 
 import { evaluateNFLHistory, evaluateNFLStackHistory } from '../server/sports/nfl/backtest.mjs'
 import { calibrateNFLProbability, correctedNFLProjection } from '../src/sports/nfl/logic/calibration.js'
 import { depthFor, indexDepthChart, indexWeather, overlayFreshness, weatherFor } from '../server/sports/nfl/context-overlays.mjs'
-import { buildNFLDataHealth } from '../server/sports/nfl/health.mjs'
+import { buildNFLDataHealth, buildNFLReadiness } from '../server/sports/nfl/health.mjs'
 import { summarizeNFLTracking, updateNFLTracking } from '../server/sports/nfl/tracking.mjs'
 import { buildTeamLineup, indexNFLLineups, lineupFor, summarizeLineupCoverage, teamLineupFor } from '../server/sports/nfl/lineups.mjs'
+import { updateNFLPreseason } from '../server/sports/nfl/preseason.mjs'
+import { runNFLGameDayRehearsal } from '../server/sports/nfl/rehearsal.mjs'
+import { archiveNFLArtifacts, rollbackNFLArtifacts } from '../server/sports/nfl/operations.mjs'
 import NFL_DEMO_SNAPSHOT from '../src/sports/nfl/data/demoSlate.js'
 
 const event = (id, date, week = 1, state = 'pre') => ({
@@ -30,6 +35,29 @@ const roster = (team) => ({ athletes: [{ position: 'offense', items: [
   { id: `${team}-fb`, displayName: `${team} Fullback`, position: { abbreviation: 'FB' }, status: { name: 'Active' }, injuries: [] },
   { id: `${team}-wr`, displayName: `${team} Receiver`, position: { abbreviation: 'WR' }, status: { name: 'Active' }, injuries: [{ status: 'Questionable', details: { type: 'Hamstring' } }] },
 ] }] })
+
+test('automatic NFL season and slate selection roll through January and completed weeks', () => {
+  assert.equal(nflSeasonYear(new Date('2027-01-15T00:00:00Z')), 2026)
+  const games = parseESPNScoreboard({ events: [event('w1', '2026-09-04T00:00:00Z', 1, 'post'), event('w2', '2026-09-10T00:00:00Z', 2, 'pre')] })
+  assert.equal(selectCurrentNFLSlate(games, new Date('2026-09-08T00:00:00Z'))[0].id, 'w2')
+})
+
+test('automatic board keeps regular-season Week 1 while preseason is collected separately', () => {
+  const preseason = { ...event('pre1', '2026-08-01T00:00:00Z', 1), season: { year: 2026, slug: 'preseason' } }
+  const regular = event('reg1', '2026-09-10T00:00:00Z', 1)
+  const games = parseESPNScoreboard({ events: [preseason, regular] })
+  assert.equal(selectCurrentNFLSlate(games, new Date('2026-07-31T00:00:00Z'))[0].id, 'reg1')
+  assert.equal(selectCurrentNFLSlate(games, new Date('2026-07-31T00:00:00Z'), { season: 2026, seasonType: 'preseason' })[0].id, 'pre1')
+})
+
+test('ESPN depth context exposes line and defensive starter availability', () => {
+  const slot = (position, id, status = null) => ({ position: { abbreviation: position }, athletes: [{ id, displayName: `${position} Player`, injuries: status ? [{ status }] : [] }] })
+  const context = parseESPNTeamDepthContext({ depthchart: [{ positions: { lt: slot('LT', '1'), lg: slot('LG', '2'), c: slot('C', '3'), rg: slot('RG', '4'), rt: slot('RT', '5', 'Out'), cb: slot('CB', '6'), lb: slot('LB', '7') } }] }, 'BUF')
+  assert.equal(context.offensiveLine.starters.length, 5)
+  assert.equal(context.offensiveLine.startersAvailable, 4)
+  assert.equal(context.defense.secondaryAvailable, 1)
+  assert.equal(context.defense.linebackersAvailable, 1)
+})
 
 test('ESPN depth chart parser preserves position, order, stable ID and availability', () => {
   const html = '<tr data-idx="0"><td data-testid="statCell">QB<!-- --> <span></span></td></tr><tr data-idx="1"><td data-testid="statCell">RB<!-- --> <span></span></td></tr>'
@@ -315,6 +343,43 @@ test('walk-forward NFL backtest emits probability and projection metrics without
   assert.ok(result.markets.anytime_td.buckets.length > 0)
   assert.ok(result.markets.anytime_td.buckets.every((bucket) => bucket.samples > 0))
   assert.ok(result.stacks['scorer-core'])
+})
+
+test('receiving-yard calibration uses role-bearing history without changing the 150-yard board gate', () => {
+  const games = Array.from({ length: 10 }, (_, index) => ({ season: 2025, week: index + 1, receivingYards: 45 + index, receptions: 4, totalTds: 0 }))
+  const result = evaluateNFLHistory({ seasons: [2025], players: [{ id: 'wr', name: 'WR', position: 'WR', recentGames: games }] })
+  assert.equal(result.markets.receiving_yards.samples, 6)
+})
+
+test('preseason observations remain separate from regular-season calibration', () => {
+  const snapshot = { generatedAt: '2026-08-10T00:00:00Z', meta: { seasonType: 'preseason' }, players: [{ id: 'p1', gameId: 'g1', name: 'Player', position: 'RB', team: 'BUF', opponent: 'MIA', lineup: { depthOrder: 2 }, live: { isFinal: true, stats: { carries: 8, rushingYards: 42 } } }] }
+  const log = updateNFLPreseason({}, null, snapshot)
+  assert.equal(log.excludedFromRegularSeasonCalibration, true)
+  assert.equal(log.summary.finals, 1)
+  assert.equal(log.games[0].closing.live.stats.carries, 8)
+})
+
+test('readiness blocks zero-sample model markets and game-day missing confirmations', () => {
+  const markets = Object.fromEntries(['passing_yards', 'receptions', 'receiving_yards', 'rushing_yards', 'rushing_receiving_yards', 'passing_rushing_yards', 'anytime_td', 'first_td', 'two_plus_td'].map((id) => [id, { samples: id === 'receiving_yards' ? 0 : 10 }]))
+  const readiness = buildNFLReadiness({ generatedAt: '2026-09-09T23:00:00Z', games: [{ date: '2026-09-10T00:00:00Z', status: { state: 'pre' }, home: { abbr: 'BUF' }, away: { abbr: 'MIA' } }], players: [{ team: 'BUF' }, { team: 'MIA' }], quality: { officialAvailability: true, weatherFresh: true, weatherCoverage: 1 }, modelPerformance: { markets } })
+  assert.equal(readiness.status, 'blocked')
+  assert.ok(readiness.blocking.includes('historical-coverage'))
+  assert.ok(readiness.blocking.includes('roles'))
+})
+
+test('game-day rehearsal covers rollover, freeze, live update, and settlement', () => {
+  assert.equal(runNFLGameDayRehearsal().ok, true)
+})
+
+test('dated NFL artifact archive can restore a known-good snapshot', async (t) => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'nfl-archive-'))
+  t.after(() => fs.rm(directory, { recursive: true, force: true }))
+  await fs.writeFile(path.join(directory, 'daily.json'), JSON.stringify({ version: 1, marker: 'good' }))
+  await fs.writeFile(path.join(directory, 'tracking.json'), JSON.stringify({ version: 1, records: [] }))
+  const archived = await archiveNFLArtifacts({ directory, now: new Date('2026-08-01T00:00:00Z') })
+  await fs.writeFile(path.join(directory, 'daily.json'), JSON.stringify({ version: 1, marker: 'bad' }))
+  await rollbackNFLArtifacts(path.basename(archived), { directory })
+  assert.equal(JSON.parse(await fs.readFile(path.join(directory, 'daily.json'), 'utf8')).marker, 'good')
 })
 
 test('walk-forward TD stack validation emits leg-count and same-game calibration', () => {

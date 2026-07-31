@@ -2,7 +2,9 @@
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { fetchESPNDepthChart, fetchESPNRoster, fetchESPNSeason, fetchESPNSummary, selectCurrentNFLSlate } from './providers/espn.mjs'
+import { fetchESPNDepthBundle, fetchESPNRoster, fetchESPNSeason, fetchESPNSummary, nflSeasonYear, selectCurrentNFLSlate } from './providers/espn.mjs'
+import { archiveNFLArtifacts } from './operations.mjs'
+import { updateNFLPreseason } from './preseason.mjs'
 import { fetchNFLWeather } from './providers/weather.mjs'
 import { fetchNFLOdds, normalizePlayerName } from './providers/odds.mjs'
 import { enrichNFLTeamOpportunityShares, indexNFLHistory, matchHistoryPlayer, playerRoleScore, projectNFLPlayer } from './projections.mjs'
@@ -23,6 +25,8 @@ const DEFAULT_DEPTH_CHART = process.env.NFL_DEPTH_CHART_PATH || path.join(ROOT, 
 const DEFAULT_WEATHER = process.env.NFL_WEATHER_PATH || path.join(ROOT, 'dist', 'nfl', 'weather.json')
 const DEFAULT_LINEUPS = process.env.NFL_LINEUP_PATH || path.join(ROOT, 'dist', 'nfl', 'lineups.json')
 const DEFAULT_TRACKING = process.env.NFL_TRACKING_PATH || path.join(ROOT, 'dist', 'nfl', 'tracking.json')
+const DEFAULT_PRESEASON = process.env.NFL_PRESEASON_PATH || path.join(ROOT, 'dist', 'nfl', 'preseason.json')
+const DEFAULT_READINESS = process.env.NFL_READINESS_PATH || path.join(ROOT, 'dist', 'nfl', 'readiness.json')
 const LIMITS = { QB: 2, RB: 4, WR: 6, TE: 4 }
 
 const n = (value, fallback = 0) => value == null || value === '' ? fallback : Number.isFinite(Number(value)) ? Number(value) : fallback
@@ -156,7 +160,7 @@ export function buildNFLRefreshStatus(games = [], quality = {}, now = new Date()
 }
 
 export async function buildNFLSnapshot({ now = new Date(), fetchImpl = fetch, historyPath = DEFAULT_HISTORY, availabilityPath = DEFAULT_AVAILABILITY, backtestPath = DEFAULT_BACKTEST, depthChartPath = DEFAULT_DEPTH_CHART, weatherPath = DEFAULT_WEATHER, lineupPath = DEFAULT_LINEUPS, trackingPath = DEFAULT_TRACKING, oddsApiKey = process.env.SPORTSGAMEODDS_API_KEY, targetSeason = process.env.NFL_TARGET_SEASON || null, targetSeasonType = process.env.NFL_TARGET_SEASON_TYPE || null, targetWeek = process.env.NFL_TARGET_WEEK || null } = {}) {
-  const year = Number(targetSeason) || new Date(now).getUTCFullYear()
+  const year = Number(targetSeason) || nflSeasonYear(now)
   const schedule = await fetchESPNSeason(year, fetchImpl)
   const games = selectCurrentNFLSlate(schedule, now, { season: targetSeason, seasonType: targetSeasonType, week: targetWeek })
   if (targetWeek != null && !games.length) throw new Error(`No ${targetSeasonType || 'regular-season'} Week ${targetWeek} games found for ${year}`)
@@ -187,10 +191,12 @@ export async function buildNFLSnapshot({ now = new Date(), fetchImpl = fetch, hi
   })))
   const automaticAvailabilityReady = teams.length > 0 && teams.every((team) => (rosters.get(team) || []).length > 0)
   const depthResults = await Promise.all(teams.map(async (team) => {
-    try { return [team, await fetchESPNDepthChart(team, fetchImpl), true] } catch (error) { console.warn(`[nfl] depth ${team}: ${error.message}`); return [team, [], false] }
+    try { const bundle = await fetchESPNDepthBundle(team, fetchImpl); return [team, bundle.players, true, bundle.team] } catch (error) { console.warn(`[nfl] depth ${team}: ${error.message}`); return [team, [], false, null] }
   }))
   const automaticDepthPlayers = depthResults.flatMap(([, players]) => players)
   const automaticDepthReady = depthResults.length > 0 && depthResults.every(([, players, ok]) => ok && players.length > 0)
+  const automaticTeamContexts = new Map(depthResults.filter(([, , , context]) => context).map(([team, , , context]) => [team, context]))
+  const effectiveTeamLineup = (team) => teamLineupFor(team, lineupIndex) || automaticTeamContexts.get(team) || null
   const depthPayload = externalDepthPayload || (automaticDepthPlayers.length ? { generatedAt: new Date(now).toISOString(), players: automaticDepthPlayers, source: 'espn-depth-chart' } : null)
   const depthIndex = indexDepthChart(depthPayload)
   const availabilityPayload = externalAvailabilityPayload || (rosterAvailabilityPlayers.length ? { generatedAt: new Date(now).toISOString(), players: rosterAvailabilityPlayers, source: 'espn-roster' } : automaticDepthPlayers.length ? { generatedAt: depthPayload.generatedAt, players: automaticDepthPlayers, source: 'espn-depth-chart' } : null)
@@ -199,6 +205,13 @@ export async function buildNFLSnapshot({ now = new Date(), fetchImpl = fetch, hi
     try { return [game.id, await fetchESPNSummary(game, fetchImpl)] } catch (error) { console.warn(`[nfl] summary ${game.id}: ${error.message}`); return [game.id, null] }
   }))
   const summaries = new Map(summaryResults)
+  const preseasonGames = games[0]?.seasonType === 'regular-season'
+    ? selectCurrentNFLSlate(schedule, now, { season: year, seasonType: 'preseason' })
+    : []
+  const preseasonSummaryResults = await Promise.all(preseasonGames.map(async (game) => {
+    try { return [game.id, await fetchESPNSummary(game, fetchImpl)] } catch (error) { console.warn(`[nfl] preseason summary ${game.id}: ${error.message}`); return [game.id, null] }
+  }))
+  const preseasonSummaries = new Map(preseasonSummaryResults)
   const automaticWeatherPayload = await fetchNFLWeather(games, fetchImpl)
   const weatherPayload = externalWeatherPayload || automaticWeatherPayload
   const weatherIndex = indexWeather(weatherPayload)
@@ -221,7 +234,7 @@ export async function buildNFLSnapshot({ now = new Date(), fetchImpl = fetch, hi
         const externalAvailability = externalAvailabilityFor(currentPlayer, availabilityIndex)
         return { player: currentPlayer, history: playerHistory, depth, availability: assessPlayerAvailability(currentPlayer, externalAvailability), entry: lineupFor(currentPlayer, lineupIndex) }
       })
-      const lineupContexts = buildTeamLineup(lineupRows, teamLineupFor(team, lineupIndex), teamLineupFor(opponent, lineupIndex), {
+      const lineupContexts = buildTeamLineup(lineupRows, effectiveTeamLineup(team), effectiveTeamLineup(opponent), {
         generatedAt: externalLineupPayload?.generatedAt || depthPayload?.generatedAt || new Date(now).toISOString(),
         source: externalLineupPayload?.source || (automaticDepthPlayers.length ? 'espn-depth-derived' : 'historical-role'),
       })
@@ -275,6 +288,23 @@ export async function buildNFLSnapshot({ now = new Date(), fetchImpl = fetch, hi
   enrichNFLTeamOpportunityShares(players)
   normalizeFirstTouchdownProbabilities(players, calibration)
 
+  const playersByTeam = new Map(teams.map((team) => [team, players.filter((player) => player.team === team)]))
+  const preseasonContext = preseasonGames.length ? {
+    generatedAt: new Date(now).toISOString(),
+    meta: { season: year, seasonType: 'preseason', week: `Preseason ${preseasonGames[0]?.week || ''}`.trim() },
+    games: preseasonGames,
+    players: preseasonGames.flatMap((game) => [game.home.abbr, game.away.abbr].flatMap((team) => {
+      const summary = preseasonSummaries.get(game.id)
+      const liveById = new Map((summary?.players || []).map((player) => [player.espnId, player]))
+      return (playersByTeam.get(team) || []).map((player) => ({
+        id: player.id, espnId: player.espnId, name: player.name, position: player.position, team,
+        gameId: game.id, kickoffAt: game.date, opponent: team === game.home.abbr ? game.away.abbr : game.home.abbr,
+        lineup: player.lineup, usage: player.usage, availability: player.availability,
+        live: { isLive: game.status.state === 'in', isFinal: game.status.state === 'post', stats: liveById.get(player.espnId) || {} },
+      }))
+    })),
+  } : null
+
   const anchor = games[0]
   const weatherCoverage = games.length ? games.filter((game) => summaries.get(game.id)?.weather?.tempF != null || game.venue.indoor).length / games.length : 0
   const defenseProfiles = Object.keys(history?.defenseAllowedByPosition || {}).length
@@ -283,7 +313,7 @@ export async function buildNFLSnapshot({ now = new Date(), fetchImpl = fetch, hi
   const weatherFreshness = overlayFreshness(weatherIndex.generatedAt, now, 24)
   const lineupFreshness = overlayFreshness(externalLineupPayload?.generatedAt || depthIndex.generatedAt, now, externalLineupPayload ? 36 : 168)
   const overlayWeatherCoverage = games.length ? games.filter((game) => weatherFor(game, weatherIndex) || game.venue.indoor).length / games.length : 0
-  const normalizedTeamLineups = teams.map((team) => normalizeTeamLineup(teamLineupFor(team, lineupIndex), team))
+  const normalizedTeamLineups = teams.map((team) => normalizeTeamLineup(effectiveTeamLineup(team), team))
   const lineupCoverage = summarizeLineupCoverage(players, normalizedTeamLineups)
   const providers = {
     schedule: 'espn', rosters: 'espn', injuries: 'espn', practice: externalAvailabilityPayload ? 'availability-snapshot' : rosterAvailabilityPlayers.length ? 'espn-roster-reports' : automaticDepthPlayers.length ? 'espn-depth-chart' : 'espn-when-reported',
@@ -312,7 +342,8 @@ export async function buildNFLSnapshot({ now = new Date(), fetchImpl = fetch, hi
   }
   const generatedAt = new Date(now).toISOString()
   const overlays = { depthChart: depthFreshness, availability: availabilityFreshness, lineups: lineupFreshness, weather: weatherFreshness }
-  const dataHealth = buildNFLDataHealth({ generatedAt, games, players, quality: dataQuality, providers: { schedule: providers.schedule, rosters: providers.rosters, depth: providers.depth, lineups: providers.lineups, availability: providers.practice, weather: providers.weather, history: providers.history }, overlayStatus: { depth: depthFreshness, lineups: lineupFreshness, availability: availabilityFreshness, weather: weatherFreshness } })
+  const trackingSummary = summarizeNFLTracking(trackingLog)
+  const dataHealth = buildNFLDataHealth({ generatedAt, games, players, quality: dataQuality, providers: { schedule: providers.schedule, rosters: providers.rosters, depth: providers.depth, lineups: providers.lineups, availability: providers.practice, weather: providers.weather, history: providers.history }, overlayStatus: { depth: depthFreshness, lineups: lineupFreshness, availability: availabilityFreshness, weather: weatherFreshness }, modelPerformance, tracking: trackingSummary, targeted: targetWeek != null })
   const refreshStatus = buildNFLRefreshStatus(games, dataQuality, now)
   return {
     version: 3,
@@ -332,11 +363,12 @@ export async function buildNFLSnapshot({ now = new Date(), fetchImpl = fetch, hi
     lineupCoverage,
     overlays,
     modelPerformance,
-    modelTracking: summarizeNFLTracking(trackingLog),
+    modelTracking: trackingSummary,
     firstTdReserve: { listedOffense: .86, otherOffense: .06, defenseSpecialTeams: .06, noTouchdown: .02 },
     meta: { week: anchor ? `${anchor.seasonType === 'preseason' ? 'Preseason ' : 'Week '}${anchor.week}` : 'No active slate', season: anchor?.season ?? year, seasonType: anchor?.seasonType ?? null, games: games.length, targeted: targetWeek != null, weatherUpdatedAt: new Date().toISOString() },
     games,
     players,
+    preseasonContext,
   }
 }
 
@@ -356,11 +388,21 @@ export function parseNFLSlateArgs(args = []) {
 export async function writeNFLSnapshot(options = {}) {
   const outputPath = options.outputPath || DEFAULT_OUTPUT
   const trackingPath = options.trackingPath || DEFAULT_TRACKING
+  const preseasonPath = options.preseasonPath || DEFAULT_PRESEASON
+  const readinessPath = options.readinessPath || DEFAULT_READINESS
   const previousSnapshot = await readJSON(outputPath)
   const previousTracking = await readJSON(trackingPath) || { records: [] }
+  const previousPreseason = await readJSON(preseasonPath) || { games: [] }
   const snapshot = await buildNFLSnapshot(options)
   const tracking = updateNFLTracking(previousTracking, previousSnapshot, snapshot)
+  const preseason = updateNFLPreseason(previousPreseason, previousSnapshot, snapshot)
   snapshot.modelTracking = summarizeNFLTracking(tracking)
+  const trackingGate = snapshot.dataHealth?.readiness?.gates?.find((gate) => gate.id === 'tracking')
+  if (trackingGate) {
+    trackingGate.pass = true
+    trackingGate.message = `Tracking updated ${tracking.updatedAt}`
+  }
+  if (previousSnapshot) await archiveNFLArtifacts({ directory: path.dirname(outputPath), now: options.now || new Date() })
   await fs.mkdir(path.dirname(outputPath), { recursive: true })
   const temporary = `${outputPath}.tmp`
   await fs.writeFile(temporary, JSON.stringify(snapshot, null, 2), 'utf8')
@@ -369,6 +411,10 @@ export async function writeNFLSnapshot(options = {}) {
   const trackingTemporary = `${trackingPath}.tmp`
   await fs.writeFile(trackingTemporary, JSON.stringify(tracking, null, 2), 'utf8')
   await fs.rename(trackingTemporary, trackingPath)
+  await fs.writeFile(`${preseasonPath}.tmp`, JSON.stringify(preseason, null, 2), 'utf8')
+  await fs.rename(`${preseasonPath}.tmp`, preseasonPath)
+  await fs.writeFile(`${readinessPath}.tmp`, JSON.stringify(snapshot.dataHealth.readiness, null, 2), 'utf8')
+  await fs.rename(`${readinessPath}.tmp`, readinessPath)
   console.log(`[nfl] wrote ${outputPath} · ${snapshot.meta.games} games · ${snapshot.players.length} players · odds=${snapshot.source.providers.odds}`)
   return snapshot
 }

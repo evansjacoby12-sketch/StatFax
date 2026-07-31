@@ -57,7 +57,19 @@ export function selectCurrentNFLSlate(events, now = new Date(), target = {}) {
       .filter((game) => game.season === targetSeason && game.seasonType === targetSeasonType && game.week === targetWeek)
       .sort((a, b) => +new Date(a.date) - +new Date(b.date))
   }
+  if (target.seasonType || target.season) {
+    const filtered = events.filter((game) => (!target.season || game.season === Number(target.season)) && (!target.seasonType || game.seasonType === target.seasonType))
+    return selectCurrentNFLSlate(filtered, now)
+  }
   const nowMs = +new Date(now)
+  // During preseason, keep the public betting board on the upcoming regular-
+  // season opener. Preseason participation is collected separately.
+  const regularUpcoming = events.filter((game) => game.seasonType === 'regular-season' && game.status.state === 'pre' && +new Date(game.date) >= nowMs - 60 * 60 * 1000).sort((a, b) => +new Date(a.date) - +new Date(b.date))
+  const preseasonExists = events.some((game) => game.seasonType === 'preseason')
+  if (preseasonExists && regularUpcoming.length && nowMs < +new Date(regularUpcoming[0].date)) {
+    const opener = regularUpcoming[0]
+    return events.filter((game) => game.season === opener.season && game.seasonType === opener.seasonType && game.week === opener.week).sort((a, b) => +new Date(a.date) - +new Date(b.date))
+  }
   const live = events.filter((game) => game.status.state === 'in')
   const recent = events.filter((game) => game.status.state === 'post' && nowMs - +new Date(game.date) <= 18 * 60 * 60 * 1000)
   const upcoming = events.filter((game) => game.status.state === 'pre' && +new Date(game.date) >= nowMs - 60 * 60 * 1000)
@@ -66,6 +78,11 @@ export function selectCurrentNFLSlate(events, now = new Date(), target = {}) {
   return events
     .filter((game) => game.season === anchor.season && game.seasonType === anchor.seasonType && game.week === anchor.week)
     .sort((a, b) => +new Date(a.date) - +new Date(b.date))
+}
+
+export function nflSeasonYear(now = new Date()) {
+  const date = new Date(now)
+  return date.getUTCMonth() < 2 ? date.getUTCFullYear() - 1 : date.getUTCFullYear()
 }
 
 export function parseESPNRoster(payload, teamAbbr) {
@@ -147,6 +164,47 @@ export function parseESPNDepthChart(payload, teamAbbr) {
     }
   }
   return players
+}
+
+const OFFENSIVE_LINE = new Set(['LT', 'LG', 'C', 'RG', 'RT', 'OL', 'G', 'T'])
+const DEFENSIVE_FRONT = new Set(['DE', 'DT', 'NT', 'DL', 'EDGE'])
+const LINEBACKERS = new Set(['LB', 'ILB', 'OLB', 'MLB'])
+const SECONDARY = new Set(['CB', 'DB', 'S', 'FS', 'SS', 'NB'])
+
+export function parseESPNTeamDepthContext(payload, teamAbbr) {
+  const slots = (payload?.depthchart || []).flatMap((group) => Object.values(group.positions || {}))
+  const starters = (positions) => slots.flatMap((slot) => {
+    const position = String(slot.position?.abbreviation || '').toUpperCase()
+    if (!positions.has(position)) return []
+    const athlete = slot.athletes?.[0]
+    if (!athlete) return []
+    const injury = athlete.injuries?.[0]
+    const status = injury?.status || injury?.type?.description || 'Active'
+    return [{ espnId: String(athlete.id || ''), name: athlete.displayName || athlete.fullName, position, status, active: !/\b(out|injured reserve|\bir\b|pup|suspend)/i.test(status) }]
+  })
+  const offensiveLine = starters(OFFENSIVE_LINE).slice(0, 5)
+  const front = starters(DEFENSIVE_FRONT)
+  const linebackers = starters(LINEBACKERS)
+  const secondary = starters(SECONDARY)
+  const defense = [...front, ...linebackers, ...secondary]
+  return {
+    team: teamAbbr,
+    source: 'espn-depth-chart',
+    confirmed: false,
+    offensiveLine: offensiveLine.length ? {
+      starters: offensiveLine,
+      startersAvailable: offensiveLine.filter((player) => player.active).length,
+      continuity: null,
+      availabilitySource: 'espn-depth-chart',
+    } : null,
+    defense: defense.length ? {
+      starters: defense,
+      frontAvailable: front.filter((player) => player.active).length,
+      linebackersAvailable: linebackers.filter((player) => player.active).length,
+      secondaryAvailable: secondary.filter((player) => player.active).length,
+      availabilitySource: 'espn-depth-chart',
+    } : null,
+  }
 }
 
 function parseClockSeconds(clock) {
@@ -273,6 +331,15 @@ export async function fetchESPNDepthChart(teamAbbr, fetchImpl = fetch) {
     }
   }
   throw lastError || new Error(`ESPN depth chart unavailable for ${teamAbbr}`)
+}
+
+export async function fetchESPNDepthBundle(teamAbbr, fetchImpl = fetch) {
+  try {
+    const payload = await getJSON(`${ESPN_BASE}/teams/${teamAbbr.toLowerCase()}/depthcharts`, fetchImpl)
+    const players = parseESPNDepthChart(payload, teamAbbr)
+    if (players.length) return { players, team: parseESPNTeamDepthContext(payload, teamAbbr) }
+  } catch {}
+  return { players: await fetchESPNDepthChart(teamAbbr, fetchImpl), team: null }
 }
 
 export async function fetchESPNSummary(game, fetchImpl = fetch) {
