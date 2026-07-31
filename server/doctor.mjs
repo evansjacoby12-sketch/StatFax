@@ -20,6 +20,8 @@ const REQUIRED_GITHUB_SECRETS = Object.freeze([
   'TAVILY_API_KEY',
 ])
 const REQUIRED_WORKER_SECRETS = Object.freeze(['GITHUB_TOKEN', 'OPENAI_API_KEY'])
+const OPTIONAL_GITHUB_SECRETS = Object.freeze(['ALERT_WEBHOOK_URL'])
+const OPTIONAL_WORKER_SECRETS = Object.freeze(['ALERT_WEBHOOK_URL'])
 
 function finiteDate(value) {
   const ms = Date.parse(value)
@@ -151,6 +153,8 @@ export async function runDoctor({
     credentialInventory: {
       githubSecrets: REQUIRED_GITHUB_SECRETS,
       workerSecrets: REQUIRED_WORKER_SECRETS,
+      optionalGithubSecrets: OPTIONAL_GITHUB_SECRETS,
+      optionalWorkerSecrets: OPTIONAL_WORKER_SECRETS,
       note: 'Names only. The doctor never reads or prints secret values.',
     },
   }
@@ -162,6 +166,7 @@ export function formatDoctor(report) {
   for (const check of report.checks) lines.push(`[${icon[check.status]}] ${check.id}: ${check.detail}`)
   lines.push(`GitHub secrets: ${report.credentialInventory.githubSecrets.join(', ')}`)
   lines.push(`Worker secrets: ${report.credentialInventory.workerSecrets.join(', ')}`)
+  lines.push(`Optional alert secret: ${report.credentialInventory.optionalGithubSecrets.join(', ')}`)
   lines.push(report.credentialInventory.note)
   return lines.join('\n')
 }

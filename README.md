@@ -4,7 +4,13 @@ MLB home-run and strikeout prop projection engine + live board. Deployed at **st
 
 ## What it is
 
-A fully automated daily pipeline that scores every batter on today's MLB slate for HR probability and every starting pitcher for projected strikeouts. The scored snapshot is published to Cloudflare R2 and served to a React UI via GitHub Pages.
+A fully automated daily pipeline that scores every batter on today's MLB slate for HR probability, every starting pitcher for projected strikeouts, and every game for moneyline, total, and first-inning probabilities. The validated snapshot is published to Cloudflare R2 and served to a React UI via GitHub Pages.
+
+Owner documentation:
+
+- [`OPS.md`](OPS.md) — health checks, incidents, secrets, recovery, and rollback.
+- [`MODEL-DECISIONS.md`](MODEL-DECISIONS.md) — current production math and promotion boundaries.
+- [`RELEASE-CHECKLIST.md`](RELEASE-CHECKLIST.md) — verification before a release/tag.
 
 ## Architecture
 
@@ -13,11 +19,12 @@ Cloudflare Worker (cron, every 10 min)
   → repository_dispatch → GitHub Actions
 
 GitHub Actions ("Build slate + deploy")
-  1. npm run build-model      bundle the scoring engine
-  2. npm run slate            live pipeline → dist/daily.json
-  3. R2 upload                publish snapshot to Cloudflare R2
-  4. npm run build (ui/)      build Vite + React board
-  5. GitHub Pages deploy      serve at statfax.online
+  1. restore/recover          GitHub cache + durable R2 state
+  2. reconcile + build-model settle results and bundle scoring
+  3. npm run slate            live pipeline → dist/daily.json
+  4. validate + AI context    contracts + capped context overlay
+  5. R2 publish + archive     current data + mlb/archive/YYYY-MM-DD
+  6. UI smoke/build/deploy    Vite board → GitHub Pages
 ```
 
 ```
@@ -44,7 +51,7 @@ model-lab/              offline harness — backtest, train, A/B rescore
 ```bash
 npm install              # just esbuild (server)
 npm run build-model      # bundle engine → server/.build/model.mjs
-npm run slate            # full live pipeline — no API keys needed
+npm run slate            # live pipeline; paid enrichments degrade when keys are absent
                          # writes dist/daily.json
 
 cd ui && npm install && npm run dev   # React board at localhost:5173
@@ -73,7 +80,7 @@ cd ui && npm install && npm run dev   # React board at localhost:5173
 
 `npm run context` researches unstructured, current-day information that the numeric feeds can miss: starter changes, opener or pitch-limit risk, lineup/injury status, roof/weather changes, bullpen availability, and call-ups.
 
-The output at `dist/context.json` is intentionally non-scoring (`mode: "advisory"`, `scoreImpact: false`). Every accepted signal must:
+The output at `dist/context.json` is a source-backed context artifact (`mode: "advisory"`, `scoreImpact: false`). Every accepted signal must:
 
 - target an exact slate-owned batter, pitcher, game, or bullpen key;
 - include a direct source URL, confidence, observation time, and expiration time;
@@ -88,7 +95,7 @@ Phase 2 runs `npm run ai:hr-shadow` after the context pass and maintains `dist/a
 - a deterministic shadow probability using `direction × confidence × 0.10` in log-odds space, capped at `±0.25` total log-odds;
 - exact signal IDs, notes, model, timestamps, and evidence URLs.
 
-The shadow ledger is a versioned experiment (`mode: "shadow"`, `scoreImpact: false`), is retained for 180 days, and is never read by the production scoring path or UI. Started-game records are frozen while current pregame records can refresh with newer sourced context. Run `npm run validate:ai-shadow` to verify its math and provenance.
+The shadow ledger is a versioned experiment (`mode: "shadow"`, `scoreImpact: false`), is retained for 180 days, and is never itself read by the production scoring path or UI. Started-game records are frozen while current pregame records can refresh with newer sourced context. Run `npm run validate:ai-shadow` to verify its math and provenance.
 
 Phase 3 runs `npm run ai:hr-evaluate` and joins shadow records to reconciled outcomes by exact date, game, and batter. `dist/ai-hr-evaluation.json` reports:
 
@@ -98,7 +105,9 @@ Phase 3 runs `npm run ai:hr-evaluate` and joins shadow records to reconciled out
 - breakdowns by net AI direction, context kind, and entity type;
 - pending, settled, and scratched-record coverage.
 
-The promotion gate remains read-only and cannot automatically change production scoring. It requires at least 500 settled batter-games, 30 HR outcomes, 40 distinct games, and 14 settled dates, then requires a positive lower 95% Brier bound, non-worse log loss, and no material calibration regression. Passing means only `eligible-for-review`; `autoPromotion` and `scoreImpact` remain false.
+The statistical promotion gate remains read-only and cannot automatically change production scoring. It requires at least 500 settled batter-games, 30 HR outcomes, 40 distinct games, and 14 settled dates, then requires a positive lower 95% Brier bound, non-worse log loss, and no material calibration regression. Passing means only `eligible-for-review`; `autoPromotion` remains false.
+
+Production currently carries an explicit manual override (`gateOverride: true`): `npm run ai:hr-production` rebuilds the same validated context hypothesis and applies only its capped log-odds move to published `hrProbability`. It records the untouched baseline and signal IDs, is idempotent, and cannot change score, grade, simulation, or calibration input. See [`MODEL-DECISIONS.md`](MODEL-DECISIONS.md).
 
 ## K Brain
 
@@ -117,7 +126,7 @@ Poisson-based strikeout projection per starter. Lives in `server/fetch-slate.mjs
 | G | TTTO penalty | BF beyond 18 (3rd time through order) → −12% K rate, applied proportionally |
 | H | Environmental multipliers | Temp (`1 + (°F − 72) × 0.003`), umpire K factor, park K factor |
 
-**Output:** λ (Poisson mean), P(K > line) at 3.5–10.5, 10th–90th percentile range, trend (↑/↓/→), confidence (high/med/low).
+**Output:** one-decimal projected strikeouts (the canonical Poisson mean), P(K > line) at 3.5–10.5, trend (↑/↓/→), and confidence (high/med/low). The product does not present a projection range as the main answer.
 
 **K Brain UI features:**
 - Filter by pitcher/team search, min projected K (4.5 / 5.5 / 6.5 / 7.5+), confidence, sort

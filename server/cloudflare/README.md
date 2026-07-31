@@ -6,10 +6,10 @@ GitHub Actions' own scheduled-event trigger is unreliable on private
 free-tier repos — we were seeing 4–8 runs/day with multi-hour gaps when
 asking for every 10 minutes.
 
-The Worker is ~80 lines and does one thing: POST to GitHub's
-`/repos/{owner}/{repo}/dispatches` endpoint. The actual slate-fetching
-still happens on GitHub Actions runners — this just gives them a
-reliable heartbeat.
+The Worker POSTs to GitHub's `/repos/{owner}/{repo}/dispatches` endpoint,
+monitors the durable MLB health artifact and latest workflow, and serves the
+small protected browser endpoints documented below. The actual deterministic
+slate scoring still happens on GitHub Actions runners.
 
 ---
 
@@ -89,6 +89,7 @@ app calls directly from the browser:
 | Route | Method | Purpose |
 | --- | --- | --- |
 | `/` or `/trigger` | GET | Manually fire a slate refresh (returns plain text). |
+| `/health` | GET | Read-only dependency/configuration health; never returns secret values. |
 | `/parse` | POST | Natural-language → backtest filter chips (Signal Backtest UI). |
 | `/list-builder` | POST | Natural-language → visible, editable List Builder criteria. |
 | `/list-builder-analyst` | POST | Aggregate-only List Builder diagnosis, recipe comparison, and one allow-listed safe relaxation. |
@@ -104,11 +105,18 @@ wrangler secret put OPENAI_API_KEY
 ```
 
 All four are **narration/configuration-only** — they translate English ↔ existing model
-output and never see raw data, do math, or influence any prediction. The
-HR scores are computed deterministically on GitHub Actions before the app
-ever loads, so the Worker cannot change a grade or probability. Optional:
+output and never supply a prediction. The HR scores are computed on GitHub
+Actions before the app loads. Optional:
 set `OPENAI_MODEL` (Worker var) to override the default cost-sensitive model, and
-`ALLOW_ORIGIN` to lock CORS to your site instead of `*`.
+use `ALLOW_ORIGINS` for the explicit comma-separated browser allow-list.
+
+Paid AI routes and the Savant proxy are rate-limited before their upstream
+requests. Requests without an approved `Origin` are rejected.
+
+Every scheduled run also checks `MLB_HEALTH_URL` and the latest deploy workflow.
+If an incident exists and `ALERT_WEBHOOK_URL` is configured, it posts a
+Discord/Slack-compatible message and deduplicates the same incident fingerprint
+for one hour. Configure it with `wrangler secret put ALERT_WEBHOOK_URL`.
 
 The browser reaches these via `VITE_WORKER_URL` (set at UI build time to the
 deployed `*.workers.dev` URL). When it's unset, the app degrades gracefully:
