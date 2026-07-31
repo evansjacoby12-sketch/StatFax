@@ -72,9 +72,11 @@ const viewFromHash = () => {
 function initialFilters() {
   const saved = store.load('filters', null)
   if (!saved) return DEFAULT_FILTERS
+  const savedGrades = Array.isArray(saved.grades) ? saved.grades : [...DEFAULT_FILTERS.grades]
+  const wasLegacyAllGrades = savedGrades.length === GRADE_ORDER.length && GRADE_ORDER.every((grade) => savedGrades.includes(grade))
   return {
     ...DEFAULT_FILTERS,
-    grades: new Set(Array.isArray(saved.grades) ? saved.grades : GRADE_ORDER),
+    grades: new Set(wasLegacyAllGrades ? DEFAULT_FILTERS.grades : savedGrades),
     // Validate against current sort options (a persisted, since-removed key like
     // 'edge' would leave the dropdown blank and silently break sorting).
     sort: SORTS.some((s) => s.key === saved.sort) ? saved.sort : DEFAULT_FILTERS.sort,
@@ -406,7 +408,7 @@ export default function App() {
 
   // Empty-state escape hatch: back to defaults but keep the user's sort.
   const clearFilters = useCallback(() => {
-    setFilters((f) => ({ ...DEFAULT_FILTERS, grades: new Set(GRADE_ORDER), gamePks: new Set(), sort: f.sort, dir: f.dir }))
+    setFilters((f) => ({ ...DEFAULT_FILTERS, grades: new Set(DEFAULT_FILTERS.grades), gamePks: new Set(), sort: f.sort, dir: f.dir }))
   }, [])
 
   // Pop up the opposing pitcher's card as an overlay (entry key matches

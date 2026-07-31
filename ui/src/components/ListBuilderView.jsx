@@ -434,6 +434,7 @@ export default function ListBuilderView({
   const [analystLoading, setAnalystLoading] = useState(false)
   const [analystError, setAnalystError] = useState('')
   const [guideOpen, setGuideOpen] = useState(false)
+  const [resultLimit, setResultLimit] = useState(50)
 
   useEffect(() => {
     let active = true
@@ -496,7 +497,9 @@ export default function ListBuilderView({
   }, [savedRecipes, analystLeftRecipeId, analystRightRecipeId])
 
   const built = useMemo(() => buildListBuilderResults(batters, form), [batters, form])
-  const visibleResults = resultMode === 'near' ? built.nearMisses : built.results
+  const hasConfiguredList = Boolean(activePreset) || built.active.some((criterion) => criterion.key !== 'pregameOnly')
+  const allVisibleResults = hasConfiguredList ? (resultMode === 'near' ? built.nearMisses : built.results) : []
+  const visibleResults = allVisibleResults.slice(0, resultLimit)
   const aiCriteria = useMemo(() => aiProposal ? activeListBuilderCriteria(aiProposal.criteria) : [], [aiProposal])
   const metricCoverage = Object.values(built.coverage)
   const covered = metricCoverage.length ? Math.min(...metricCoverage.map((item) => item.available)) : batters.length
@@ -534,11 +537,13 @@ export default function ListBuilderView({
 
   const update = (patch) => {
     setActivePreset(null)
+    setResultLimit(50)
     setForm((current) => createListBuilderCriteria({ ...current, ...patch }))
   }
 
   const applyPreset = (preset) => {
     setActivePreset(preset.id)
+    setResultLimit(50)
     setForm(createListBuilderCriteria(preset.criteria))
   }
 
@@ -550,6 +555,7 @@ export default function ListBuilderView({
 
   const reset = () => {
     setActivePreset(null)
+    setResultLimit(50)
     setForm(createListBuilderCriteria())
   }
 
@@ -691,8 +697,8 @@ export default function ListBuilderView({
           <p>Start with a recipe or tune the evidence gates. Results refresh with the slate and every match shows why it qualified.</p>
         </div>
         <div className="lbv-live-count" aria-live="polite">
-          <strong key={built.results.length}>{built.results.length}</strong>
-          <span>exact · {built.nearMisses.length} near</span>
+          <strong key={hasConfiguredList ? built.results.length : 0}>{hasConfiguredList ? built.results.length : 0}</strong>
+          <span>{hasConfiguredList ? `exact · ${built.nearMisses.length} near` : 'waiting for a recipe'}</span>
           <small>Updates live</small>
         </div>
       </header>
@@ -849,20 +855,22 @@ export default function ListBuilderView({
         </div>
       </section>
 
-      <ListBuilderAnalystPanel
-        context={analystContext}
-        result={visibleAnalystResult}
-        relaxation={analystRelaxation}
-        loading={analystLoading}
-        error={analystError}
-        recipes={savedRecipes}
-        leftRecipeId={analystLeftRecipeId}
-        rightRecipeId={analystRightRecipeId}
-        onLeftRecipeChange={changeAnalystLeftRecipe}
-        onRightRecipeChange={changeAnalystRightRecipe}
-        onAnalyze={runAiAnalyst}
-        onApplyRelaxation={applyAnalystRelaxation}
-      />
+      {hasConfiguredList && (
+        <ListBuilderAnalystPanel
+          context={analystContext}
+          result={visibleAnalystResult}
+          relaxation={analystRelaxation}
+          loading={analystLoading}
+          error={analystError}
+          recipes={savedRecipes}
+          leftRecipeId={analystLeftRecipeId}
+          rightRecipeId={analystRightRecipeId}
+          onLeftRecipeChange={changeAnalystLeftRecipe}
+          onRightRecipeChange={changeAnalystRightRecipe}
+          onAnalyze={runAiAnalyst}
+          onApplyRelaxation={applyAnalystRelaxation}
+        />
+      )}
 
       <section className="lbv-control-card">
         <div className="lbv-control-top">
@@ -932,8 +940,8 @@ export default function ListBuilderView({
         <div className="lbv-results-head">
           <div>
             <span className="lbv-eyebrow">Ranked matches</span>
-            <h3>{built.results.length} exact · {built.nearMisses.length} near</h3>
-            <p>{metricCoverage.length ? `${covered}/${batters.length} hitters have data for every active metric gate.` : 'No metric gates active; actionability rules still apply.'}</p>
+            <h3>{hasConfiguredList ? `${built.results.length} exact · ${built.nearMisses.length} near` : 'Define the list before matching hitters'}</h3>
+            <p>{hasConfiguredList ? (metricCoverage.length ? `${covered}/${batters.length} hitters have data for every active metric gate.` : 'Actionability and signal gates are active.') : 'Choose an evidence-backed recipe, describe a list, or add a gate below.'}</p>
           </div>
           <div className="lbv-results-tools">
             <label className="lbv-sort">Sort
@@ -945,7 +953,7 @@ export default function ListBuilderView({
           </div>
         </div>
 
-        <div className="lbv-result-tabs" role="tablist" aria-label="Result type">
+        {hasConfiguredList && <div className="lbv-result-tabs" role="tablist" aria-label="Result type">
           <button type="button" role="tab" aria-selected={resultMode === 'exact'} className={resultMode === 'exact' ? 'on' : ''} onClick={() => setResultMode('exact')}>
             <Icon name="CircleCheck" size={13} /> Exact matches <b>{built.results.length}</b>
           </button>
@@ -953,10 +961,16 @@ export default function ListBuilderView({
             <Icon name="Target" size={13} /> Near misses <b>{built.nearMisses.length}</b>
           </button>
           <span>Fit measures criteria closeness, not HR probability. Missing data and multi-gate failures stay excluded.</span>
-        </div>
+        </div>}
 
 
-        {visibleResults.length ? (
+        {!hasConfiguredList ? (
+          <div className="lbv-empty lbv-empty-starter">
+            <Icon name="ListFilter" size={28} />
+            <strong>Start with a real decision rule</strong>
+            <p>The full slate is intentionally hidden until a recipe or meaningful gate defines what belongs on your list.</p>
+          </div>
+        ) : visibleResults.length ? (
           <div className="lbv-result-list">
             {visibleResults.map((item, index) => (
               <ResultCard
@@ -972,6 +986,11 @@ export default function ListBuilderView({
                 onToggleSlip={onToggleSlip}
               />
             ))}
+            {allVisibleResults.length > resultLimit && (
+              <button type="button" className="lbv-show-more" onClick={() => setResultLimit((limit) => limit + 50)}>
+                <Icon name="ChevronDown" size={14} /> Show 50 more ({allVisibleResults.length - resultLimit} remaining)
+              </button>
+            )}
           </div>
         ) : (
           <div className="lbv-empty">

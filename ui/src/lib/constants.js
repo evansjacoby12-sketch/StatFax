@@ -1,7 +1,6 @@
 // Shared UI constants. Kept in one place so the board, the games view, and the
 // filter bar never drift (e.g. the "hot bat" threshold and the sort vocabulary
 // used to live in two files each).
-import { GRADE_ORDER } from './badges.js'
 
 // heatIndex ≥ this counts as a "hot bat" — drives both the Hot-only filter and
 // the inline heat badge in the games view.
@@ -22,7 +21,8 @@ export const DESC_BY_DEFAULT = new Set(['hrProbability', 'score', 'rating', 'hea
 
 export const DEFAULT_FILTERS = {
   q: '',
-  grades: new Set(GRADE_ORDER),
+  // Open on the decision tier. WATCH/LEAN/SKIP remain one click away in filters.
+  grades: new Set(['PRIME', 'STRONG']),
   gamePks: new Set(),
   confirmedOnly: false,
   watchedOnly: false,

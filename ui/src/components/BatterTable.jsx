@@ -1,4 +1,4 @@
-import { useRef, useLayoutEffect } from 'react'
+import { useEffect, useRef, useLayoutEffect, useState } from 'react'
 import BatterRow from './BatterRow.jsx'
 import Icon from './Icon.jsx'
 
@@ -55,6 +55,9 @@ export default function BatterTable({
   onClearFilters,
 }) {
   const bodyRef = useRef(null)
+  const [showAll, setShowAll] = useState(false)
+  const visibleBatters = showAll ? batters : batters.slice(0, 50)
+  useEffect(() => setShowAll(false), [batters])
   useFlipRows(bodyRef, [batters])
   const HeadCol = ({ k, children, className, title }) => {
     const active = sort === k
@@ -118,7 +121,7 @@ export default function BatterTable({
               </button>
             )}
           </div>
-        ) : batters.map((b, index) => (
+        ) : visibleBatters.map((b, index) => (
             <BatterRow
               key={b.id}
               batter={b}
@@ -135,6 +138,15 @@ export default function BatterTable({
             />
           ))}
       </div>
+      {batters.length > 50 && (
+        <div className="board-disclosure">
+          <span>{showAll ? `Showing all ${batters.length} hitters` : `Showing the top 50 of ${batters.length}`}</span>
+          <button type="button" onClick={() => setShowAll((current) => !current)}>
+            <Icon name={showAll ? 'ChevronUp' : 'ChevronDown'} size={14} />
+            {showAll ? 'Show top 50' : `Show all ${batters.length}`}
+          </button>
+        </div>
+      )}
     </div>
   )
 }

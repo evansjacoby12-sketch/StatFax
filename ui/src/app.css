@@ -1044,6 +1044,35 @@ button.th:focus-visible {
 .board-body > .board-swipe:last-child {
   border-bottom: none;
 }
+.board-disclosure {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  color: var(--text-faint);
+  background: rgba(255,255,255,.018);
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+}
+.board-disclosure button,
+.lbv-show-more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 7px 11px;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.board-disclosure button:hover,
+.lbv-show-more:hover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
 .board-swipe-actions {
   position: absolute;
   inset: 0;
@@ -9185,6 +9214,7 @@ button.th:focus-visible {
 .lbv-result-tabs button.on b { color: var(--accent); background: color-mix(in srgb, var(--accent) 13%, transparent); }
 .lbv-result-tabs > span { margin-left: auto; color: var(--text-faint); font-size: 9px; text-align: right; }
 .lbv-result-list { display: flex; flex-direction: column; gap: 7px; }
+.lbv-show-more { align-self: center; min-height: 40px; margin-top: 7px; }
 .lbv-result-card {
   display: grid;
   grid-template-columns: minmax(190px, 1.05fr) minmax(260px, 1.5fr) auto auto;
