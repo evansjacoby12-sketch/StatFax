@@ -142,10 +142,10 @@ export const blastMixOf = (b) => {
 // carry (it only needs key/rank/require). Keys match combo-engine.js STRATEGIES.
 const STRAT_META = {
   core:      { label: 'Core Pair',     icon: 'Target',     desc: 'one PRIME anchor + one strong model support bat · no prices required' },
-  precision: { label: 'Precision',    icon: 'ScanSearch', desc: 'hottest elite-barrel bats — power surge + barrel ≥12% · 2.3× HR lift' },
-  hot:       { label: 'Hot Hand',     icon: 'Flame',      desc: 'heat-led bats on live power — best audited leg hit rate (42.9%)' },
+  precision: { label: 'Precision',    icon: 'ScanSearch', desc: 'recent power form plus an elite barrel rate of at least 12%' },
+  hot:       { label: 'Hot Hand',     icon: 'Flame',      desc: 'heat-led bats with the strongest recent power form' },
   matchup:   { label: 'Soft Matchup', icon: 'Radar',      desc: 'facing HR-prone pitchers (HR/9 ≥1.3)' },
-  mix:       { label: 'Best Mix',     icon: 'ChartSpline', desc: 'grade + barrel + heat blend — best audited all-hit rate' },
+  mix:       { label: 'Best Mix',     icon: 'ChartSpline', desc: 'balanced blend of grade, barrel quality and recent heat' },
   park:      { label: 'Park & Air',   icon: 'CloudSun',   desc: 'park × weather × hand boosts HR' },
   value:     { label: 'Value',        icon: 'DollarSign', desc: 'the +EV pairing — bats the market underprices (model HR% > the fair line)' },
   edge:      { label: 'Edge Stack',   icon: 'Swords',     desc: '2+ matchup signals converge (pitch type, zones, platoon, fly-ball)' },

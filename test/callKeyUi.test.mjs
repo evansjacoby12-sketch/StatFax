@@ -3,8 +3,9 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 
 test('Games and NRFI/YRFI share an honest responsive call-key legend', async () => {
-  const [key, games, firstInning, css] = await Promise.all([
+  const [key, catalog, games, firstInning, css] = await Promise.all([
     readFile(new URL('../ui/src/components/CallKey.jsx', import.meta.url), 'utf8'),
+    readFile(new URL('../ui/src/lib/explanationCatalog.js', import.meta.url), 'utf8'),
     readFile(new URL('../ui/src/components/GamesView.jsx', import.meta.url), 'utf8'),
     readFile(new URL('../ui/src/components/FirstInningZone.jsx', import.meta.url), 'utf8'),
     readFile(new URL('../ui/src/app.css', import.meta.url), 'utf8'),
@@ -12,14 +13,16 @@ test('Games and NRFI/YRFI share an honest responsive call-key legend', async () 
 
   assert.match(key, /aria-label="Model call key"/)
   assert.match(key, /title: 'Game markets'/)
-  assert.match(key, /tier: 'PLAY'/)
-  assert.match(key, /tier: 'PASS'/)
-  assert.match(key, /Best actionable edge/)
-  assert.match(key, /not recommended as a bet/)
+  assert.match(key, /items: GAME_CALLS/)
+  assert.match(catalog, /tier: 'PLAY'/)
+  assert.match(catalog, /tier: 'PASS'/)
+  assert.match(catalog, /Actionable model edge/)
+  assert.match(catalog, /No recommended wager/)
   assert.match(key, /title: 'First inning'/)
-  assert.match(key, /tier: 'STRONG'/)
-  assert.match(key, /tier: 'WATCH'/)
-  assert.match(key, /Diagnostic matchup — not actionable yet/)
+  assert.match(key, /items: FIRST_INNING_CALLS/)
+  assert.match(catalog, /tier: 'STRONG'/)
+  assert.match(catalog, /tier: 'WATCH'/)
+  assert.match(catalog, /Track, do not force/)
   assert.match(key, /<Icon name=\{item\.icon\}/)
 
   assert.match(

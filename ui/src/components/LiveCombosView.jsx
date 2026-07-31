@@ -131,7 +131,7 @@ export default function LiveCombosView({ batters, onSelect, favorConsistency = f
   return (
     <>
       <p className="lc-intro dim" style={{ fontSize: '12px', marginBottom: '12px', lineHeight: 1.4 }}>
-        Model combos in <b>in-progress games</b>, graded live against home runs. <b>Cashed</b> = all legs homered; <b>alive</b> = still going with no dead leg. Dead combos are hidden. Once every leg's game is final the combo drops off here — the settled day-by-day record lives in <b>Results → Combo results</b>.
+        Model combos in <b>in-progress games</b>, graded live against home runs. <b>Cashed</b> = all legs homered; <b>alive</b> = still going with no dead leg. Dead combos are hidden. Once every leg's game is final, find it under <b>Results → My Tickets → History</b>.
       </p>
 
       <div className="lc-kpis" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '14px' }}>

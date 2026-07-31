@@ -1,51 +1,16 @@
 import Icon from './Icon.jsx'
+import { FIRST_INNING_CALLS, GAME_CALLS } from '../lib/explanationCatalog.js'
 
 const GROUPS = [
   {
     title: 'Game markets',
-    items: [
-      {
-        tier: 'PLAY',
-        icon: 'CircleCheck',
-        tone: 'actionable',
-        description: 'Best actionable edge — every decision gate cleared.',
-      },
-      {
-        tier: 'LEAN',
-        icon: 'TrendingUp',
-        tone: 'lean',
-        description: 'Usable model edge — short of every PLAY gate.',
-      },
-      {
-        tier: 'PASS',
-        icon: 'Minus',
-        tone: 'diagnostic',
-        description: 'Direction only — not recommended as a bet.',
-      },
-    ],
+    scope: 'Moneyline and over/under only',
+    items: GAME_CALLS,
   },
   {
     title: 'First inning',
-    items: [
-      {
-        tier: 'STRONG',
-        icon: 'Shield',
-        tone: 'actionable',
-        description: 'Fully qualified NRFI/YRFI setup.',
-      },
-      {
-        tier: 'LEAN',
-        icon: 'TrendingUp',
-        tone: 'lean',
-        description: 'Qualified direction with smaller separation.',
-      },
-      {
-        tier: 'WATCH',
-        icon: 'Eye',
-        tone: 'diagnostic',
-        description: 'Diagnostic matchup — not actionable yet.',
-      },
-    ],
+    scope: 'NRFI and YRFI only',
+    items: FIRST_INNING_CALLS,
   },
 ]
 
@@ -76,6 +41,7 @@ export default function CallKey({ className = '' }) {
         {GROUPS.map((group) => (
           <section className="call-key-group" key={group.title}>
             <h3>{group.title}</h3>
+            <p className="call-key-scope">{group.scope}</p>
             <div className="call-key-list">
               {group.items.map((item) => (
                 <TierItem key={`${group.title}-${item.tier}`} item={item} />

@@ -1,34 +1,16 @@
 import { useState } from 'react'
 import Icon from './Icon.jsx'
 import { BADGES, gradeColor } from '../lib/badges.js'
+import { DATA_STATES, GRADE_DEFINITIONS, STAT_TERMS } from '../lib/explanationCatalog.js'
 import { hexA, Badge } from './atoms.jsx'
-
-const GRADES = [
-  { label: 'PRIME', min: 72, desc: 'Top-tier play — signals stack strongly' },
-  { label: 'STRONG', min: 52, desc: 'Above-average HR case' },
-  { label: 'LEAN', min: 36, desc: 'Marginal — some edge, some risk' },
-  { label: 'SKIP', min: 0, desc: 'Model sees little HR upside' },
-]
-
-const TERMS = [
-  ['HR Probability', 'Chance of ≥1 HR today. Starts with the calibrated, sim-resolved model rate; a visible AI marker means sourced external context applied a capped production adjustment.'],
-  ['Model score', '0–100 composite: 45% batter · 30% matchup · 25% environment, after calibration.'],
-  ['xHR', 'Expected HRs this game (sum of per-PA HR probabilities).'],
-  ['Rating', 'Quick 0–10 read of the score.'],
-  ['All-hit', 'Chance that every parlay leg homers. Leg probabilities multiply, so it falls quickly as legs are added.'],
-  ['Action ready', 'The player is in the posted starting order. It verifies execution readiness but does not raise the research ranking.'],
-  ['Projected lineup', 'The player is expected to start and remains fully ranked for research, but the official order is not posted. Verify before betting.'],
-  ['SGP probability', 'Independent product of the calibrated leg rates. No same-game correlation uplift is currently applied.'],
-  ['Edge', 'Model probability vs the best book price. Positive = model sees value.'],
-  ['Barrel%', 'Share of batted balls hit at HR-optimal exit velo + launch angle.'],
-  ['xSLG / xISO', "Statcast 'expected' slugging / isolated power from contact quality — strips out luck."],
-]
 
 export default function Legend({ onClose, embedded = false }) {
   const [query, setQuery] = useState('')
   const needle = query.trim().toLowerCase()
+  const visibleGrades = needle ? GRADE_DEFINITIONS.filter((grade) => `${grade.key} ${grade.threshold} ${grade.short} ${grade.description}`.toLowerCase().includes(needle)) : GRADE_DEFINITIONS
   const visibleBadges = needle ? BADGES.filter((badge) => `${badge.label} ${badge.desc}`.toLowerCase().includes(needle)) : BADGES
-  const visibleTerms = needle ? TERMS.filter(([term, description]) => `${term} ${description}`.toLowerCase().includes(needle)) : TERMS
+  const allTerms = [...DATA_STATES, ...STAT_TERMS]
+  const visibleTerms = needle ? allTerms.filter(([term, description]) => `${term} ${description}`.toLowerCase().includes(needle)) : allTerms
   return (
     <>
       {!embedded && <div className="drawer-scrim" onClick={onClose} />}
@@ -54,15 +36,15 @@ export default function Legend({ onClose, embedded = false }) {
           <Icon name="Trophy" size={14} /> Grades
         </h3>
         <div className="legend-grades">
-          {GRADES.map((g) => {
-            const c = gradeColor(g.label)
+          {visibleGrades.map((grade) => {
+            const c = gradeColor(grade.key)
             return (
-              <div className="legend-grade" key={g.label}>
+              <div className="legend-grade" key={grade.key}>
                 <span className="grade-chip grade-md" style={{ color: c, borderColor: hexA(c, 0.45), background: hexA(c, 0.12) }}>
-                  {g.label}
+                  {grade.key}
                 </span>
-                <span className="legend-grade-min mono">score ≥ {g.min}</span>
-                <span className="legend-grade-desc dim">{g.desc}</span>
+                <span className="legend-grade-min mono">{grade.threshold}</span>
+                <span className="legend-grade-desc"><b>{grade.short}</b><span className="dim">{grade.description}</span></span>
               </div>
             )
           })}
@@ -91,7 +73,7 @@ export default function Legend({ onClose, embedded = false }) {
             </div>
           ))}
         </dl>
-        {needle && visibleBadges.length === 0 && visibleTerms.length === 0 && <div className="learn-search-empty">No glossary entries match “{query}”.</div>}
+        {needle && visibleGrades.length === 0 && visibleBadges.length === 0 && visibleTerms.length === 0 && <div className="learn-search-empty">No glossary entries match “{query}”.</div>}
       </div>
     </>
   )

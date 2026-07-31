@@ -719,11 +719,11 @@ function GroupCard({ g, idx = 0, onSelect, selectedId, comboConf = 'off', slipSe
             <Icon name="Layers" size={10} /> CROSS-WINDOW
           </span>
         ) : allConfirmed ? (
-          <span className="grp-locked-tag" title="Every leg's lineup is confirmed — this is the final combo. Frozen at the morning lock and graded for the record.">
-            <Icon name="Lock" size={10} /> LOCKED
+          <span className="grp-locked-tag" title="Every leg is in a posted starting lineup. The combo is ready for a final price and starter check.">
+            <Icon name="UserRoundCheck" size={10} /> READY
           </span>
         ) : (
-          <span className="grp-projected-tag" title={`Projected — ${g.legs.filter((b) => b.lineupConfirmed !== true).length} of ${g.legs.length} legs aren't in a confirmed lineup yet. The combo is frozen at the morning lock and won't drift, but a leg could still be scratched or moved down the order before first pitch.`}>
+          <span className="grp-projected-tag" title={`Projected — ${g.legs.filter((b) => b.lineupConfirmed !== true).length} of ${g.legs.length} legs are not in a posted starting lineup yet. Use this for research, then verify every leg before placing it.`}>
             <Icon name="Clock3" size={10} /> PROJECTED
           </span>
         )}

@@ -1,10 +1,15 @@
 import Icon from './Icon.jsx'
 import { gradeColor, activeBadges, toneColor } from '../lib/badges.js'
+import { gradeExplanation } from '../lib/explanationCatalog.js'
 import { pct, rate, num } from '../lib/format.js'
 
 export function GradeChip({ grade, size = 'md', score = null }) {
   const label = grade?.label || 'SKIP'
   const color = gradeColor(label)
+  const explanation = gradeExplanation(label)
+  const accessibleLabel = score != null
+    ? `${label}, model score ${Math.round(score)} out of 100. ${explanation.description}`
+    : `${label}. ${explanation.description}`
   return (
     <span
       className={`grade-chip grade-${size} label-${label.toLowerCase()}`}
@@ -17,7 +22,8 @@ export function GradeChip({ grade, size = 'md', score = null }) {
         fontWeight: '700',
         letterSpacing: '0.05em'
       }}
-      title={score != null ? `${label} · model score ${score}/100` : label}
+      title={accessibleLabel}
+      aria-label={accessibleLabel}
     >
       {label}
       {score != null && (
@@ -160,6 +166,7 @@ export function Badge({ badge }) {
       className="badge"
       data-badge-key={b.key}
       title={b.desc}
+      aria-label={`${b.label}: ${b.desc}`}
       style={{
         borderColor: hexA(b.color, 0.2),
         background: `linear-gradient(135deg, ${hexA(b.color, 0.08)} 0%, rgba(255, 255, 255, 0.01) 100%)`,

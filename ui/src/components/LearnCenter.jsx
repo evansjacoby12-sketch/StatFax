@@ -5,8 +5,8 @@ import Guide from './Guide.jsx'
 import Legend from './Legend.jsx'
 
 const TABS = [
-  { id: 'playbook', label: 'Playbook', icon: 'Focus' },
-  { id: 'guide', label: 'Guide', icon: 'BookOpen' },
+  { id: 'playbook', label: 'Start here', icon: 'Focus' },
+  { id: 'guide', label: 'Keys', icon: 'BookOpen' },
   { id: 'glossary', label: 'Glossary', icon: 'Search' },
 ]
 
@@ -17,7 +17,7 @@ export default function LearnCenter({ initialTab = 'playbook', onClose }) {
       icon="GraduationCap"
       eyebrow="Reference workspace"
       title="Learn Center"
-      description="A practical playbook, product guide, and plain-language definition library in one place."
+      description="How to use the MLB engine and what every grade, call, badge, and data state means."
       tabs={TABS}
       activeTab={tab}
       onTabChange={setTab}

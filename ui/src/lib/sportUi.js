@@ -7,7 +7,7 @@ export const SPORT_UI = Object.freeze({
       { id: 'games', label: 'Games', icon: 'CalendarDays', desc: 'Game-by-game' },
       { id: 'pitchers', label: 'Pitchers', icon: 'Radar', desc: 'Pitcher vulnerability' },
       { id: 'weather', label: 'Weather', icon: 'CloudSun', desc: 'Weather report' },
-      { id: 'results', label: 'Results', icon: 'ChartNoAxesCombined', desc: 'Model track record + combos' },
+      { id: 'results', label: 'Results', icon: 'ChartNoAxesCombined', desc: 'Model results + tracked tickets' },
     ],
     mobileViews: [
       { id: 'board', label: 'Board', icon: 'Rows3' },

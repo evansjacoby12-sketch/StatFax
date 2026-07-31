@@ -1,20 +1,15 @@
 import Icon from './Icon.jsx'
+import { slateConditionForStars } from '../lib/explanationCatalog.js'
 
 // Day Rating — a slate-level "should I play HR props today?" signal. The
 // server score stays authoritative; this component makes its decision and
 // three inputs scannable without asking users to interpret a star scale.
 const TONE = { 5: 'great', 4: 'good', 3: 'ok', 2: 'soft', 1: 'skip' }
 
-function signalFor(stars) {
-  if (stars >= 4) return 'PLAY'
-  if (stars === 3) return 'LEAN'
-  return 'PASS'
-}
-
 export default function DayRating({ rating, estHRs }) {
   if (!rating || !rating.stars) return null
   const { stars, score, verdict, factors = {}, primePerGame, softArmPct, favGames, games, resilience = null } = rating
-  const signal = signalFor(stars)
+  const signal = slateConditionForStars(stars)
   const pct = (x) => `${Math.round(Math.max(0, Math.min(1, x ?? 0)) * 100)}%`
   const scoreValue = Math.round(Math.max(0, Math.min(100, score ?? 0)))
   const hasEst = Number.isFinite(estHRs) && estHRs > 0
@@ -28,7 +23,7 @@ export default function DayRating({ rating, estHRs }) {
           <small>/100</small>
         </span>
         <span className="dr-signal-copy">
-          <span className="dr-head">Day Rating</span>
+          <span className="dr-head">Slate condition</span>
           <span className="dr-signal-line">
             <b className="dr-signal">{signal}</b>
             <span className="dr-verdict">{verdict}</span>

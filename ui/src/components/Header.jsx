@@ -132,19 +132,19 @@ function HelpMenu({ sport, onOpenWeather, onOpenGroups, onOpenSplits, onOpenHowT
     {
       title: 'Build',
       items: [
-        { label: 'Bet Lab', desc: 'Explore combos, rank first innings and isolate same-game plays', icon: 'Beaker', fn: onOpenGroups },
+        { label: 'Bet Lab', desc: 'Curate HR combinations and evaluate NRFI/YRFI first innings', icon: 'Beaker', fn: onOpenGroups },
       ],
     },
     {
       title: 'Discover',
       items: [
-        { label: 'Find Plays', desc: 'Cheat sheets and your own evidence-backed lists', icon: 'ScanSearch', fn: onOpenWeather },
+        { label: 'Find Plays', desc: 'Turn a research idea into filters and a qualified hitter list', icon: 'ScanSearch', fn: onOpenWeather },
       ],
     },
     {
       title: 'Learn',
       items: [
-        { label: 'Learn Center', desc: 'Playbook, product guide and searchable glossary', icon: 'GraduationCap', fn: onOpenHowTo },
+        { label: 'Learn Center', desc: 'How to use StatFax and what every call, grade and badge means', icon: 'GraduationCap', fn: onOpenHowTo },
       ],
     },
     {
@@ -167,7 +167,7 @@ function HelpMenu({ sport, onOpenWeather, onOpenGroups, onOpenSplits, onOpenHowT
     keywords: 'nfl football reload games players injuries odds live stats',
   } : {
     label: 'Bet Lab',
-    desc: 'Analyze first innings and parlay combos',
+    desc: 'Evaluate NRFI/YRFI and curated HR combinations',
     icon: 'Beaker',
     fn: onOpenGroups,
     keywords: 'nrfi yrfi first inning same game combos',
@@ -176,8 +176,8 @@ function HelpMenu({ sport, onOpenWeather, onOpenGroups, onOpenSplits, onOpenHowT
     { label: 'Cheat Sheet', meta: 'NFL leaders', icon: 'LayoutGrid', fn: onOpenSplits, keywords: 'nfl football ranked props touchdown receiving rushing passing' },
     { label: 'Learn', meta: 'NFL guide', icon: 'GraduationCap', fn: onOpenHowTo, keywords: 'nfl football learn center playbook glossary guide' },
   ] : [
-    { label: 'Find Plays', meta: 'Discovery', icon: 'ScanSearch', fn: onOpenWeather, keywords: 'cheat sheets filtered lists' },
-    { label: 'Learn', meta: 'Guide', icon: 'GraduationCap', fn: onOpenHowTo, keywords: 'learn center playbook glossary help' },
+    { label: 'Find Plays', meta: 'List builder', icon: 'ScanSearch', fn: onOpenWeather, keywords: 'research filters qualified hitter lists' },
+    { label: 'Learn', meta: 'Keys + how to', icon: 'GraduationCap', fn: onOpenHowTo, keywords: 'learn center start keys glossary calls grades badges help' },
   ]
   const utilityTools = isNFL ? [
     {
@@ -225,7 +225,7 @@ function HelpMenu({ sport, onOpenWeather, onOpenGroups, onOpenSplits, onOpenHowT
     label: 'System settings',
     icon: 'SlidersHorizontal',
     fn: onOpenSettings,
-    keywords: 'display updates parlays experimental controls settings',
+    keywords: 'live updates explanations detail settings',
   }
   const normalizedQuery = toolQuery.trim().toLowerCase()
   const toolMatches = (tool) => !normalizedQuery || `${tool.label} ${tool.meta || ''} ${tool.desc || ''} ${tool.keywords || ''}`.toLowerCase().includes(normalizedQuery)
