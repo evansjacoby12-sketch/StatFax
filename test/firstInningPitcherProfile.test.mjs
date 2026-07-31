@@ -11,6 +11,7 @@ function play({
   batter,
   eventType,
   outs,
+  score = 0,
   pitcher = 50,
 }) {
   return {
@@ -19,7 +20,7 @@ function play({
       pitcher: { id: pitcher },
       batter: { id: batter },
     },
-    result: { eventType },
+    result: { eventType, awayScore: score, homeScore: 0 },
     count: { outs },
   }
 }
@@ -29,9 +30,9 @@ test('pitcher micro parser isolates inning one and each hitter’s first trip', 
     allPlays: [
       play({ inning: 1, batter: 1, eventType: 'walk', outs: 0 }),
       play({ inning: 1, batter: 2, eventType: 'strikeout', outs: 1 }),
-      play({ inning: 1, batter: 3, eventType: 'home_run', outs: 1 }),
-      play({ inning: 1, batter: 4, eventType: 'field_out', outs: 2 }),
-      play({ inning: 1, batter: 5, eventType: 'field_out', outs: 3 }),
+      play({ inning: 1, batter: 3, eventType: 'home_run', outs: 1, score: 2 }),
+      play({ inning: 1, batter: 4, eventType: 'field_out', outs: 2, score: 2 }),
+      play({ inning: 1, batter: 5, eventType: 'field_out', outs: 3, score: 2 }),
       play({ inning: 2, batter: 6, eventType: 'strikeout', outs: 1 }),
       play({ inning: 2, batter: 7, eventType: 'field_out', outs: 2 }),
       play({ inning: 2, batter: 8, eventType: 'walk', outs: 2 }),
@@ -53,10 +54,31 @@ test('pitcher micro parser isolates inning one and each hitter’s first trip', 
     bb: 1,
     hbp: 0,
     hr: 1,
+    runs: 2,
   })
   assert.equal(record.firstTimeThrough.bf, 9)
   assert.equal(record.firstTimeThrough.k, 3)
   assert.equal(record.firstTimeThrough.bb, 2)
+})
+
+test('starter scoreless rate follows the entire first-inning half after an early hook', () => {
+  const record = parsePitcherMicroGame({
+    allPlays: [
+      play({ inning: 1, batter: 1, eventType: 'walk', outs: 0, pitcher: 50 }),
+      play({ inning: 1, batter: 2, eventType: 'field_out', outs: 1, pitcher: 50 }),
+      play({ inning: 1, batter: 3, eventType: 'field_out', outs: 2, pitcher: 50 }),
+      play({ inning: 1, batter: 4, eventType: 'single', outs: 2, pitcher: 51, score: 1 }),
+      play({ inning: 1, batter: 5, eventType: 'field_out', outs: 3, pitcher: 51, score: 1 }),
+    ],
+  }, {
+    pitcherId: 50,
+    gamePk: 100,
+    date: '2026-07-21',
+    season: 2026,
+  })
+
+  assert.equal(record.firstInning.runs, 1)
+  assert.equal(record.firstInning.bf, 3)
 })
 
 test('start sample uses a 60-day window and drops prior season at eight starts', () => {
@@ -92,7 +114,7 @@ test('thin current-season samples blend previous starts and emit FIP/TTO rates',
   })
   const records = selected.selected.map((start) => ({
     ...start,
-    firstInning: { bf: 4, outs: 3, k: 2, bb: 0, hbp: 0, hr: 0 },
+    firstInning: { bf: 4, outs: 3, k: 2, bb: 0, hbp: 0, hr: 0, runs: 0 },
     firstTimeThrough: { bf: 9, outs: 7, k: 3, bb: 1, hbp: 0, hr: 0 },
   }))
   const profile = buildPitcherFirstInningProfile(records, {
@@ -109,5 +131,12 @@ test('thin current-season samples blend previous starts and emit FIP/TTO rates',
   assert.ok(profile.firstInningFip < 3)
   assert.ok(profile.ttoK9 > 9)
   assert.ok(profile.ttoBb9 < 4)
+  assert.equal(profile.scorelessFirstInningRate, 1)
+  assert.ok(profile.adjustedScorelessFirstInningRate > 0.733)
+  assert.ok(profile.adjustedScorelessFirstInningRate < 1)
+  assert.equal(
+    profile.firstInningScoringAllowedRate,
+    Number((1 - profile.adjustedScorelessFirstInningRate).toFixed(4)),
+  )
   assert.ok(profile.coverage > 0.5)
 })

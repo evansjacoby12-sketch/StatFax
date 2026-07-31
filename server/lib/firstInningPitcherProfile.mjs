@@ -1,4 +1,6 @@
-export const FIRST_INNING_PITCHER_PROFILE_VERSION = 1
+export const FIRST_INNING_PITCHER_PROFILE_VERSION = 2
+export const FIRST_INNING_PITCHER_SCORELESS_PRIOR = 0.733
+export const FIRST_INNING_PITCHER_SCORELESS_PRIOR_STARTS = 8
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value))
 const round = (value, digits = 3) => {
@@ -13,6 +15,23 @@ function dateAgeDays(date, asOf) {
   return Number.isFinite(from) && Number.isFinite(to)
     ? Math.floor((to - from) / 86_400_000)
     : null
+}
+
+function firstInningRuns(plays) {
+  if (!plays.length) return null
+  const scoreField = plays[0]?.about?.isTopInning ? 'awayScore' : 'homeScore'
+  const scoreboard = plays
+    .map((play) => Number(play?.result?.[scoreField]))
+    .filter(Number.isFinite)
+  if (scoreboard.length) return Math.max(0, ...scoreboard)
+
+  const scoringRunners = plays.reduce((runs, play) => (
+    runs + (play?.runners || []).filter((runner) => runner?.movement?.isScoringEvent === true).length
+  ), 0)
+  if (scoringRunners > 0) return scoringRunners
+
+  const rbi = plays.reduce((runs, play) => runs + (Number(play?.result?.rbi) || 0), 0)
+  return Math.max(0, rbi)
 }
 
 function playStats(plays) {
@@ -61,6 +80,11 @@ export function parsePitcherMicroGame(playByPlay, {
     firstTimeThroughPlays.push(play)
   }
   if (!firstInningPlays.length || !firstTimeThroughPlays.length) return null
+  const starterFieldingHalfIsTop = firstInningPlays[0]?.about?.isTopInning === true
+  const firstInningHalfPlays = (playByPlay?.allPlays || [])
+    .filter((play) => Number(play?.about?.inning) === 1)
+    .filter((play) => (play?.about?.isTopInning === true) === starterFieldingHalfIsTop)
+    .filter((play) => play?.about?.isComplete !== false)
 
   return {
     version: FIRST_INNING_PITCHER_PROFILE_VERSION,
@@ -68,7 +92,10 @@ export function parsePitcherMicroGame(playByPlay, {
     pitcherId: Number(pitcherId),
     date,
     season: Number(season),
-    firstInning: playStats(firstInningPlays),
+    firstInning: {
+      ...playStats(firstInningPlays),
+      runs: firstInningRuns(firstInningHalfPlays),
+    },
     firstTimeThrough: playStats(firstTimeThroughPlays),
   }
 }
@@ -129,6 +156,23 @@ function weightedTotals(records, field) {
   return totals
 }
 
+function weightedScorelessRate(records) {
+  let sample = 0
+  let scoreless = 0
+  for (const record of records) {
+    const runs = Number(record?.firstInning?.runs)
+    const weight = Number(record?.sampleWeight)
+    if (!Number.isFinite(runs) || !(weight > 0)) continue
+    sample += weight
+    if (runs === 0) scoreless += weight
+  }
+  return {
+    sample,
+    scoreless,
+    rate: sample > 0 ? scoreless / sample : null,
+  }
+}
+
 function rate9(value, outs) {
   return outs > 0 ? value * 27 / outs : null
 }
@@ -144,6 +188,7 @@ export function buildPitcherFirstInningProfile(records, {
 } = {}) {
   const first = weightedTotals(records, 'firstInning')
   const tto = weightedTotals(records, 'firstTimeThrough')
+  const scoreless = weightedScorelessRate(records)
   const effectiveStarts = records.reduce(
     (sum, record) => sum + (Number(record?.sampleWeight) || 0),
     0,
@@ -157,6 +202,12 @@ export function buildPitcherFirstInningProfile(records, {
   const firstCoverage = clamp(first.bf / 34, 0, 1)
   const ttoCoverage = clamp(tto.bf / 72, 0, 1)
   const coverage = 0.45 * startCoverage + 0.25 * firstCoverage + 0.30 * ttoCoverage
+  const adjustedScorelessRate = scoreless.sample > 0
+    ? (
+        scoreless.scoreless
+        + (FIRST_INNING_PITCHER_SCORELESS_PRIOR * FIRST_INNING_PITCHER_SCORELESS_PRIOR_STARTS)
+      ) / (scoreless.sample + FIRST_INNING_PITCHER_SCORELESS_PRIOR_STARTS)
+    : null
 
   return {
     version: FIRST_INNING_PITCHER_PROFILE_VERSION,
@@ -169,6 +220,15 @@ export function buildPitcherFirstInningProfile(records, {
     currentWindowStarts: Number(currentWindowStarts) || 0,
     previousSeasonStartsUsed: Number(previousSeasonStartsUsed) || 0,
     effectiveStarts: round(effectiveStarts, 2),
+    scorelessFirstInningRate: round(scoreless.rate, 4),
+    adjustedScorelessFirstInningRate: round(adjustedScorelessRate, 4),
+    firstInningScoringAllowedRate: Number.isFinite(adjustedScorelessRate)
+      ? round(1 - adjustedScorelessRate, 4)
+      : null,
+    scorelessFirstInningStarts: round(scoreless.scoreless, 2),
+    scorelessFirstInningSample: round(scoreless.sample, 2),
+    scorelessPriorRate: FIRST_INNING_PITCHER_SCORELESS_PRIOR,
+    scorelessPriorStarts: FIRST_INNING_PITCHER_SCORELESS_PRIOR_STARTS,
     firstInningFip: Number.isFinite(firstInningFip) ? round(clamp(firstInningFip, 0, 15)) : null,
     firstInningK9: Number.isFinite(rate9(first.k, first.outs)) ? round(clamp(rate9(first.k, first.outs), 0, 30)) : null,
     firstInningBb9: Number.isFinite(rate9(first.bb, first.outs)) ? round(clamp(rate9(first.bb, first.outs), 0, 30)) : null,

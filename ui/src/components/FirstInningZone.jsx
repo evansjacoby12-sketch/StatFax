@@ -116,6 +116,16 @@ function HalfPanel({ label, half }) {
       </div>
       <dl>
         <div><dt>Half runs</dt><dd className="mono">{half?.expectedRuns?.toFixed?.(2) ?? '—'}</dd></div>
+        <div><dt>Offense no-run base</dt><dd className="mono">{pct(half?.foundation?.offenseNoRunRate, 1)}</dd></div>
+        <div>
+          <dt>Starter scoreless 1st</dt>
+          <dd className="mono">
+            {pct(half?.foundation?.starterRawScorelessRate, 1)}
+            {half?.foundation?.starterSample > 0 ? ` · ${half.foundation.starterSample.toFixed(1)} starts` : ''}
+          </dd>
+        </div>
+        <div><dt>Shrunk starter rate</dt><dd className="mono">{pct(half?.foundation?.starterScorelessRate, 1)}</dd></div>
+        <div><dt>Half scoreless base</dt><dd className="mono">{pct(half?.foundation?.halfScorelessProbability, 1)}</dd></div>
         <div><dt>Top-3 split OBP</dt><dd className="mono">{half?.topOrderObp?.toFixed?.(3) ?? '—'}</dd></div>
         <div><dt>Offense score · L30</dt><dd className="mono">{pct(half?.historical?.offenseRecent30ScoreRate, 1)}</dd></div>
         <div><dt>Team YRFI · L30</dt><dd className="mono">{pct(half?.historical?.teamRecent30YrfiRate, 1)}</dd></div>

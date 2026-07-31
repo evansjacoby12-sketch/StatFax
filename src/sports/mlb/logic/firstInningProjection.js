@@ -437,6 +437,11 @@ function pitcherFirstInningFactor(profile) {
       firstInningBb9: null,
       ttoK9: null,
       ttoBb9: null,
+      scorelessFirstInningRate: null,
+      adjustedScorelessFirstInningRate: null,
+      firstInningScoringAllowedRate: null,
+      scorelessFirstInningStarts: 0,
+      scorelessFirstInningSample: 0,
       sampleMode: null,
       currentWindowStarts: 0,
       previousSeasonStartsUsed: 0,
@@ -468,9 +473,53 @@ function pitcherFirstInningFactor(profile) {
     firstInningBb9: finite(profile.firstInningBb9),
     ttoK9: finite(profile.ttoK9),
     ttoBb9: finite(profile.ttoBb9),
+    scorelessFirstInningRate: finite(profile.scorelessFirstInningRate),
+    adjustedScorelessFirstInningRate: finite(profile.adjustedScorelessFirstInningRate),
+    firstInningScoringAllowedRate: finite(profile.firstInningScoringAllowedRate),
+    scorelessFirstInningStarts: finite(profile.scorelessFirstInningStarts, 0),
+    scorelessFirstInningSample: finite(profile.scorelessFirstInningSample, 0),
     sampleMode: profile.sampleMode || null,
     currentWindowStarts: Number(profile.currentWindowStarts) || 0,
     previousSeasonStartsUsed: Number(profile.previousSeasonStartsUsed) || 0,
+  }
+}
+
+function halfInningFoundation(historical, pitcherMicro) {
+  const offenseScoreRate = clamp(finite(
+    historical?.offenseScoreRate,
+    historical?.scoringProbability,
+    MLB_FIRST_INNING_FALLBACK_HALF_SCORE_RATE,
+  ), 0.05, 0.7)
+  const offenseNoRunRate = 1 - offenseScoreRate
+  const rawStarterScorelessRate = finite(pitcherMicro?.scorelessFirstInningRate)
+  const adjustedStarterScorelessRate = finite(pitcherMicro?.adjustedScorelessFirstInningRate)
+  const defenseFallbackScorelessRate = 1 - clamp(finite(
+    historical?.defenseAllowanceRate,
+    historical?.leagueScoreRate,
+    MLB_FIRST_INNING_FALLBACK_HALF_SCORE_RATE,
+  ), 0.05, 0.7)
+  const starterScorelessRate = clamp(
+    finite(adjustedStarterScorelessRate, defenseFallbackScorelessRate),
+    0.3,
+    0.95,
+  )
+  const halfScorelessProbability = logistic(
+    0.5 * logit(offenseNoRunRate) + 0.5 * logit(starterScorelessRate),
+  )
+
+  return {
+    methodology: 'shrunk-starter-scoreless-x-offense-no-run',
+    starterSource: Number.isFinite(adjustedStarterScorelessRate)
+      ? 'starter-first-inning-sample'
+      : 'team-defense-fallback',
+    offenseScoreRate: round(offenseScoreRate),
+    offenseNoRunRate: round(offenseNoRunRate),
+    starterScorelessRate: round(starterScorelessRate),
+    starterRawScorelessRate: round(rawStarterScorelessRate),
+    starterScorelessStarts: finite(pitcherMicro?.scorelessFirstInningStarts, 0),
+    starterSample: finite(pitcherMicro?.scorelessFirstInningSample, 0),
+    halfScorelessProbability: round(halfScorelessProbability),
+    halfScoringProbability: round(1 - halfScorelessProbability),
   }
 }
 
@@ -504,22 +553,25 @@ function adjustedHalfProjection({
 }) {
   const starterFactor = finite(forecastInput?.starterFactor, 1)
   const pitcherMicro = pitcherFirstInningFactor(topOrder?.pitcherFirstInning)
+  const foundation = halfInningFoundation(historical, pitcherMicro)
   const collision = pitcherTopOrderCollision(topOrder, pitcherMicro)
   const environmentFactor = finite(forecastInput?.runEnvironmentFactor, 1)
   const baseRunsPerTeam = finite(forecastInput?.baseRunsPerTeam, 4.42)
   const forecastFactor = Number.isFinite(expectedRuns)
     ? clamp(expectedRuns / baseRunsPerTeam, 0.7, 1.4)
     : 1
-  const probabilityShift = (
-    0.80 * Math.log(finite(topOrder?.factor, 1))
-    + 0.35 * Math.log(starterFactor)
-    + 0.75 * Math.log(pitcherMicro.factor)
-    + 0.35 * Math.log(collision.factor)
-    + 0.30 * Math.log(environmentFactor)
-    + 0.25 * Math.log(forecastFactor)
+  const probabilityShift = clamp(
+    0.70 * Math.log(finite(topOrder?.factor, 1))
+    + 0.25 * Math.log(starterFactor)
+    + 0.45 * Math.log(pitcherMicro.factor)
+    + 0.30 * Math.log(collision.factor)
+    + 0.25 * Math.log(environmentFactor)
+    + 0.15 * Math.log(forecastFactor),
+    -0.45,
+    0.45,
   )
   const scoringProbability = clamp(
-    logistic(logit(finite(historical?.scoringProbability, MLB_FIRST_INNING_FALLBACK_HALF_SCORE_RATE)) + probabilityShift),
+    logistic(logit(foundation.halfScoringProbability) + probabilityShift),
     0.12,
     0.5,
   )
@@ -548,8 +600,9 @@ function adjustedHalfProjection({
     scoringProbability: round(scoringProbability),
     expectedRuns: round(projectedRuns, 3),
     coverage: round(clamp(coverage, 0, 1)),
+    foundation,
     factors: {
-      historical: round(finite(historical?.scoringProbability, MLB_FIRST_INNING_FALLBACK_HALF_SCORE_RATE)),
+      historical: foundation.halfScoringProbability,
       topOrder: round(finite(topOrder?.factor, 1)),
       starter: round(starterFactor),
       pitcherFirstInning: round(pitcherMicro.factor),
@@ -771,6 +824,12 @@ export function buildFirstInningProjection({
     version: MLB_FIRST_INNING_PROJECTION_VERSION,
     advisoryOnly: true,
     model: 'Forecast V10 + 1st Inning Layer',
+    foundation: {
+      methodology: 'starter-scoreless-rate blended with offense no-run rate per half',
+      sampleShrinkage: true,
+      advancedAdjustments: 'FIP, first-time-through K/BB, top-three hitters, park, weather, and Forecast V10',
+      halvesMultiplied: true,
+    },
     status: coverage >= 0.62 ? 'ready' : 'limited',
     lean,
     tier: finalTier,

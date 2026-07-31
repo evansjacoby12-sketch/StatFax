@@ -203,6 +203,11 @@ test('Forecast V10 first-inning layer emits complementary NRFI and YRFI probabil
             firstInningFip: 5.5,
             ttoK9: 6,
             ttoBb9: 4.5,
+            scorelessFirstInningRate: 0.25,
+            adjustedScorelessFirstInningRate: 0.55,
+            firstInningScoringAllowedRate: 0.45,
+            scorelessFirstInningStarts: 2,
+            scorelessFirstInningSample: 8,
             sampleMode: 'current-season-only',
             currentWindowStarts: 8,
             previousSeasonStartsUsed: 0,
@@ -227,6 +232,11 @@ test('Forecast V10 first-inning layer emits complementary NRFI and YRFI probabil
             firstInningFip: 2.7,
             ttoK9: 10,
             ttoBb9: 2,
+            scorelessFirstInningRate: 0.875,
+            adjustedScorelessFirstInningRate: 0.80,
+            firstInningScoringAllowedRate: 0.20,
+            scorelessFirstInningStarts: 7,
+            scorelessFirstInningSample: 8,
             sampleMode: 'current-season-only',
             currentWindowStarts: 8,
             previousSeasonStartsUsed: 0,
@@ -276,6 +286,16 @@ test('Forecast V10 first-inning layer emits complementary NRFI and YRFI probabil
   assert.ok(projection.halves.away.scoringProbability > projection.halves.home.scoringProbability)
   assert.ok(projection.halves.away.pitcherFirstInning.factor > 1)
   assert.ok(projection.halves.home.pitcherFirstInning.factor < 1)
+  assert.equal(projection.foundation.sampleShrinkage, true)
+  assert.equal(
+    projection.halves.away.foundation.methodology,
+    'shrunk-starter-scoreless-x-offense-no-run',
+  )
+  assert.equal(projection.halves.away.foundation.starterSource, 'starter-first-inning-sample')
+  assert.equal(projection.halves.away.foundation.starterRawScorelessRate, 0.25)
+  assert.equal(projection.halves.away.foundation.starterScorelessRate, 0.55)
+  assert.ok(projection.halves.away.foundation.offenseNoRunRate > 0)
+  assert.ok(projection.halves.away.foundation.halfScorelessProbability > 0)
   assert.equal(projection.shadow.recent30Applied, false)
   assert.ok(Number.isFinite(projection.shadow.recent30YrfiProbability))
   assert.equal(projection.shadow.recentLeagueApplied, false)

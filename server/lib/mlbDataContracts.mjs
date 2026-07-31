@@ -798,6 +798,24 @@ function validateGameProjectionRecord(prefix, projection, errors, gameIds = null
         }
       }
       if (first.pricesAvailable !== false) errors.push(`${at}.pricesAvailable: expected false until prices are modeled`)
+      if (first.foundation != null) {
+        const foundation = first.foundation
+        if (!isObject(foundation)) {
+          errors.push(`${at}.foundation: expected an object`)
+        } else {
+          if (foundation.sampleShrinkage !== true) {
+            errors.push(`${at}.foundation.sampleShrinkage: expected true`)
+          }
+          if (foundation.halvesMultiplied !== true) {
+            errors.push(`${at}.foundation.halvesMultiplied: expected true`)
+          }
+          for (const field of ['methodology', 'advancedAdjustments']) {
+            if (typeof foundation[field] !== 'string' || !foundation[field].trim()) {
+              errors.push(`${at}.foundation.${field}: expected non-empty text`)
+            }
+          }
+        }
+      }
       for (const field of ['selectedProbability', 'nrfiProbability', 'yrfiProbability', 'coverage']) {
         validateProbability(`${at}.${field}`, first[field], errors)
       }
@@ -865,6 +883,33 @@ function validateGameProjectionRecord(prefix, projection, errors, gameIds = null
         validateOptionalMetric(`${halfAt}.expectedRuns`, half.expectedRuns, errors, { min: 0, max: 3 })
         validateOptionalMetric(`${halfAt}.topOrderObp`, half.topOrderObp, errors, { min: 0, max: 1 })
         validateOptionalMetric(`${halfAt}.topOrderSplitCoverage`, half.topOrderSplitCoverage, errors, { min: 0, max: 1 })
+        if (half.foundation != null) {
+          const foundation = half.foundation
+          const foundationAt = `${halfAt}.foundation`
+          if (!isObject(foundation)) {
+            errors.push(`${foundationAt}: expected an object`)
+          } else {
+            if (foundation.methodology !== 'shrunk-starter-scoreless-x-offense-no-run') {
+              errors.push(`${foundationAt}.methodology: unsupported`)
+            }
+            if (!['starter-first-inning-sample', 'team-defense-fallback'].includes(foundation.starterSource)) {
+              errors.push(`${foundationAt}.starterSource: unsupported`)
+            }
+            for (const field of [
+              'offenseScoreRate',
+              'offenseNoRunRate',
+              'starterScorelessRate',
+              'starterRawScorelessRate',
+              'halfScorelessProbability',
+              'halfScoringProbability',
+            ]) {
+              validateOptionalMetric(`${foundationAt}.${field}`, foundation[field], errors, { min: 0, max: 1 })
+            }
+            for (const field of ['starterScorelessStarts', 'starterSample']) {
+              validateOptionalMetric(`${foundationAt}.${field}`, foundation[field], errors, { min: 0, max: 20 })
+            }
+          }
+        }
         if (!Array.isArray(half.topOrder) || half.topOrder.length > 3) {
           errors.push(`${halfAt}.topOrder: expected up to three hitters`)
         }
@@ -880,6 +925,16 @@ function validateGameProjectionRecord(prefix, projection, errors, gameIds = null
             validateProbability(`${microAt}.coverage`, micro.coverage, errors)
             validateOptionalMetric(`${microAt}.factor`, micro.factor, errors, { min: 0.5, max: 1.5 })
             validateOptionalMetric(`${microAt}.preventionScore`, micro.preventionScore, errors, { min: 0, max: 100 })
+            for (const field of [
+              'scorelessFirstInningRate',
+              'adjustedScorelessFirstInningRate',
+              'firstInningScoringAllowedRate',
+            ]) {
+              validateOptionalMetric(`${microAt}.${field}`, micro[field], errors, { min: 0, max: 1 })
+            }
+            for (const field of ['scorelessFirstInningStarts', 'scorelessFirstInningSample']) {
+              validateOptionalMetric(`${microAt}.${field}`, micro[field], errors, { min: 0, max: 20 })
+            }
             for (const field of ['firstInningFip', 'firstInningK9', 'firstInningBb9', 'ttoK9', 'ttoBb9']) {
               validateOptionalMetric(`${microAt}.${field}`, micro[field], errors, { min: 0, max: 30 })
             }

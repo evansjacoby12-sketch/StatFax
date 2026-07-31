@@ -1337,7 +1337,7 @@ function readFirstInningPitcherCache() {
   try {
     if (!existsSync(FIRST_INNING_PITCHER_CACHE_OUT_PATH)) return {};
     const artifact = JSON.parse(readFileSync(FIRST_INNING_PITCHER_CACHE_OUT_PATH, 'utf8'));
-    return artifact?.version === 1 && artifact.records && typeof artifact.records === 'object'
+    return [1, 2].includes(artifact?.version) && artifact.records && typeof artifact.records === 'object'
       ? artifact.records
       : {};
   } catch {
@@ -1372,7 +1372,7 @@ async function buildSlateFirstInningPitcherProfiles(pitcherRecentForm, pitcherId
   let cache = readFirstInningPitcherCache();
   if (!Object.keys(cache).length) {
     const remote = await fetchFromR2(FIRST_INNING_PITCHER_CACHE_URL);
-    if (remote?.version === 1 && remote.records && typeof remote.records === 'object') {
+    if ([1, 2].includes(remote?.version) && remote.records && typeof remote.records === 'object') {
       cache = remote.records;
       console.log(`[first-inning] restored ${Object.keys(cache).length} cached pitcher-game samples from R2`);
     }
@@ -1382,7 +1382,12 @@ async function buildSlateFirstInningPitcherProfiles(pitcherRecentForm, pitcherId
   for (const [pitcherId, sample] of Object.entries(samples)) {
     for (const start of sample.selected) {
       const key = `${pitcherId}-${start.gamePk}`;
-      if (cache[key] || seen.has(key)) continue;
+      const cached = cache[key];
+      const cacheReady = (
+        cached?.version === 2
+        && Number.isFinite(Number(cached?.firstInning?.runs))
+      );
+      if (cacheReady || seen.has(key)) continue;
       seen.add(key);
       jobs.push({ pitcherId: Number(pitcherId), ...start, key });
     }
@@ -1413,7 +1418,7 @@ async function buildSlateFirstInningPitcherProfiles(pitcherRecentForm, pitcherId
   );
   mkdirSync(dirname(FIRST_INNING_PITCHER_CACHE_OUT_PATH), { recursive: true });
   writeFileSync(FIRST_INNING_PITCHER_CACHE_OUT_PATH, JSON.stringify({
-    version: 1,
+    version: 2,
     updatedAt: new Date().toISOString(),
     records: compactRecords,
   }));
