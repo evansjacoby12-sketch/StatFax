@@ -12,6 +12,7 @@ import { useTickets } from '../lib/tickets.js'
 import { gradeTicket, summarizeTickets } from '../lib/ticketMath.js'
 import { loadBacktestLog } from '../lib/backtestLog.js'
 import { GRADE_FORM_WINDOWS, summarizeGradeForm } from '../lib/gradeForm.js'
+import { calibrationBandVerdict, summarizeRankPerformance } from '../lib/hrTransparency.js'
 import ModelTrackingResults from './ModelTrackingResults.jsx'
 
 function computeAuc(rows) {
@@ -213,7 +214,8 @@ function ModelResults({ meta }) {
   const auc = computeAuc(rows)
   const sorted = rows.slice().sort((a, b) => b.score - a.score)
   const topN = Math.max(1, Math.round(N * 0.1))
-  const topRate = sorted.slice(0, topN).filter((r) => r.homered).length / topN
+  const topHits = sorted.slice(0, topN).filter((r) => r.homered).length
+  const topRate = topHits / topN
 
   const byGrade = GRADE_ORDER.map((g) => {
     const seg = rows.filter((r) => (r.grade || 'SKIP') === g)
@@ -254,8 +256,9 @@ function ModelResults({ meta }) {
     else break
   }
 
-  const m = meta.modelMetrics
+  const m = meta?.modelMetrics
   const reliability = m?.reliability || []
+  const rankPerformance = summarizeRankPerformance(log.records || {}, RECENT_DAYS)
 
   // Scope the top-tier HR feed to the same rolling week as the tables above.
   const recentSet = new Set(dates.slice(0, RECENT_DAYS))
@@ -269,11 +272,13 @@ function ModelResults({ meta }) {
   return (
     <div className="results">
       <div className="results-kpis" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px', marginBottom: '24px' }}>
-        <Kpi label="Discrimination (AUC)" value={Number.isFinite(auc) ? auc.toFixed(3) : '—'} sub="ranking quality · 0.5 = random" accent="var(--prime)" />
-        <Kpi label="Top-decile hit rate" value={pct(topRate, 0)} sub={`${(topRate / base).toFixed(1)}x vs base ${pct(base, 0)}`} accent="var(--strong)" />
+        <Kpi label="Discrimination (AUC)" value={Number.isFinite(auc) ? auc.toFixed(3) : '—'} sub={`ranking quality · 0.5 = random · n=${N}`} accent="var(--prime)" />
+        <Kpi label="Top-decile hit rate" value={pct(topRate, 0)} sub={`${topHits}/${topN} HR · ${(topRate / base).toFixed(1)}x vs ${pct(base, 0)} base`} accent="var(--strong)" />
         <Kpi label="Graded picks" value={num(N)} sub={`${hits} HR · ${dates.length} days`} />
-        {m && <Kpi label="Brier vs baseline" value={m.brier.toFixed(4)} sub={`${pct((m.baselineBrier - m.brier) / m.baselineBrier, 0)} better`} accent="var(--accent)" />}
+        {m && <Kpi label="Brier vs baseline" value={m.brier.toFixed(4)} sub={`${signedPct((m.baselineBrier - m.brier) / m.baselineBrier, 0)} lift · n=${m.totalReconciled || N}`} accent="var(--accent)" />}
       </div>
+
+      <RankPerformance summary={rankPerformance} />
 
       <GradeForm records={log.records || {}} />
 
@@ -334,6 +339,7 @@ function ModelResults({ meta }) {
           <div style={{ flex: '1', display: 'grid', placeItems: 'center' }}>
             <Reliability bins={reliability} />
           </div>
+          <CalibrationBands bins={reliability} />
           <p className="chart-cap dim" style={{ fontSize: '11px', marginTop: '16px' }}>Predicted vs observed HR rates. Dashed diagonal = ideal calibration.</p>
         </section>
       </div>
@@ -468,6 +474,79 @@ function ModelResults({ meta }) {
           ))}
         </div>
       </section>
+    </div>
+  )
+}
+
+function RankPerformance({ summary }) {
+  const rankRows = [3, 10].map((limit) => summary.summaries[limit]).filter(Boolean)
+  return (
+    <section className="results-card rank-performance-card">
+      <div className="rank-performance-head">
+        <div>
+          <h3><Icon name="ListOrdered" size={14} /> Daily ranking performance</h3>
+          <p>Did the highest-ranked bats actually produce?</p>
+        </div>
+        <span className="mono">{summary.dateCount} settled {summary.dateCount === 1 ? 'slate' : 'slates'} · last 7</span>
+      </div>
+
+      <div className="rank-performance-summary">
+        {rankRows.map((row) => (
+          <div className="rank-performance-kpi" key={row.limit}>
+            <span>Top {row.limit}</span>
+            <strong className="mono">{row.hits}/{row.n} HR</strong>
+            <div>
+              <b>{row.cashDays}/{row.days}</b> slates with 1+ HR
+              {Number.isFinite(row.lift) && <small className="mono">{row.lift.toFixed(1)}× slate rate</small>}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="rank-performance-days" aria-label="Top ranked daily home-run results">
+        <div className="rank-performance-day rank-performance-th">
+          <span>Date</span><span>Top 3</span><span>Top 10</span><span>Slate</span>
+        </div>
+        {summary.daily.map((day) => (
+          <div className="rank-performance-day" key={day.date}>
+            <span className="mono">{day.date.slice(5)}</span>
+            {[3, 10].map((limit) => {
+              const result = day.selections[limit]
+              return (
+                <span className={`mono ${result?.cashed ? 'positive' : ''}`} key={limit}>
+                  {result ? `${result.hits}/${result.n}` : '—'}
+                  {result && <small>{result.cashed ? '1+ HR' : 'no HR'}</small>}
+                </span>
+              )
+            })}
+            <span className="mono">{day.slateHits}/{day.slateN}<small>{day.slateN ? pct(day.slateHits / day.slateN, 0) : '—'}</small></span>
+          </div>
+        ))}
+      </div>
+      <p className="rank-performance-note">Rank uses the frozen pregame model score. Only reconciled players who appeared count; every rate shows its denominator.</p>
+    </section>
+  )
+}
+
+function CalibrationBands({ bins }) {
+  if (!bins?.length) return null
+  return (
+    <div className="calibration-bands" aria-label="Public probability band calibration">
+      <div className="calibration-band calibration-band-head">
+        <span>Published band</span><span>Model avg</span><span>Actual HR</span><span>Sample</span><span>Read</span>
+      </div>
+      {bins.map((bin, index) => {
+        const verdict = calibrationBandVerdict(bin)
+        return (
+          <div className="calibration-band" key={`${bin.binLo}-${bin.binHi}-${index}`}>
+            <span className="mono">{Math.round(bin.binLo * 100)}–{Math.round(bin.binHi * 100)}%</span>
+            <span className="mono">{pct(bin.avgPredicted, 1)}</span>
+            <span className="mono">{pct(bin.observedRate, 1)}</span>
+            <span className="mono">n={num(bin.n)}</span>
+            <span className={`calibration-read ${verdict.key}`}>{verdict.label}</span>
+          </div>
+        )
+      })}
     </div>
   )
 }

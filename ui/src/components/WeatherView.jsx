@@ -7,6 +7,7 @@ import { num, signedPct, gameTime } from '../lib/format.js'
 import { teamColor, teamLogo, hexToRgba } from '../lib/teams.js'
 import { useLiveMode } from '../lib/liveMode.js'
 import { airSortValue, classifyWeatherGame, isFavorableWeatherGame, roofStatusForGame } from '../lib/weatherDecision.js'
+import stadiumData from '../../../src/sports/mlb/data/stadiums.json'
 
 const WX_SORTS = [
   { key: 'air', label: 'Best air', icon: 'CloudSun' },
@@ -15,6 +16,20 @@ const WX_SORTS = [
   { key: 'warm', label: 'Warmest', icon: 'Thermometer' },
   { key: 'time', label: 'First pitch', icon: 'Clock' },
 ]
+
+const PARK_SORTS = [
+  { key: 'overall', label: 'Overall' },
+  { key: 'L', label: 'LHB' },
+  { key: 'R', label: 'RHB' },
+]
+
+const parkFactorTone = (value) => value >= 1.05 ? 'boost' : value <= 0.95 ? 'drag' : 'neutral'
+
+function parkSplitLabel(park) {
+  const delta = (park.parkFactorL ?? park.parkFactor ?? 1) - (park.parkFactorR ?? park.parkFactor ?? 1)
+  if (Math.abs(delta) < 0.015) return 'Balanced'
+  return delta > 0 ? 'LHB edge' : 'RHB edge'
+}
 
 function sortGames(games, sort) {
   const byAir = (a, b) => airSortValue(b) - airSortValue(a) || (a.gamePk ?? 0) - (b.gamePk ?? 0)
@@ -30,6 +45,7 @@ function sortGames(games, sort) {
 
 export default function WeatherView({ batters, onSelect, selectedId }) {
   const [sort, setSort] = useState('air')
+  const [parkSort, setParkSort] = useState('overall')
   const [outdoorOnly, setOutdoorOnly] = useState(false)
   const [favorableOnly, setFavorableOnly] = useState(false)
 
@@ -49,6 +65,12 @@ export default function WeatherView({ batters, onSelect, selectedId }) {
     const warmest = sortGames(outdoor, 'warm')[0] || null
     return { outdoor, favorable, rainRisk, bestCarry, warmest }
   }, [allGames])
+  const parkRows = useMemo(() => {
+    const field = parkSort === 'L' ? 'parkFactorL' : parkSort === 'R' ? 'parkFactorR' : 'parkFactor'
+    return (stadiumData?.stadiums || []).slice().sort((a, b) =>
+      (b[field] ?? b.parkFactor ?? 1) - (a[field] ?? a.parkFactor ?? 1)
+      || a.team.localeCompare(b.team))
+  }, [parkSort])
 
   if (!allGames.length) return <WeatherEmpty message="No games match the current slate filters." />
 
@@ -100,6 +122,8 @@ export default function WeatherView({ batters, onSelect, selectedId }) {
         </div>
       </section>
 
+      <ParkFactorReference rows={parkRows} sort={parkSort} onSort={setParkSort} />
+
       <section className="wxboard-panel" aria-label="Weather decision board">
         <div className="wxboard-toolbar">
           <div className="wxboard-title">
@@ -150,6 +174,44 @@ export default function WeatherView({ batters, onSelect, selectedId }) {
         )}
       </section>
     </div>
+  )
+}
+
+function ParkFactorReference({ rows, sort, onSort }) {
+  return (
+    <details className="park-factor-reference">
+      <summary>
+        <span className="park-factor-reference-icon"><Icon name="Gauge" size={16} /></span>
+        <span><b>Handedness park-factor reference</b><small>Park-only HR multipliers · 1.00 is league average</small></span>
+        <span className="park-factor-reference-count mono">{rows.length} venues</span>
+        <Icon name="ChevronDown" size={16} className="park-factor-reference-chevron" />
+      </summary>
+      <div className="park-factor-reference-body">
+        <div className="park-factor-reference-intro">
+          <p>Compare how each venue plays for left- and right-handed batters before tonight&apos;s weather is applied.</p>
+          <div role="group" aria-label="Sort park factors">
+            {PARK_SORTS.map((option) => (
+              <button key={option.key} className={sort === option.key ? 'on' : ''} onClick={() => onSort(option.key)} aria-pressed={sort === option.key}>{option.label}</button>
+            ))}
+          </div>
+        </div>
+        <div className="park-factor-table">
+          <div className="park-factor-row park-factor-row-head">
+            <span>Team</span><span>Ballpark</span><span>LHB</span><span>RHB</span><span>Split</span>
+          </div>
+          {rows.map((park) => (
+            <div className="park-factor-row" key={`${park.team}-${park.name}`}>
+              <span className="mono park-factor-team">{park.team}</span>
+              <span className="park-factor-name"><b>{park.name}</b><small>{park.type}</small></span>
+              <span className={`mono factor-${parkFactorTone(park.parkFactorL ?? park.parkFactor ?? 1)}`}>{num(park.parkFactorL ?? park.parkFactor, 3)}×</span>
+              <span className={`mono factor-${parkFactorTone(park.parkFactorR ?? park.parkFactor ?? 1)}`}>{num(park.parkFactorR ?? park.parkFactor, 3)}×</span>
+              <span className="park-factor-split">{parkSplitLabel(park)}</span>
+            </div>
+          ))}
+        </div>
+        <p className="park-factor-reference-note"><Icon name="Info" size={11} /> Park factors describe venue tendency, not tonight&apos;s full environment. The Weather board adds roof, wind and air density separately.</p>
+      </div>
+    </details>
   )
 }
 

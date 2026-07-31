@@ -19,6 +19,7 @@ import { PLAYER_EXPLAIN_VERSION, useExplain } from '../lib/explain.js'
 import { buildPlayerExplainSignals } from '../lib/playerExplain.js'
 import { locationRating5, arsenalRating5, verifiedAttackCount } from '../lib/zoneEdge.js'
 import { powerReadyCriteria, barrelReadyCriteria } from '../lib/powerReady.js'
+import { probabilityBandForScore } from '../lib/hrTransparency.js'
 import * as store from '../lib/storage.js'
 
 const WORKER_URL = import.meta.env?.VITE_WORKER_URL || ''
@@ -328,7 +329,7 @@ function TabBar({ active, onChange }) {
 // Main export
 // ---------------------------------------------------------------------------
 
-export default function PlayerDrawer({ batter: b, batters, onClose, watched, inSlip, onToggleWatch, onToggleSlip, onOpenZone, onOpenPitcher }) {
+export default function PlayerDrawer({ batter: b, batters, scoreToProb, onClose, watched, inSlip, onToggleWatch, onToggleSlip, onOpenZone, onOpenPitcher }) {
   const trapRef = useFocusTrap()
   const liveMode = useLiveMode()
   const [tab, setTab] = useState('overview')
@@ -379,7 +380,7 @@ export default function PlayerDrawer({ batter: b, batters, onClose, watched, inS
             {/* key={tab} remounts the pane on tab change so the section-stagger
                 entrance animation (.drawer-pane > * in app.css) replays. */}
             <div key={tab} className="drawer-pane" style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
-              {tab === 'overview'  && <OverviewTab  b={b} color={color} onOpenZone={onOpenZone} liveMode={liveMode} />}
+              {tab === 'overview'  && <OverviewTab  b={b} color={color} scoreToProb={scoreToProb} onOpenZone={onOpenZone} liveMode={liveMode} />}
               {tab === 'matchup'   && <MatchupTab   b={b} batters={batters} onOpenZone={onOpenZone} onOpenPitcher={onOpenPitcher} />}
               {tab === 'form'      && <FormTab      b={b} />}
               {tab === 'splits'    && <SplitsTab    b={b} />}
@@ -400,12 +401,12 @@ export default function PlayerDrawer({ batter: b, batters, onClose, watched, inS
 // Tab panels
 // ---------------------------------------------------------------------------
 
-function OverviewTab({ b, color, onOpenZone, liveMode }) {
+function OverviewTab({ b, color, scoreToProb, onOpenZone, liveMode }) {
   return (
     <>
       <ResearchThesis b={b} />
       <PlateMatchup b={b} onOpenZone={onOpenZone} />
-      <ModelBreakdown b={b} />
+      <ModelBreakdown b={b} scoreToProb={scoreToProb} />
       <CaseVsCaution b={b} />
       <PaCurve b={b} color={color} />
       <EnvSection b={b} />
@@ -1381,11 +1382,67 @@ const SCOUT_TOOLS = [
   { key: 'environment', label: 'Park / Air', color: 'var(--accent)' },
 ]
 
-function ModelBreakdown({ b }) {
+function ModelBreakdown({ b, scoreToProb }) {
   if (b.batterScore == null && b.matchupScore == null) return null
   const grades = toolGrades(b)
+  const band = probabilityBandForScore(b.score, scoreToProb)
+  const leagueFactor = Number.isFinite(b.hrResilience?.leaguePowerFactor) ? b.hrResilience.leaguePowerFactor : null
+  const zone = b.zonePowerCollision?.applied === true ? b.zonePowerCollision : null
+  const aiBaseline = b.aiHr?.applied === true && Number.isFinite(b.baselineHrProbability) ? b.baselineHrProbability : null
+  const pointDelta = (after, before) => Number.isFinite(after) && Number.isFinite(before)
+    ? `${after - before >= 0 ? '+' : ''}${num((after - before) * 100, 1)}pp`
+    : '—'
   return (
-    <Section title="Model Breakdown" icon="BarChart3" className="scout-report-card model-breakdown-card">
+    <Section title="How this probability was built" icon="BarChart3" className="scout-report-card model-breakdown-card">
+      <div className="probability-recipe">
+        <div className="probability-recipe-head">
+          <span>Published HR chance</span>
+          <strong className="mono">{pct(b.hrProbability, 1)}</strong>
+        </div>
+        <div className="probability-recipe-steps">
+          {Number.isFinite(b.simHRProb) && (
+            <div className="probability-recipe-step">
+              <span className="probability-step-index">1</span>
+              <div><b>At-bat simulation</b><small>Per-PA power, pitcher path and expected opportunities.</small></div>
+              <strong className="mono">{pct(b.simHRProb, 1)}</strong>
+            </div>
+          )}
+          {band && (
+            <div className="probability-recipe-step">
+              <span className="probability-step-index">2</span>
+              <div><b>Historical calibration anchor</b><small>Score {band.label} has produced {pct(band.observedProb, 1)} HR · n={num(band.n)} settled picks.</small></div>
+              <strong className="mono">{pct(band.observedProb, 1)}</strong>
+            </div>
+          )}
+          {leagueFactor != null && leagueFactor !== 1 && (
+            <div className="probability-recipe-step context">
+              <span className="probability-step-index"><Icon name="Activity" size={11} /></span>
+              <div><b>League power environment</b><small>Slate-wide adjustment; player order is unchanged.</small></div>
+              <strong className="mono">×{num(leagueFactor, 3)}</strong>
+            </div>
+          )}
+          {zone && (
+            <div className="probability-recipe-step context">
+              <span className="probability-step-index"><Icon name="Crosshair" size={11} /></span>
+              <div><b>Verified zone + power collision</b><small>{zone.attackCount} attack {zone.attackCount === 1 ? 'zone' : 'zones'} · {num(zone.hardHitPct, 1)}% hard hit.</small></div>
+              <strong className="mono">{pointDelta(zone.inflatedProbability, zone.baselineProbability)}</strong>
+            </div>
+          )}
+          {aiBaseline != null && (
+            <div className="probability-recipe-step context">
+              <span className="probability-step-index"><Icon name="Sparkles" size={11} /></span>
+              <div><b>Sourced AI context</b><small>Bounded external-context adjustment; core score and grade stay unchanged.</small></div>
+              <strong className="mono">{pointDelta(b.hrProbability, aiBaseline)}</strong>
+            </div>
+          )}
+          <div className="probability-recipe-step final">
+            <span className="probability-step-index"><Icon name="Check" size={11} /></span>
+            <div><b>Published probability</b><small>Final calibrated estimate shown across StatFax.</small></div>
+            <strong className="mono">{pct(b.hrProbability, 1)}</strong>
+          </div>
+        </div>
+        <p className="probability-recipe-note"><Icon name="Info" size={11} /> Calibration sets the historical level; simulation resolves players within the score band. Context layers appear only when applied.</p>
+      </div>
       <div className="model-breakdown-meta">
         <span>Model inputs</span>
         <small>Power quality · matchup fit · park and air</small>

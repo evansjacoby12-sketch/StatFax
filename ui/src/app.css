@@ -10224,6 +10224,130 @@ button.th:focus-visible {
   filter: drop-shadow(0 0 4px color-mix(in srgb, var(--gc) 70%, transparent));
   animation: precisionPing 3s ease-in-out infinite;
 }
+
+/* ── HR transparency: public ranking, calibration, recipe and park reference ── */
+.rank-performance-card {
+  margin-bottom: 24px;
+  padding: 18px 20px;
+  background: rgba(17, 18, 20, 0.45);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 12px;
+}
+.rank-performance-head,
+.rank-performance-head > div,
+.rank-performance-head h3,
+.rank-performance-kpi > div {
+  display: flex;
+  align-items: center;
+}
+.rank-performance-head { justify-content: space-between; gap: 16px; margin-bottom: 14px; }
+.rank-performance-head > div { min-width: 0; align-items: flex-start; flex-direction: column; gap: 3px; }
+.rank-performance-head h3 { margin: 0; gap: 6px; color: #fff; font-size: 13px; text-transform: uppercase; letter-spacing: .05em; }
+.rank-performance-head h3 svg { color: var(--accent); }
+.rank-performance-head p { margin: 0; color: var(--text-faint); font-size: 10px; }
+.rank-performance-head > span { flex: none; color: var(--text-faint); font-size: 9px; }
+.rank-performance-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 12px; }
+.rank-performance-kpi { min-width: 0; padding: 12px; display: grid; grid-template-columns: auto auto; align-items: end; gap: 4px 10px; border: 1px solid var(--border-soft); border-radius: 10px; background: rgba(255,255,255,.018); }
+.rank-performance-kpi > span { color: var(--text-faint); font-size: 9px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
+.rank-performance-kpi > strong { justify-self: end; color: #fff; font-size: 18px; }
+.rank-performance-kpi > div { grid-column: 1 / -1; justify-content: space-between; gap: 8px; color: var(--text-dim); font-size: 9px; }
+.rank-performance-kpi > div b { color: var(--strong); }
+.rank-performance-kpi > div small { color: var(--accent); }
+.rank-performance-days { overflow: hidden; border: 1px solid var(--border-soft); border-radius: 9px; }
+.rank-performance-day { min-height: 42px; padding: 7px 10px; display: grid; grid-template-columns: 72px repeat(3, minmax(70px, 1fr)); align-items: center; gap: 8px; border-bottom: 1px solid rgba(255,255,255,.035); color: var(--text-dim); font-size: 10px; }
+.rank-performance-day:last-child { border-bottom: 0; }
+.rank-performance-day > span:not(:first-child) { display: flex; align-items: center; justify-content: space-between; gap: 5px; }
+.rank-performance-day > span small { color: var(--text-faint); font-family: var(--font); font-size: 8px; }
+.rank-performance-day > span.positive { color: var(--strong); font-weight: 800; }
+.rank-performance-day > span.positive small { color: var(--strong); }
+.rank-performance-th { min-height: 28px; background: rgba(255,255,255,.025); color: var(--text-faint); font-size: 8px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+.rank-performance-note { margin: 10px 0 0; color: var(--text-faint); font-size: 9px; line-height: 1.45; }
+
+.calibration-bands { width: 100%; margin-top: 12px; overflow: hidden; border: 1px solid var(--border-soft); border-radius: 8px; }
+.calibration-band { min-height: 34px; padding: 6px 8px; display: grid; grid-template-columns: 1.2fr .8fr .8fr .75fr .9fr; align-items: center; gap: 6px; border-bottom: 1px solid rgba(255,255,255,.035); color: var(--text-dim); font-size: 9px; }
+.calibration-band:last-child { border-bottom: 0; }
+.calibration-band-head { min-height: 27px; color: var(--text-faint); background: rgba(255,255,255,.025); font-size: 7px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+.calibration-read { justify-self: start; padding: 2px 5px; border: 1px solid var(--border-soft); border-radius: 5px; font-size: 7px; font-weight: 800; white-space: nowrap; }
+.calibration-read.aligned { color: var(--strong); border-color: color-mix(in srgb, var(--strong) 30%, transparent); background: color-mix(in srgb, var(--strong) 7%, transparent); }
+.calibration-read.low { color: var(--prime); border-color: color-mix(in srgb, var(--prime) 30%, transparent); background: color-mix(in srgb, var(--prime) 7%, transparent); }
+.calibration-read.high { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 30%, transparent); background: color-mix(in srgb, var(--warn) 7%, transparent); }
+
+.probability-recipe { margin-bottom: 16px; overflow: hidden; border: 1px solid color-mix(in srgb, var(--accent) 20%, var(--border-soft)); border-radius: 11px; background: rgba(151,149,203,.025); }
+.probability-recipe-head { min-height: 48px; padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px; border-bottom: 1px solid var(--border-soft); }
+.probability-recipe-head > span { color: var(--text-faint); font-size: 9px; font-weight: 850; letter-spacing: .06em; text-transform: uppercase; }
+.probability-recipe-head > strong { color: var(--accent); font-size: 20px; }
+.probability-recipe-steps { padding: 5px 10px; }
+.probability-recipe-step { min-height: 52px; padding: 8px 2px; display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; align-items: center; gap: 8px; border-bottom: 1px solid rgba(255,255,255,.04); }
+.probability-recipe-step:last-child { border-bottom: 0; }
+.probability-step-index { width: 22px; height: 22px; display: grid; place-items: center; color: var(--text-faint); border: 1px solid var(--border-soft); border-radius: 7px; background: rgba(255,255,255,.025); font-family: var(--mono); font-size: 9px; font-weight: 800; }
+.probability-recipe-step > div { min-width: 0; display: grid; gap: 2px; }
+.probability-recipe-step b { color: var(--text); font-size: 10.5px; }
+.probability-recipe-step small { color: var(--text-faint); font-size: 8.5px; line-height: 1.4; }
+.probability-recipe-step > strong { color: #fff; font-size: 11px; }
+.probability-recipe-step.context .probability-step-index { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 25%, transparent); }
+.probability-recipe-step.context > strong { color: var(--accent); }
+.probability-recipe-step.final { margin: 4px -4px; padding-inline: 6px; border: 1px solid color-mix(in srgb, var(--strong) 23%, transparent); border-radius: 8px; background: color-mix(in srgb, var(--strong) 6%, transparent); }
+.probability-recipe-step.final .probability-step-index,
+.probability-recipe-step.final > strong { color: var(--strong); }
+.probability-recipe-note { margin: 0; padding: 9px 12px; display: flex; align-items: flex-start; gap: 6px; color: var(--text-faint); border-top: 1px solid var(--border-soft); font-size: 8px; line-height: 1.45; }
+.probability-recipe-note svg { flex: none; margin-top: 1px; }
+
+.park-factor-reference { margin-bottom: 12px; border: 1px solid var(--border-soft); border-radius: 12px; background: rgba(15,14,21,.62); }
+.park-factor-reference > summary { min-height: 58px; padding: 9px 14px; display: grid; grid-template-columns: 34px minmax(0, 1fr) auto 22px; align-items: center; gap: 10px; cursor: pointer; list-style: none; }
+.park-factor-reference > summary::-webkit-details-marker { display: none; }
+.park-factor-reference-icon { width: 32px; height: 32px; display: grid; place-items: center; color: var(--accent); border: 1px solid rgba(151,149,203,.2); border-radius: 9px; background: rgba(151,149,203,.07); }
+.park-factor-reference > summary > span:nth-child(2) { min-width: 0; display: grid; gap: 2px; }
+.park-factor-reference > summary b { color: #fff; font-size: 11px; }
+.park-factor-reference > summary small { color: var(--text-faint); font-size: 8px; }
+.park-factor-reference-count { color: var(--text-faint); font-size: 8px; }
+.park-factor-reference-chevron { color: var(--text-faint); transition: transform .18s ease; }
+.park-factor-reference[open] .park-factor-reference-chevron { transform: rotate(180deg); }
+.park-factor-reference-body { padding: 0 14px 14px; border-top: 1px solid var(--border-soft); }
+.park-factor-reference-intro { min-height: 60px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.park-factor-reference-intro p { max-width: 620px; margin: 0; color: var(--text-dim); font-size: 9px; line-height: 1.45; }
+.park-factor-reference-intro > div { flex: none; display: flex; gap: 4px; }
+.park-factor-reference-intro button { min-width: 58px; min-height: 36px; padding: 0 9px; color: var(--text-dim); border: 1px solid var(--border-soft); border-radius: 8px; background: rgba(255,255,255,.02); font-size: 9px; font-weight: 800; }
+.park-factor-reference-intro button.on { color: var(--accent); border-color: rgba(151,149,203,.38); background: rgba(151,149,203,.08); }
+.park-factor-table { max-height: 430px; overflow-y: auto; border: 1px solid var(--border-soft); border-radius: 9px; }
+.park-factor-row { min-height: 43px; padding: 6px 10px; display: grid; grid-template-columns: 54px minmax(150px, 1fr) 72px 72px 82px; align-items: center; gap: 8px; border-bottom: 1px solid rgba(255,255,255,.035); color: var(--text-dim); font-size: 9px; }
+.park-factor-row:last-child { border-bottom: 0; }
+.park-factor-row-head { position: sticky; top: 0; z-index: 1; min-height: 28px; color: var(--text-faint); background: #111016; font-size: 7px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
+.park-factor-team { color: #fff; font-weight: 800; }
+.park-factor-name { min-width: 0; display: grid; gap: 1px; }
+.park-factor-name b { overflow: hidden; color: var(--text); font-size: 9.5px; text-overflow: ellipsis; white-space: nowrap; }
+.park-factor-name small { color: var(--text-faint); font-size: 7px; }
+.factor-boost { color: var(--strong); font-weight: 800; }
+.factor-drag { color: var(--bad); font-weight: 800; }
+.factor-neutral { color: var(--text-dim); }
+.park-factor-split { color: var(--text-faint); font-size: 8px; }
+.park-factor-reference-note { margin: 9px 0 0; display: flex; gap: 5px; color: var(--text-faint); font-size: 8px; line-height: 1.4; }
+.park-factor-reference-note svg { flex: none; }
+
+@media (max-width: 560px) {
+  .rank-performance-card { padding: 13px 12px; }
+  .rank-performance-head { align-items: flex-start; flex-direction: column; gap: 7px; }
+  .rank-performance-summary { grid-template-columns: 1fr; }
+  .rank-performance-day { min-height: 44px; padding-inline: 7px; grid-template-columns: 48px repeat(3, minmax(0, 1fr)); gap: 5px; font-size: 9px; }
+  .rank-performance-day > span:not(:first-child) { align-items: flex-start; flex-direction: column; justify-content: center; gap: 1px; }
+  .calibration-band { padding-inline: 5px; grid-template-columns: 1.15fr .8fr .8fr .72fr .9fr; gap: 3px; font-size: 8px; }
+  .calibration-read { padding-inline: 3px; font-size: 6.5px; }
+  .probability-recipe-step { min-height: 58px; }
+  .probability-recipe-step small { font-size: 9px; }
+  .park-factor-reference > summary { min-height: 64px; padding-inline: 10px; grid-template-columns: 34px minmax(0, 1fr) 18px; }
+  .park-factor-reference-count { display: none; }
+  .park-factor-reference-body { padding: 0 8px 10px; }
+  .park-factor-reference-intro { padding: 9px 2px; align-items: stretch; flex-direction: column; }
+  .park-factor-reference-intro > div { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .park-factor-reference-intro button { min-width: 0; min-height: 44px; }
+  .park-factor-row { min-height: 45px; padding-inline: 7px; grid-template-columns: 40px minmax(112px, 1fr) 50px 50px; gap: 5px; }
+  .park-factor-row > span:last-child { display: none; }
+  .park-factor-row-head { min-height: 30px; }
+  .park-factor-name b { font-size: 9px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .park-factor-reference-chevron { transition: none; }
+}
 .grp-core-tag {
   display: inline-flex;
   align-items: center;

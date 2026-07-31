@@ -885,6 +885,7 @@ export default function App() {
         <PlayerDrawer
           batter={selected}
           batters={all}
+          scoreToProb={data.meta?.scoreToProb}
           onClose={() => setSelectedId(null)}
           watched={watchlist.has(selected.id)}
           inSlip={slipSet.has(selected.id)}
