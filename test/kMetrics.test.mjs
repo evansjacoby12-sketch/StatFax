@@ -13,9 +13,9 @@ import {
 } from '../src/sports/mlb/logic/kMetrics.js'
 
 const ROWS = [
-  { estK: 6, actualK: 5, expIP: 5.5, actualIP: 5, expBF: 24, actualBF: 22 },
-  { estK: 8, actualK: 7, expIP: 6.2, actualIP: 6, expBF: 26, actualBF: 25 },
-  { estK: 4, actualK: 3, expIP: 4.8, actualIP: 4.2, expBF: 20, actualBF: 18 },
+  { estK: 6, baselineK: 5.4, actualK: 5, baselineHR: 0.8, actualHR: 1, expIP: 5.5, actualIP: 5, expBF: 24, actualBF: 22 },
+  { estK: 8, baselineK: 7.2, actualK: 7, baselineHR: 1.1, actualHR: 0, expIP: 6.2, actualIP: 6, expBF: 26, actualBF: 25 },
+  { estK: 4, baselineK: 3.1, actualK: 3, baselineHR: 0.4, actualHR: 0, expIP: 4.8, actualIP: 4.2, expBF: 20, actualBF: 18 },
 ]
 
 test('K metrics report mean, probability, and volume bias', () => {
@@ -28,6 +28,9 @@ test('K metrics report mean, probability, and volume bias', () => {
   assert.ok(metrics.bfBias > 0)
   assert.ok(metrics.brier >= 0 && metrics.brier <= 1)
   assert.equal(Object.keys(metrics.byLine).length, 8)
+  assert.equal(metrics.transparentBaseline.k.n, 3)
+  assert.equal(metrics.transparentBaseline.hr.n, 3)
+  assert.ok(metrics.transparentBaseline.k.mae < metrics.mae)
 })
 
 test('K scale search improves RMSE for a consistently high projection', () => {

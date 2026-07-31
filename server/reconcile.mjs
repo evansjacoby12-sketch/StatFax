@@ -659,8 +659,8 @@ export async function repairRecentDays(log, maxScan = 7) {
 }
 
 /**
- * Fetch actual starter K totals for each game on `date`.
- * Returns Map<`${pitcherId}-${gamePk}`, { k, ip, bf, name }> for all games that finished.
+ * Fetch actual starter K and HR totals for each game on `date`.
+ * Returns Map<`${pitcherId}-${gamePk}`, { k, hr, ip, bf, name }> for all games that finished.
  * allFinal = true when every scheduled game is Final.
  */
 export async function fetchPitcherKsForDate(date) {
@@ -680,12 +680,14 @@ export async function fetchPitcherKsForDate(date) {
       const p = bs?.teams?.[side]?.players?.[playerKey];
       if (!p) continue;
       const ks = p?.stats?.pitching?.strikeOuts;
+      const hr = p?.stats?.pitching?.homeRuns;
       const ip = p?.stats?.pitching?.inningsPitched;
       const bf = parseInt(p?.stats?.pitching?.battersFaced, 10);
       const name = p?.person?.fullName || '';
       if (Number.isFinite(ks)) {
         out.set(`${starterId}-${g.gamePk}`, {
           k: ks,
+          hr: Number.isFinite(hr) ? hr : null,
           ip: ip ? parseFloat(ip) : null,
           bf: Number.isFinite(bf) ? bf : null,
           name,

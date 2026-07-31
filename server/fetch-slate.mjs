@@ -5429,6 +5429,24 @@ async function main() {
           expIP: Number.isFinite(kd.expIP) ? kd.expIP : null,
           expBF: Number.isFinite(kd.expBF) ? kd.expBF : null,
           volumeSource: kd.volumeSource || null,
+          // Simple, readable benchmarks. These never feed K Brain or the HR
+          // scoring model; they are frozen here so results can compare each
+          // formula with the same starter's actual outcome.
+          baselineVersion: kd.transparentBaseline?.version ?? null,
+          baselineK: Number.isFinite(kd.baselineK) ? kd.baselineK : null,
+          baselineHR: Number.isFinite(kd.baselineHR) ? kd.baselineHR : null,
+          baselineLineupKRate: Number.isFinite(kd.transparentBaseline?.k?.lineupKRate)
+            ? kd.transparentBaseline.k.lineupKRate
+            : null,
+          baselineLineupIso: Number.isFinite(kd.transparentBaseline?.hr?.lineupIso)
+            ? kd.transparentBaseline.hr.lineupIso
+            : null,
+          baselineParkFactor: Number.isFinite(kd.transparentBaseline?.hr?.parkFactor)
+            ? kd.transparentBaseline.hr.parkFactor
+            : null,
+          baselineWeatherFactor: Number.isFinite(kd.transparentBaseline?.hr?.weatherFactor)
+            ? kd.transparentBaseline.hr.weatherFactor
+            : null,
           adjustedKRate: Number.isFinite(kd.adjustedKRate) ? kd.adjustedKRate : null,
           calibration: Number.isFinite(kd.calibration) ? kd.calibration : null,
           calibrationScale: Number.isFinite(kd.calibrationScale) ? kd.calibrationScale : null,
@@ -5481,6 +5499,7 @@ async function main() {
           return {
             ...e,
             actualK: actual?.k ?? null,
+            actualHR: actual?.hr ?? null,
             actualIP: actual?.ip ?? null,
             actualBF: actual?.bf ?? null,
           };

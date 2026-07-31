@@ -57,9 +57,29 @@ export function summarizeKRows(rows, { scale = 1 } = {}) {
 
   const ipRows = usable.filter((row) => Number.isFinite(row.expIP) && Number.isFinite(row.actualIP))
   const bfRows = usable.filter((row) => Number.isFinite(row.expBF) && Number.isFinite(row.actualBF))
+  const baselineKRows = usable.filter((row) => Number.isFinite(row.baselineK))
+  const baselineHRRows = usable.filter((row) => Number.isFinite(row.baselineHR) && Number.isFinite(row.actualHR))
   const summarizeVolumeBias = (values, predictedKey, actualKey) => values.length
     ? values.reduce((sum, row) => sum + row[predictedKey] - row[actualKey], 0) / values.length
     : null
+  const summarizePointBaseline = (values, predictedKey, actualKey) => {
+    if (!values.length) return { n: 0, bias: null, mae: null, rmse: null }
+    let error = 0
+    let absoluteError = 0
+    let squaredError = 0
+    for (const row of values) {
+      const delta = row[predictedKey] - row[actualKey]
+      error += delta
+      absoluteError += Math.abs(delta)
+      squaredError += delta ** 2
+    }
+    return {
+      n: values.length,
+      bias: error / values.length,
+      mae: absoluteError / values.length,
+      rmse: Math.sqrt(squaredError / values.length),
+    }
+  }
 
   for (const line of K_LINES) {
     const values = byLine[line]
@@ -81,6 +101,10 @@ export function summarizeKRows(rows, { scale = 1 } = {}) {
     ipBias: summarizeVolumeBias(ipRows, 'expIP', 'actualIP'),
     bfN: bfRows.length,
     bfBias: summarizeVolumeBias(bfRows, 'expBF', 'actualBF'),
+    transparentBaseline: {
+      k: summarizePointBaseline(baselineKRows, 'baselineK', 'actualK'),
+      hr: summarizePointBaseline(baselineHRRows, 'baselineHR', 'actualHR'),
+    },
     byLine,
   }
 }

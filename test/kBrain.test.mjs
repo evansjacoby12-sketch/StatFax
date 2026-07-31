@@ -22,7 +22,7 @@ import {
 const PITCHER = {
   id: 42,
   hand: 'R',
-  season: { bf: 500, k: 130, kPer9: 10.1 },
+  season: { bf: 500, k: 130, kPer9: 10.1, ip: 120, hr: 16, hrPer9: 1.2 },
   splits: {
     vl: { bf: 210, kPct: 27.5, hrPer9: 1.1 },
     vr: { bf: 290, kPct: 24.8, hrPer9: 0.9 },
@@ -66,6 +66,7 @@ test('canonical K Brain emits the complete server/UI contract', () => {
     'trend', 'conf', 'boost', 'splitKRate', 'swStrPct', 'whiffPct',
     'tempAdj', 'umpireAdj', 'parkKAdj', 'tttoPenalty', 'vegasTrim',
     'adjustedKRate', 'calibration', 'calibrationScale', 'calibrationBasis', 'modelVersion', 'tempF',
+    'baselineK', 'baselineHR', 'transparentBaseline',
     'lineupMode', 'lineupSize', 'lineupCandidates', 'lineupCoverage',
     'lineupSourceGamePk', 'lineupAsOf',
   ]) {
@@ -81,6 +82,9 @@ test('canonical K Brain emits the complete server/UI contract', () => {
   assert.equal(result.expBF, 22.5)
   assert.equal(result.calibration, K_CALIBRATION)
   assert.equal(result.calibrationScale, K_CALIBRATION_SCALE)
+  assert.ok(Number.isFinite(result.baselineK))
+  assert.ok(Number.isFinite(result.baselineHR))
+  assert.equal(result.transparentBaseline.version, 1)
   assert.ok(result.lo <= result.lambda && result.lambda <= result.hi)
 
   let previous = 1
@@ -255,14 +259,18 @@ test('K projection helpers use the expected total, not the uncertainty range', (
   assert.equal(projectedK({ lo: 4, hi: 8 }), 6, 'legacy range-only rows fall back to midpoint')
 
   const summary = summarizeKProjectionResults([
-    { estK: 6.6, actualK: 8, lo: 3, hi: 10 },
-    { estK: 8.2, actualK: 6, lo: 5, hi: 12 },
-    { estK: 7.4, actualK: 7, lo: 4, hi: 11 },
+    { estK: 6.6, baselineK: 7.5, baselineHR: 0.8, actualK: 8, actualHR: 1, lo: 3, hi: 10 },
+    { estK: 8.2, baselineK: 6.0, baselineHR: 1.2, actualK: 6, actualHR: 1, lo: 5, hi: 12 },
+    { estK: 7.4, baselineK: 7.0, baselineHR: 0.7, actualK: 7, actualHR: 0, lo: 4, hi: 11 },
   ])
   assert.equal(summary.n, 3)
   assert.equal(summary.exactCount, 1)
   assert.equal(summary.withinCount, 2, 'within-one accuracy uses the rounded whole-K projection')
   assert.ok(Math.abs(summary.mae - (4 / 3)) < 1e-9, 'MAE keeps the decimal projection')
+  assert.equal(summary.baselineKN, 3)
+  assert.equal(summary.baselineKMae, 1 / 6)
+  assert.equal(summary.baselineHRN, 3)
+  assert.ok(Math.abs(summary.baselineHRMae - (1.1 / 3)) < 1e-9)
 })
 
 test('K Brain UI is projection-first and does not invent betting value without odds', () => {
@@ -270,5 +278,7 @@ test('K Brain UI is projection-first and does not invent betting value without o
   assert.match(source, /Projected K/)
   assert.match(source, /chance to go over/)
   assert.match(source, /Why this projection/)
+  assert.match(source, /Simple K baseline/)
+  assert.match(source, /Starter HR baseline/)
   assert.doesNotMatch(source, /value ✓|fade ✗|neutral/)
 })

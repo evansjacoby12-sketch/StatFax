@@ -35,6 +35,10 @@ export function summarizeKProjectionResults(rows, within = 1) {
   let absoluteError = 0
   let exactCount = 0
   let withinCount = 0
+  let baselineKN = 0
+  let baselineKAbsoluteError = 0
+  let baselineHRN = 0
+  let baselineHRAbsoluteError = 0
   for (const row of rows || []) {
     const projection = projectedK(row)
     if (!Number.isFinite(projection) || !Number.isFinite(row?.actualK)) continue
@@ -44,6 +48,14 @@ export function summarizeKProjectionResults(rows, within = 1) {
     absoluteError += error
     if (pointError === 0) exactCount++
     if (pointError <= within) withinCount++
+    if (Number.isFinite(row.baselineK)) {
+      baselineKN++
+      baselineKAbsoluteError += Math.abs(row.actualK - row.baselineK)
+    }
+    if (Number.isFinite(row.baselineHR) && Number.isFinite(row.actualHR)) {
+      baselineHRN++
+      baselineHRAbsoluteError += Math.abs(row.actualHR - row.baselineHR)
+    }
   }
   return {
     n,
@@ -51,6 +63,10 @@ export function summarizeKProjectionResults(rows, within = 1) {
     within,
     exactCount,
     withinCount,
+    baselineKN,
+    baselineKMae: baselineKN ? baselineKAbsoluteError / baselineKN : null,
+    baselineHRN,
+    baselineHRMae: baselineHRN ? baselineHRAbsoluteError / baselineHRN : null,
   }
 }
 

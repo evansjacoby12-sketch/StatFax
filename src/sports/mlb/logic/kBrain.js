@@ -2,6 +2,8 @@
 // and the UI. Keep all K-distribution math here so a produced snapshot has the
 // same contract and values as a client-side fallback projection.
 
+import { buildTransparentStarterBaseline } from './transparentBaseline.js'
+
 const LEAGUE_K_PCT = 0.22
 const BF_PER_IP = 4.3
 const LEAGUE_WHIFF_PCT = 24.5
@@ -360,6 +362,7 @@ function umpireKAdjustment(umpire) {
  *   whiffPct:number|null, tempAdj:number, umpireAdj:number,
  *   parkKAdj:number, tttoPenalty:number, vegasTrim:number,
  *   adjustedKRate:number, calibration:number, calibrationScale:number,
+ *   baselineK:number|null, baselineHR:number|null, transparentBaseline:Object,
  *   calibrationBasis:string, modelVersion:number,
  *   tempF:number|null
  * }}
@@ -512,6 +515,10 @@ export function kBrain(pitcher, targets, { weather, umpire, parkFactorK } = {}) 
   const lambda = expBF * adjustedKRate * oppAdj * matchup.matchupAdj
     * tempAdj * umpireAdj * parkKAdj * tttoPenalty * K_CALIBRATION
 
+  // Keep the user's readable formulas beside the advanced model as a frozen
+  // benchmark. They never feed lambda, probabilities, grades, or decisions.
+  const transparentBaseline = buildTransparentStarterBaseline(pitcher, selectedTargets, { expectedIP: expIP })
+
   const probs = {}
   for (const line of K_LINES) probs[line] = kOverProb(lambda, line)
 
@@ -576,6 +583,9 @@ export function kBrain(pitcher, targets, { weather, umpire, parkFactorK } = {}) 
     tttoPenalty,
     vegasTrim,
     adjustedKRate,
+    baselineK: transparentBaseline.k.projection,
+    baselineHR: transparentBaseline.hr.projection,
+    transparentBaseline,
     calibration: K_CALIBRATION,
     calibrationScale: K_CALIBRATION_SCALE,
     calibrationBasis: 'v2-heldout-72-guarded-step-plus-v4-matchup',

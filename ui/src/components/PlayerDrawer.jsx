@@ -1654,6 +1654,8 @@ function PitcherSection({ b, batters, onOpenPitcher }) {
         <Cell k="HR/9" v={num(s.hrPer9, 2)} tone={s.hrPer9 >= 1.3 ? 'good' : s.hrPer9 <= 0.9 ? 'bad' : null} />
         <Cell k="K/9" v={num(s.kPer9, 1)} />
         <Cell k="Projected K" v={Number.isFinite(kProjection) ? kProjection.toFixed(1) : '—'} title={Number.isFinite(kProjection) ? `Projected strikeouts: ${kProjection.toFixed(1)} K. 80% uncertainty interval: ${estK.lo}–${estK.hi} K.` : 'Need a season K sample.'} />
+        <Cell k="Simple K" v={Number.isFinite(estK?.baselineK) ? estK.baselineK.toFixed(1) : '—'} title="Transparent benchmark: (K/9 × expected IP/9) × (lineup K% ÷ 22.2%). It does not change K Brain." />
+        <Cell k="Starter HR" v={Number.isFinite(estK?.baselineHR) ? estK.baselineHR.toFixed(2) : '—'} title="Transparent starter-only benchmark: (HR/9 × expected IP/9) × (lineup ISO ÷ .165) × park × weather. It does not change batter HR probability." />
         <Cell k="WHIP" v={num(s.whip, 2)} />
         <Cell k="IP" v={num(s.ip, 1)} />
         <Cell k="GB/FB" v={battedBallLabel(s.goAo)} tone={ballTone(s.goAo)} title="League ~1.15." />

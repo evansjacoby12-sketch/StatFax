@@ -279,6 +279,12 @@ function KBrainView({ pitchers, liveKsByPitcher = {} }) {
                   <div className="kbrain-projection-meta">
                     <span style={{ color: CONF_COLOR[ek.conf] }}>{ek.conf} confidence</span>
                     <span>{Number.isFinite(ek.expIP) ? `${ek.expIP.toFixed(1)} expected IP` : 'Workload unavailable'}</span>
+                    {(Number.isFinite(ek.baselineK) || Number.isFinite(ek.baselineHR)) && (
+                      <span title="Simple formula benchmarks; neither changes the advanced model projection">
+                        base {Number.isFinite(ek.baselineK) ? `${ek.baselineK.toFixed(1)} K` : 'K —'}
+                        {Number.isFinite(ek.baselineHR) ? ` · ${ek.baselineHR.toFixed(2)} starter HR` : ''}
+                      </span>
+                    )}
                   </div>
                 </div>
                 {liveK && (
@@ -424,6 +430,16 @@ function KBrainView({ pitchers, liveKsByPitcher = {} }) {
             <div className="kbrain-context">
               <div className="kbrain-section-label">Model &amp; matchup context</div>
               <div className="kbrain-adjustments">
+                {Number.isFinite(ek.baselineK) && (
+                  <span title="(K/9 × expected IP/9) × (lineup K% ÷ 22.2%). Benchmark only; it does not change K Brain.">
+                    Simple K baseline {ek.baselineK.toFixed(1)}
+                  </span>
+                )}
+                {Number.isFinite(ek.baselineHR) && (
+                  <span title="(HR/9 × expected IP/9) × (lineup ISO ÷ .165) × park × weather. Starter-only benchmark; it does not change batter HR probabilities.">
+                    Starter HR baseline {ek.baselineHR.toFixed(2)}
+                  </span>
+                )}
                 {ek.tempF != null && (
                   <span style={{ color: ek.tempAdj < 0.97 ? 'var(--bad)' : ek.tempAdj > 1.02 ? 'var(--strong)' : 'var(--text-faint)' }}>
                     {Math.round(ek.tempF)}°F{ek.tempAdj < 0.97 ? ' · cold' : ek.tempAdj > 1.02 ? ' · warm' : ''}
@@ -502,6 +518,9 @@ function KBrainView({ pitchers, liveKsByPitcher = {} }) {
         const showingCurrentModel = currentResults.length > 0
         const scoredResults = showingCurrentModel ? currentResults : recentResults
         const projectionSummary = summarizeKProjectionResults(scoredResults)
+        const kBaselineEdge = projectionSummary.baselineKMae != null && projectionSummary.mae != null
+          ? projectionSummary.baselineKMae - projectionSummary.mae
+          : null
         const displayDates = dates.filter((d) => (resultsByDate[d] || []).some((row) => (
           showingCurrentModel ? row.modelVersion === K_MODEL_VERSION : true
         )))
@@ -511,7 +530,10 @@ function KBrainView({ pitchers, liveKsByPitcher = {} }) {
               <span style={{ fontSize: '12px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-faint)' }}>K projection accuracy</span>
               {projectionSummary.n > 0 && (
                 <span style={{ fontSize: '11px', color: projectionSummary.mae <= 1 ? 'var(--strong)' : projectionSummary.mae <= 1.75 ? '#c69a57' : 'var(--bad)' }}>
-                  {showingCurrentModel ? `v${K_MODEL_VERSION}` : 'legacy'} · MAE {projectionSummary.mae.toFixed(1)} K · exact {projectionSummary.exactCount}/{projectionSummary.n} · ±1 K {projectionSummary.withinCount}/{projectionSummary.n}
+                  {showingCurrentModel ? `v${K_MODEL_VERSION}` : 'legacy'} · MAE {projectionSummary.mae.toFixed(1)} K
+                  {projectionSummary.baselineKMae != null ? ` vs simple ${projectionSummary.baselineKMae.toFixed(1)}` : ''}
+                  {kBaselineEdge != null ? ` · ${kBaselineEdge >= 0 ? 'model better' : 'simple better'} by ${Math.abs(kBaselineEdge).toFixed(1)}` : ''}
+                  {` · exact ${projectionSummary.exactCount}/${projectionSummary.n} · ±1 K ${projectionSummary.withinCount}/${projectionSummary.n}`}
                 </span>
               )}
               <Icon className="kbrain-record-chevron" name="ChevronDown" size={14} />
@@ -519,6 +541,11 @@ function KBrainView({ pitchers, liveKsByPitcher = {} }) {
             {!showingCurrentModel && projectionSummary.n > 0 && (
               <div style={{ fontSize: '10px', color: 'var(--text-faint)', margin: '-4px 0 10px' }}>
                 Legacy baseline only. v{K_MODEL_VERSION} tracking begins with its first graded slate. Exact and ±1 use the rounded projected total; MAE uses the decimal projection.
+              </div>
+            )}
+            {projectionSummary.baselineHRMae != null && (
+              <div style={{ fontSize: '10px', color: 'var(--text-faint)', margin: '-4px 0 10px' }}>
+                Starter HR formula · MAE {projectionSummary.baselineHRMae.toFixed(2)} HR across {projectionSummary.baselineHRN} settled starts. Tracked separately from batter HR probabilities.
               </div>
             )}
             <div className="kbrain-record-body">
@@ -537,10 +564,12 @@ function KBrainView({ pitchers, liveKsByPitcher = {} }) {
                       const pointError = Number.isFinite(pointProjection) ? e.actualK - pointProjection : null
                       const hit = Number.isFinite(pointError) && Math.abs(pointError) <= 1
                       return (
-                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', padding: '4px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: '6px' }}>
+                        <div key={i} style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px', fontSize: '11px', padding: '4px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: '6px' }}>
                           <span style={{ flex: 1, fontWeight: '600', color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{e.name}</span>
                           <span className="mono" style={{ color: 'var(--text-faint)', flexShrink: 0 }}>proj {Number.isFinite(projection) ? `${projection.toFixed(1)} → ${pointProjection}` : '—'} K</span>
+                          {Number.isFinite(e.baselineK) && <span className="mono" style={{ color: 'var(--text-faint)', flexShrink: 0 }}>base {e.baselineK.toFixed(1)}</span>}
                           <span className="mono" style={{ color: '#fff', fontWeight: '700', flexShrink: 0 }}>actual {e.actualK}</span>
+                          {Number.isFinite(e.baselineHR) && Number.isFinite(e.actualHR) && <span className="mono" style={{ color: 'var(--text-faint)', flexShrink: 0 }} title="Simple starter HR projection versus actual starter home runs allowed">HR {e.baselineHR.toFixed(2)} → {e.actualHR}</span>}
                           {Number.isFinite(pointError) && <span className="mono" style={{ color: hit ? 'var(--strong)' : 'var(--bad)', flexShrink: 0 }}>{pointError >= 0 ? '+' : ''}{pointError}</span>}
                           <Icon name={hit ? 'Check' : 'X'} size={13} style={{ flexShrink: 0, color: hit ? 'var(--strong)' : 'var(--bad)' }} aria-label={hit ? 'within one strikeout' : 'more than one strikeout off'} />
                         </div>
