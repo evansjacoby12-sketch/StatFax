@@ -76,38 +76,9 @@ cd ui && npm install && npm run dev   # React board at localhost:5173
 
 **Day Rating (1–5★):** Pitching 45% + Environment 30% + Supply 25%, computed from pre-cap PRIME count to correctly reflect raw slate quality.
 
-### AI HR context and shadow projections
-
-`npm run context` researches unstructured, current-day information that the numeric feeds can miss: starter changes, opener or pitch-limit risk, lineup/injury status, roof/weather changes, bullpen availability, and call-ups.
-
-The output at `dist/context.json` is a source-backed context artifact (`mode: "advisory"`, `scoreImpact: false`). Every accepted signal must:
-
-- target an exact slate-owned batter, pitcher, game, or bullpen key;
-- include a direct source URL, confidence, observation time, and expiration time;
-- use an allowed HR-context category and entity type;
-- contain no probability, score, multiplier, or weight fields.
-
-Run `npm run validate:ai-context` to enforce the source contract.
-
-Phase 2 runs `npm run ai:hr-shadow` after the context pass and maintains `dist/ai-hr-shadow.json`. For each affected pregame batter it freezes:
-
-- the engine's published HR probability as the baseline;
-- a deterministic shadow probability using `direction × confidence × 0.10` in log-odds space, capped at `±0.25` total log-odds;
-- exact signal IDs, notes, model, timestamps, and evidence URLs.
-
-The shadow ledger is a versioned experiment (`mode: "shadow"`, `scoreImpact: false`), is retained for 180 days, and is never itself read by the production scoring path or UI. Started-game records are frozen while current pregame records can refresh with newer sourced context. Run `npm run validate:ai-shadow` to verify its math and provenance.
-
-Phase 3 runs `npm run ai:hr-evaluate` and joins shadow records to reconciled outcomes by exact date, game, and batter. `dist/ai-hr-evaluation.json` reports:
-
-- paired baseline-versus-shadow Brier score and log loss;
-- fixed-bin expected calibration error and calibration tables;
-- a game-clustered 95% confidence interval for paired Brier improvement;
-- breakdowns by net AI direction, context kind, and entity type;
-- pending, settled, and scratched-record coverage.
-
-The statistical promotion gate remains read-only and cannot automatically change production scoring. It requires at least 500 settled batter-games, 30 HR outcomes, 40 distinct games, and 14 settled dates, then requires a positive lower 95% Brier bound, non-worse log loss, and no material calibration regression. Passing means only `eligible-for-review`; `autoPromotion` remains false.
-
-Production currently carries an explicit manual override (`gateOverride: true`): `npm run ai:hr-production` rebuilds the same validated context hypothesis and applies only its capped log-odds move to published `hrProbability`. It records the untouched baseline and signal IDs, is idempotent, and cannot change score, grade, simulation, or calibration input. See [`MODEL-DECISIONS.md`](MODEL-DECISIONS.md).
+Published HR probabilities now come only from the deterministic simulation,
+calibration, resilience, and explicitly documented statistical overlays. External
+AI research does not adjust, rank, or annotate HR probabilities.
 
 ## K Brain
 

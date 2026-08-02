@@ -18,13 +18,7 @@ export const MLB_ARTIFACTS = Object.freeze([
   'board-history.json',
   'zone-cache.json',
   'zone-evaluation.json',
-  'context.json',
   'mlb-data-health.json',
-  'mlb-data-health-history.json',
-  'ai-hr-shadow.json',
-  'ai-hr-evaluation.json',
-  'ai-hr-attribution.json',
-  'ai-hr-production.json',
   'brief.json',
 ])
 

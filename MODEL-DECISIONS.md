@@ -23,12 +23,12 @@ Authority: `src/sports/mlb/logic/ProbabilityEngine.js`, with the production pipe
 - The zone/contact collision can apply a capped HR-probability-only overlay after reliable zone evidence and hard-hit qualification. It must not mutate score or grade.
 - Post-break/calendar-gap form decay, league power regime, ranking-health checks, and context-overlay lift control slate resilience. Weak regimes reduce PRIME/combo supply rather than manufacturing confidence.
 
-AI external context has two paths:
-
-1. The shadow ledger evaluates the hypothesis without changing production.
-2. A manual production promotion, explicitly marked `gateOverride: true`, applies only the same source-backed, confidence-derived capped log-odds adjustment to `hrProbability`. It never changes score, grade, simulation input, or calibration input. The adjustment is idempotent and records the baseline and exact signal IDs.
-
-The manual override is intentional despite the original sample gate. It must remain visible in artifacts and validators; do not describe it as fully evidence-promoted.
+AI-HR production overlay v1 was retired on 2026-08-02. Published HR probability
+now stops after the deterministic simulation, calibration, resilience, and
+documented statistical overlays. Tavily/OpenAI research, shadow ledgers, and
+external-context probability deltas are not part of production. Rollback means
+restoring the removed versioned subsystem and its validation gate in one reviewed
+change; do not reintroduce an untracked post-process adjustment.
 
 ## K Brain
 
@@ -41,27 +41,28 @@ Authority: `src/sports/mlb/logic/kBrain.js`; current model version is 4.
 - Lineup-aware selection and pregame identity must remain doubleheader-safe.
 - Calibration changes require current-model held-out starts; do not tune from the old 45/183 aggregate record alone.
 
-## Forecast V10: moneyline and totals
+## Forecast V11: moneyline and totals
 
-Authority: `src/sports/mlb/logic/gameProjection.js` and `gameMarketDecision.js`; current model version is 10.
+Authority: `src/sports/mlb/logic/gameProjection.js` and `gameMarketDecision.js`; current model version is 11.
 
 - Team runs begin with opposing-starter expected runs over expected innings plus bullpen runs for the remainder, then apply lineup strength, park/weather, contextual matchup factors, and a small home-field run edge.
 - Win probability is a logistic transform of projected run differential (slope 0.45). A one-run edge is roughly 61%, two runs roughly 71%, and three runs roughly 79% before rounding.
 - Total pricing uses the independent Poisson scoring contract at the decimal projected total.
 - Sportsbook no-vig probabilities and prices measure edge/expected ROI and market quality. They do not define the raw run projection.
 - Game-market calls are PLAY, LEAN, or PASS. PLAY requires historical readiness, forward non-drift, edge, ROI, coverage, and at least two books. A raw PLAY is capped to LEAN while validation is not ready.
+- Under decisions also expose Blow-Up Risk from the historically calibrated negative-binomial score distribution. It is the chance of finishing at least three runs above the posted total. A HIGH result (one-in-six or greater) prospectively caps an otherwise-qualified Under PLAY to LEAN; it does not change projected runs, Poisson market probability, edge, or ROI. The cap is conservative and must be judged separately on settled forward calls before its threshold is promoted as optimized.
 - PASS is directional model information, not a recommended bet.
 
 Run lines are not a production market. Do not reintroduce them without a separately validated pricing and tracking contract.
 
 ## NRFI/YRFI first-inning layer
 
-Authority: `src/sports/mlb/logic/firstInningProjection.js` on top of Forecast V10.
+Authority: `src/sports/mlb/logic/firstInningProjection.js` on top of Forecast V11.
 
 - Foundation: three-season MLB first-inning linescores with expanding-date walk-forward validation and sample shrinkage.
 - Current teams: season/recent first-inning offense and allowance, strict recent-30 team form as evidence, plus starter first-inning samples.
 - Pitcher micro layer: roughly 30-60-day lookback, previous-season blend when the current-season start sample is thin, first-inning FIP, first-time-through K/BB, and handedness-aware top-three lineup quality.
-- Park, weather, lineup availability, and Forecast V10 contribute current-slate context.
+- Park, weather, lineup availability, and Forecast V11 contribute current-slate context.
 - NRFI and YRFI probabilities are complementary and sum to 1.
 - First-inning calls are STRONG, LEAN, or WATCH. WATCH is diagnostic unless the explicit prospective WATCH-NRFI promotion policy earns promotion from settled results.
 - The rolling league-wide 30-day NRFI/YRFI regime is shadow-only until it proves stable Brier improvement.

@@ -1145,10 +1145,6 @@ function MobileDrawerHeader({ b, color, onClose, watched, inSlip, onToggleWatch,
   const market = b.vegasImpliedProb
   const hasMarket = Number.isFinite(market)
   const edge = hasMarket && Number.isFinite(b.hrProbability) ? b.hrProbability - market : null
-  const aiDelta = b.aiHr?.applied === true && Number.isFinite(b.baselineHrProbability) && Number.isFinite(b.hrProbability)
-    ? b.hrProbability - b.baselineHrProbability
-    : null
-  const aiPointDelta = aiDelta == null ? null : `${aiDelta >= 0 ? '+' : ''}${num(aiDelta * 100, 1)}pp`
 
   useEffect(() => setSignalsOpen(false), [b.id])
 
@@ -1179,7 +1175,6 @@ function MobileDrawerHeader({ b, color, onClose, watched, inSlip, onToggleWatch,
         <div className="mobile-player-prob">
           <b className="mono">{pct(b.hrProbability, 1)}</b>
           <small>HR PROB</small>
-          {aiDelta != null && <span className="mobile-player-ai mono">AI {aiPointDelta}</span>}
         </div>
         <button className="mobile-player-close" onClick={onClose} aria-label="Close player details">
           <Icon name="X" size={17} />
@@ -1254,10 +1249,6 @@ function HeroNumbers({ b, color }) {
   const diff = vegas != null && b.hrProbability != null ? b.hrProbability - vegas : null
   const shownProb = useCountUp(b.hrProbability)
   const shownScore = useCountUp(b.score ?? 0)
-  const aiDelta = b.aiHr?.applied === true && Number.isFinite(b.baselineHrProbability) && Number.isFinite(b.hrProbability)
-    ? b.hrProbability - b.baselineHrProbability
-    : null
-  const aiPointDelta = aiDelta == null ? null : `${aiDelta >= 0 ? '+' : ''}${num(aiDelta * 100, 1)}pp`
   return (
     <div className="player-hero-numbers" style={{ display: 'flex', alignItems: 'center', gap: '16px', rowGap: '10px', flexWrap: 'wrap', padding: '12px 16px', marginBottom: '16px', borderRadius: '12px', border: `1px solid ${hexA(color, 0.25)}`, background: `linear-gradient(135deg, ${hexA(color, 0.07)} 0%, rgba(255,255,255,0.01) 100%)` }}>
       <div title={`raw score ${num(b.rawScore)}`}>
@@ -1269,7 +1260,6 @@ function HeroNumbers({ b, color }) {
         <HeroMini k="PAs" v={num(b.expectedPAs, 1)} title="Expected plate appearances" />
         <HeroMini k="Sim" v={pct(b.simHRProb, 1)} title="AB-by-AB simulated HR probability" />
         <HeroMini k="Ens" v={num(b.ensembleScore)} title="Ensemble model score" />
-        {aiDelta != null && <HeroMini k="AI Δ" v={aiPointDelta} tone="var(--accent)" title={`External-context AI adjustment from a ${pct(b.baselineHrProbability, 1)} statistical baseline`} />}
         {vegas != null && <HeroMini k="Market" v={pct(vegas, 1)} title="Market implied HR probability (mean across books)" />}
         {diff != null && <HeroMini k="vs Mkt" v={signedPct(diff, 1)} tone={diff >= 0 ? 'var(--good)' : 'var(--bad)'} title="Model probability minus market implied — positive = value" />}
       </div>
@@ -1386,7 +1376,6 @@ function ModelBreakdown({ b, scoreToProb }) {
   const band = probabilityBandForScore(b.score, scoreToProb)
   const leagueFactor = Number.isFinite(b.hrResilience?.leaguePowerFactor) ? b.hrResilience.leaguePowerFactor : null
   const zone = b.zonePowerCollision?.applied === true ? b.zonePowerCollision : null
-  const aiBaseline = b.aiHr?.applied === true && Number.isFinite(b.baselineHrProbability) ? b.baselineHrProbability : null
   const pointDelta = (after, before) => Number.isFinite(after) && Number.isFinite(before)
     ? `${after - before >= 0 ? '+' : ''}${num((after - before) * 100, 1)}pp`
     : '—'
@@ -1424,13 +1413,6 @@ function ModelBreakdown({ b, scoreToProb }) {
               <span className="probability-step-index"><Icon name="Crosshair" size={11} /></span>
               <div><b>Verified zone + power collision</b><small>{zone.attackCount} attack {zone.attackCount === 1 ? 'zone' : 'zones'} · {num(zone.hardHitPct, 1)}% hard hit.</small></div>
               <strong className="mono">{pointDelta(zone.inflatedProbability, zone.baselineProbability)}</strong>
-            </div>
-          )}
-          {aiBaseline != null && (
-            <div className="probability-recipe-step context">
-              <span className="probability-step-index"><Icon name="Sparkles" size={11} /></span>
-              <div><b>Sourced AI context</b><small>Bounded external-context adjustment; core score and grade stay unchanged.</small></div>
-              <strong className="mono">{pointDelta(b.hrProbability, aiBaseline)}</strong>
             </div>
           )}
           <div className="probability-recipe-step final">

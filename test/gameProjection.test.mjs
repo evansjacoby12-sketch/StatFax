@@ -8,6 +8,7 @@ import {
   evaluateWatchNrfiPromotion,
   gradeGameMarketDecision,
   gameMarketBlendPolicy,
+  gameBlowUpRisk,
   gameTotalProbabilities,
   MLB_GAME_WIN_LOGISTIC_SLOPE,
   negativeBinomialDistribution,
@@ -111,6 +112,17 @@ test('score summary exposes central 80% ranges and permits an honest tied mode',
   assert.ok(summary.total.coverage >= 0.8)
 })
 
+test('blow-up risk prices the negative-binomial tail three runs above the total line', () => {
+  const risk = gameBlowUpRisk(3.49, 5.12, 9.5)
+
+  assert.equal(risk.thresholdRuns, 13)
+  assert.equal(risk.marginRuns, 3)
+  assert.equal(risk.level, 'high')
+  assert.ok(risk.probability > 0.17 && risk.probability < 0.18)
+  assert.equal(risk.distributionFamily, 'negative-binomial')
+  assert.equal(gameBlowUpRisk(4, 4, null), null)
+})
+
 test('game projection emits run ranges, transparent factors, and market comparison', () => {
   const rows = balancedRows()
   const output = buildGameProjection({
@@ -137,7 +149,7 @@ test('game projection emits run ranges, transparent factors, and market comparis
 
   assert.equal(output.advisoryOnly, true)
   assert.equal(output.captureState, 'pregame')
-  assert.equal(output.modelVersion, 10)
+  assert.equal(output.modelVersion, 11)
   assert.ok(output.projectedTotal > 7 && output.projectedTotal < 11)
   assert.equal(output.estimatedScore.away + output.estimatedScore.home > 0, true)
   assert.deepEqual(output.estimatedScore, {
@@ -178,7 +190,9 @@ test('game projection emits run ranges, transparent factors, and market comparis
   assert.equal(output.pricingContract.marketInputsAffectProjection, false)
   assert.equal(output.marketComparison.total.line, 8.5)
   assert.ok(Number.isFinite(output.marketComparison.moneyline.homeModelEdge))
-  assert.equal(output.marketDecision.version, 1)
+  assert.equal(output.marketDecision.version, 2)
+  assert.ok(output.marketDecision.total.blowUpRisk)
+  assert.equal(output.marketDecision.total.blowUpRisk.line, 8.5)
   assert.equal(output.marketDecision.status, 'collecting')
   assert.equal(output.marketDecision.moneyline.rawTier, 'unavailable')
   assert.equal(output.marketDecision.total.rawTier, 'unavailable')
@@ -776,7 +790,7 @@ test('forward evaluation reports winner calibration and total error against simp
     marketHomeProbability,
     marketTotal,
   }) => ({
-    modelVersion: 10,
+    modelVersion: 11,
     pricingContract: {
       version: 1,
       projectedRuns: 'starter-bullpen-er-times-lineup-park-weather-plus-home-edge',

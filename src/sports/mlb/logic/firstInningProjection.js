@@ -823,11 +823,11 @@ export function buildFirstInningProjection({
   return {
     version: MLB_FIRST_INNING_PROJECTION_VERSION,
     advisoryOnly: true,
-    model: 'Forecast V10 + 1st Inning Layer',
+    model: 'Forecast V11 + 1st Inning Layer',
     foundation: {
       methodology: 'starter-scoreless-rate blended with offense no-run rate per half',
       sampleShrinkage: true,
-      advancedAdjustments: 'FIP, first-time-through K/BB, top-three hitters, park, weather, and Forecast V10',
+      advancedAdjustments: 'FIP, first-time-through K/BB, top-three hitters, park, weather, and Forecast V11',
       halvesMultiplied: true,
     },
     status: coverage >= 0.62 ? 'ready' : 'limited',

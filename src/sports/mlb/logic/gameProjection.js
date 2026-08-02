@@ -9,14 +9,17 @@ import {
   MLB_WATCH_NRFI_PROMOTION_POLICY,
 } from './firstInningProjection.js'
 
-export const MLB_GAME_PROJECTION_VERSION = 10
+export const MLB_GAME_PROJECTION_VERSION = 11
 export const MLB_GAME_BASE_RUNS_PER_TEAM = 4.42
 export const MLB_GAME_EVALUATION_MIN_GAMES = 100
 export const MLB_GAME_EVALUATION_MIN_DATES = 10
 // Retained for descriptive score uncertainty only. Market totals use the
-// Forecast V10 Poisson pricing contract below.
+// Forecast V11 Poisson pricing contract below.
 export const MLB_GAME_SCORE_DISPERSION = 3.5
 export const MLB_GAME_SCORE_INTERVAL_LEVEL = 0.8
+export const MLB_GAME_BLOW_UP_MARGIN_RUNS = 3
+export const MLB_GAME_BLOW_UP_MODERATE_PROBABILITY = 0.10
+export const MLB_GAME_BLOW_UP_HIGH_PROBABILITY = 1 / 6
 export const MLB_GAME_MARKET_SIDE_MIN_ADVANTAGE = 0.005
 export const MLB_GAME_MARKET_TOTAL_MIN_ADVANTAGE = 0.15
 export const MLB_GAME_MARKET_MAX_WEIGHT = 0.2
@@ -459,6 +462,52 @@ export function scoreDistributionSummary(
       home: home.mode,
       probability: round(awayDistribution[away.mode] * homeDistribution[home.mode], 4),
     },
+  }
+}
+
+export function gameBlowUpRisk(
+  awayExpectedRuns,
+  homeExpectedRuns,
+  line,
+  {
+    dispersion = MLB_GAME_SCORE_DISPERSION,
+    marginRuns = MLB_GAME_BLOW_UP_MARGIN_RUNS,
+  } = {},
+) {
+  if (
+    !Number.isFinite(awayExpectedRuns)
+    || awayExpectedRuns < 0
+    || !Number.isFinite(homeExpectedRuns)
+    || homeExpectedRuns < 0
+    || !Number.isFinite(line)
+    || line <= 0
+    || !Number.isFinite(marginRuns)
+    || marginRuns <= 0
+  ) return null
+
+  const away = negativeBinomialDistribution(awayExpectedRuns, dispersion)
+  const home = negativeBinomialDistribution(homeExpectedRuns, dispersion)
+  const total = convolveDistributions(away, home)
+  const thresholdRuns = Math.ceil(line + marginRuns)
+  const probability = total
+    .slice(thresholdRuns)
+    .reduce((sum, value) => sum + value, 0)
+  const level = probability >= MLB_GAME_BLOW_UP_HIGH_PROBABILITY
+    ? 'high'
+    : probability >= MLB_GAME_BLOW_UP_MODERATE_PROBABILITY
+      ? 'moderate'
+      : 'low'
+
+  return {
+    version: 1,
+    probability: round(probability, 4),
+    level,
+    line: round(line, 2),
+    thresholdRuns,
+    marginRuns,
+    distributionFamily: 'negative-binomial',
+    dispersion,
+    evidenceStatus: 'historical-distribution-prospective-tier-cap',
   }
 }
 
@@ -1011,6 +1060,11 @@ export function buildGameProjection({
     blended.awayExpectedRuns,
     blended.homeExpectedRuns,
   )
+  const blowUpRisk = gameBlowUpRisk(
+    blended.awayExpectedRuns,
+    blended.homeExpectedRuns,
+    comparison?.total?.line,
+  )
   const projection = {
     modelVersion: MLB_GAME_PROJECTION_VERSION,
     advisoryOnly: true,
@@ -1066,6 +1120,7 @@ export function buildGameProjection({
       projectedTotal,
       confidence,
       marketComparison: comparison,
+      blowUpRisk,
       policy: marketDecisionPolicy,
     }),
   }
@@ -2095,7 +2150,7 @@ export function evaluateGameForecasts(log = {}) {
       calibration: firstInningCalibration(firstInningRows),
     },
     note: status === 'collecting'
-      ? 'Forecast V10 moneyline and total results are collecting under the independent logistic and Poisson pricing contract.'
-      : 'Forecast V10 evaluation uses only model-independent fair prices; sportsbook markets remain comparison inputs.',
+      ? 'Forecast V11 moneyline and total results are collecting under the independent logistic and Poisson pricing contract.'
+      : 'Forecast V11 evaluation uses only model-independent fair prices; sportsbook markets remain comparison inputs.',
   }
 }

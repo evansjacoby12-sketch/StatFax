@@ -1,26 +1,9 @@
-import {
-  aiHrSignalAppliesToBatter,
-} from './aiHrShadow.mjs'
-import {
-  isPregameMlbGame,
-  validateAiHrContext,
-} from './aiHrContext.mjs'
 import { isValidFrozenPitcherCorrection } from './pitcherProvenance.mjs'
 
-export const MLB_DATA_HEALTH_VERSION = 2
+export const MLB_DATA_HEALTH_VERSION = 3
 export const MLB_DATA_HEALTH_MODE = 'watchdog'
 
-const AI_REVIEW_KINDS = new Set([
-  'starter-change',
-  'opener-risk',
-  'pitch-limit',
-  'lineup-status',
-  'injury',
-  'scratch-risk',
-  'roof',
-  'callup',
-])
-const ISSUE_SOURCES = new Set(['deterministic', 'ai-context'])
+const ISSUE_SOURCES = new Set(['deterministic'])
 const ISSUE_SEVERITIES = new Set(['critical', 'warning', 'info'])
 const ISSUE_SCOPES = new Set(['slate', 'game', 'batter'])
 const EXACT_PITCH_MIX_FIELDS = [
@@ -34,6 +17,14 @@ const same = (left, right) => left != null && right != null && String(left) === 
 const isObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value)
 const validIso = (value) => typeof value === 'string' && !Number.isNaN(Date.parse(value))
 const clean = (value, max = 280) => String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max)
+
+function isPregameMlbGame(game) {
+  if (!game || game.isLive === true || game.isFinal === true) return false
+  const status = clean(game.status, 40).toLowerCase()
+  if (!status) return true
+  return !['final', 'game over', 'completed', 'postponed', 'suspended', 'in progress']
+    .some((value) => status.includes(value))
+}
 
 function issueId(code, gamePk = null, playerId = null, suffix = null) {
   return [code, gamePk, playerId, suffix].filter((value) => value != null && value !== '').join(':')
@@ -278,42 +269,9 @@ function deterministicIssues(slate, generatedAt) {
   return issues
 }
 
-function aiIssues(slate, context, generatedAt) {
-  if (!context || !validateAiHrContext(context).ok || context.skipped || context.date !== slate?.date) return []
-  const now = Date.parse(generatedAt)
-  return context.signals
-    .filter((signal) => (
-      AI_REVIEW_KINDS.has(signal.kind) &&
-      Date.parse(signal.observedAt) <= now &&
-      Date.parse(signal.expiresAt) > now &&
-      !(signal.kind === 'lineup-status' && signal.direction === 'boost' && signal.severity === 'info')
-    ))
-    .map((signal) => ({
-      id: issueId('ai-context', signal.gamePk, signal.entityType === 'batter' ? signal.entityId : null, signal.id),
-      source: 'ai-context',
-      severity: 'warning',
-      code: `external-${signal.kind}`,
-      scope: signal.entityType === 'batter' ? 'batter' : 'game',
-      gamePk: Number(signal.gamePk),
-      playerId: signal.entityType === 'batter' && finite(signal.entityId) ? Number(signal.entityId) : null,
-      entityKey: signal.entityKey,
-      signalId: signal.id,
-      confidence: signal.confidence,
-      message: `${signal.entity}: ${signal.note}`,
-      blocksPublish: false,
-      requiresReview: true,
-      evidence: signal.evidence.map((item) => ({
-        url: item.url,
-        title: item.title,
-        publishedAt: item.publishedAt ?? null,
-      })),
-    }))
-}
-
 function summarize(issues) {
   const hardFailures = issues.filter((issue) => issue.blocksPublish).length
   const warnings = issues.filter((issue) => issue.severity === 'warning').length
-  const aiAlerts = issues.filter((issue) => issue.source === 'ai-context').length
   const affectedGames = new Set(issues.map((issue) => issue.gamePk).filter(finite)).size
   const affectedPlayerIds = new Set()
   for (const issue of issues) {
@@ -323,12 +281,12 @@ function summarize(issues) {
     }
   }
   const affectedBatters = affectedPlayerIds.size
-  return { hardFailures, warnings, aiAlerts, affectedGames, affectedBatters }
+  return { hardFailures, warnings, affectedGames, affectedBatters }
 }
 
-export function buildMlbDataHealth({ slate, context = null, generatedAt = new Date().toISOString() }) {
+export function buildMlbDataHealth({ slate, generatedAt = new Date().toISOString() }) {
   const at = validIso(generatedAt) ? new Date(generatedAt).toISOString() : new Date().toISOString()
-  const issues = [...deterministicIssues(slate, at), ...aiIssues(slate, context, at)]
+  const issues = deterministicIssues(slate, at)
     .sort((left, right) => (
       Number(right.blocksPublish) - Number(left.blocksPublish) ||
       left.source.localeCompare(right.source) ||
@@ -347,45 +305,32 @@ export function buildMlbDataHealth({ slate, context = null, generatedAt = new Da
     scoreImpact: false,
     enforcement: {
       deterministicIdentityFailuresBlockPublish: true,
-      aiAlertsBlockPublish: false,
-      aiAlertsChangeScores: false,
-    },
-    ai: {
-      status: !context ? 'missing' : !validateAiHrContext(context).ok ? 'invalid' : context.skipped ? 'skipped' : context.date !== slate?.date ? 'stale' : 'checked',
-      contextGeneratedAt: validIso(context?.generatedAt) ? context.generatedAt : null,
-      model: clean(context?.model, 100) || null,
     },
     counts,
     issues,
   }
 }
 
-function issueAppliesToRow(issue, row, game, contextBySignalId) {
+function issueAppliesToRow(issue, row) {
   if (issue.scope === 'slate') return true
   if (issue.scope === 'batter') return same(issue.playerId, row.playerId) && (issue.gamePk == null || same(issue.gamePk, row.gamePk))
   if (!same(issue.gamePk, row.gamePk)) return false
   if (finite(issue.teamId) && !same(issue.teamId, row.teamId)) return false
-  if (issue.source !== 'ai-context') return true
-  const signal = contextBySignalId.get(issue.signalId)
-  return signal ? aiHrSignalAppliesToBatter(signal, row, game) : true
+  return true
 }
 
-export function applyMlbDataHealth({ slate, context = null, generatedAt = new Date().toISOString() }) {
-  const report = buildMlbDataHealth({ slate, context, generatedAt })
+export function applyMlbDataHealth({ slate, generatedAt = new Date().toISOString() }) {
+  const report = buildMlbDataHealth({ slate, generatedAt })
   const output = structuredClone(slate)
-  const games = new Map((output.games || []).map((game) => [Number(game.gamePk), game]))
-  const contextBySignalId = new Map((context?.signals || []).map((signal) => [signal.id, signal]))
 
   for (const row of Object.values(output.scoredBatters || {})) {
     delete row.dataTrust
-    const game = games.get(Number(row.gamePk))
-    const related = report.issues.filter((issue) => issueAppliesToRow(issue, row, game, contextBySignalId))
+    const related = report.issues.filter((issue) => issueAppliesToRow(issue, row))
     if (!related.length) continue
     row.dataTrust = {
       status: related.some((issue) => issue.blocksPublish) ? 'blocked' : 'review',
       checkedAt: report.generatedAt,
       issueCodes: [...new Set(related.map((issue) => issue.code))].sort(),
-      aiAlerts: related.filter((issue) => issue.source === 'ai-context').length,
     }
   }
   output.dataHealth = {
@@ -423,9 +368,7 @@ export function validateMlbDataHealth({ slate, report }) {
   if (report.scoreImpact !== false) errors.push('scoreImpact: must be false')
   if (!validIso(report.generatedAt)) errors.push('generatedAt: expected an ISO timestamp')
   if (!Array.isArray(report.issues)) errors.push('issues: expected an array')
-  if (report.enforcement?.aiAlertsBlockPublish !== false || report.enforcement?.aiAlertsChangeScores !== false) {
-    errors.push('enforcement: AI alerts cannot block publishing or change scores')
-  }
+  if (report.enforcement?.deterministicIdentityFailuresBlockPublish !== true) errors.push('enforcement: deterministic identity failures must block publishing')
 
   const ids = new Set()
   for (const [index, issue] of (Array.isArray(report.issues) ? report.issues : []).entries()) {
@@ -442,16 +385,6 @@ export function validateMlbDataHealth({ slate, report }) {
     if (issue.affectedPlayerIds != null && (!Array.isArray(issue.affectedPlayerIds) || issue.affectedPlayerIds.some((value) => !finite(value)))) {
       errors.push(`${at}.affectedPlayerIds: expected finite MLB player IDs`)
     }
-    if (issue.source === 'ai-context') {
-      if (issue.blocksPublish) errors.push(`${at}: AI context cannot block publishing`)
-      if (!issue.signalId || !issue.entityKey) errors.push(`${at}: AI context requires signal provenance`)
-      if (!Array.isArray(issue.evidence) || !issue.evidence.length) errors.push(`${at}.evidence: source-backed AI issue requires evidence`)
-      for (const source of issue.evidence || []) {
-        try {
-          if (!['http:', 'https:'].includes(new URL(source?.url).protocol)) throw new Error('bad protocol')
-        } catch { errors.push(`${at}.evidence: invalid source URL`) }
-      }
-    }
   }
 
   const expectedCounts = summarize(Array.isArray(report.issues) ? report.issues : [])
@@ -463,13 +396,12 @@ export function validateMlbDataHealth({ slate, report }) {
   if (report.date !== slate?.date || report.slateGeneratedAt !== slate?.generatedAt) errors.push('report: slate identity does not reconcile')
   if (!isObject(slate?.dataHealth)) errors.push('slate.dataHealth: expected embedded summary')
   else {
-    for (const field of ['status', 'generatedAt', 'hardFailures', 'warnings', 'aiAlerts', 'affectedGames', 'affectedBatters']) {
+    for (const field of ['status', 'generatedAt', 'hardFailures', 'warnings', 'affectedGames', 'affectedBatters']) {
       const expected = field in expectedCounts ? expectedCounts[field] : report[field]
       if (slate.dataHealth[field] !== expected) errors.push(`slate.dataHealth.${field}: does not reconcile with report`)
     }
     if (slate.dataHealth.scoreImpact !== false) errors.push('slate.dataHealth.scoreImpact: must be false')
   }
-  if (report.ai?.status !== 'checked') warnings.push(`AI cross-check status: ${report.ai?.status || 'unknown'}`)
   return { ok: errors.length === 0, errors, warnings, metrics: { ...expectedCounts, status: expectedStatus } }
 }
 

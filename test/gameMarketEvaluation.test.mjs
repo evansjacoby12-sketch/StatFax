@@ -40,7 +40,7 @@ function resultRow({
   const totalProfit = totalResult === 'win' ? 0.9091 : totalResult === 'push' ? 0 : -1
   return {
     gamePk,
-    modelVersion: 10,
+    modelVersion: 11,
     pricingContract: { version: 1 },
     marketDecision: {
       moneyline: {
@@ -104,7 +104,7 @@ function logFromRows(rowsByDate) {
             {
               opening: {
                 capturedAt: `${date}T16:00:00.000Z`,
-                modelVersion: 10,
+                modelVersion: 11,
                 pricingContract: { version: 1 },
                 marketDecision: row.marketDecision,
                 market: {
@@ -117,7 +117,7 @@ function logFromRows(rowsByDate) {
               },
               closing: {
                 capturedAt: `${date}T18:00:00.000Z`,
-                modelVersion: 10,
+                modelVersion: 11,
                 pricingContract: { version: 1 },
                 marketDecision: row.marketDecision,
                 market: {

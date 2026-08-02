@@ -21,7 +21,7 @@ test('BetLab replaces the MLB custom builder with a priced-honest NRFI/YRFI zone
   assert.doesNotMatch(lab, /<FirstInningZone[\s\S]*?generatedAt=\{generatedAt\}/)
   assert.match(app, /firstInningHistoricalValidation=\{data\.raw\?\.firstInningHistoricalValidation \|\| null\}/)
   assert.match(app, /gameProjections=\{data\.raw\?\.gameProjections \|\| \{\}\}/)
-  assert.match(zone, /Forecast V10 \+ 1st Inning Layer/)
+  assert.match(zone, /Forecast V11 \+ 1st Inning Layer/)
   assert.match(zone, /WATCH NRFI gate/)
   assert.match(zone, /watchNrfiPromotion\.sample/)
   assert.match(zone, /promotionMinimum/)

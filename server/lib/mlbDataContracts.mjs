@@ -366,8 +366,8 @@ function validateGameMarketCallSnapshot(prefix, call, errors) {
   if (!call.capturedAt || Number.isNaN(Date.parse(call.capturedAt))) {
     errors.push(`${prefix}.capturedAt: expected an ISO timestamp`)
   }
-  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10].includes(call.modelVersion)) {
-    errors.push(`${prefix}.modelVersion: expected 1 through 10`)
+  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].includes(call.modelVersion)) {
+    errors.push(`${prefix}.modelVersion: expected 1 through 11`)
   }
   validateGamePricingContract(
     `${prefix}.pricingContract`,
@@ -486,7 +486,10 @@ function validateGameMarketDecision(prefix, decision, projection, errors) {
     errors.push(`${prefix}: expected an object for model v8`)
     return
   }
-  if (decision.version !== 1) errors.push(`${prefix}.version: expected 1`)
+  if (![1, 2].includes(decision.version)) errors.push(`${prefix}.version: expected 1 or 2`)
+  if (projection?.modelVersion >= 11 && decision.version !== 2) {
+    errors.push(`${prefix}.version: model v11 requires decision version 2`)
+  }
   if (decision.advisoryOnly !== true) errors.push(`${prefix}.advisoryOnly: must be true`)
   if (!['collecting', 'hold', 'drift-hold', 'ready'].includes(decision.status)) {
     errors.push(`${prefix}.status: unsupported`)
@@ -608,7 +611,14 @@ function validateGameMarketDecision(prefix, decision, projection, errors) {
     } else {
       const names = market === 'moneyline'
         ? ['edge', 'roi', 'coverage', 'marketQuality']
-        : ['edge', 'roi', 'coverage', 'marketQuality', 'separation']
+        : [
+            'edge',
+            'roi',
+            'coverage',
+            'marketQuality',
+            'separation',
+            ...(decision.version >= 2 ? ['blowUpRisk'] : []),
+          ]
       for (const name of names) {
         if (typeof value.gates[name] !== 'boolean') errors.push(`${at}.gates.${name}: expected boolean`)
       }
@@ -663,6 +673,48 @@ function validateGameMarketDecision(prefix, decision, projection, errors) {
       && Number.isFinite(total.modelPushProbability)
       && Math.abs(total.modelWinProbability + total.modelLoseProbability + total.modelPushProbability - 1) > 0.002
     ) errors.push(`${prefix}.total: win, lose, and push probabilities must sum to 1`)
+
+    const risk = total.blowUpRisk
+    if (risk != null) {
+      const at = `${prefix}.total.blowUpRisk`
+      if (!isObject(risk)) {
+        errors.push(`${at}: expected null or an object`)
+      } else {
+        if (risk.version !== 1) errors.push(`${at}.version: expected 1`)
+        validateOptionalMetric(`${at}.probability`, risk.probability, errors, { min: 0, max: 1 })
+        if (!['low', 'moderate', 'high'].includes(risk.level)) errors.push(`${at}.level: unsupported`)
+        validateOptionalMetric(`${at}.line`, risk.line, errors, { min: 0.5, max: 30 })
+        if (!Number.isInteger(risk.thresholdRuns) || risk.thresholdRuns < 1 || risk.thresholdRuns > 60) {
+          errors.push(`${at}.thresholdRuns: expected an integer in [1,60]`)
+        }
+        if (risk.marginRuns !== 3) errors.push(`${at}.marginRuns: expected 3`)
+        if (risk.distributionFamily !== 'negative-binomial') {
+          errors.push(`${at}.distributionFamily: expected negative-binomial`)
+        }
+        validateOptionalMetric(`${at}.dispersion`, risk.dispersion, errors, { min: 0.5, max: 20 })
+        if (risk.evidenceStatus !== 'historical-distribution-prospective-tier-cap') {
+          errors.push(`${at}.evidenceStatus: unsupported`)
+        }
+        if (typeof risk.capApplied !== 'boolean') errors.push(`${at}.capApplied: expected boolean`)
+        if (Number.isFinite(total.line) && Math.abs(risk.line - total.line) > 0.01) {
+          errors.push(`${at}.line: must match total line`)
+        }
+        if (
+          Number.isFinite(risk.line)
+          && Number.isInteger(risk.thresholdRuns)
+          && risk.thresholdRuns !== Math.ceil(risk.line + risk.marginRuns)
+        ) errors.push(`${at}.thresholdRuns: inconsistent with line and margin`)
+        if (risk.capApplied && !(
+          total.selectedSide === 'under'
+          && total.rawTier === 'play'
+          && total.tier === 'lean'
+          && risk.level === 'high'
+          && total.gates?.blowUpRisk === false
+        )) errors.push(`${at}.capApplied: inconsistent with the under tier cap`)
+      }
+    } else if (projection?.modelVersion >= 11 && Number.isFinite(total.line)) {
+      errors.push(`${prefix}.total.blowUpRisk: required when a model v11 total line is available`)
+    }
   }
 }
 
@@ -671,7 +723,7 @@ function validateGameProjectionRecord(prefix, projection, errors, gameIds = null
     errors.push(`${prefix}: expected an object`)
     return
   }
-  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10].includes(projection.modelVersion)) errors.push(`${prefix}.modelVersion: expected 1 through 10`)
+  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].includes(projection.modelVersion)) errors.push(`${prefix}.modelVersion: expected 1 through 11`)
   if (projection.advisoryOnly !== true) errors.push(`${prefix}.advisoryOnly: must be true`)
   if (projection.captureState !== 'pregame') errors.push(`${prefix}.captureState: expected pregame`)
   if (!Number.isFinite(projection.gamePk)) errors.push(`${prefix}.gamePk: must be finite`)
@@ -720,7 +772,7 @@ function validateGameProjectionRecord(prefix, projection, errors, gameIds = null
     } else {
       if (first.version !== 1) errors.push(`${at}.version: expected 1`)
       if (first.advisoryOnly !== true) errors.push(`${at}.advisoryOnly: must be true`)
-      if (!['Forecast V9 + 1st Inning Layer', 'Forecast V10 + 1st Inning Layer'].includes(first.model)) errors.push(`${at}.model: unsupported`)
+      if (!['Forecast V9 + 1st Inning Layer', 'Forecast V10 + 1st Inning Layer', 'Forecast V11 + 1st Inning Layer'].includes(first.model)) errors.push(`${at}.model: unsupported`)
       if (!['ready', 'limited'].includes(first.status)) errors.push(`${at}.status: unsupported`)
       if (!['nrfi', 'yrfi'].includes(first.lean)) errors.push(`${at}.lean: unsupported`)
       if (!['strong', 'lean', 'watch', 'limited'].includes(first.tier)) errors.push(`${at}.tier: unsupported`)

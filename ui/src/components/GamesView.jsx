@@ -212,6 +212,9 @@ function MarketDecisionCard({
     : validation.drift === 'watch'
       ? 'Drift watch'
       : null
+  const blowUpRisk = market === 'total' && decision?.selectedSide === 'under'
+    ? decision?.blowUpRisk
+    : null
 
   return (
     <article className={`game-decision-card ${tier}`} aria-label={`${market} decision: ${tier}`}>
@@ -266,6 +269,18 @@ function MarketDecisionCard({
           </span>
         )}
       </div>
+      {blowUpRisk && (
+        <div
+          className={`game-decision-blowup ${blowUpRisk.level}`}
+          title={`Chance this game finishes at least ${blowUpRisk.marginRuns} runs above the posted total. This is a volatility warning, not a second projection.`}
+        >
+          <Icon name={blowUpRisk.level === 'high' ? 'TriangleAlert' : 'Flame'} size={11} />
+          <span>Blow-Up Risk</span>
+          <b>{blowUpRisk.level.toUpperCase()}</b>
+          <em className="mono">{pct(blowUpRisk.probability, 1)} chance of {blowUpRisk.thresholdRuns}+ runs</em>
+          {blowUpRisk.capApplied && <small>PLAY capped to LEAN</small>}
+        </div>
+      )}
       {(caution || driftWarning) && (
         <div className="game-decision-caution">
           <Icon name="TriangleAlert" size={11} />

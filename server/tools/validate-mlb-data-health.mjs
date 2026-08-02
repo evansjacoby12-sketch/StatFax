@@ -19,7 +19,7 @@ try {
   const validation = assertValidMlbDataHealth({ slate, report })
   assertPublishableMlbDataHealth(report)
   for (const warning of validation.warnings) console.warn(`[mlb-data-health] warning: ${warning}`)
-  console.log(`[mlb-data-health] valid: ${validation.metrics.status} · ${validation.metrics.hardFailures} blocker(s) · ${validation.metrics.warnings} warning(s) · ${validation.metrics.aiAlerts} AI alert(s)`)
+  console.log(`[mlb-data-health] valid: ${validation.metrics.status} · ${validation.metrics.hardFailures} blocker(s) · ${validation.metrics.warnings} warning(s)`)
 } catch (error) {
   console.error(`[mlb-data-health] ${error.message}`)
   process.exitCode = 1

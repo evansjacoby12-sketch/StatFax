@@ -101,7 +101,7 @@ This usually means Pages deployment failed after data publication. Re-run the wo
 
 ### API/AI degraded
 
-OpenAI/Tavily features degrade separately from deterministic core scoring. Keep the slate running, check provider usage and billing, then inspect context/brief artifacts. Never remove the AI validation contracts to make a build green.
+OpenAI narration and filter-translation features degrade separately from deterministic core scoring. Keep the slate running, check provider usage and billing, then inspect the brief and browser AI endpoints. AI does not adjust HR probability.
 
 ## Secrets and service inventory
 
@@ -109,7 +109,6 @@ GitHub repository secrets:
 
 - `ODDS_API_KEY`
 - `OPENAI_API_KEY`
-- `TAVILY_API_KEY`
 - `R2_ACCESS_KEY_ID`
 - `R2_ACCOUNT_ID`
 - `R2_SECRET_ACCESS_KEY`
@@ -118,7 +117,7 @@ GitHub repository secrets:
 GitHub repository variables:
 
 - required durable-store configuration: `R2_BUCKET`
-- optional model/UI controls: `AI_HR_MODEL`, `BRIEF_MODEL`, `ODDS_REFRESH_MINUTES`, `VITE_PARSE_URL`, `VITE_WORKER_URL`
+- optional model/UI controls: `BRIEF_MODEL`, `ODDS_REFRESH_MINUTES`, `VITE_PARSE_URL`, `VITE_WORKER_URL`
 - NFL controls: `NFL_TARGET_SEASON`, `NFL_TARGET_SEASON_TYPE`, `NFL_TARGET_WEEK`
 
 Cloudflare Worker secrets:
@@ -144,7 +143,7 @@ Rotate a leaked key at the provider first, then replace the GitHub and/or Worker
 
 ## Cost controls outside the repository
 
-The code cannot set provider account budgets. In the OpenAI and Tavily dashboards, set a monthly budget and email alerts, restrict keys to this project where supported, and review usage weekly. Rate limiting protects public endpoints but is not a substitute for provider-side spend limits.
+The code cannot set provider account budgets. In the OpenAI dashboard, set a monthly budget and email alerts, restrict keys to this project where supported, and review usage weekly. Rate limiting protects public endpoints but is not a substitute for provider-side spend limits.
 
 ## Release verification
 

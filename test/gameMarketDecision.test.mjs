@@ -91,6 +91,124 @@ test('tiny total separation is a PASS even when one side has the better probabil
   assert.equal(decision.total.tier, 'pass')
 })
 
+test('high blow-up risk caps an otherwise qualified Under PLAY to LEAN', () => {
+  const decision = buildGameMarketDecision({
+    awayTeam,
+    homeTeam,
+    awayWinProbability: 0.48,
+    homeWinProbability: 0.52,
+    projectedTotal: 8.61,
+    confidence,
+    policy: readyPolicy(),
+    blowUpRisk: {
+      version: 1,
+      probability: 0.1774,
+      level: 'high',
+      line: 9.5,
+      thresholdRuns: 13,
+      marginRuns: 3,
+      distributionFamily: 'negative-binomial',
+      dispersion: 3.5,
+      evidenceStatus: 'historical-distribution-prospective-tier-cap',
+    },
+    marketComparison: {
+      total: {
+        line: 9.5,
+        books: 5,
+        modelOverProbability: 0.3703,
+        modelUnderProbability: 0.6297,
+        modelPushProbability: 0,
+        marketOverProbability: 0.4783,
+        marketUnderProbability: 0.5217,
+        overAmerican: 100,
+        underAmerican: -120,
+      },
+    },
+  })
+
+  assert.equal(decision.total.rawTier, 'play')
+  assert.equal(decision.total.tier, 'lean')
+  assert.equal(decision.total.gates.blowUpRisk, false)
+  assert.equal(decision.total.blowUpRisk.capApplied, true)
+  assert.match(decision.total.reason, /17\.7% chance of 13\+ runs/i)
+})
+
+test('blow-up risk does not cap totals below HIGH or an Over selection', () => {
+  const comparison = {
+    line: 9.5,
+    books: 5,
+    modelOverProbability: 0.3703,
+    modelUnderProbability: 0.6297,
+    modelPushProbability: 0,
+    marketOverProbability: 0.4783,
+    marketUnderProbability: 0.5217,
+    overAmerican: 100,
+    underAmerican: -120,
+  }
+  const moderate = buildGameMarketDecision({
+    awayTeam,
+    homeTeam,
+    awayWinProbability: 0.48,
+    homeWinProbability: 0.52,
+    projectedTotal: 8.61,
+    confidence,
+    policy: readyPolicy(),
+    blowUpRisk: {
+      version: 1,
+      probability: 0.15,
+      level: 'moderate',
+      line: 9.5,
+      thresholdRuns: 13,
+      marginRuns: 3,
+      distributionFamily: 'negative-binomial',
+      dispersion: 3.5,
+      evidenceStatus: 'historical-distribution-prospective-tier-cap',
+    },
+    marketComparison: { total: comparison },
+  })
+  assert.equal(moderate.total.tier, 'play')
+  assert.equal(moderate.total.gates.blowUpRisk, true)
+  assert.equal(moderate.total.blowUpRisk.capApplied, false)
+
+  const over = buildGameMarketDecision({
+    awayTeam,
+    homeTeam,
+    awayWinProbability: 0.48,
+    homeWinProbability: 0.52,
+    projectedTotal: 10.6,
+    confidence,
+    policy: readyPolicy(),
+    blowUpRisk: {
+      version: 1,
+      probability: 0.25,
+      level: 'high',
+      line: 9.5,
+      thresholdRuns: 13,
+      marginRuns: 3,
+      distributionFamily: 'negative-binomial',
+      dispersion: 3.5,
+      evidenceStatus: 'historical-distribution-prospective-tier-cap',
+    },
+    marketComparison: {
+      total: {
+        line: 9.5,
+        books: 5,
+        modelOverProbability: 0.62,
+        modelUnderProbability: 0.38,
+        modelPushProbability: 0,
+        marketOverProbability: 0.5,
+        marketUnderProbability: 0.5,
+        overAmerican: -110,
+        underAmerican: -110,
+      },
+    },
+  })
+  assert.equal(over.total.selectedSide, 'over')
+  assert.equal(over.total.tier, 'play')
+  assert.equal(over.total.gates.blowUpRisk, true)
+  assert.equal(over.total.blowUpRisk.capApplied, false)
+})
+
 test('totals use push-adjusted probability and price EV instead of mean direction alone', () => {
   const decision = buildGameMarketDecision({
     awayTeam,

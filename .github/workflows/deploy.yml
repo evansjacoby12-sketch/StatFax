@@ -139,34 +139,6 @@ jobs:
           key: pregame-freeze-${{ github.run_id }}
           restore-keys: pregame-freeze-
 
-      # Carry the prior LLM context.json across runs so the context pass can see
-      # it and reuse a recent result — without this every fresh container starts
-      # empty and the staleness guard would re-pay the API on every 10-min tick.
-      - name: Restore context pass
-        uses: actions/cache@v4
-        with:
-          path: dist/context.json
-          key: context-${{ github.run_id }}
-          restore-keys: context-
-
-      # Rolling pregame AI experiment. Stores baseline + hypothetical shadow
-      # probabilities for later outcome grading; never feeds the live board.
-      - name: Restore AI HR shadow ledger
-        uses: actions/cache@v4
-        with:
-          path: dist/ai-hr-shadow.json
-          key: ai-hr-shadow-${{ github.run_id }}
-          restore-keys: ai-hr-shadow-
-
-      # Rolling source-backed watchdog record. Alerts are preserved after they
-      # expire and are settled later against objective MLB box-score facts.
-      - name: Restore MLB data health history
-        uses: actions/cache@v4
-        with:
-          path: dist/mlb-data-health-history.json
-          key: mlb-data-health-history-${{ github.run_id }}
-          restore-keys: mlb-data-health-history-
-
       # Carry the prior Slate Brief across runs so its same-day staleness guard
       # can reuse a recent result instead of re-paying the API on every tick.
       - name: Restore slate brief
@@ -297,8 +269,7 @@ jobs:
           npm run nfl:audit
 
       # Publish rolling state back to R2 (S3-compatible). daily.json is held
-      # until the external-context production overlay has run below, so R2 and
-      # the UI receive exactly the same probabilities. This also lets the NEXT
+      # until the deterministic data-health watchdog has run below. This also lets the NEXT
       # run's reconcile read a fresh "yesterday" snapshot from a DURABLE store
       # instead of depending on an external publisher (the gap that froze the
       # rolling log). No-op (and never blocks the deploy) unless the R2 secrets
@@ -346,70 +317,18 @@ jobs:
             echo "R2: archived $ARCHIVE_KEY"
           fi
 
-      # Source-backed AI HR context (injuries/lineups/weather/bullpen →
-      # dist/context.json). Extraction is advisory; only the deterministic,
-      # capped production overlay below can touch probability.
-      # Skips itself if the key is unset; a flaky API call emits a valid empty
-      # artifact so the board can still deploy.
-      - name: Context pass (Tavily + OpenAI)
-        env:
-          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          AI_HR_MODEL: ${{ vars.AI_HR_MODEL || 'gpt-5.6-luna' }}
-        run: npm run context || true
-
-      - name: Validate AI HR context contract
-        run: npm run validate:ai-context
-
-      # Deterministic feed/identity checks are the enforcement authority. The
-      # sourced AI context can add review warnings, but it cannot block a slate
-      # or mutate a score. Any team/side/opposing-pitcher contradiction stops
-      # this run before production probabilities or public artifacts are built.
+      # Deterministic feed/identity checks are the enforcement authority. Any
+      # team/side/opposing-pitcher contradiction stops this run before public
+      # artifacts are built.
       - name: Build MLB data health watchdog report
         run: npm run mlb:data-health
 
       - name: Validate MLB data health watchdog
         run: npm run validate:mlb-data-health
 
-      - name: Capture and settle MLB data health history
-        run: npm run mlb:data-health-history
-
-      - name: Validate MLB data health history
-        run: npm run validate:mlb-data-health-history
-
-      - name: Build AI HR shadow projections
-        run: npm run ai:hr-shadow
-
-      - name: Validate AI HR shadow ledger
-        run: npm run validate:ai-shadow
-
-      - name: Grade AI HR shadow projections
-        run: npm run ai:hr-evaluate
-
-      - name: Validate AI HR evaluation report
-        run: npm run validate:ai-evaluation
-
-      - name: Build AI HR postgame attribution
-        run: npm run ai:hr-attribution
-
-      - name: Validate AI HR postgame attribution
-        run: npm run validate:ai-attribution
-
-      # Manual production promotion (2026-07-15): apply the versioned
-      # external-factor hypothesis despite the sample gate. This changes only
-      # hrProbability, never score/grade/simulation/calibration.
-      - name: Apply capped AI HR production adjustment
-        run: npm run ai:hr-production
-
-      - name: Validate AI HR production adjustment
-        run: |
-          npm run validate:ai-production
-          npm run validate:mlb-data
-          npm run validate:mlb-data-health
-
-      # Publish the adjusted slate and its complete AI audit trail together.
-      # The UI build below reads this same adjusted dist/daily.json.
-      - name: Publish production slate and AI HR artifacts to R2
+      # Publish the checked deterministic slate. The UI build below reads this
+      # exact same dist/daily.json.
+      - name: Publish current MLB slate to R2
         env:
           AWS_ACCESS_KEY_ID:     ${{ secrets.R2_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
@@ -423,7 +342,7 @@ jobs:
             exit 0
           fi
           ENDPOINT="https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com"
-          for f in daily.json context.json mlb-data-health.json mlb-data-health-history.json ai-hr-shadow.json ai-hr-evaluation.json ai-hr-attribution.json ai-hr-production.json zone-evaluation.json; do
+          for f in daily.json mlb-data-health.json zone-evaluation.json; do
             if [ -f "dist/$f" ]; then
               aws s3 cp "dist/$f" "s3://$R2_BUCKET/$f" --endpoint-url "$ENDPOINT" \
                 --content-type application/json --cache-control no-cache \
@@ -431,7 +350,7 @@ jobs:
             fi
           done
           ARCHIVE_DATE=$(node -e "const d=require('./dist/daily.json');if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(d.date||''))process.exit(1);process.stdout.write(d.date)")
-          for f in daily.json backtest-log.json calibration.json mlb-game-results.json mlb-game-history.json first-inning-pitcher-cache.json pregame-freeze.json list-builder-evidence.json board-history.json zone-evaluation.json mlb-data-health-history.json ai-hr-shadow.json; do
+          for f in daily.json backtest-log.json calibration.json mlb-game-results.json mlb-game-history.json first-inning-pitcher-cache.json pregame-freeze.json list-builder-evidence.json board-history.json zone-evaluation.json mlb-data-health.json; do
             if [ -f "dist/$f" ]; then
               aws s3 cp "dist/$f" "s3://$R2_BUCKET/mlb/archive/$ARCHIVE_DATE/$f" --endpoint-url "$ENDPOINT" \
                 --content-type application/json --cache-control no-cache

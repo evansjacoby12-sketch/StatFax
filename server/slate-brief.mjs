@@ -13,7 +13,6 @@ import { callOpenAiStructured, OPENAI_DEFAULT_MODEL } from './lib/aiProviders.mj
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const SLATE_PATH = resolve(__dirname, '../dist/daily.json');
-const CONTEXT_PATH = resolve(__dirname, '../dist/context.json');
 const OUT_PATH = resolve(__dirname, '../dist/brief.json');
 const R2_SLATE = 'https://pub-f7f0c61cfc5840ce8b07ddb42902aa48.r2.dev/daily.json';
 const MODEL = process.env.BRIEF_MODEL || OPENAI_DEFAULT_MODEL;
@@ -92,22 +91,8 @@ async function loadSlate() {
   return res.json();
 }
 
-// Read high-severity sourced context without giving the AI authority to alter it.
-export function loadAlerts() {
-  try {
-    if (!existsSync(CONTEXT_PATH)) return [];
-    const ctx = JSON.parse(readFileSync(CONTEXT_PATH, 'utf8'));
-    return (ctx.signals || ctx.flags || [])
-      .filter((f) => f && (f.severity === 'alert' || f.severity === 'warn') && f.entity && f.note)
-      .slice(0, 8)
-      .map((f) => `${f.entity}${f.team ? ` (${f.team})` : ''}: ${f.note}`);
-  } catch {
-    return [];
-  }
-}
-
 // Produce the only facts and selections the narration layer is allowed to use.
-export function summarizeSlateBrief(slate, alerts = loadAlerts()) {
+export function summarizeSlateBrief(slate, alerts = []) {
   const games = slate.games || [];
   const gamesByPk = new Map(games.map((game) => [String(game.gamePk), game]));
   const rawBatters = Object.values(slate.scoredBatters || {});

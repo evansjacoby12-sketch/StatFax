@@ -509,7 +509,7 @@ test('daily contract validates forecast v4 platoon and run-environment provenanc
   assert.ok(validateDailySnapshot(mismatched).errors.some((error) => error.includes('must match runEnvironment.factor')))
 })
 
-test('daily contract validates forecast v10 pricing, distributions, decisions, team context, and run-prior provenance', () => {
+test('daily contract validates forecast v11 pricing, blow-up risk, decisions, team context, and run-prior provenance', () => {
   const runEnvironment = {
     factor: 1,
     rawParkFactor: 1,
@@ -578,6 +578,16 @@ test('daily contract validates forecast v10 pricing, distributions, decisions, t
       gameScheduleContexts: {
         byGame: { 10: { 1: schedule, 2: { ...schedule } } },
       },
+      gameOdds: {
+        consensus: {
+          total: {
+            books: 2,
+            line: 8.5,
+            over: { fairProbability: 0.49 },
+            under: { fairProbability: 0.51 },
+          },
+        },
+      },
     }),
     freezeState: 'refreshing-pregame',
   }
@@ -592,8 +602,22 @@ test('daily contract validates forecast v10 pricing, distributions, decisions, t
     gameProjections: { 10: projection },
   }
 
-  assert.equal(projection.modelVersion, 10)
+  assert.equal(projection.modelVersion, 11)
+  assert.equal(projection.marketDecision.version, 2)
+  assert.ok(projection.marketDecision.total.blowUpRisk)
   assert.deepEqual(validateDailySnapshot(snapshot).errors, [])
+
+  const missingBlowUpRisk = structuredClone(snapshot)
+  delete missingBlowUpRisk.gameProjections[10].marketDecision.total.blowUpRisk
+  assert.ok(validateDailySnapshot(missingBlowUpRisk).errors.some((error) => (
+    error.includes('total.blowUpRisk: required')
+  )))
+
+  const invalidBlowUpCap = structuredClone(snapshot)
+  invalidBlowUpCap.gameProjections[10].marketDecision.total.blowUpRisk.capApplied = true
+  assert.ok(validateDailySnapshot(invalidBlowUpCap).errors.some((error) => (
+    error.includes('capApplied: inconsistent')
+  )))
 
   const missingRunPriorProvenance = structuredClone(snapshot)
   delete missingRunPriorProvenance.gameProjections[10].inputs.away.teamScoring.currentSeasonFactor

@@ -75,10 +75,6 @@ function mkBatter(id, name, homered) {
     score: 80 - id,
     grade: { label: id === 1 ? 'PRIME' : 'STRONG', color: id === 1 ? '#00d4ff' : '#32d74b' },
     hrProbability: 0.3 - id * 0.02,
-    ...(id === 1 ? {
-      baselineHrProbability: 0.27,
-      aiHr: { productionVersion: 1, applied: true, logitDelta: 0.05, signalIds: ['weather-1'] },
-    } : {}),
     expectedHRs: 0.2,
     expectedPAs: 4,
     hot: true,
@@ -212,11 +208,11 @@ add('PlayerCaseVsCaution', <PlayerCaseVsCaution b={normal} explanation={{
 add('ListBuilderView', <ListBuilderView batters={batters} onSelect={noop} watchlist={new Set()} slip={new Set()} onToggleWatch={noop} onToggleSlip={noop} />)
 add('MlbDataHealthBanner.ready', <MlbDataHealthBanner health={{ status: 'ready' }} />)
 add('MlbDataHealthBanner.limited', <MlbDataHealthBanner health={{
-  status: 'limited', warnings: 1, aiAlerts: 1, hardFailures: 0,
+  status: 'limited', warnings: 1, hardFailures: 0,
   issues: [{
-    id: 'ai-context:1', severity: 'warning',
-    message: 'Listed starter may change before first pitch.',
-    evidence: [{ url: 'https://www.mlb.com/gameday/1', title: 'Official game update' }],
+    id: 'weather-missing:1', severity: 'warning',
+    message: 'Test Park is missing game weather.',
+    evidence: [],
   }],
 }} />)
 add('SlateBrief.decision', <SlateBrief brief={{

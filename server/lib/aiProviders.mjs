@@ -1,29 +1,8 @@
 export const OPENAI_DEFAULT_MODEL = 'gpt-5.6-luna'
-export const TAVILY_SEARCH_URL = 'https://api.tavily.com/search'
 export const OPENAI_RESPONSES_URL = 'https://api.openai.com/v1/responses'
-
-const validIso = (value) => typeof value === 'string' && !Number.isNaN(Date.parse(value))
 
 function clean(value, max = 2000) {
   return String(value ?? '').trim().replace(/\s+/g, ' ').slice(0, max)
-}
-
-function exactPublishedTimestamp(value) {
-  const raw = clean(value, 80)
-  if (!raw || !validIso(raw)) return null
-  // A date-only value is not safe for an intraday historical cutoff: the
-  // source may have been published after first pitch.
-  if (!/(?:T|\s)\d{1,2}:\d{2}/.test(raw)) return null
-  return new Date(raw).toISOString()
-}
-
-function validHttpUrl(value) {
-  try {
-    const url = new URL(value)
-    return ['http:', 'https:'].includes(url.protocol) ? url.toString() : null
-  } catch {
-    return null
-  }
 }
 
 const defaultSleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds))
@@ -67,71 +46,6 @@ async function fetchJsonWithRetry({
     await sleepImpl(400 * (2 ** (attempt - 1)))
   }
   throw lastError || new Error(`${label} request failed`)
-}
-
-export function normalizeTavilySources(payload) {
-  const seen = new Set()
-  const sources = []
-  for (const result of Array.isArray(payload?.results) ? payload.results : []) {
-    const url = validHttpUrl(result?.url)
-    if (!url || seen.has(url)) continue
-    seen.add(url)
-    sources.push({
-      url,
-      title: clean(result?.title || new URL(url).hostname, 180),
-      content: clean(result?.content || result?.raw_content, 1800),
-      publishedAt: exactPublishedTimestamp(result?.published_date || result?.publishedAt),
-      score: Number.isFinite(Number(result?.score)) ? Number(result.score) : null,
-    })
-  }
-  return sources
-}
-
-export async function searchTavily({
-  apiKey,
-  query,
-  startDate = null,
-  endDate = null,
-  maxResults = 8,
-  topic = 'news',
-  includeDomains = [],
-  fetchImpl = fetch,
-  maxAttempts = 3,
-  sleepImpl = defaultSleep,
-}) {
-  if (!apiKey) throw new Error('TAVILY_API_KEY is required')
-  const body = {
-    query: clean(query, 1200),
-    search_depth: 'basic',
-    topic,
-    max_results: Math.max(1, Math.min(20, Number(maxResults) || 8)),
-    include_answer: false,
-    include_raw_content: false,
-  }
-  if (/^\d{4}-\d{2}-\d{2}$/.test(startDate || '')) body.start_date = startDate
-  if (/^\d{4}-\d{2}-\d{2}$/.test(endDate || '')) body.end_date = endDate
-  if (Array.isArray(includeDomains) && includeDomains.length) body.include_domains = includeDomains.slice(0, 300)
-  const payload = await fetchJsonWithRetry({
-    label: 'Tavily API',
-    url: TAVILY_SEARCH_URL,
-    fetchImpl,
-    maxAttempts,
-    sleepImpl,
-    init: {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify(body),
-    },
-  })
-  return {
-    query: body.query,
-    requestId: payload?.request_id || null,
-    usageCredits: Number(payload?.usage?.credits) || null,
-    sources: normalizeTavilySources(payload),
-  }
 }
 
 export function openAiOutputText(payload) {

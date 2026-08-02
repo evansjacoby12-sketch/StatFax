@@ -1,4 +1,4 @@
-export const MLB_GAME_MARKET_DECISION_VERSION = 1
+export const MLB_GAME_MARKET_DECISION_VERSION = 2
 export const MLB_GAME_MARKET_MIN_GAMES = 100
 export const MLB_GAME_MARKET_MIN_DATES = 10
 
@@ -150,8 +150,13 @@ function tierReason({
   market,
   side,
   missing = null,
+  blowUpRisk = null,
+  riskCapApplied = false,
 }) {
   if (missing) return missing
+  if (riskCapApplied) {
+    return `PLAY thresholds cleared, but a ${(blowUpRisk.probability * 100).toFixed(1)}% chance of ${blowUpRisk.thresholdRuns}+ runs caps this UNDER at LEAN.`
+  }
   if (rawTier === 'play' && tier === 'lean') {
     if (!policy.historicalGate) {
       const history = policy.historicalSample
@@ -297,6 +302,7 @@ function totalDecision({
   confidence,
   comparison,
   policy,
+  blowUpRisk = null,
 }) {
   const line = comparison?.line
   const pushProbability = comparison?.modelPushProbability
@@ -356,7 +362,17 @@ function totalDecision({
         separation: selected.projectionSeparation,
       })
     : 'unavailable'
-  const tier = capUnvalidatedPlay(rawTier, policy)
+  const policyTier = capUnvalidatedPlay(rawTier, policy)
+  const riskBlocksPlay = (
+    selected?.side === 'under'
+    && blowUpRisk?.level === 'high'
+  )
+  const riskCapApplied = policyTier === 'play' && riskBlocksPlay
+  const tier = riskCapApplied ? 'lean' : policyTier
+  const resolvedBlowUpRisk = blowUpRisk ? {
+    ...blowUpRisk,
+    capApplied: riskCapApplied,
+  } : null
   return {
     market: 'total',
     line: Number.isFinite(line) ? line : null,
@@ -385,6 +401,7 @@ function totalDecision({
     rawTier,
     tier,
     provisional: !policy.ready,
+    blowUpRisk: resolvedBlowUpRisk,
     reason: tierReason({
       tier,
       rawTier,
@@ -392,6 +409,8 @@ function totalDecision({
       market: 'total',
       side: selected?.side?.toUpperCase() || 'The best available total',
       missing: selected ? null : 'No complete consensus total is available.',
+      blowUpRisk: resolvedBlowUpRisk,
+      riskCapApplied,
     }),
     gates: {
       edge: Number.isFinite(selected?.modelEdge)
@@ -406,6 +425,7 @@ function totalDecision({
       separation: Number.isFinite(selected?.projectionSeparation)
         ? selected.projectionSeparation >= MLB_GAME_MARKET_GATES.total.leanRunSeparation
         : false,
+      blowUpRisk: !riskBlocksPlay,
     },
   }
 }
@@ -418,6 +438,7 @@ export function buildGameMarketDecision({
   projectedTotal = null,
   confidence = null,
   marketComparison = null,
+  blowUpRisk = null,
   policy = gameMarketDecisionPolicy(),
 } = {}) {
   const resolvedPolicy = policy || gameMarketDecisionPolicy()
@@ -440,6 +461,7 @@ export function buildGameMarketDecision({
       confidence,
       comparison: marketComparison?.total,
       policy: resolvedPolicy.total,
+      blowUpRisk,
     }),
   }
 }
