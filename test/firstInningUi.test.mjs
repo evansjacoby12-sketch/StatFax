@@ -2,11 +2,12 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 
-test('BetLab replaces the MLB custom builder with a priced-honest NRFI/YRFI zone and Results owns live tracking', async () => {
-  const [app, lab, zone, results, trackingUi, ledgerUi, tracking, css] = await Promise.all([
+test('BetLab replaces the MLB custom builder with priced-honest first-inning and game-combo tools', async () => {
+  const [app, lab, zone, gameCombos, results, trackingUi, ledgerUi, tracking, css] = await Promise.all([
     readFile(new URL('../ui/src/App.jsx', import.meta.url), 'utf8'),
     readFile(new URL('../ui/src/components/BetLab.jsx', import.meta.url), 'utf8'),
     readFile(new URL('../ui/src/components/FirstInningZone.jsx', import.meta.url), 'utf8'),
+    readFile(new URL('../ui/src/components/GameCombosView.jsx', import.meta.url), 'utf8'),
     readFile(new URL('../ui/src/components/ResultsView.jsx', import.meta.url), 'utf8'),
     readFile(new URL('../ui/src/components/ModelTrackingResults.jsx', import.meta.url), 'utf8'),
     readFile(new URL('../ui/src/components/ModelTrackingLedger.jsx', import.meta.url), 'utf8'),
@@ -18,7 +19,14 @@ test('BetLab replaces the MLB custom builder with a priced-honest NRFI/YRFI zone
   assert.doesNotMatch(lab, /label: 'Custom builder'/)
   assert.doesNotMatch(lab, /ParlayBuilder/)
   assert.match(lab, /<FirstInningZone/)
-  assert.doesNotMatch(lab, /<FirstInningZone[\s\S]*?generatedAt=\{generatedAt\}/)
+  assert.match(lab, /label: 'Game combos'/)
+  assert.match(lab, /<GameCombosView/)
+  assert.match(gameCombos, /Game Combo Lab v1/)
+  assert.match(gameCombos, /Three recipes\. No shuffle\./)
+  assert.match(gameCombos, /Different gamePks/)
+  assert.match(gameCombos, /EV unavailable · NRFI price missing/)
+  assert.match(gameCombos, /PASS Under and WATCH NRFI remain diagnostic signals/)
+  assert.doesNotMatch(lab.match(/<FirstInningZone[\s\S]*?\/>/)?.[0] || '', /generatedAt=\{generatedAt\}/)
   assert.match(app, /firstInningHistoricalValidation=\{data\.raw\?\.firstInningHistoricalValidation \|\| null\}/)
   assert.match(app, /gameProjections=\{data\.raw\?\.gameProjections \|\| \{\}\}/)
   assert.match(zone, /Forecast V11 \+ 1st Inning Layer/)
@@ -76,4 +84,6 @@ test('BetLab replaces the MLB custom builder with a priced-honest NRFI/YRFI zone
   assert.match(css, /\.fi-half/)
   assert.match(css, /\.fi-case-caution/)
   assert.match(css, /@media \(max-width: 700px\)[\s\S]*?\.fi-game-main/)
+  assert.match(css, /\.game-combo-grid/)
+  assert.match(css, /@media \(max-width: 700px\)[\s\S]*?\.game-combo-leg/)
 })

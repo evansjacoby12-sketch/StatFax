@@ -1044,6 +1044,338 @@ button.th:focus-visible {
 .board-body > .board-swipe:last-child {
   border-bottom: none;
 }
+
+/* ============ Bet Lab: cross-market game combos ============ */
+.game-combos-view {
+  display: grid;
+  gap: 14px;
+}
+
+.game-combo-overview {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 24px;
+  align-items: center;
+  padding: 18px;
+  border: 1px solid rgba(131, 220, 190, 0.2);
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at 90% 0%, rgba(92, 216, 172, 0.12), transparent 38%),
+    rgba(11, 14, 20, 0.88);
+}
+
+.game-combo-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #75d9b5;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.game-combo-overview h2 {
+  margin: 6px 0 4px;
+  color: #f3f5fb;
+  font-size: clamp(18px, 2vw, 24px);
+  line-height: 1.1;
+}
+
+.game-combo-overview p {
+  max-width: 680px;
+  margin: 0;
+  color: #969cac;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.game-combo-track-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(88px, 1fr));
+  min-width: 220px;
+  overflow: hidden;
+  border: 1px solid #282d39;
+  border-radius: 11px;
+  background: #0d1016;
+}
+
+.game-combo-track-grid > div {
+  display: grid;
+  gap: 3px;
+  padding: 11px 13px;
+}
+
+.game-combo-track-grid > div + div {
+  border-left: 1px solid #282d39;
+}
+
+.game-combo-track-grid span {
+  color: #858b9c;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.game-combo-track-grid strong span {
+  color: #f2f5fb;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 15px;
+  letter-spacing: 0;
+}
+
+.game-combo-track-grid > small {
+  grid-column: 1 / -1;
+  padding: 7px 12px;
+  border-top: 1px solid #282d39;
+  color: #72798b;
+  font-size: 9px;
+  text-align: center;
+}
+
+.game-combo-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.game-combo-card {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid #292e39;
+  border-radius: 13px;
+  background: #0d1016;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.15);
+}
+
+.game-combo-card.is-3 {
+  border-color: rgba(196, 169, 111, 0.38);
+  background: linear-gradient(180deg, rgba(196, 169, 111, 0.055), transparent 36%), #0d1016;
+}
+
+.game-combo-card-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+  padding: 15px;
+  border-bottom: 1px solid #242934;
+}
+
+.game-combo-kicker {
+  color: #777f91;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.game-combo-card h3 {
+  margin: 3px 0 4px;
+  color: #f3f5fa;
+  font-size: 15px;
+}
+
+.game-combo-card-head p {
+  margin: 0;
+  color: #8d94a5;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.game-combo-chance {
+  display: grid;
+  min-width: 70px;
+  gap: 2px;
+  text-align: right;
+}
+
+.game-combo-chance strong {
+  color: #7cdec0;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 17px;
+}
+
+.game-combo-chance span {
+  color: #72798b;
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.game-combo-legs {
+  display: grid;
+  flex: 1;
+}
+
+.game-combo-leg {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  gap: 9px;
+  align-items: center;
+  min-height: 62px;
+  padding: 10px 14px;
+}
+
+.game-combo-leg + .game-combo-leg {
+  border-top: 1px solid #202530;
+}
+
+.game-combo-leg-number {
+  display: grid;
+  width: 21px;
+  height: 21px;
+  place-items: center;
+  border: 1px solid #343a48;
+  border-radius: 50%;
+  color: #9da4b5;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 9px;
+}
+
+.game-combo-leg-copy,
+.game-combo-leg-signal {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.game-combo-leg-copy b {
+  overflow: hidden;
+  color: #eef1f7;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.game-combo-leg-copy span {
+  overflow: hidden;
+  color: #777f91;
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.game-combo-leg-signal {
+  justify-items: end;
+}
+
+.game-combo-tier {
+  padding: 3px 6px;
+  border: 1px solid #3b4352;
+  border-radius: 5px;
+  color: #aeb5c4;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+}
+
+.game-combo-tier.is-play,
+.game-combo-tier.is-lean {
+  border-color: rgba(105, 209, 173, 0.4);
+  color: #74d8b5;
+  background: rgba(77, 184, 148, 0.08);
+}
+
+.game-combo-tier.is-pass,
+.game-combo-tier.is-watch {
+  border-color: rgba(215, 178, 106, 0.4);
+  color: #dfb86e;
+  background: rgba(198, 156, 76, 0.08);
+}
+
+.game-combo-leg-signal small {
+  color: #8d94a5;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 9px;
+}
+
+.game-combo-card-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 11px;
+  align-items: center;
+  padding: 10px 14px;
+  border-top: 1px solid #242934;
+  color: #737b8d;
+  font-size: 9px;
+}
+
+.game-combo-card-foot > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.game-combo-card-foot svg { color: #65caa7; }
+.game-combo-card-foot .game-combo-record {
+  margin-left: auto;
+  color: #a8afbd;
+  font-family: var(--font-mono, ui-monospace, monospace);
+}
+
+.game-combo-empty {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  padding: 22px;
+  border: 1px dashed #343a47;
+  border-radius: 13px;
+  color: #7b8292;
+  background: #0d1015;
+}
+
+.game-combo-empty h3 { margin: 0 0 4px; color: #e5e9f1; font-size: 14px; }
+.game-combo-empty p { margin: 0; font-size: 11px; line-height: 1.45; }
+.game-combo-supply { display: flex; gap: 7px; }
+.game-combo-supply span {
+  min-width: 54px;
+  padding: 8px;
+  border: 1px solid #2d3340;
+  border-radius: 7px;
+  color: #8d94a5;
+  font-size: 9px;
+  text-align: center;
+}
+.game-combo-supply b { display: block; color: #f0f3f8; font-size: 14px; }
+
+.game-combo-notes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  padding: 11px 13px;
+  border: 1px solid #252a35;
+  border-radius: 10px;
+  color: #777f91;
+  background: #0c0f14;
+  font-size: 9px;
+}
+
+.game-combo-notes span { display: inline-flex; align-items: center; gap: 5px; }
+.game-combo-notes svg { flex: 0 0 auto; color: #8f97a8; }
+
+@media (max-width: 1040px) {
+  .game-combo-grid { grid-template-columns: 1fr; }
+  .game-combo-card-head p { max-width: 580px; }
+}
+
+@media (max-width: 700px) {
+  .game-combo-overview { grid-template-columns: 1fr; gap: 14px; padding: 15px; }
+  .game-combo-track-grid { width: 100%; min-width: 0; }
+  .game-combo-card-head { padding: 13px; }
+  .game-combo-leg { grid-template-columns: 20px minmax(0, 1fr); min-height: 70px; padding: 11px 12px; }
+  .game-combo-leg-signal { grid-column: 2; grid-template-columns: auto auto; justify-content: start; justify-items: start; align-items: center; }
+  .game-combo-card-foot { display: grid; grid-template-columns: 1fr; padding: 10px 12px; }
+  .game-combo-card-foot .game-combo-record { margin-left: 0; }
+  .game-combo-empty { grid-template-columns: auto minmax(0, 1fr); padding: 17px; }
+  .game-combo-supply { grid-column: 1 / -1; }
+  .game-combo-supply span { flex: 1; }
+  .game-combo-notes { display: grid; }
+}
 .board-disclosure {
   display: flex;
   align-items: center;

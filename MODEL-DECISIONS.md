@@ -73,6 +73,10 @@ Authority: `src/sports/mlb/logic/firstInningProjection.js` on top of Forecast V1
 - Curated parlay recipes use selected PRIME/STRONG candidates, pregame status, game separation, and tracked recipe evidence. Randomization may choose among qualified candidates but cannot bypass validity gates.
 - BetLab combo strategies and NRFI/YRFI calls remain distinct from List Builder recipes.
 - Ignore HR sportsbook prices where the strategy explicitly says to; never silently apply that rule to moneyline/totals pricing.
+- Game Combo Lab v1 is a deterministic presentation layer over frozen Forecast V11 and first-inning calls; it does not create or upgrade a market call. It may return at most three recipes: PLAY/LEAN moneyline + WATCH NRFI, PASS Under + WATCH NRFI, or all three together.
+- Every Game Combo Lab leg must have a different `gamePk` inside its recipe, both probable starters, and at least 72% source coverage. YRFI, Over, live/final games, missing starters, and HIGH Blow-Up Risk Unders are excluded. PASS and WATCH keep their diagnostic meaning.
+- Game Combo Lab all-hit probability is the independent product of the already-produced leg probabilities. Combo price and EV stay unavailable until a real NRFI price is stored. Seven-day 2-leg and 3-leg records are reconstructed deterministically from frozen pregame calls; results grade the recipe but never select its legs.
+- Rollback for Game Combo Lab v1 is removal of its BetLab tab and derived UI engine. Forecast V11, NRFI/YRFI, and their tracking records remain unchanged.
 
 ## Required proof for a production model change
 
