@@ -224,12 +224,31 @@ function aucOf(rows, scoreOf) {
 
 function coreRank(row) {
   const feat = row?.feat;
-  if (!feat || !Number.isFinite(feat.bs) || !Number.isFinite(feat.heat) || !Number.isFinite(feat.setup)) {
+  if (!feat || !Number.isFinite(feat.bs) || !Number.isFinite(feat.setup)) {
     return null;
   }
   return (
+    0.80 * clamp(feat.bs / 88, 0, 1) * 100
+    + 0.20 * clamp(feat.setup / 6, 0, 1) * 100
+  );
+}
+
+function legacyCoreRank(row) {
+  const feat = row?.feat;
+  if (!feat || !Number.isFinite(feat.bs) || !Number.isFinite(feat.heat) || !Number.isFinite(feat.setup)) return null;
+  return (
     0.62 * clamp(feat.bs / 88, 0, 1) * 100
     + 0.23 * clamp(feat.heat / 100, 0, 1) * 100
+    + 0.15 * clamp(feat.setup / 6, 0, 1) * 100
+  );
+}
+
+function barrelCoreRank(row) {
+  const feat = row?.feat;
+  if (!feat || !Number.isFinite(feat.bs) || !Number.isFinite(feat.brl) || !Number.isFinite(feat.setup)) return null;
+  return (
+    0.62 * clamp(feat.bs / 88, 0, 1) * 100
+    + 0.23 * clamp(feat.brl / 20, 0, 1) * 100
     + 0.15 * clamp(feat.setup / 6, 0, 1) * 100
   );
 }
@@ -311,6 +330,33 @@ export function buildRankingHealth(backtestLog, slateDate, { lookbackDays = 10, 
     && (contextAucLift >= 0.005 || contextTopTenLift >= 0.10);
   const contextStatus = !contextReady ? 'collecting' : contextEarnedLift ? 'earning' : 'stalled';
 
+  const shadowCandidate = (key, scoreOf) => {
+    const candidateRows = rows.filter((row) => scoreOf(row) != null);
+    const coverage = rows.length ? candidateRows.length / rows.length : 0;
+    const candidateAuc = coverage >= 0.75 ? aucOf(candidateRows, scoreOf) : null;
+    const candidateTop = coverage >= 0.75 ? topNMetrics(rowsByDate, scoreOf, topN) : { hitRate: null, n: 0 };
+    const candidateLift = candidateTop.hitRate != null && baseRate > 0 ? candidateTop.hitRate / baseRate : null;
+    const aucEdge = Number.isFinite(candidateAuc) && Number.isFinite(auc) ? candidateAuc - auc : null;
+    const topLiftEdge = Number.isFinite(candidateLift) && Number.isFinite(lift) ? candidateLift - lift : null;
+    return {
+      key,
+      coverage: round(coverage),
+      n: candidateRows.length,
+      auc: round(candidateAuc, 4),
+      aucEdge: round(aucEdge, 4),
+      topTenHitRate: round(candidateTop.hitRate, 4),
+      topTenLift: round(candidateLift),
+      topTenLiftEdge: round(topLiftEdge),
+      clearsRankingGate: coverage >= 0.75
+        && (aucEdge >= 0.005 || topLiftEdge >= 0.10),
+    };
+  };
+  const rankingShadow = [
+    shadowCandidate('batter-plus-setup', coreRank),
+    shadowCandidate('legacy-batter-heat-setup', legacyCoreRank),
+    shadowCandidate('batter-barrel-setup', barrelCoreRank),
+  ];
+
   return {
     ready,
     status,
@@ -346,6 +392,11 @@ export function buildRankingHealth(backtestLog, slateDate, { lookbackDays = 10, 
       coreTopTenLift: round(coreLift),
       topTenLiftDelta: round(contextTopTenLift),
       earnedLift: contextEarnedLift,
+    },
+    shadow: {
+      evaluation: 'same-date-paired-ranking-only',
+      productionFallback: 'batter-plus-setup',
+      candidates: rankingShadow,
     },
   };
 }
@@ -437,7 +488,7 @@ export function buildHrResiliencePolicy({
 
 /**
  * Bounded ranking correction used only when the historical context overlay has
- * stopped beating the core Batter Score + Heat + HR Setup rank.
+ * stopped beating the clean, full-coverage Batter Score + HR Setup rank.
  */
 export function applyCoreRankingEmphasis(
   scoredBatters,
@@ -460,15 +511,12 @@ export function applyCoreRankingEmphasis(
     if (!key || seen.has(key) || !Number.isFinite(row.score) || !Number.isFinite(row.batterScore)) continue;
     seen.add(key);
     if (typeof heatIndex !== 'function' || typeof hrSetup !== 'function') continue;
-    const heat = heatIndex(row);
     const setup = hrSetup(row).n;
-    if (!Number.isFinite(heat) || !Number.isFinite(setup)) continue;
-    const decayedHeat = 45 + (heat - 45) * formWeight;
+    if (!Number.isFinite(setup)) continue;
     const decayedSetup = 2.5 + (setup - 2.5) * formWeight;
     const coreScore = (
-      0.62 * clamp(row.batterScore / 88, 0, 1) * 100
-      + 0.23 * clamp(decayedHeat / 100, 0, 1) * 100
-      + 0.15 * clamp(decayedSetup / 6, 0, 1) * 100
+      0.80 * clamp(row.batterScore / 88, 0, 1) * 100
+      + 0.20 * clamp(decayedSetup / 6, 0, 1) * 100
     );
     const proposed = (1 - weight) * row.score + weight * coreScore;
     const delta = Math.round(clamp(proposed - row.score, -maxDelta, maxDelta));

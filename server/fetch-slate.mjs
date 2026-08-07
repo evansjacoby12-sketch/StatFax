@@ -263,7 +263,17 @@ import {
   CLEAN_PREGAME_FEATURE_CAPTURE,
   CLEAN_PREGAME_FEATURE_GENERATION,
 } from './lib/historicalFeatureArchive.mjs';
+import {
+  buildCompatibleCalibrationLog,
+  buildForwardHrMetrics,
+} from './lib/hrModelEvaluation.mjs';
+import {
+  HR_MODEL_VERSION,
+  HR_PROBABILITY_PIPELINE_VERSION,
+  HR_PROBABILITY_TELEMETRY_VERSION,
+} from '../src/sports/mlb/logic/hrModelVersion.js';
 import { buildListBuilderEvidence, validateListBuilderEvidence } from './lib/listBuilderEvidence.mjs';
+import { applyMlbDataHealth } from './lib/mlbDataHealth.mjs';
 import {
   comboRowFromSnapshot,
   buildComboRecords,
@@ -2781,6 +2791,8 @@ async function main() {
   // beating naive baselines week over week.
   let scoreToProbTable = null;
   let modelMetrics     = null;
+  const compatibleCalibration = buildCompatibleCalibrationLog(backtestLog, { lookbackDays: 30 });
+  const calibrationLog = compatibleCalibration.log;
   try {
     // Calibration method and isotonic bucket width are selected each run with
     // expanding-window validation. The old fixed 15-bin path came from an
@@ -2790,7 +2802,8 @@ async function main() {
     // selector starts coarse and only goes finer when it measurably improves
     // expanding-window Brier on the now-clean log, lifting the ceiling for the
     // genuinely hot top band. See server/tools/model-metrics.mjs.
-    scoreToProbTable = fitScoreCalibrationAdaptive(backtestLog, { lookbackDays: 30 });
+    scoreToProbTable = fitScoreCalibrationAdaptive(calibrationLog, { lookbackDays: 30 });
+    scoreToProbTable.population = compatibleCalibration.meta;
     console.log(`[calib] ${scoreToProbTable.method} — totalN:${scoreToProbTable.totalN} buckets:${scoreToProbTable.table?.length} bucketSize:${scoreToProbTable.bucketSize ?? 'n/a'} adaptive:${scoreToProbTable.adaptive === true}` +
       (Array.isArray(scoreToProbTable.cv) ? ` cv:[${scoreToProbTable.cv.map(c => `${c.bucketSize}:${c.brier.toFixed(4)}`).join(' ')}]` : ''));
   } catch (e) {
@@ -2800,7 +2813,7 @@ async function main() {
     // Use the selected score-calibration table for the metric prob conversion. Falls
     // back to the rough linear scoreToProb when the table is sparse/missing.
     const probFn = (s) => lookupProb(s, scoreToProbTable?.table, (sc) => Math.max(0.005, Math.min(0.30, sc / 100 * 0.28)));
-    modelMetrics = computeMetricsFromBacktest(backtestLog, { lookbackDays: 30, scoreToProbFn: probFn });
+    modelMetrics = computeMetricsFromBacktest(calibrationLog, { lookbackDays: 30, scoreToProbFn: probFn });
     if (modelMetrics) {
       // The Brier/logLoss just computed are IN-SAMPLE — scored on the very rows
       // the calibration table was fit on, so they read optimistically. Attach the
@@ -2823,14 +2836,16 @@ async function main() {
       // base rate: "could you beat always predicting the base rate?"
       let baseRate = 0.035;
       try {
-        const recs = (backtestLog?.dates || [])
-          .flatMap(d => backtestLog?.records?.[d] || [])
+        const recs = (calibrationLog?.dates || [])
+          .flatMap(d => calibrationLog?.records?.[d] || [])
           .filter(r => r.actuallyPlayed !== false && r.homered != null);
         if (recs.length >= 100) baseRate = recs.filter(r => r.homered).length / recs.length;
       } catch {}
       modelMetrics.baseRate        = baseRate;
       modelMetrics.baselineBrier   = baselineBrierForRate(baseRate);
       modelMetrics.baselineLogLoss = baselineLogLossForRate(baseRate);
+      modelMetrics.population = compatibleCalibration.meta;
+      modelMetrics.forward = buildForwardHrMetrics(backtestLog);
       console.log(`[calib] metrics — brier:${modelMetrics.brier?.toFixed(4)} logLoss:${modelMetrics.logLoss?.toFixed(4)} n:${modelMetrics.totalReconciled}`);
     }
   } catch (e) {
@@ -2845,7 +2860,7 @@ async function main() {
   // dist/ensemble-weights.json which scoreWithML reads at inference time.
   // Trains in <100ms on 1000+ records — pure-JS gradient descent, zero deps.
   try {
-    const trained = trainEnsembleWeights(backtestLog, { lookbackDays: 30 });
+    const trained = trainEnsembleWeights(calibrationLog, { lookbackDays: 30 });
     writeFileSync(`${process.cwd()}/dist/ensemble-weights.json`, JSON.stringify(trained, null, 2));
     console.log(`[ml] trained weights — n:${trained.trainedOn} brier:${trained.brier.toFixed(4)} logLoss:${trained.logLoss.toFixed(4)} intercept:${trained.intercept.toFixed(3)}`);
   } catch (e) {
@@ -2864,21 +2879,21 @@ async function main() {
   let ensembleMeta = { mlWeight: 0, ruleHoldoutBrier: null, mlHoldoutBrier: null, holdoutN: 0, trainN: 0, reason: 'init' };
   try {
     const HOLDOUT_DAYS = 5, MIN_HOLDOUT = 400, MIN_TRAIN_DAYS = 3;
-    const sortedDates = (backtestLog?.dates || []).slice().sort();
+    const sortedDates = (calibrationLog?.dates || []).slice().sort();
     if (sortedDates.length >= MIN_TRAIN_DAYS + 1) {
       const testDates  = sortedDates.slice(-HOLDOUT_DAYS);
       const trainDates = sortedDates.slice(0, sortedDates.length - testDates.length);
       if (trainDates.length >= MIN_TRAIN_DAYS) {
-        const holdoutModel = trainEnsembleWeights({ dates: trainDates, records: backtestLog.records }, { lookbackDays: trainDates.length });
+        const holdoutModel = trainEnsembleWeights({ dates: trainDates, records: calibrationLog.records }, { lookbackDays: trainDates.length });
         const holdoutCalibration = fitScoreCalibrationAdaptive(
-          { dates: trainDates, records: backtestLog.records },
+          { dates: trainDates, records: calibrationLog.records },
           { lookbackDays: trainDates.length },
         );
         const sig = (z) => (z >= 0 ? 1 / (1 + Math.exp(-z)) : Math.exp(z) / (1 + Math.exp(z)));
         const ruleProbOf = (s) => lookupProb(s, holdoutCalibration?.table, (sc) => Math.max(0.005, Math.min(0.30, sc / 100 * 0.28)));
         let ruleBrierSum = 0, mlBrierSum = 0, n = 0;
         for (const d of testDates) {
-          for (const rec of (backtestLog.records[d] || [])) {
+          for (const rec of (calibrationLog.records[d] || [])) {
             if (rec.actuallyPlayed === false || rec.homered == null || !Number.isFinite(rec.score)) continue;
             const y = rec.homered ? 1 : 0;
             const feat = extractFeatures(rec);
@@ -2925,7 +2940,7 @@ async function main() {
   let featRankWeight = 0;
   try {
     if (EXPERIMENTAL_ML_RANK) {
-      featModel = trainFeatModel(backtestLog);
+      featModel = trainFeatModel(calibrationLog);
       if (featModel.ready && Number.isFinite(featModel.cvAuc) && Number.isFinite(featModel.ruleAuc)) {
         const edge = featModel.cvAuc - featModel.ruleAuc;
         featRankWeight = edge > 0.01 ? Math.min(EXPERIMENTAL_ML_RANK_CAP, edge * 10) : 0;
@@ -4352,6 +4367,18 @@ async function main() {
     formWeight: hrResiliencePolicy.formDecay.weight,
   };
 
+  // The model verdict and the curated board label are different concepts.
+  // Freeze the uncapped score/grade before the per-game PRIME display cap so
+  // calibration and historical evaluation never learn from a presentation rule.
+  for (const key of Object.keys(scoredBatters)) {
+    if (!key.includes('-')) continue;
+    const row = scoredBatters[key];
+    if (!row || !Number.isFinite(row.score)) continue;
+    row.hrModelVersion = HR_MODEL_VERSION;
+    row.preCapScore = row.score;
+    row.preCapGrade = row.grade?.label || row.grade || null;
+  }
+
   // ─── PRIME game-normalized cap ──────────────────────────────────────────────
   // Runs AFTER all pregame score/grade passes and BEFORE the live-decay freeze
   // so it flows into preGameGrade. PRIME keeps its absolute score ≥72 floor,
@@ -4380,6 +4407,11 @@ async function main() {
     };
     console.log(`[slate] PRIME game cap: ${primeCap.rawPrimeCount} raw → ${primeCap.retainedCount} retained ` +
       `(cap ${primeCap.cap}; resilience ×${primeCap.multiplier}, min ${primeCap.minimum}; demoted ${primeCap.demotedCount} to STRONG)`);
+  }
+  for (const key of Object.keys(scoredBatters)) {
+    if (!key.includes('-')) continue;
+    const row = scoredBatters[key];
+    if (row) row.displayGrade = row.grade?.label || row.grade || null;
   }
 
   // 8.68) Live in-game context (Tier-1 live signals — display only)
@@ -4580,6 +4612,21 @@ async function main() {
       // anchor so rows without a usable sim (or in tiny buckets) keep it.
       row._anchorProb   = calProb;
       row.hrProbability = calProb;
+      row.probabilityPipelineVersion = HR_PROBABILITY_PIPELINE_VERSION;
+      row.hrProbabilityTrace = {
+        telemetryVersion: HR_PROBABILITY_TELEMETRY_VERSION,
+        modelVersion: HR_MODEL_VERSION,
+        probabilityPipelineVersion: HR_PROBABILITY_PIPELINE_VERSION,
+        calibrationSource: scoreToProbTable?.population?.source || 'unknown',
+        rawSimulation: Number.isFinite(row.simHRProb) ? +Number(row.simHRProb).toFixed(6) : null,
+        calibratedAnchor: +Number(calProb).toFixed(6),
+        simResolutionWeight: null,
+        simResolved: null,
+        leaguePowerFactor: 1,
+        powerAdjusted: null,
+        zoneLogitDelta: 0,
+        published: null,
+      };
       calibratedRowObjs.push(row);
     }
 
@@ -4588,7 +4635,15 @@ async function main() {
     // isotonic calibration intact but restores ranking at the flat top/bottom
     // of the table where many players otherwise share an identical probability.
     const simRes = applySimResolution(calibratedRowObjs, { table: scoreToProbTable.table, lookupProb });
-    for (const row of calibratedRowObjs) delete row._anchorProb;
+    for (const row of calibratedRowObjs) {
+      if (row.hrProbabilityTrace) {
+        row.hrProbabilityTrace.simResolutionWeight = simRes.weight ?? null;
+        row.hrProbabilityTrace.simResolved = Number.isFinite(row.hrProbability)
+          ? +Number(row.hrProbability).toFixed(6)
+          : null;
+      }
+      delete row._anchorProb;
+    }
     console.log(`[calib] applied isotonic HR-prob to ${calibratedRowObjs.length} scored rows; ` +
       `sim-resolution refined ${simRes.adjusted} across ${simRes.buckets} buckets`);
   }
@@ -4610,9 +4665,33 @@ async function main() {
         : Number.isFinite(row.simHRProb)
           ? row.simHRProb
           : linFallback(row.score);
+      row.probabilityPipelineVersion = HR_PROBABILITY_PIPELINE_VERSION;
       patched++;
     }
     if (patched) console.warn(`[calib] safety-net: backfilled ${patched} null/NaN hrProbability row(s)`);
+  }
+  for (const key of Object.keys(scoredBatters)) {
+    if (!key.includes('-')) continue;
+    const row = scoredBatters[key];
+    if (!row || !Number.isFinite(row.hrProbability)) continue;
+    row.hrModelVersion = HR_MODEL_VERSION;
+    row.probabilityPipelineVersion = HR_PROBABILITY_PIPELINE_VERSION;
+    if (!row.hrProbabilityTrace) {
+      row.hrProbabilityTrace = {
+        telemetryVersion: HR_PROBABILITY_TELEMETRY_VERSION,
+        modelVersion: HR_MODEL_VERSION,
+        probabilityPipelineVersion: HR_PROBABILITY_PIPELINE_VERSION,
+        calibrationSource: 'probability-fallback',
+        rawSimulation: Number.isFinite(row.simHRProb) ? +Number(row.simHRProb).toFixed(6) : null,
+        calibratedAnchor: +Number(row.hrProbability).toFixed(6),
+        simResolutionWeight: 0,
+        simResolved: +Number(row.hrProbability).toFixed(6),
+        leaguePowerFactor: 1,
+        powerAdjusted: null,
+        zoneLogitDelta: 0,
+        published: null,
+      };
+    }
   }
 
   // 8.85) Morning score lock — one scoring pass a day.
@@ -4651,10 +4730,15 @@ async function main() {
         ...(row.hrResilience || {}),
         leaguePowerFactor: factor,
       };
-      if (factor === 1) continue;
-      row.leaguePowerBaselineProbability = row.hrProbability;
-      row.hrProbability = Math.max(0.005, Math.min(0.40, row.hrProbability * factor));
-      adjusted++;
+      if (row.hrProbabilityTrace) row.hrProbabilityTrace.leaguePowerFactor = factor;
+      if (factor !== 1) {
+        row.leaguePowerBaselineProbability = row.hrProbability;
+        row.hrProbability = Math.max(0.005, Math.min(0.40, row.hrProbability * factor));
+        adjusted++;
+      }
+      if (row.hrProbabilityTrace) {
+        row.hrProbabilityTrace.powerAdjusted = +Number(row.hrProbability).toFixed(6);
+      }
     }
     hrResiliencePolicy.power.adjustedRows = adjusted;
     console.log(`[hr-resilience] league power probability factor ×${factor} applied to ${adjusted} pregame rows`);
@@ -4666,7 +4750,7 @@ async function main() {
   // park strategy (rank score×air, gate air≥1.08): left floating, each 15-min
   // weather refresh could reorder park-combo legs all day while the scores
   // built FROM that same weather sat frozen. One lock, one story.
-  const LOCK_FIELDS = ['score', 'grade', 'rating', 'hrProbability', 'simHRProb', 'expectedHRs', 'ensembleScore', 'batterScore', 'matchupScore', 'envScore', 'reasons', 'eli5Reasons', 'parkWeatherHandFactor'];
+  const LOCK_FIELDS = ['score', 'grade', 'rating', 'hrProbability', 'simHRProb', 'expectedHRs', 'ensembleScore', 'batterScore', 'matchupScore', 'envScore', 'reasons', 'eli5Reasons', 'parkWeatherHandFactor', 'rawScore', 'rawGrade', 'preCapScore', 'preCapGrade', 'displayGrade', 'hrModelVersion', 'probabilityPipelineVersion', 'hrProbabilityTrace'];
   if (MORNING_LOCK_ON) try {
     const gameByPk = new Map((games || []).map((g) => [g.gamePk, g]));
     const started = (pk) => { const g = gameByPk.get(pk); return !!(g && (g.isLive || g.isFinal)); };
@@ -4735,11 +4819,21 @@ async function main() {
       const game = gameByPk.get(row?.gamePk);
       if (!row || game?.isLive === true || game?.isFinal === true) continue;
       const collision = applyZonePowerProbabilityInflation(row);
-      if (!collision.applied) continue;
-      const lift = collision.inflatedProbability - collision.baselineProbability;
-      applied++;
-      absoluteLift += lift;
-      maxLift = Math.max(maxLift, lift);
+      if (row.hrProbabilityTrace) {
+        row.hrProbabilityTrace.zoneLogitDelta = collision.applied ? collision.logitDelta : 0;
+        row.hrProbabilityTrace.published = Number.isFinite(row.hrProbability)
+          ? +Number(row.hrProbability).toFixed(6)
+          : null;
+      }
+      row.publishedHRProbability = Number.isFinite(row.hrProbability)
+        ? +Number(row.hrProbability).toFixed(6)
+        : null;
+      if (collision.applied) {
+        const lift = collision.inflatedProbability - collision.baselineProbability;
+        applied++;
+        absoluteLift += lift;
+        maxLift = Math.max(maxLift, lift);
+      }
     }
     console.log(`[zone-power] probability inflation applied to ${applied} pregame row(s); ` +
       `avg +${applied ? (absoluteLift / applied * 100).toFixed(2) : '0.00'}pp, max +${(maxLift * 100).toFixed(2)}pp; score/grade unchanged`);
@@ -5275,6 +5369,20 @@ async function main() {
     }
     if (Object.keys(weatherByGame).length === 0) {
       throw new Error('[slate-qa] FATAL: 0 weather rows despite ' + games.length + ' games. NWS unreachable or all stadium lookups failed?');
+    }
+  }
+
+  // Apply the deterministic data-trust gate before combo construction and
+  // before publishing. The standalone health job still re-validates the file,
+  // but warned rows cannot enter the canonical PRIME/STRONG parlay board.
+  {
+    const healthApplied = applyMlbDataHealth({ slate: payload, generatedAt: payload.finishedAt });
+    payload.scoredBatters = healthApplied.scoredBatters;
+    payload.dataHealth = healthApplied.dataHealth;
+    for (const row of Object.values(payload.scoredBatters || {})) {
+      if (row?.preGamePredictionRecord) {
+        row.preGamePredictionRecord.dataTrusted = !row.dataTrust?.status;
+      }
     }
   }
 

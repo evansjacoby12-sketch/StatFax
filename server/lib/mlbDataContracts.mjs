@@ -181,6 +181,57 @@ function validateProbability(prefix, value, errors) {
   if (!Number.isFinite(value) || value < 0 || value > 1) errors.push(`${prefix}: expected probability in [0,1]`)
 }
 
+function validateHrProbabilityTelemetry(record, prefix, errors) {
+  const present = record?.hrModelVersion != null
+    || record?.probabilityPipelineVersion != null
+    || record?.publishedHRProbability != null
+    || record?.hrProbabilityTrace != null
+  if (!present) return
+  if (!Number.isInteger(record.hrModelVersion) || record.hrModelVersion < 1) {
+    errors.push(`${prefix}.hrModelVersion: expected a positive integer`)
+  }
+  if (!Number.isInteger(record.probabilityPipelineVersion) || record.probabilityPipelineVersion < 1) {
+    errors.push(`${prefix}.probabilityPipelineVersion: expected a positive integer`)
+  }
+  if (record.publishedHRProbability != null) {
+    validateProbability(`${prefix}.publishedHRProbability`, record.publishedHRProbability, errors)
+  }
+  for (const field of ['rawScore', 'preCapScore']) {
+    if (record[field] != null && (!Number.isFinite(record[field]) || record[field] < 0 || record[field] > 100)) {
+      errors.push(`${prefix}.${field}: expected null or finite value in [0,100]`)
+    }
+  }
+  for (const field of ['rawGrade', 'preCapGrade', 'displayGrade']) {
+    if (record[field] != null && !GRADE_LABELS.has(record[field])) {
+      errors.push(`${prefix}.${field}: unsupported label ${String(record[field])}`)
+    }
+  }
+  const trace = record.hrProbabilityTrace
+  if (!isObject(trace)) {
+    errors.push(`${prefix}.hrProbabilityTrace: expected an object`)
+    return
+  }
+  if (!Number.isInteger(trace.telemetryVersion) || trace.telemetryVersion < 1) {
+    errors.push(`${prefix}.hrProbabilityTrace.telemetryVersion: expected a positive integer`)
+  }
+  if (trace.modelVersion !== record.hrModelVersion) errors.push(`${prefix}.hrProbabilityTrace.modelVersion: must match hrModelVersion`)
+  if (trace.probabilityPipelineVersion !== record.probabilityPipelineVersion) {
+    errors.push(`${prefix}.hrProbabilityTrace.probabilityPipelineVersion: must match probabilityPipelineVersion`)
+  }
+  for (const field of ['rawSimulation', 'calibratedAnchor', 'simResolved', 'powerAdjusted', 'published']) {
+    if (trace[field] != null) validateProbability(`${prefix}.hrProbabilityTrace.${field}`, trace[field], errors)
+  }
+  if (!Number.isFinite(trace.leaguePowerFactor) || trace.leaguePowerFactor < 0.8 || trace.leaguePowerFactor > 1.2) {
+    errors.push(`${prefix}.hrProbabilityTrace.leaguePowerFactor: expected finite value in [0.8,1.2]`)
+  }
+  if (!Number.isFinite(trace.zoneLogitDelta) || trace.zoneLogitDelta < 0 || trace.zoneLogitDelta > 0.25) {
+    errors.push(`${prefix}.hrProbabilityTrace.zoneLogitDelta: expected finite value in [0,0.25]`)
+  }
+  if (Number.isFinite(trace.published) && Math.abs(trace.published - record.publishedHRProbability) > 0.000001) {
+    errors.push(`${prefix}.hrProbabilityTrace.published: must match publishedHRProbability`)
+  }
+}
+
 function validateOptionalIso(prefix, value, errors) {
   if (value != null && (typeof value !== 'string' || Number.isNaN(Date.parse(value)))) {
     errors.push(`${prefix}: expected null or an ISO timestamp`)
@@ -2565,6 +2616,7 @@ export function validateDailySnapshot(snapshot) {
     if (row.hrProbability != null && (!Number.isFinite(row.hrProbability) || row.hrProbability < 0 || row.hrProbability > 1)) {
       errors.push(`${prefix}.hrProbability: expected null or probability in [0,1]`)
     }
+    validateHrProbabilityTelemetry(row, prefix, errors)
     if (row.zoneBonus != null || row.baseScore != null) errors.push(`${prefix}: retired zone score adjustment fields are forbidden`)
     if (row.zoneMatchup != null) validateZoneMatchup(`${prefix}.zoneMatchup`, row.zoneMatchup, errors)
     if (row.pitcherContactLeak != null) errors.push(...validatePitcherContactLeakEvidence(row.pitcherContactLeak, `${prefix}.pitcherContactLeak`))
@@ -2580,6 +2632,7 @@ export function validateDailySnapshot(snapshot) {
         if (String(frozen.gamePk) !== String(row.gamePk)) errors.push(`${at}.gamePk: must match row gamePk`)
         if (!Number.isFinite(frozen.score) || frozen.score < 0 || frozen.score > 100) errors.push(`${at}.score: expected finite value in [0,100]`)
         if (!GRADE_LABELS.has(frozen.grade)) errors.push(`${at}.grade: unsupported label ${String(frozen.grade)}`)
+        validateHrProbabilityTelemetry(frozen, at, errors)
         errors.push(...validateHistoricalFeatureRecord(frozen, at))
       }
     }
@@ -2651,6 +2704,7 @@ function validateRecordRows(records, dates, prefix, errors, warnings, { compact 
       if (row.feat != null && !isObject(row.feat)) errors.push(`${at}.feat: must be an object or null`)
       if (row.zoneEvidence != null) errors.push(...validateZoneEvidenceArchive(row.zoneEvidence, row.simHRProb, `${at}.zoneEvidence`))
       if (row.contactLeakEvidence != null) errors.push(...validatePitcherContactLeakEvidence(row.contactLeakEvidence, `${at}.contactLeakEvidence`))
+      validateHrProbabilityTelemetry(row, at, errors)
       errors.push(...validateHistoricalFeatureRecord(row, at))
       if (compact && !row.feat) missingFeatures++
       if (row.gamePk == null) {

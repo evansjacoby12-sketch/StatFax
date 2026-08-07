@@ -5,10 +5,9 @@
  * active badges) and the actual game outcomes from MLB's box-score endpoints,
  * this module builds a per-day reconciliation record and appends it to a
  * rolling 30-day operational log plus a compact 180-day model archive. From
- * the operational log it computes per-badge
- * and per-grade multipliers using the same math the on-device path used to
- * use — sqrt-dampened lift ratios clamped to ±8% — and writes them out as
- * `calibration.json` for tomorrow's cron run to load.
+ * the operational log it computes per-badge scoring multipliers and per-grade
+ * reporting diagnostics. Grade lift is never fed back into the score. The
+ * bundle is written as `calibration.json` for tomorrow's cron run to load.
  *
  * Why on the server rather than the device:
  *   The on-device path kept a per-user backtest log in AsyncStorage and
@@ -47,6 +46,7 @@ import {
   buildPitcherContactLeak,
   compactPitcherContactLeakEvidence,
 } from '../src/sports/mlb/logic/pitcherContactLeak.js';
+import { isCleanHrHistoryRow } from './lib/hrModelEvaluation.mjs';
 
 const MLB_BASE = 'https://statsapi.mlb.com/api/v1';
 const ROLLING_DAYS = 30;
@@ -257,8 +257,27 @@ export function extractPredictionRecord(row) {
     // the instant a game first goes live/Final (see fetch-slate's decay + Final
     // blocks), and are what calibration must measure. Fall back to the live
     // field for rows that never went live (e.g. postponed) — there it IS pregame.
-    score:          Number.isFinite(row.preGameScore) ? row.preGameScore : row.score,
-    grade:          row.preGameGrade?.label || row.preGameGrade || row.grade?.label || row.grade || null,
+    score:          Number.isFinite(row.preCapScore)
+      ? row.preCapScore
+      : Number.isFinite(row.preGameScore) ? row.preGameScore : row.score,
+    grade:          row.preCapGrade
+      || row.preGameGrade?.label || row.preGameGrade
+      || row.grade?.label || row.grade || null,
+    rawScore:       Number.isFinite(row.rawScore) ? row.rawScore : null,
+    rawGrade:       row.rawGrade || null,
+    preCapScore:    Number.isFinite(row.preCapScore) ? row.preCapScore : null,
+    preCapGrade:    row.preCapGrade || null,
+    displayGrade:   row.displayGrade || row.preGameGrade?.label || row.preGameGrade || row.grade?.label || row.grade || null,
+    hrModelVersion: Number.isInteger(row.hrModelVersion) ? row.hrModelVersion : null,
+    probabilityPipelineVersion: Number.isInteger(row.probabilityPipelineVersion)
+      ? row.probabilityPipelineVersion
+      : null,
+    publishedHRProbability: Number.isFinite(row.publishedHRProbability)
+      ? +Number(row.publishedHRProbability).toFixed(6)
+      : null,
+    hrProbabilityTrace: row.hrProbabilityTrace && typeof row.hrProbabilityTrace === 'object'
+      ? structuredClone(row.hrProbabilityTrace)
+      : null,
     badges:         activeBadgesForRow(row),
     lineupConfirmed: row.lineupConfirmed ?? null,
     // Mirrors the List Builder's deterministic trust gate exactly: healthy
@@ -354,6 +373,10 @@ export function compactModelRecord(record) {
   const featureVersion = historicalFeatureVersionOf(record);
   const validFeat = record?.feat && typeof record.feat === 'object' && !Array.isArray(record.feat);
   const rawFeat = validFeat ? record.feat : (record?.feat ?? null);
+  const hasProbabilityTelemetry = Number.isInteger(record?.hrModelVersion)
+    || Number.isInteger(record?.probabilityPipelineVersion)
+    || Number.isFinite(record?.publishedHRProbability)
+    || (record?.hrProbabilityTrace && typeof record.hrProbabilityTrace === 'object');
   return {
     playerId:       record?.playerId ?? null,
     gamePk:         record?.gamePk ?? null,
@@ -361,6 +384,23 @@ export function compactModelRecord(record) {
     homered:        record?.homered === true,
     actuallyPlayed: record?.actuallyPlayed !== false,
     grade:          record?.grade ?? null,
+    ...(hasProbabilityTelemetry ? {
+      rawScore:       Number.isFinite(record?.rawScore) ? record.rawScore : null,
+      rawGrade:       record?.rawGrade ?? null,
+      preCapScore:    Number.isFinite(record?.preCapScore) ? record.preCapScore : null,
+      preCapGrade:    record?.preCapGrade ?? null,
+      displayGrade:   record?.displayGrade ?? record?.grade ?? null,
+      hrModelVersion: Number.isInteger(record?.hrModelVersion) ? record.hrModelVersion : null,
+      probabilityPipelineVersion: Number.isInteger(record?.probabilityPipelineVersion)
+        ? record.probabilityPipelineVersion
+        : null,
+      publishedHRProbability: Number.isFinite(record?.publishedHRProbability)
+        ? record.publishedHRProbability
+        : null,
+      hrProbabilityTrace: record?.hrProbabilityTrace && typeof record.hrProbabilityTrace === 'object'
+        ? { ...record.hrProbabilityTrace }
+        : null,
+    } : {}),
     badges:         Array.isArray(record?.badges) ? record.badges : [],
     lineupConfirmed: typeof record?.lineupConfirmed === 'boolean' ? record.lineupConfirmed : null,
     dataTrusted:    typeof record?.dataTrusted === 'boolean' ? record.dataTrusted : null,
@@ -474,8 +514,8 @@ export function appendToLog(log, date, reconciled) {
  * measurement artifact, not signal. Older log entries without the
  * `actuallyPlayed` field are treated as played (backward-compatible default).
  *
- * Returns { samples, badges, grades, computedAt } in the exact shape
- * setActiveCalibration() expects.
+ * Returns { samples, badges, grades, computedAt }. `grades` is retained for
+ * model review; production score calibration reads only `badges`.
  */
 export function computeMultipliers(log) {
   const allRaw = (log?.dates || []).flatMap(d => log?.records?.[d] || []);
@@ -483,7 +523,7 @@ export function computeMultipliers(log) {
   // Separate scratches from played. Legacy records (no actuallyPlayed field)
   // default to true so the existing 30-day window isn't suddenly invalidated.
   const scratched = allRaw.filter(r => r.actuallyPlayed === false);
-  const all       = allRaw.filter(r => r.actuallyPlayed !== false);
+  const all       = allRaw.filter(isCleanHrHistoryRow);
 
   const totalPredictions = allRaw.length;
   const scratchCount     = scratched.length;
@@ -493,7 +533,13 @@ export function computeMultipliers(log) {
   }
 
   const samples = all.length;
-  const base = { samples, badges: {}, grades: {}, computedAt: new Date().toISOString() };
+  const base = {
+    samples,
+    badges: {},
+    grades: {},
+    computedAt: new Date().toISOString(),
+    population: 'identity-safe-pregame-generation-3',
+  };
   if (!samples) return base;
 
   const homers = all.filter(r => r.homered).length;

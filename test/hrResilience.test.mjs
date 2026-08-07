@@ -106,7 +106,7 @@ test('low power plus low ranking confidence cuts PRIME and auto-combo exposure',
   assert.equal(combo.maxCombosPerSize, 2);
 });
 
-test('stalled context lift activates a bounded Batter Score, Heat, and Setup correction', () => {
+test('stalled context lift activates a bounded Batter Score and Setup correction', () => {
   const policy = buildHrResiliencePolicy({
     backtestLog: history(),
     scoredBatters: lowPowerRows(),
@@ -125,4 +125,6 @@ test('stalled context lift activates a bounded Batter Score, Heat, and Setup cor
   assert.equal(result.applied, 1);
   assert.ok(row.score > 55);
   assert.ok(row.hrResilience.scoreDelta <= 4);
+  assert.equal(policy.ranking.shadow.productionFallback, 'batter-plus-setup');
+  assert.ok(policy.ranking.shadow.candidates.some((candidate) => candidate.key === 'batter-barrel-setup'));
 });

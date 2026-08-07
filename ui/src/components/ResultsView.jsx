@@ -116,8 +116,9 @@ function AccountabilityOverview({ meta, batters, onSelect, onOpenTickets }) {
   const weakestGrade = qualifiedGrades.slice().sort((a, b) => a.rate - b.rate)[0] || null
   const projectedLegs = tickets.flatMap((ticket) => ticket.legs || []).filter((leg) => leg.lineupConfirmed === false).length
   const modelMetrics = meta?.modelMetrics
-  const brierLift = modelMetrics && modelMetrics.baselineBrier > 0
-    ? (modelMetrics.baselineBrier - modelMetrics.brier) / modelMetrics.baselineBrier
+  const forwardMetrics = modelMetrics?.forward
+  const brierLift = forwardMetrics?.ready && forwardMetrics.baselineBrier > 0
+    ? (forwardMetrics.baselineBrier - forwardMetrics.brier) / forwardMetrics.baselineBrier
     : null
 
   let verdict = 'Track tickets to connect StatFax recommendations to your actual betting results.'
@@ -150,7 +151,7 @@ function AccountabilityOverview({ meta, batters, onSelect, onOpenTickets }) {
         <Kpi label="Settled record" value={summary.settled ? `${summary.wins}-${summary.settled - summary.wins}` : '—'} sub={summary.settled ? `${pct(summary.wins / summary.settled, 1)} cash rate · n=${summary.settled}` : 'No settled tickets'} />
         <Kpi label="Net units / ROI" value={summary.pricedSettled ? `${summary.net >= 0 ? '+' : ''}${summary.net.toFixed(2)}u` : '—'} sub={summary.roi != null ? `${signedPct(summary.roi, 1)} ROI · n=${summary.pricedSettled}` : 'Needs wager + odds'} accent={summary.pricedSettled ? summary.net >= 0 ? 'var(--strong)' : 'var(--bad)' : null} />
         <Kpi label="Open exposure" value={summary.knownExposure > 0 ? `${summary.knownExposure.toFixed(2)}u` : summary.open ? 'Unknown' : '0u'} sub={`${summary.live} live · ${summary.open} open`} accent={summary.open ? 'var(--accent)' : null} />
-        <Kpi label="Model health" value={modelMetrics?.brier != null ? modelMetrics.brier.toFixed(4) : 'Building'} sub={brierLift != null ? `${signedPct(brierLift, 0)} vs baseline Brier` : `${rows.length} reconciled picks`} accent="var(--prime)" />
+        <Kpi label={forwardMetrics?.ready ? 'OOS Brier' : 'Forward model health'} value={forwardMetrics?.ready ? forwardMetrics.brier.toFixed(4) : 'Collecting'} sub={brierLift != null ? `${signedPct(brierLift, 0)} vs prior-rate baseline · n=${forwardMetrics.n}` : `${forwardMetrics?.n || 0}/${forwardMetrics?.requirements?.readyRows || 300} frozen published picks`} accent="var(--prime)" />
       </div>
 
       <div className="accountability-grid">
@@ -255,7 +256,8 @@ function ModelResults({ meta }) {
   }
 
   const m = meta?.modelMetrics
-  const reliability = m?.reliability || []
+  const forwardMetrics = m?.forward
+  const reliability = forwardMetrics?.reliability?.length ? forwardMetrics.reliability : (m?.reliability || [])
   const rankPerformance = summarizeRankPerformance(log.records || {}, RECENT_DAYS)
 
   // Scope the top-tier HR feed to the same rolling week as the tables above.
@@ -273,7 +275,9 @@ function ModelResults({ meta }) {
         <Kpi label="Discrimination (AUC)" value={Number.isFinite(auc) ? auc.toFixed(3) : '—'} sub={`ranking quality · 0.5 = random · n=${N}`} accent="var(--prime)" />
         <Kpi label="Top-decile hit rate" value={pct(topRate, 0)} sub={`${topHits}/${topN} HR · ${(topRate / base).toFixed(1)}x vs ${pct(base, 0)} base`} accent="var(--strong)" />
         <Kpi label="Graded picks" value={num(N)} sub={`${hits} HR · ${dates.length} days`} />
-        {m && <Kpi label="Brier vs baseline" value={m.brier.toFixed(4)} sub={`${signedPct((m.baselineBrier - m.brier) / m.baselineBrier, 0)} lift · n=${m.totalReconciled || N}`} accent="var(--accent)" />}
+        {m && (forwardMetrics?.ready
+          ? <Kpi label="OOS Brier vs baseline" value={forwardMetrics.brier.toFixed(4)} sub={`${signedPct(forwardMetrics.brierSkill, 0)} skill · n=${forwardMetrics.n} · ${forwardMetrics.dates} dates`} accent="var(--accent)" />
+          : <Kpi label="Forward probability audit" value="Collecting" sub={`${forwardMetrics?.n || 0}/${forwardMetrics?.requirements?.readyRows || 300} frozen picks · CV Brier ${Number.isFinite(m.cvBrier) ? m.cvBrier.toFixed(4) : '—'}`} accent="var(--accent)" />)}
       </div>
 
       <RankPerformance summary={rankPerformance} />
@@ -338,7 +342,11 @@ function ModelResults({ meta }) {
             <Reliability bins={reliability} />
           </div>
           <CalibrationBands bins={reliability} />
-          <p className="chart-cap dim" style={{ fontSize: '11px', marginTop: '16px' }}>Predicted vs observed HR rates. Dashed diagonal = ideal calibration.</p>
+          <p className="chart-cap dim" style={{ fontSize: '11px', marginTop: '16px' }}>
+            {forwardMetrics?.reliability?.length
+              ? `Frozen published probabilities · n=${forwardMetrics.n}. Dashed diagonal = ideal calibration.`
+              : 'Retrospective score calibration only while the exact published-probability sample collects.'}
+          </p>
         </section>
       </div>
 

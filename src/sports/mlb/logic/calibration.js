@@ -238,16 +238,15 @@ export async function recomputeCalibration() {
 export function applyCalibration(score, gradeKey, activeBadgeKeys = []) {
   if (!activeCalibration.ready) return { score, gradeKey };
 
-  // Geometric-mean dampening over GRADE + badges (n = badges + 1). Combining the
-  // grade multiplier with each active badge and taking the nth root keeps total
-  // movement bounded AND keeps the grade nudge from inflating the grade
-  // distribution — the multiplier is applied to the 0-100 score and the displayed
-  // grade is re-derived from it, so an undiluted/wide grade multiplier floods the
-  // PRIME tier (we saw ~90 PRIMEs). Probability is already calibrated by the
-  // score→prob isotonic table, so the grade multiplier only nudges gently here.
-  let product = gradeMultiplier(gradeKey);
+  // Grade multipliers are reporting-only. Applying a multiplier learned from a
+  // grade back to the score that created that same grade is circular, and the
+  // published PRIME cap made the historical grade population differ from the
+  // pre-cap population being scored. Only independent badge evidence may nudge
+  // the raw score. A row without an active badge is therefore unchanged.
+  if (!activeBadgeKeys.length) return { score, gradeKey };
+  let product = 1;
   for (const k of activeBadgeKeys) product *= badgeMultiplier(k);
-  const damped = Math.pow(product, 1 / (activeBadgeKeys.length + 1));
+  const damped = Math.pow(product, 1 / activeBadgeKeys.length);
 
   let adjusted = Math.min(100, Math.max(0, Math.round(score * damped)));
 

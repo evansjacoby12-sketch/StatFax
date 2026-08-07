@@ -308,6 +308,7 @@ function eligible(rows, require) {
   const out = []
   for (const b of rows || []) {
     if (!b || b.gamePk == null) continue
+    if (b.dataTrusted === false) continue
     if (!COMBO_TIERS.has(b.grade || 'SKIP')) continue
     if (!Number.isFinite(b.score)) continue
     if (require && !require(b)) continue

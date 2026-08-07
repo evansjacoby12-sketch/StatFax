@@ -177,6 +177,7 @@ function toComboRow(b, applyLock = false) {
     battingOrder: Number.isFinite(b.battingOrder) ? b.battingOrder : null,
     paWeight: pw,
     benched: isBenched(b),
+    dataTrusted: !b.dataTrust?.status,
     score: b.score,
     grade: b.grade?.label || b.grade || null,
     hrProb: rawProb != null ? rawProb * pw : null,

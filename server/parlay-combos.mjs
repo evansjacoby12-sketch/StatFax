@@ -82,6 +82,7 @@ export function comboRowFromSnapshot(row) {
     lineupConfirmed: row.lineupConfirmed === true,
     paWeight: pw,
     benched: isBenched(row),
+    dataTrusted: !row.dataTrust?.status,
     score,
     grade,
     // The model's stated chance this leg homers — the CALIBRATED headline

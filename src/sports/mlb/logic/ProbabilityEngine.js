@@ -2,9 +2,9 @@
  * ProbabilityEngine — StatFax HR probability scoring
  *
  * Score breakdown:
- *   45% Batter quality  (ISO, HR rate, launch angle, pull rate, hot bat, who's due, Statcast)
+ *   52% Batter quality  (ISO, HR rate, launch angle, pull rate, hot bat, who's due, Statcast)
  *   30% Matchup         (pitcher HR/9 splits by hand, ERA, K/9, H2H career, pitcher contact quality)
- *   25% Environment     (ball carry = wind direction × stadium bearing + temp + park factor)
+ *   18% Environment     (ball carry = wind direction × stadium bearing + temp + park factor)
  *
  * Grade thresholds:
  *   PRIME  ≥ 72
@@ -21,6 +21,7 @@
 
 import stadiumsData from '../data/stadiums.json';
 import { applyCalibration, setActiveCalibration } from './calibration';
+import { HR_MODEL_VERSION } from './hrModelVersion.js';
 
 // Re-export so the bundled server-side build (server/.build/model.mjs) can
 // hydrate calibration multipliers from R2 before scoring. The on-device
@@ -1682,9 +1683,6 @@ export function scoreBatter(
 
   const grade = gradeFromScore(score);
 
-  // 1–10 rating for the player card quick-read
-  const rating = Math.max(1, Math.min(10, Math.round(score / 10)));
-
   const reasonArgs = {
     iso, hrRate, hot, due, dueScore, expected30, deficit,
     cold, dueAndHotBonus, coldPenalty, savantStats, pitcherSavant, pitchMix,
@@ -1717,9 +1715,9 @@ export function scoreBatter(
 
   // ── Calibration pass ─────────────────────────────────────────────────────
   // Nudge the score using empirical hit-rate data from prior reconciled days
-  // (see src/logic/calibration.js). No-op until 300+ reconciled predictions
-  // exist; bounded to ±15% per multiplier with geometric-mean dampening so
-  // stacked badges can't compound runaway.
+  // (see calibration.js). No-op until 1500+ clean reconciled predictions exist;
+  // grade lift is reporting-only and evidence-backed badge multipliers are
+  // geometrically dampened so stacked badges cannot compound runaway.
   const activeBadgeKeys = [];
   if (hot)                              activeBadgeKeys.push('hot');
   if (due)                              activeBadgeKeys.push('due');
@@ -1756,11 +1754,14 @@ export function scoreBatter(
   return {
     score:  finalScore,
     grade:  finalGrade,
+    rawScore: score,
+    rawGrade: grade.label,
+    hrModelVersion: HR_MODEL_VERSION,
     hrProbability:  sim.hrProbability,   // 0..1, "≥1 HR today"
     expectedHRs:    sim.expectedHRs,     // sum of per-PA p_i
     expectedPAs:    sim.expectedPAs,
     paBreakdown:    sim.perPA,
-    rating,
+    rating: Math.max(1, Math.min(10, Math.round(finalScore / 10))),
     hot,
     due,
     dueScore,

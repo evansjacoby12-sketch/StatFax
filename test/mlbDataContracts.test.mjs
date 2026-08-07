@@ -809,6 +809,28 @@ test('daily contract identity-binds a frozen pregame prediction record', () => {
           lineupConfirmed: true,
           dataTrusted: true,
           simHRProb: 0.12,
+          rawScore: 70,
+          rawGrade: 'STRONG',
+          preCapScore: 72,
+          preCapGrade: 'PRIME',
+          displayGrade: 'PRIME',
+          hrModelVersion: 2,
+          probabilityPipelineVersion: 2,
+          publishedHRProbability: 0.16,
+          hrProbabilityTrace: {
+            telemetryVersion: 1,
+            modelVersion: 2,
+            probabilityPipelineVersion: 2,
+            calibrationSource: 'current-version',
+            rawSimulation: 0.12,
+            calibratedAnchor: 0.15,
+            simResolutionWeight: 0,
+            simResolved: 0.15,
+            leaguePowerFactor: 1,
+            powerAdjusted: 0.15,
+            zoneLogitDelta: 0.08,
+            published: 0.16,
+          },
           zoneEvidence: null,
           contactLeakEvidence: null,
         },
@@ -817,6 +839,10 @@ test('daily contract identity-binds a frozen pregame prediction record', () => {
     stats: { scoredBatters: 1 },
   }
   assert.deepEqual(validateDailySnapshot(snapshot).errors, [])
+
+  const badTelemetry = structuredClone(snapshot)
+  badTelemetry.scoredBatters['1-10'].preGamePredictionRecord.hrProbabilityTrace.published = 0.20
+  assert.ok(validateDailySnapshot(badTelemetry).errors.some((error) => error.includes('must match publishedHRProbability')))
 
   snapshot.scoredBatters['1-10'].preGamePredictionRecord.gamePk = 11
   const invalid = validateDailySnapshot(snapshot)

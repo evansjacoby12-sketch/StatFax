@@ -474,7 +474,13 @@ export default function Header({
   onOpenSettings,
 }) {
   const m = meta.modelMetrics
-  const brierEdge = m ? (m.baselineBrier - m.brier) / m.baselineBrier : null
+  const forwardMetrics = m?.forward
+  const modelHealthReady = forwardMetrics?.ready === true
+  const modelHealthValue = modelHealthReady ? forwardMetrics.brier : m?.cvBrier
+  const modelHealthLabel = modelHealthReady ? 'OOS Brier' : 'CV Brier'
+  const brierEdge = modelHealthReady && forwardMetrics.baselineBrier > 0
+    ? (forwardMetrics.baselineBrier - forwardMetrics.brier) / forwardMetrics.baselineBrier
+    : null
   const genMs = meta.generatedAt ? Date.parse(meta.generatedAt) : NaN
   const slateStale = Number.isFinite(genMs) && Date.now() - genMs > 14 * 60_000
 
@@ -601,15 +607,15 @@ export default function Header({
               ? `Model accuracy & calibration. Slate generated ${meta.generatedAt} — scores/innings are from then, not live-now.`
               : `Model accuracy & calibration. Generated ${meta.generatedAt}`
           }
-          aria-label={`Model health. Brier ${m ? m.brier.toFixed(4) : 'unavailable'}${brierEdge != null ? `, ${pct(Math.abs(brierEdge), 0)} ${brierEdge >= 0 ? 'better' : 'worse'} than baseline` : ''}. ${slateStale ? 'Stale' : 'Updated'} ${timeAgo(meta.generatedAt)}.`}
+          aria-label={`Model health. ${modelHealthLabel} ${Number.isFinite(modelHealthValue) ? modelHealthValue.toFixed(4) : 'collecting'}${brierEdge != null ? `, ${pct(Math.abs(brierEdge), 0)} ${brierEdge >= 0 ? 'better' : 'worse'} than baseline` : ''}. ${modelHealthReady ? 'Frozen published probabilities.' : `Forward sample collecting, ${forwardMetrics?.n || 0} graded.`} ${slateStale ? 'Stale' : 'Updated'} ${timeAgo(meta.generatedAt)}.`}
         >
           <span className="model-health-gauge" aria-hidden="true">
             <Icon name="Gauge" size={15} />
           </span>
           <span className="model-health-copy">
             <span className="model-health-main">
-              <strong className="mono">{m ? m.brier.toFixed(4) : '—'}</strong>
-              <small>Brier</small>
+              <strong className="mono">{Number.isFinite(modelHealthValue) ? modelHealthValue.toFixed(4) : '—'}</strong>
+              <small>{modelHealthLabel}</small>
             </span>
             <span className={`model-health-meta ${slateStale ? 'stale' : ''}`}>
               {brierEdge != null && (
@@ -617,6 +623,7 @@ export default function Header({
                   {brierEdge >= 0 ? '▲' : '▼'} {pct(Math.abs(brierEdge), 0)}
                 </span>
               )}
+              {!modelHealthReady && <span className="mono">n={forwardMetrics?.n || 0}</span>}
               <span className="model-health-dot" aria-hidden="true" />
               <span>{slateStale ? 'Stale' : 'Updated'} {timeAgo(meta.generatedAt)}</span>
             </span>

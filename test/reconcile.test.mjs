@@ -2,6 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   appendToLog,
+  compactModelRecord,
   extractPredictionRecord,
   mergeModelHistories,
   reconcileOutcomes,
@@ -11,6 +12,32 @@ import {
   CLEAN_PREGAME_FEATURE_CAPTURE,
   CLEAN_PREGAME_FEATURE_GENERATION,
 } from '../server/lib/historicalFeatureArchive.mjs'
+
+test('compact model history preserves exact published probability telemetry only when present', () => {
+  const trace = {
+    telemetryVersion: 1,
+    modelVersion: 2,
+    probabilityPipelineVersion: 2,
+    rawSimulation: 0.11,
+    calibratedAnchor: 0.14,
+    simResolutionWeight: 0,
+    simResolved: 0.14,
+    leaguePowerFactor: 0.95,
+    powerAdjusted: 0.133,
+    zoneLogitDelta: 0,
+    published: 0.133,
+  }
+  const compact = compactModelRecord({
+    playerId: 1, gamePk: 10, score: 72, grade: 'PRIME', homered: false,
+    hrModelVersion: 2, probabilityPipelineVersion: 2,
+    publishedHRProbability: 0.133, hrProbabilityTrace: trace,
+  })
+  assert.equal(compact.publishedHRProbability, 0.133)
+  assert.deepEqual(compact.hrProbabilityTrace, trace)
+
+  const legacy = compactModelRecord({ playerId: 2, gamePk: 11, score: 60, grade: 'STRONG', homered: false })
+  assert.equal('publishedHRProbability' in legacy, false)
+})
 
 // Outcome sets shaped the way fetchHomerersForDate now returns them: bare
 // playerId sets (combo scorecard) + composite `playerId-gamePk` sets (per-batter).

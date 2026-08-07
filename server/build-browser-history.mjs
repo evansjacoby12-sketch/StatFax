@@ -17,6 +17,9 @@ export function compactHistoryRecord(row = {}) {
   const keep = [
     'playerId', 'gamePk', 'name', 'score', 'grade', 'badges',
     'lineupConfirmed', 'dataTrusted', 'simHRProb', 'zoneEvidence',
+    'rawScore', 'rawGrade', 'preCapScore', 'preCapGrade', 'displayGrade',
+    'hrModelVersion', 'probabilityPipelineVersion', 'publishedHRProbability',
+    'hrProbabilityTrace',
     'contactLeakEvidence', 'homered', 'actuallyPlayed',
   ]
   const out = {}

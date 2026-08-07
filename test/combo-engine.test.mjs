@@ -229,6 +229,17 @@ test('identical leg sets from different strategies dedupe within a size', () => 
   assert.ok(sigs.length >= 1)
 })
 
+test('known data-health warnings remove a leg from every combo strategy', () => {
+  const rows = [
+    row({ playerId: 1, gamePk: 101, dataTrusted: false }),
+    row({ playerId: 2, gamePk: 102, dataTrusted: true }),
+    row({ playerId: 3, gamePk: 103, dataTrusted: true }),
+  ]
+  const combos = buildCombos(rows)
+  assert.ok(combos.length > 0)
+  assert.ok(combos.every((combo) => combo.legs.every((leg) => leg.playerId !== 1)))
+})
+
 test('Core Pair is supplemental and does not suppress an existing strategy', () => {
   const rows = [
     row({ playerId: 1, gamePk: 1, score: 80, grade: 'PRIME', hrProb: 0.24, hot: true, heat: 70 }),

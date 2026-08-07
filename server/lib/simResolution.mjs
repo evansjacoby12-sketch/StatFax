@@ -32,9 +32,10 @@
 const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x))
 const logit = (p) => Math.log(p / (1 - p))
 
-// Strength of the sim tilt. Tunable once the backtest log carries simHRProb
-// (reconcile.mjs logs it going forward).
-export const SIM_RESOLUTION_WEIGHT = 0.7
+// The last clean paired replay did not improve Brier or AUC, so v2 keeps this
+// overlay in telemetry/shadow mode. It may return only after frozen published
+// probabilities show a material forward benefit.
+export const SIM_RESOLUTION_WEIGHT = 0
 
 const NUDGE_MAX_SCORE = 3 // max score-points a row can move (keeps it within ~its bucket)
 const MIN_BUCKET_N = 3 // need this many sim'd rows in a bucket to tilt
@@ -61,7 +62,7 @@ function bucketIndex(score, table) {
  */
 export function applySimResolution(rows, { table, lookupProb, weight = SIM_RESOLUTION_WEIGHT, anchorKey = '_anchorProb' } = {}) {
   if (!Array.isArray(rows) || !rows.length || !Array.isArray(table) || !table.length || typeof lookupProb !== 'function') {
-    return { adjusted: 0, buckets: 0 }
+    return { adjusted: 0, buckets: 0, weight }
   }
 
   // Dedup by object identity — callers may pass the same row under multiple
@@ -115,5 +116,5 @@ export function applySimResolution(rows, { table, lookupProb, weight = SIM_RESOL
     bucketsTilted++
   }
 
-  return { adjusted, buckets: bucketsTilted }
+  return { adjusted, buckets: bucketsTilted, weight }
 }

@@ -15,13 +15,24 @@ This document defines what production models currently do and which boundaries m
 
 Authority: `src/sports/mlb/logic/ProbabilityEngine.js`, with the production pipeline in `server/fetch-slate.mjs`.
 
-- Composite score: 45% batter quality, 30% matchup, 25% environment.
+- Composite score: 52% batter quality, 30% matchup, 18% environment.
 - Internal tiers: PRIME at 72+, STRONG at 52+, LEAN at 36+, otherwise SKIP. Display names may differ.
 - PRIME has an absolute score floor and a game-normalized label cap. Overflow is demoted to STRONG; score and HR probability are not changed by the cap.
 - The published HR probability is calibrated separately from the 0-100 rank score. Do not treat a grade as an event guarantee.
 - Park/weather, hotness, and other post-process adjustments have explicit caps. Blast remains non-scoring unless its forward gate is deliberately promoted.
 - The zone/contact collision can apply a capped HR-probability-only overlay after reliable zone evidence and hard-hit qualification. It must not mutate score or grade.
 - Post-break/calendar-gap form decay, league power regime, ranking-health checks, and context-overlay lift control slate resilience. Weak regimes reduce PRIME/combo supply rather than manufacturing confidence.
+
+### HR model v2 / probability pipeline v2 — 2026-08-07
+
+- Every frozen pregame record carries `hrModelVersion`, `probabilityPipelineVersion`, the exact `publishedHRProbability`, and an auditable probability trace from raw simulation through calibration, power regime, zone delta, and publication. Forward Brier may use only exact-version, identity-safe, data-trusted, actually-played rows.
+- The old headline Brier was in-sample because it re-mapped historical scores through the table fitted on those same outcomes. It remains retrospective diagnostics only. Production health is now the expanding-date score of the probability actually published; it reports `collecting` until at least 300 paired rows, 20 HR events, and three evaluation dates exist.
+- Score calibration no longer applies a circular grade multiplier. Grades remain tracked for reporting, while independent badge multipliers may still apply after their sample gate. The PRIME game cap is explicitly a `displayGrade`; probability calibration and model history use the uncapped `preCapGrade` and score.
+- Calibration/training drops legacy rows without `gamePk`, postgame feature captures, non-generation-3 rows, scratches, and known data-health failures. Current-version rows take over from the clean prior-generation bridge after 750 exact rows across five dates.
+- The AB simulation resolution weight is 0 in v2. A clean paired replay was slightly worse than the calibrated anchor (Brier 0.094258 vs 0.094248 and AUC 0.5790 vs 0.5798), so it remains traceable shadow evidence rather than an applied tie-break.
+- When context ranking stalls, the bounded fallback uses Batter Score plus HR Setup (80/20). In the latest clean ten-date audit it had full coverage and AUC 0.6027 versus 0.5928 for the full score and 0.5836 for the former Batter/Heat/Setup fallback. Batter/Barrel/Setup stays shadow-only despite AUC 0.6179 because coverage was only 68%.
+- Known deterministic data-health warnings are attached before canonical combo construction. A warned batter cannot enter automatic HR combos; missing evidence never becomes a neutral prior silently.
+- Rollback: restore model/pipeline version 1, restore the prior grade calibration and sim-resolution weight, and switch the UI back only with the matching version-1 historical population. Keep the v2 telemetry fields so evidence is not discarded.
 
 AI-HR production overlay v1 was retired on 2026-08-02. Published HR probability
 now stops after the deterministic simulation, calibration, resilience, and
