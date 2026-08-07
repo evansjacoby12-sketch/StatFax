@@ -32,6 +32,14 @@ export function buildNFLDataHealth({ generatedAt = new Date().toISOString(), gam
     { id: 'availability', label: 'Availability', state: quality.officialAvailability ? 'ready' : 'limited', message: quality.officialAvailability ? 'Current roster and injury statuses loaded' : 'Current availability is incomplete' },
     { id: 'weather', label: 'Weather', state: quality.weatherFresh && Number(quality.weatherCoverage) >= .8 ? 'ready' : 'limited', message: `${Math.round(Number(quality.weatherCoverage || 0) * 100)}% game coverage` },
     { id: 'history', label: 'History', state: quality.playByPlay && quality.defenseByPosition ? 'ready' : 'limited', message: quality.playByPlay ? 'Play-by-play and defense context loaded' : 'Historical context limited' },
+    {
+      id: 'preseasonParticipation',
+      label: 'Preseason participation',
+      state: Number(quality.verifiedPreseasonSnaps || 0) > 0 && Number(quality.verifiedPreseasonRoutes || 0) > 0 ? 'ready' : 'limited',
+      message: Number(quality.verifiedPreseasonSnaps || 0) > 0 && Number(quality.verifiedPreseasonRoutes || 0) > 0
+        ? `${Number(quality.verifiedPreseasonSnaps)} verified snap profiles · ${Number(quality.verifiedPreseasonRoutes)} verified route profiles`
+        : `${Number(quality.preseasonRoles || 0)} box-score role profiles · verified snaps/routes unavailable`,
+    },
   ].map((feed) => ({ ...feed, provider: providers[feed.id] || null, freshness: overlayStatus[feed.id] || null }))
   const readiness = buildNFLReadiness({ generatedAt, games, players, quality, modelPerformance, tracking, targeted })
   const alarms = [

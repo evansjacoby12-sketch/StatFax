@@ -111,6 +111,16 @@ final feed cannot identify the scorer.
 
 The public NFL board automatically follows the active regular-season week. During preseason it keeps Week 1 on the board while `preseason.json` separately records depth movement, projected deployment, carries, targets and box-score participation. Preseason results are explicitly excluded from regular-season calibration.
 
+Preseason role intelligence follows a conservative evidence ladder:
+
+- ESPN box scores supply observed attempts, carries, targets, touchdowns and play-by-play-derived red-zone/goal-line opportunities.
+- One game creates a `watch` signal only. A Week 1 adjustment requires repeated usage across at least two games or an official depth promotion.
+- A listed starter with no preseason opportunities is `rest-protected`; zero usage cannot create a downgrade.
+- Rising/falling adjustments are capped at ±4% and affect role factors only. Preseason outcomes never train probability calibration.
+- True snaps/routes are accepted only from a timestamped, source-labeled overlay at `dist/nfl/preseason-participation.json` (or `NFL_PRESEASON_PARTICIPATION_PATH`). Unverified rows are ignored. See `data/preseason-participation.example.json`.
+
+ESPN does not publish complete route counts or offensive snap counts in its public summary response. StatFax therefore labels the built-in feed `box-score-only` and leaves verified snap/route coverage at zero until a licensed or official participation feed supplies it. Estimated deployment is never presented as observed participation.
+
 ## Normal cycle
 
 ```bash

@@ -207,7 +207,7 @@ jobs:
           fi
           ENDPOINT="https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com"
           mkdir -p dist/nfl
-          for f in tracking.json preseason.json history.json backtest.json readiness.json; do
+          for f in tracking.json preseason.json preseason-participation.json history.json backtest.json readiness.json; do
             if [ ! -s "dist/nfl/$f" ] || ! node -e "JSON.parse(require('fs').readFileSync('dist/nfl/$f','utf8'))" 2>/dev/null; then
               aws s3 cp "s3://$R2_BUCKET/nfl/$f" "dist/nfl/$f.tmp" --endpoint-url "$ENDPOINT" 2>/dev/null || true
               if [ -s "dist/nfl/$f.tmp" ] && node -e "JSON.parse(require('fs').readFileSync('dist/nfl/$f.tmp','utf8'))" 2>/dev/null; then
@@ -303,7 +303,7 @@ jobs:
               --content-type application/json --cache-control no-cache \
               && echo "R2: published nfl/daily.json"
           fi
-          for f in backtest.json tracking.json preseason.json readiness.json history.json; do
+          for f in backtest.json tracking.json preseason.json preseason-participation.json readiness.json history.json; do
             if [ -f "dist/nfl/$f" ]; then
               aws s3 cp "dist/nfl/$f" "s3://$R2_BUCKET/nfl/$f" --endpoint-url "$ENDPOINT" \
                 --content-type application/json --cache-control no-cache

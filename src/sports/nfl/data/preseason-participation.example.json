@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "sport": "nfl",
+  "generatedAt": "2026-08-10T06:00:00Z",
+  "source": "licensed-or-official-participation-feed",
+  "players": [
+    {
+      "gameId": "401000001",
+      "espnId": "123456",
+      "name": "Example Receiver",
+      "team": "BUF",
+      "offenseSnaps": 34,
+      "snapShare": 0.62,
+      "routes": 23,
+      "routeParticipation": 0.72,
+      "firstTeamSnaps": 12,
+      "verified": true,
+      "source": "licensed-or-official-participation-feed"
+    }
+  ]
+}

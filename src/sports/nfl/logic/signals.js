@@ -10,7 +10,8 @@ const n = (value, fallback = null) => value == null || value === '' || !Number.i
 const pct = (value) => `${Math.round(Number(value) * 100)}%`
 
 const SIGNAL_PRIORITY = {
-  'snap-limit': 100, 'scoring-role-lost': 99, 'quick-pressure-risk': 98, 'protection-mismatch': 97, 'committee-risk': 96,
+  'snap-limit': 100, 'scoring-role-lost': 99, 'preseason-role-falling': 99, 'quick-pressure-risk': 98, 'protection-mismatch': 97, 'committee-risk': 96,
+  'preseason-role-rising': 95, 'preseason-role-watch': 76, 'preseason-rest-protected': 68,
   'end-zone-alpha': 94, 'goal-to-go-dominator': 93, 'role-inheritance': 92, 'opportunity-spike': 91, 'drive-participation': 90,
   'qb-keeper-threat': 89, 'goal-line-package': 88, 'goal-line': 87, 'air-yards-leader': 86, 'defense-funnel': 85,
   'separation-edge': 84, 'yac-creator': 83, 'rushing-over-expected': 82, 'rz-targets': 80, 'rz-touches': 79,
@@ -18,7 +19,7 @@ const SIGNAL_PRIORITY = {
 }
 
 const ASSESSMENT_ORDER = { avoid: 3, caution: 2, good: 1 }
-const CRITICAL_RISK_SIGNALS = new Set(['snap-limit', 'scoring-role-lost', 'quick-pressure-risk', 'protection-mismatch'])
+const CRITICAL_RISK_SIGNALS = new Set(['snap-limit', 'scoring-role-lost', 'preseason-role-falling', 'quick-pressure-risk', 'protection-mismatch'])
 
 export function nflSignalAssessment(signal) {
   if (signal?.tone === 'bad') return 'avoid'
@@ -89,6 +90,11 @@ export function nflRoleSignals(player) {
   const defense = player?.defenseVsPosition || {}
   const opponentDefense = lineup.opponentDefense || {}
   const signals = []
+  const preseason = player?.preseasonRole || lineup.preseasonRole
+  if (preseason?.status === 'falling' && preseason.adjustmentReady) signals.push({ key: 'preseason-role-falling', text: `Preseason role falling · depth ${preseason.startingDepth}→${preseason.currentDepth}`, tone: 'bad' })
+  else if (preseason?.status === 'rising' && preseason.adjustmentReady) signals.push({ key: 'preseason-role-rising', text: `Preseason role rising · ${preseason.opportunities} opportunities`, tone: 'prime' })
+  else if (preseason?.status === 'watch') signals.push({ key: 'preseason-role-watch', text: `${preseason.opportunities} preseason opportunities · more evidence needed`, tone: 'warn' })
+  else if (preseason?.status === 'rest-protected') signals.push({ key: 'preseason-rest-protected', text: 'Preseason rest · no role downgrade', tone: 'neutral' })
   if (n(usage.endZoneTargetShare) >= .35 && n(usage.endZoneTargetsL3, 0) >= 2) signals.push({ key: 'end-zone-alpha', text: `${pct(usage.endZoneTargetShare)} end-zone target share`, tone: 'prime' })
   if (n(usage.goalToGoOpportunityShare) >= .50 && n(usage.goalToGoOpportunitiesL3, 0) >= 3) signals.push({ key: 'goal-to-go-dominator', text: `${pct(usage.goalToGoOpportunityShare)} goal-to-go share`, tone: 'prime' })
   if (trend?.change >= .20 && trend.recent - trend.baseline >= 3) signals.push({ key: 'opportunity-spike', text: `Opportunities up ${pct(trend.change)}`, tone: 'prime' })

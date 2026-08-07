@@ -95,6 +95,10 @@ Recovery and rollback validate JSON and critical shapes before atomic writes. Th
 4. Manually dispatch one workflow run.
 5. If GitHub never receives it, rotate/re-add the Worker `GITHUB_TOKEN`, deploy the Worker, and test `/trigger`.
 
+For an NFL-only stale slate, compare the deployed `data/nfl/daily.json` timestamp with the latest workflow run and run `npm run nfl:audit`. During preseason, also inspect `nfl/preseason.json` in R2: completed games should have final observations and role summaries, while preseason results must remain excluded from regular-season calibration.
+
+If the latest deploy remains queued because an older run is stuck in `waiting` on the Pages environment, cancel only that oldest waiting run, then allow the newest queued run to proceed. Do not mass-cancel active refreshes. Afterward, confirm the NFL snapshot timestamp advanced, run `npm run doctor`, and verify publish parity.
+
 ### Site failed but R2 is current
 
 This usually means Pages deployment failed after data publication. Re-run the workflow. The deploy step already retries twice with backoff; model data does not need to be recomputed manually.

@@ -4,7 +4,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { fetchESPNDepthBundle, fetchESPNRoster, fetchESPNSeason, fetchESPNSummary, nflSeasonYear, selectCurrentNFLSlate } from './providers/espn.mjs'
 import { archiveNFLArtifacts } from './operations.mjs'
-import { updateNFLPreseason } from './preseason.mjs'
+import { applyNFLPreseasonRole, indexNFLPreseasonParticipation, indexNFLPreseasonRoles, preseasonParticipationFor, preseasonRoleFor, updateNFLPreseason } from './preseason.mjs'
 import { fetchNFLWeather } from './providers/weather.mjs'
 import { fetchNFLOdds, normalizePlayerName } from './providers/odds.mjs'
 import { enrichNFLTeamOpportunityShares, indexNFLHistory, matchHistoryPlayer, playerRoleScore, projectNFLPlayer } from './projections.mjs'
@@ -26,6 +26,7 @@ const DEFAULT_WEATHER = process.env.NFL_WEATHER_PATH || path.join(ROOT, 'dist', 
 const DEFAULT_LINEUPS = process.env.NFL_LINEUP_PATH || path.join(ROOT, 'dist', 'nfl', 'lineups.json')
 const DEFAULT_TRACKING = process.env.NFL_TRACKING_PATH || path.join(ROOT, 'dist', 'nfl', 'tracking.json')
 const DEFAULT_PRESEASON = process.env.NFL_PRESEASON_PATH || path.join(ROOT, 'dist', 'nfl', 'preseason.json')
+const DEFAULT_PRESEASON_PARTICIPATION = process.env.NFL_PRESEASON_PARTICIPATION_PATH || path.join(ROOT, 'dist', 'nfl', 'preseason-participation.json')
 const DEFAULT_READINESS = process.env.NFL_READINESS_PATH || path.join(ROOT, 'dist', 'nfl', 'readiness.json')
 const LIMITS = { QB: 2, RB: 4, WR: 6, TE: 4 }
 
@@ -159,7 +160,7 @@ export function buildNFLRefreshStatus(games = [], quality = {}, now = new Date()
   }
 }
 
-export async function buildNFLSnapshot({ now = new Date(), fetchImpl = fetch, historyPath = DEFAULT_HISTORY, availabilityPath = DEFAULT_AVAILABILITY, backtestPath = DEFAULT_BACKTEST, depthChartPath = DEFAULT_DEPTH_CHART, weatherPath = DEFAULT_WEATHER, lineupPath = DEFAULT_LINEUPS, trackingPath = DEFAULT_TRACKING, oddsApiKey = process.env.SPORTSGAMEODDS_API_KEY, targetSeason = process.env.NFL_TARGET_SEASON || null, targetSeasonType = process.env.NFL_TARGET_SEASON_TYPE || null, targetWeek = process.env.NFL_TARGET_WEEK || null } = {}) {
+export async function buildNFLSnapshot({ now = new Date(), fetchImpl = fetch, historyPath = DEFAULT_HISTORY, availabilityPath = DEFAULT_AVAILABILITY, backtestPath = DEFAULT_BACKTEST, depthChartPath = DEFAULT_DEPTH_CHART, weatherPath = DEFAULT_WEATHER, lineupPath = DEFAULT_LINEUPS, trackingPath = DEFAULT_TRACKING, preseasonPath = DEFAULT_PRESEASON, preseasonParticipationPath = DEFAULT_PRESEASON_PARTICIPATION, oddsApiKey = process.env.SPORTSGAMEODDS_API_KEY, targetSeason = process.env.NFL_TARGET_SEASON || null, targetSeasonType = process.env.NFL_TARGET_SEASON_TYPE || null, targetWeek = process.env.NFL_TARGET_WEEK || null } = {}) {
   const year = Number(targetSeason) || nflSeasonYear(now)
   const schedule = await fetchESPNSeason(year, fetchImpl)
   const games = selectCurrentNFLSlate(schedule, now, { season: targetSeason, seasonType: targetSeasonType, week: targetWeek })
@@ -176,6 +177,10 @@ export async function buildNFLSnapshot({ now = new Date(), fetchImpl = fetch, hi
   const externalLineupPayload = currentOverlay(await readOptionalJSON(lineupPath), now, 36)
   const lineupIndex = indexNFLLineups(externalLineupPayload)
   const trackingLog = await readJSON(trackingPath) || { records: [] }
+  const preseasonLog = await readJSON(preseasonPath) || { games: [] }
+  const preseasonRoleIndex = indexNFLPreseasonRoles(preseasonLog)
+  const preseasonParticipationPayload = currentOverlay(await readOptionalJSON(preseasonParticipationPath), now, 336)
+  const preseasonParticipationIndex = indexNFLPreseasonParticipation(preseasonParticipationPayload)
   const oddsResult = await fetchNFLOdds(oddsApiKey, fetchImpl)
   const teams = [...new Set(games.flatMap((game) => [game.home.abbr, game.away.abbr]))]
   const teamIds = new Map(games.flatMap((game) => [[game.home.abbr, game.home.id], [game.away.abbr, game.away.id]]))
@@ -242,7 +247,9 @@ export async function buildNFLSnapshot({ now = new Date(), fetchImpl = fetch, hi
         if (!availability.eligible) continue
         const player = currentPlayer
         const quote = oddsResult.players.get(normalizePlayerName(player.name)) || null
-        const model = projectNFLPlayer(currentPlayer, playerHistory, { isHome: side === 'home', odds: quote, availability, lineup, calibration })
+        const preseasonRole = preseasonRoleFor(player, preseasonRoleIndex)
+        const effectiveLineupContext = applyNFLPreseasonRole(lineup, preseasonRole)
+        const model = projectNFLPlayer(currentPlayer, playerHistory, { isHome: side === 'home', odds: quote, availability, lineup: effectiveLineupContext, calibration })
         const liveStats = liveById.get(player.espnId) || {}
         const report = rosterStatus(player, availability)
         players.push({
@@ -260,6 +267,8 @@ export async function buildNFLSnapshot({ now = new Date(), fetchImpl = fetch, hi
           headshotUrl: player.headshotUrl || liveStats.headshotUrl || null,
           ...report,
           ...model,
+          lineup: model.lineup,
+          preseasonRole,
           defenseVsPosition: defenseProfile(history, opponent, player.position),
           weather: { ...(summary?.weather || { roof: game.venue.indoor ? 'dome' : 'outdoor', tempF: null, windMph: null }), ...(weatherFor(game, weatherIndex) || {}) },
           live: {
@@ -300,6 +309,7 @@ export async function buildNFLSnapshot({ now = new Date(), fetchImpl = fetch, hi
         id: player.id, espnId: player.espnId, name: player.name, position: player.position, team,
         gameId: game.id, kickoffAt: game.date, opponent: team === game.home.abbr ? game.away.abbr : game.home.abbr,
         lineup: player.lineup, usage: player.usage, availability: player.availability,
+        participation: preseasonParticipationFor(player, game.id, preseasonParticipationIndex),
         live: { isLive: game.status.state === 'in', isFinal: game.status.state === 'post', stats: liveById.get(player.espnId) || {} },
       }))
     })),
@@ -321,6 +331,7 @@ export async function buildNFLSnapshot({ now = new Date(), fetchImpl = fetch, hi
     lineups: externalLineupPayload ? externalLineupPayload.source || 'lineup-snapshot' : automaticDepthPlayers.length ? 'espn-depth-derived' : 'historical-role',
     weather: externalWeatherPayload ? 'weather-snapshot' : automaticWeatherPayload.games.length ? 'open-meteo' : 'espn-when-reported',
     live: 'espn', history: history ? 'nflverse' : 'position-priors', odds: oddsResult.status === 'ok' ? 'sportsgameodds' : oddsResult.status,
+    preseasonParticipation: preseasonParticipationPayload ? preseasonParticipationPayload.source || 'verified-overlay' : 'box-score-only',
   }
   const dataQuality = {
     playByPlay: Boolean(history?.coverage?.playByPlay),
@@ -339,23 +350,28 @@ export async function buildNFLSnapshot({ now = new Date(), fetchImpl = fetch, hi
     weatherCoverage: Math.max(weatherCoverage, overlayWeatherCoverage),
     weatherFresh: weatherCoverage > 0 || (weatherFreshness.fresh && overlayWeatherCoverage > 0),
     calibratedMarkets: Object.values(calibration).filter((market) => market?.samples > 0).length,
+    preseasonRoles: preseasonRoleIndex.roles.length,
+    preseasonRoleAdjustments: preseasonRoleIndex.roles.filter((role) => role.adjustmentReady).length,
+    verifiedPreseasonSnaps: preseasonRoleIndex.roles.filter((role) => role.evidence.verifiedSnaps).length,
+    verifiedPreseasonRoutes: preseasonRoleIndex.roles.filter((role) => role.evidence.verifiedRoutes).length,
   }
   const generatedAt = new Date(now).toISOString()
   const overlays = { depthChart: depthFreshness, availability: availabilityFreshness, lineups: lineupFreshness, weather: weatherFreshness }
   const trackingSummary = summarizeNFLTracking(trackingLog)
-  const dataHealth = buildNFLDataHealth({ generatedAt, games, players, quality: dataQuality, providers: { schedule: providers.schedule, rosters: providers.rosters, depth: providers.depth, lineups: providers.lineups, availability: providers.practice, weather: providers.weather, history: providers.history }, overlayStatus: { depth: depthFreshness, lineups: lineupFreshness, availability: availabilityFreshness, weather: weatherFreshness }, modelPerformance, tracking: trackingSummary, targeted: targetWeek != null })
+  const dataHealth = buildNFLDataHealth({ generatedAt, games, players, quality: dataQuality, providers: { schedule: providers.schedule, rosters: providers.rosters, depth: providers.depth, lineups: providers.lineups, availability: providers.practice, weather: providers.weather, history: providers.history, preseasonParticipation: providers.preseasonParticipation }, overlayStatus: { depth: depthFreshness, lineups: lineupFreshness, availability: availabilityFreshness, weather: weatherFreshness }, modelPerformance, tracking: trackingSummary, targeted: targetWeek != null })
   const refreshStatus = buildNFLRefreshStatus(games, dataQuality, now)
   return {
-    version: 3,
+    version: 4,
     sport: 'nfl',
     generatedAt,
     source: {
       mode: 'live',
+      modelVersion: 'nfl-td-v4-preseason-role-1',
       historicalFrom: history?.seasons?.[0] ?? 2020,
       historicalThrough: history?.seasons?.at?.(-1) ?? null,
       providers,
       availabilityGeneratedAt: availabilityIndex.generatedAt,
-      notes: ['ESPN endpoints are keyless and undocumented; failures retain the last published snapshot.', 'Model-reference lines are used when no sportsbook quote is available.', 'Premium lineup fields remain projected and visibly limited until a timestamped lineup overlay supplies them.'],
+      notes: ['ESPN endpoints are keyless and undocumented; failures retain the last published snapshot.', 'Model-reference lines are used when no sportsbook quote is available.', 'Preseason box-score opportunities are observed; snaps and routes remain unavailable unless a verified participation overlay supplies them.', 'Preseason results never enter regular-season calibration, and Week 1 role adjustments require repeated usage or an official depth promotion.'],
     },
     dataQuality,
     dataHealth,

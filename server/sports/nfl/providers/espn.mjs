@@ -229,28 +229,62 @@ function categoryRows(teamBlock, categoryName) {
 
 export function parseESPNSummary(payload, game) {
   const byPlayer = new Map()
-  const ensure = (athlete) => {
+  const ensure = (athlete, teamBlock = null) => {
     const id = String(athlete?.id || '')
     if (!id) return null
-    if (!byPlayer.has(id)) byPlayer.set(id, { espnId: id, name: athlete.displayName, headshotUrl: athlete.headshot?.href || null })
+    if (!byPlayer.has(id)) {
+      const team = teamBlock?.team?.abbreviation || null
+      const teamId = String(teamBlock?.team?.id || '') || null
+      byPlayer.set(id, { espnId: id, name: athlete.displayName, headshotUrl: athlete.headshot?.href || null, ...(team ? { team, teamId } : {}) })
+    }
     return byPlayer.get(id)
   }
   for (const teamBlock of payload?.boxscore?.players || []) {
     for (const row of categoryRows(teamBlock, 'passing')) {
-      const target = ensure(row.athlete); if (!target) continue
+      const target = ensure(row.athlete, teamBlock); if (!target) continue
       const [completions, attempts] = String(row.values['completions/passingAttempts'] || '0/0').split('/').map(Number)
       Object.assign(target, { completions: n(completions), attempts: n(attempts), passingYards: n(row.values.passingYards), passingTds: n(row.values.passingTouchdowns) })
     }
     for (const row of categoryRows(teamBlock, 'rushing')) {
-      const target = ensure(row.athlete); if (!target) continue
+      const target = ensure(row.athlete, teamBlock); if (!target) continue
       Object.assign(target, { carries: n(row.values.rushingAttempts), rushingYards: n(row.values.rushingYards), rushingTds: n(row.values.rushingTouchdowns) })
     }
     for (const row of categoryRows(teamBlock, 'receiving')) {
-      const target = ensure(row.athlete); if (!target) continue
+      const target = ensure(row.athlete, teamBlock); if (!target) continue
       Object.assign(target, { receptions: n(row.values.receptions), receivingYards: n(row.values.receivingYards), receivingTds: n(row.values.receivingTouchdowns), targets: n(row.values.receivingTargets) })
     }
   }
   for (const value of byPlayer.values()) value.totalTds = n(value.rushingTds) + n(value.receivingTds)
+  const aliasFor = (name = '') => {
+    const parts = String(name).replace(/\b(Jr\.?|Sr\.?|II|III|IV)\b/gi, '').trim().split(/\s+/)
+    const first = parts[0] || ''
+    const last = parts.at(-1) || ''
+    return [`${first[0] || ''}.${last}`, `${first[0] || ''}${last}`, `${first} ${last}`].filter((value) => value.length > 2)
+  }
+  const includesAlias = (text, aliases) => aliases.some((alias) => String(text).toLowerCase().includes(alias.toLowerCase()))
+  const plays = [...(payload?.drives?.previous || []), ...(payload?.drives?.current ? [payload.drives.current] : [])].flatMap((drive) => drive.plays || [])
+  for (const play of plays) {
+    const yardsToEndzone = n(play.start?.yardsToEndzone, 999)
+    if (yardsToEndzone > 20) continue
+    const text = String(play.text || '')
+    const type = String(play.type?.text || '')
+    const offenseId = String(play.start?.team?.id || '')
+    const period = n(play.period?.number, 0)
+    for (const player of byPlayer.values()) {
+      if (!player.teamId || player.teamId !== offenseId) continue
+      const aliases = aliasFor(player.name)
+      const rushSegment = text.split(/\s+for\s+/i)[0]
+      const isCarry = /rush|scramble/i.test(type) && includesAlias(rushSegment, aliases)
+      const isTarget = /pass/i.test(type) && aliases.some((alias) => new RegExp(`(?:to|for)\\s+${alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:\\s|,|\\.|$)`, 'i').test(text))
+      if (!isCarry && !isTarget) continue
+      player.redZoneCarries = n(player.redZoneCarries) + (isCarry ? 1 : 0)
+      player.redZoneTargets = n(player.redZoneTargets) + (isTarget ? 1 : 0)
+      player.redZoneOpportunities = n(player.redZoneOpportunities) + 1
+      if (yardsToEndzone <= 5) player.goalLineOpportunities = n(player.goalLineOpportunities) + 1
+      if (period <= 2) player.firstHalfOpportunities = n(player.firstHalfOpportunities) + 1
+      if (period === 1) player.firstQuarterOpportunities = n(player.firstQuarterOpportunities) + 1
+    }
+  }
   const headerCompetition = payload?.header?.competitions?.[0] || {}
   const weather = headerCompetition.weather || payload?.gameInfo?.weather || {}
   const situation = payload?.situation || headerCompetition.situation || {}

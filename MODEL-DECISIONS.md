@@ -89,6 +89,17 @@ Authority: `src/sports/mlb/logic/firstInningProjection.js` on top of Forecast V1
 - Game Combo Lab all-hit probability is the independent product of the already-produced leg probabilities. Combo price and EV stay unavailable until a real NRFI price is stored. Seven-day 2-leg and 3-leg records are reconstructed deterministically from frozen pregame calls; results grade the recipe but never select its legs.
 - Rollback for Game Combo Lab v1 is removal of its BetLab tab and derived UI engine. Forecast V11, NRFI/YRFI, and their tracking records remain unchanged.
 
+## NFL TD engine and preseason role layer
+
+Authority: `server/sports/nfl/fetch-nfl-slate.mjs`, `server/sports/nfl/preseason.mjs`, and `src/sports/nfl/logic/ScoringEngine.js`. Snapshot model version: `nfl-td-v4-preseason-role-1`.
+
+- Preseason games are role evidence only and never enter regular-season probability calibration or historical backtests.
+- One preseason game can emit a visible WATCH signal but cannot adjust Week 1. An adjustment requires repeated opportunity evidence across at least two games or an official depth-chart promotion.
+- Listed starters with zero preseason work are rest-protected. Absence alone cannot lower a projection.
+- Qualified role movement is capped at ±4% for TD markets and ±3% for yardage/reception markets. It changes lineup role factors, not the historical calibration artifact.
+- ESPN box-score attempts, carries, targets and play-by-play-derived scoring-area opportunities are observed. Complete snap and route participation is unavailable in the public ESPN response and remains null unless a verified, timestamped, source-labeled overlay supplies it.
+- Rollback: remove the preseason role application in `fetch-nfl-slate.mjs`, retain `preseason.json` as a non-scoring observation ledger, and revert the snapshot model version to the prior NFL contract.
+
 ## Required proof for a production model change
 
 1. State the hypothesis and exact fields changed.

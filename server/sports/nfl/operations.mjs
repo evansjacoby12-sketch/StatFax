@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
 const NFL_DIR = path.join(ROOT, 'dist', 'nfl')
-const ARTIFACTS = ['daily.json', 'tracking.json', 'backtest.json', 'history.json', 'preseason.json', 'readiness.json']
+const ARTIFACTS = ['daily.json', 'tracking.json', 'backtest.json', 'history.json', 'preseason.json', 'preseason-participation.json', 'readiness.json']
 
 async function validJSON(file) {
   try { JSON.parse(await fs.readFile(file, 'utf8')); return true } catch { return false }

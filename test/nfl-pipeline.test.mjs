@@ -16,7 +16,7 @@ import { depthFor, indexDepthChart, indexWeather, overlayFreshness, weatherFor }
 import { buildNFLDataHealth, buildNFLReadiness } from '../server/sports/nfl/health.mjs'
 import { summarizeNFLTracking, updateNFLTracking } from '../server/sports/nfl/tracking.mjs'
 import { buildTeamLineup, indexNFLLineups, lineupFor, summarizeLineupCoverage, teamLineupFor } from '../server/sports/nfl/lineups.mjs'
-import { updateNFLPreseason } from '../server/sports/nfl/preseason.mjs'
+import { applyNFLPreseasonRole, indexNFLPreseasonParticipation, preseasonParticipationFor, summarizeNFLPreseasonRoles, updateNFLPreseason } from '../server/sports/nfl/preseason.mjs'
 import { runNFLGameDayRehearsal } from '../server/sports/nfl/rehearsal.mjs'
 import { archiveNFLArtifacts, rollbackNFLArtifacts } from '../server/sports/nfl/operations.mjs'
 import NFL_DEMO_SNAPSHOT from '../src/sports/nfl/data/demoSlate.js'
@@ -345,6 +345,20 @@ test('walk-forward NFL backtest emits probability and projection metrics without
   assert.ok(result.stacks['scorer-core'])
 })
 
+test('ESPN play-by-play adds observed red-zone and early-game opportunities', () => {
+  const game = parseESPNScoreboard({ events: [event('final', '2026-08-10T00:00:00Z', 1, 'post')] })[0]
+  const athlete = { id: '7', displayName: 'Alex Runner' }
+  const summary = parseESPNSummary({
+    boxscore: { players: [{ team: { id: '1', abbreviation: 'BUF' }, statistics: [
+      { name: 'rushing', keys: ['rushingAttempts', 'rushingYards', 'rushingTouchdowns'], athletes: [{ athlete, stats: ['8', '40', '1'] }] },
+    ] }] },
+    drives: { previous: [{ plays: [{ type: { text: 'Rush' }, text: 'A.Runner up the middle for 3 yards', start: { team: { id: '1' }, yardsToEndzone: 4 }, period: { number: 1 } }] }] },
+  }, game)
+  assert.equal(summary.players[0].redZoneOpportunities, 1)
+  assert.equal(summary.players[0].goalLineOpportunities, 1)
+  assert.equal(summary.players[0].firstQuarterOpportunities, 1)
+})
+
 test('receiving-yard calibration uses role-bearing history without changing the 150-yard board gate', () => {
   const games = Array.from({ length: 10 }, (_, index) => ({ season: 2025, week: index + 1, receivingYards: 45 + index, receptions: 4, totalTds: 0 }))
   const result = evaluateNFLHistory({ seasons: [2025], players: [{ id: 'wr', name: 'WR', position: 'WR', recentGames: games }] })
@@ -357,6 +371,37 @@ test('preseason observations remain separate from regular-season calibration', (
   assert.equal(log.excludedFromRegularSeasonCalibration, true)
   assert.equal(log.summary.finals, 1)
   assert.equal(log.games[0].closing.live.stats.carries, 8)
+})
+
+test('preseason role adjustments require repeated evidence or a depth promotion', () => {
+  const record = (gameId, carries, depthOrder = 2, openedDepthOrder = depthOrder) => ({
+    id: `${gameId}:p1`, opened: { depthOrder: openedDepthOrder }, closing: { gameId, playerId: 'p1', espnId: '7', name: 'Runner', position: 'RB', team: 'BUF', depthOrder, live: { isFinal: true, stats: { carries, targets: 2 } } },
+  })
+  const oneGame = summarizeNFLPreseasonRoles({ games: [record('g1', 9)] }).roles[0]
+  assert.equal(oneGame.status, 'watch')
+  assert.equal(oneGame.adjustmentReady, false)
+  const repeated = summarizeNFLPreseasonRoles({ games: [record('g1', 9), record('g2', 8)] }).roles[0]
+  assert.equal(repeated.status, 'rising')
+  assert.equal(repeated.factor, 1.04)
+  const lineup = applyNFLPreseasonRole({ marketFactors: { anytime_td: 1, rushing_yards: .95 } }, repeated)
+  assert.equal(lineup.marketFactors.anytime_td, 1.04)
+  assert.ok(lineup.marketFactors.rushing_yards > .97)
+})
+
+test('preseason rest protection prevents a starter zero from becoming a downgrade', () => {
+  const role = summarizeNFLPreseasonRoles({ games: [{ opened: { depthOrder: 1 }, closing: { gameId: 'g1', playerId: 'p1', espnId: '7', name: 'Starter', position: 'WR', team: 'BUF', depthOrder: 1, live: { isFinal: true, stats: {} } } }] }).roles[0]
+  assert.equal(role.status, 'rest-protected')
+  assert.equal(role.factor, 1)
+  assert.equal(role.adjustmentReady, false)
+})
+
+test('only source-labeled verified snap and route overlays are accepted', () => {
+  const index = indexNFLPreseasonParticipation({ players: [
+    { gameId: 'g1', espnId: '7', verified: false, source: 'guess', snapShare: .9 },
+    { gameId: 'g1', espnId: '8', verified: true, source: 'official-feed', snapShare: .72, routeParticipation: .81 },
+  ] })
+  assert.equal(preseasonParticipationFor({ espnId: '7' }, 'g1', index), null)
+  assert.equal(preseasonParticipationFor({ espnId: '8' }, 'g1', index).routeParticipation, .81)
 })
 
 test('readiness blocks zero-sample model markets and game-day missing confirmations', () => {

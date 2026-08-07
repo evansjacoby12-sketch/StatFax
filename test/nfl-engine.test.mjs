@@ -84,6 +84,15 @@ test('tracking-only badges stay dormant until the source is verified', () => {
   assert.equal(signals.some((signal) => ['drive-participation', 'yac-creator', 'separation-edge'].includes(signal.key)), false)
 })
 
+test('preseason badges distinguish confirmed movement, watch evidence, and protected rest', () => {
+  const rising = buildNFLSignals({ position: 'RB', preseasonRole: { status: 'rising', adjustmentReady: true, opportunities: 21 } })
+  assert.ok(rising.some((signal) => signal.key === 'preseason-role-rising' && signal.assessment === 'good'))
+  const watch = buildNFLSignals({ position: 'WR', preseasonRole: { status: 'watch', adjustmentReady: false, opportunities: 7 } })
+  assert.ok(watch.some((signal) => signal.key === 'preseason-role-watch' && signal.assessment === 'caution'))
+  const rested = buildNFLSignals({ position: 'WR', preseasonRole: { status: 'rest-protected', adjustmentReady: false } })
+  assert.ok(rested.some((signal) => signal.key === 'preseason-rest-protected' && signal.assessment === 'good'))
+})
+
 test('declining opportunity creates a negative scoring-role signal', () => {
   const signals = buildNFLSignals({ position: 'WR', recentGames: [
     { season: 2025, week: 6, targets: 4 }, { season: 2025, week: 5, targets: 5 },
