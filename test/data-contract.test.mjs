@@ -37,6 +37,13 @@ test('slate builds schedule context only after games are initialized', () => {
   assert.ok(scheduleContextBuilt > gamesInitialized, 'schedule context cannot read games before initialization')
 })
 
+test('slate writer retains health-checked batter rows and summary', () => {
+  const source = readFileSync(new URL('../server/fetch-slate.mjs', import.meta.url), 'utf8')
+  assert.match(source, /payload\.scoredBatters\s*=\s*healthApplied\.slate\.scoredBatters/)
+  assert.match(source, /payload\.dataHealth\s*=\s*healthApplied\.slate\.dataHealth/)
+  assert.doesNotMatch(source, /payload\.scoredBatters\s*=\s*healthApplied\.scoredBatters/)
+})
+
 test('day rating and persisted combo boards retain both doubleheader games', () => {
   const source = readFileSync(new URL('../server/fetch-slate.mjs', import.meta.url), 'utf8')
   const rating = source.slice(source.indexOf('function computeDayRating'), source.indexOf('// below', source.indexOf('function computeDayRating')))

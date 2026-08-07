@@ -5377,8 +5377,8 @@ async function main() {
   // but warned rows cannot enter the canonical PRIME/STRONG parlay board.
   {
     const healthApplied = applyMlbDataHealth({ slate: payload, generatedAt: payload.finishedAt });
-    payload.scoredBatters = healthApplied.scoredBatters;
-    payload.dataHealth = healthApplied.dataHealth;
+    payload.scoredBatters = healthApplied.slate.scoredBatters;
+    payload.dataHealth = healthApplied.slate.dataHealth;
     for (const row of Object.values(payload.scoredBatters || {})) {
       if (row?.preGamePredictionRecord) {
         row.preGamePredictionRecord.dataTrusted = !row.dataTrust?.status;
