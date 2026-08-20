@@ -274,6 +274,7 @@ import {
 } from '../src/sports/mlb/logic/hrModelVersion.js';
 import { buildListBuilderEvidence, validateListBuilderEvidence } from './lib/listBuilderEvidence.mjs';
 import { applyMlbDataHealth } from './lib/mlbDataHealth.mjs';
+import { validateDailySnapshot } from './lib/mlbDataContracts.mjs';
 import {
   comboRowFromSnapshot,
   buildComboRecords,
@@ -5412,6 +5413,12 @@ async function main() {
   // Morning-lock stamp — lets the UI show "scores locked HH:MM" so the user
   // knows the board they're reading won't shift under them.
   payload.morningLockAt = backtestLog?.morningLock?.date === date ? backtestLog.morningLock.at : null;
+
+  const validation = validateDailySnapshot(payload);
+  if (!validation.ok) {
+    console.error(`[slate-qa] daily.json failed validation before saving:\n- ${validation.errors.join('\n- ')}`);
+    throw new Error(`daily.json failed validation: ${validation.errors.join('; ')}`);
+  }
 
   mkdirSync(dirname(OUT_PATH), { recursive: true });
   writeFileSync(OUT_PATH, JSON.stringify(payload));

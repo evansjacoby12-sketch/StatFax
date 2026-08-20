@@ -283,3 +283,29 @@ test('K Brain UI is projection-first and does not invent betting value without o
   assert.doesNotMatch(source, /Starter HR baseline|80% range/)
   assert.doesNotMatch(source, /value ✓|fade ✗|neutral/)
 })
+
+test('K Brain handles rookie/zero-strikeout pitchers gracefully', () => {
+  const rookiePitcher = {
+    id: 999,
+    hand: 'L',
+    season: { bf: 5, k: 0, kPer9: 0 },
+    splits: {
+      vl: { bf: 2, kPct: 0 },
+      vr: { bf: 3, kPct: 0 },
+    },
+    recentForm: {
+      games: 1,
+      ip: 1,
+      recentStarts: [
+        { ip: 1, bf: 5, pitches: 20, k: 0 }
+      ]
+    }
+  }
+  
+  const result = kBrain(rookiePitcher, TARGETS)
+  assert.ok(result)
+  assert.equal(result.lambda, 0)
+  for (const line of K_LINES) {
+    assert.equal(result.probs[line], 0, `probability for line ${line} must be 0, not null`)
+  }
+})

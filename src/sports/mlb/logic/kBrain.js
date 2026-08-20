@@ -310,8 +310,9 @@ function poissonCDF(k, lambda) {
 }
 
 export function kOverProb(lambda, line) {
-  if (!Number.isFinite(lambda) || lambda <= 0) return null
-  return 1 - poissonCDF(Math.floor(line), lambda)
+  if (!Number.isFinite(lambda) || lambda < 0) return null
+  const prob = 1 - poissonCDF(Math.floor(line), lambda)
+  return Math.max(0, Math.min(1, prob))
 }
 
 function findPoiQuantile(lambda, probability) {
@@ -374,39 +375,44 @@ export function kBrain(pitcher, targets, { weather, umpire, parkFactorK } = {}) 
   const matchup = buildKMatchupInputs(selectedTargets)
 
   let seasonKRate = season.bf > 0 && Number.isFinite(season.k)
-    ? season.k / season.bf
+    ? Math.max(0, season.k / season.bf)
     : Number.isFinite(season.kPer9)
-      ? (season.kPer9 / 9) / BF_PER_IP
+      ? Math.max(0, (season.kPer9 / 9) / BF_PER_IP)
       : null
 
   const vl = pitcher?.splits?.vl
   const vr = pitcher?.splits?.vr
-  const vlKRate = vl?.kPct != null && Number.isFinite(vl.kPct) ? vl.kPct / 100 : null
-  const vrKRate = vr?.kPct != null && Number.isFinite(vr.kPct) ? vr.kPct / 100 : null
+  const vlKRate = vl?.kPct != null && Number.isFinite(vl.kPct) ? Math.max(0, vl.kPct / 100) : null
+  const vrKRate = vr?.kPct != null && Number.isFinite(vr.kPct) ? Math.max(0, vr.kPct / 100) : null
 
   let splitKRate = null
   if (seasonKRate != null && (vlKRate != null || vrKRate != null)) {
+    const vlBf = Number.isFinite(vl?.bf) ? Math.max(0, vl.bf) : 0
     const stabVl = vlKRate != null
-      ? Number.isFinite(vl?.bf) && vl.bf < STAB_BF
-        ? (vlKRate * vl.bf + seasonKRate * STAB_BF) / (vl.bf + STAB_BF)
+      ? vlBf < STAB_BF
+        ? (vlKRate * vlBf + seasonKRate * STAB_BF) / (vlBf + STAB_BF)
         : vlKRate
       : seasonKRate
+    const vrBf = Number.isFinite(vr?.bf) ? Math.max(0, vr.bf) : 0
     const stabVr = vrKRate != null
-      ? Number.isFinite(vr?.bf) && vr.bf < STAB_BF
-        ? (vrKRate * vr.bf + seasonKRate * STAB_BF) / (vr.bf + STAB_BF)
+      ? vrBf < STAB_BF
+        ? (vrKRate * vrBf + seasonKRate * STAB_BF) / (vrBf + STAB_BF)
         : vrKRate
       : seasonKRate
+
+    const cleanStabVl = Math.max(0, stabVl)
+    const cleanStabVr = Math.max(0, stabVr)
 
     const leagueOdds = LEAGUE_K_PCT / (1 - LEAGUE_K_PCT)
     const perBatterK = selectedTargets.map((batter) => {
       const side = effSide(batter.batSide, pitcher?.hand)
-      const pitcherK = Math.min(0.99, side === 'L' ? stabVl : stabVr)
+      const pitcherK = Math.max(0, Math.min(0.99, side === 'L' ? cleanStabVl : cleanStabVr))
       const batterK = clamp(stabilizedBatterKRate(batter).rate, 0.01, 0.60)
       const matchupOdds = (pitcherK / (1 - pitcherK)) * (batterK / (1 - batterK)) / leagueOdds
       return matchupOdds / (1 + matchupOdds)
     })
     if (perBatterK.length) {
-      splitKRate = perBatterK.reduce((sum, rate) => sum + rate, 0) / perBatterK.length
+      splitKRate = Math.max(0, perBatterK.reduce((sum, rate) => sum + rate, 0) / perBatterK.length)
     }
   }
 
@@ -423,9 +429,9 @@ export function kBrain(pitcher, targets, { weather, umpire, parkFactorK } = {}) 
       const bf = start.bf ?? (start.ip * BF_PER_IP)
       return bf > 0 && Number.isFinite(start.k) ? start.k / bf : null
     }).filter((rate) => rate != null)
-    if (rates.length) recentKRate = rates.reduce((sum, rate) => sum + rate, 0) / rates.length
+    if (rates.length) recentKRate = Math.max(0, rates.reduce((sum, rate) => sum + rate, 0) / rates.length)
   } else if (Number.isFinite(recentForm?.k9)) {
-    recentKRate = (recentForm.k9 / 9) / BF_PER_IP
+    recentKRate = Math.max(0, (recentForm.k9 / 9) / BF_PER_IP)
   }
 
   let baseKRate
@@ -443,11 +449,11 @@ export function kBrain(pitcher, targets, { weather, umpire, parkFactorK } = {}) 
   } else if (Number.isFinite(whiffPct)) {
     kRate = baseKRate * (1 + ((whiffPct - LEAGUE_WHIFF_PCT) / LEAGUE_WHIFF_PCT) * 0.25)
   }
-  kRate = Math.min(0.45, kRate)
+  kRate = Math.max(0, Math.min(0.45, kRate))
 
   const hasMissMetric = Number.isFinite(swStrPct) || Number.isFinite(whiffPct)
   const boost = hasMissMetric ? 0 : pitchMixKBoost(pitcher?.pitchMix)
-  const adjustedKRate = kRate + boost
+  const adjustedKRate = Math.max(0, kRate + boost)
 
   const oppK = matchup.oppSeasonK
   const oppAdj = clamp(matchup.oppRecentK / LEAGUE_K_PCT, 0.82, 1.22)
@@ -512,8 +518,8 @@ export function kBrain(pitcher, targets, { weather, umpire, parkFactorK } = {}) 
 
   const rawParkFactor = Number.isFinite(parkFactorK) ? parkFactorK : pitcher?.gameParkKFactor
   const parkKAdj = Number.isFinite(rawParkFactor) && rawParkFactor > 0 ? rawParkFactor : 1
-  const lambda = expBF * adjustedKRate * oppAdj * matchup.matchupAdj
-    * tempAdj * umpireAdj * parkKAdj * tttoPenalty * K_CALIBRATION
+  const lambda = Math.max(0, expBF * adjustedKRate * oppAdj * matchup.matchupAdj
+    * tempAdj * umpireAdj * parkKAdj * tttoPenalty * K_CALIBRATION)
 
   // Keep the user's readable formulas beside the advanced model as a frozen
   // benchmark. They never feed lambda, probabilities, grades, or decisions.
