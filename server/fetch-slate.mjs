@@ -4940,7 +4940,7 @@ async function main() {
   // burn API credits. No key → board ships without prices, as before.
   let oddsByGamePk = {};
   try {
-    const oddsKey = process.env.ODDS_API_KEY;
+    const oddsKey = process.env.ODDS_API_KEY || process.env.SPORTSGAMEODDS_API_KEY;
     const refreshMin = +(process.env.ODDS_REFRESH_MINUTES ?? 120);
     const cache = backtestLog.oddsCache;
     if (cache?.date === date) {
@@ -4984,7 +4984,7 @@ async function main() {
   // (US region × h2h/totals), so a shorter refresh window is affordable.
   let gameOddsByGamePk = {};
   try {
-    const oddsKey = process.env.ODDS_API_KEY;
+    const oddsKey = process.env.ODDS_API_KEY || process.env.SPORTSGAMEODDS_API_KEY;
     const refreshMin = +(process.env.GAME_ODDS_REFRESH_MINUTES ?? 60);
     const cache = backtestLog.gameOddsCache;
     if (cache?.date === date) {
