@@ -10,7 +10,7 @@
  *
  * Bump VERSION to force a full cache flush on the next deploy.
  */
-const VERSION = 'sf-v3'
+const VERSION = 'sf-v4'
 const SHELL = `${VERSION}-shell`
 const ASSETS = `${VERSION}-assets`
 const DATA = `${VERSION}-data`

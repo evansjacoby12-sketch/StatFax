@@ -1,16 +1,35 @@
-<header class="flex h-16 items-center justify-between border-b border-white/10 bg-[#07060c]/90 px-4 text-[#f2f2f5] backdrop-blur-xl">
-  <div class="flex min-w-0 items-center gap-4">
-    <div class="flex items-center gap-2.5">
-      <img src="/icons/icon-192.png" alt="" class="h-9 w-9 rounded-xl" />
-      <div class="leading-none">
-        <div class="font-['Space_Grotesk'] text-[15px] font-bold">Stat<span class="text-[#b8b7d8]">Fax</span></div>
-        <div class="mt-1 text-[8px] font-bold uppercase tracking-[0.16em] text-[#858491]">Model Board</div>
-      </div>
+<header class="flex items-center justify-between gap-4 border-b border-white/10 bg-black/90 px-5 py-3 text-[#f2f2f5]">
+  <div class="flex min-w-0 items-center gap-5">
+    <div class="flex items-center gap-3">
+      <span class="grid h-9 w-9 place-items-center overflow-hidden rounded-[10px] border border-white/10 bg-[#17161d] shadow-[0_0_16px_rgba(151,149,203,.28)]">
+        <img src="/icons/icon-192.png" alt="" class="h-full w-full object-cover" />
+      </span>
+      <span class="flex flex-col leading-none">
+        <b class="font-['Space_Grotesk'] text-[17px] tracking-tight">Stat<span class="text-[#b8b7d8]">Fax</span></b>
+        <small class="mt-1 text-[10px] uppercase tracking-[.08em] text-[#858491]">Model Board</small>
+      </span>
     </div>
-    <div class="flex h-9 items-center rounded-xl border border-white/10 bg-white/[0.025] p-1" role="group" aria-label="Sport">
-      <button class="flex h-7 items-center gap-1.5 rounded-lg bg-[#b8b7d8]/10 px-3 text-xs font-bold text-[#b8b7d8]">MLB</button>
-      <button class="flex h-7 items-center gap-1.5 rounded-lg px-3 text-xs font-bold text-[#858491]" disabled>NFL <small class="text-[7px] uppercase">Soon</small></button>
+    <div class="hidden items-center gap-1 rounded-[10px] border border-white/10 bg-white/[.03] p-1 sm:flex">
+      <button class="rounded-lg border border-[#b8b7d8]/50 bg-[#b8b7d8]/10 px-3 py-1.5 text-xs font-bold text-white">MLB</button>
+      <button class="rounded-lg px-3 py-1.5 text-xs font-semibold text-[#858491]">NFL</button>
+    </div>
+    <div class="hidden text-xs text-[#c4c4cc] md:block">
+      <b class="text-white">07-27</b><span class="mx-2 text-[#676673]">·</span>15 games
     </div>
   </div>
-  <button class="grid h-11 w-11 place-items-center rounded-xl border border-white/10 text-[#c4c4cc]" aria-label="Open tools">•••</button>
+  <div class="flex items-center gap-2">
+    <button class="hidden min-w-[108px] items-center gap-2 rounded-[10px] border border-white/10 bg-white/[.03] px-3 py-2 text-left sm:flex">
+      <span class="text-[#b8b7d8]">◔</span>
+      <span class="grid"><b class="font-mono text-xs">0.1974</b><small class="text-[9px] uppercase text-[#858491]">Brier</small></span>
+    </button>
+    <button class="grid h-9 w-9 place-items-center rounded-[10px] border border-white/10 bg-white/[.03] text-[#b8b7d8]" aria-label="Live scores">
+      <svg viewBox="0 0 24 24" class="h-4 w-4 fill-none stroke-current" stroke-width="2"><path d="M4 14a8 8 0 0 1 0-4M8 16a5 5 0 0 1 0-8M12 18a8 8 0 0 0 0-12"/><circle cx="16" cy="12" r="2"/></svg>
+    </button>
+    <button class="grid h-9 w-9 place-items-center rounded-[10px] border border-white/10 bg-white/[.03] text-[#c4c4cc]" aria-label="Menu">
+      <svg viewBox="0 0 24 24" class="h-4 w-4 fill-none stroke-current" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+    </button>
+    <button class="grid h-9 w-9 place-items-center rounded-[10px] border border-white/10 bg-white/[.03] text-[#c4c4cc]" aria-label="Refresh">
+      <svg viewBox="0 0 24 24" class="h-4 w-4 fill-none stroke-current" stroke-width="2"><path d="M20 11a8 8 0 1 0 2 5.3"/><path d="M20 4v7h-7"/></svg>
+    </button>
+  </div>
 </header>

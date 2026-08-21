@@ -111,6 +111,7 @@ OpenAI narration and filter-translation features degrade separately from determi
 
 GitHub repository secrets:
 
+- `SITE_PASSWORD_SHA256` (required; SHA-256 of the quick shared site password)
 - `ODDS_API_KEY`
 - `OPENAI_API_KEY`
 - `R2_ACCESS_KEY_ID`
@@ -140,6 +141,30 @@ npx wrangler secret put OPENAI_API_KEY
 npx wrangler secret put ALERT_WEBHOOK_URL
 npx wrangler deploy
 ```
+
+### Quick shared site password
+
+Production builds fail closed unless the repository secret `SITE_PASSWORD_SHA256` contains a lowercase, 64-character SHA-256 hash. The plaintext password is never stored in the repository or GitHub Actions configuration. Generate and save the hash from a private PowerShell prompt:
+
+```powershell
+$secure = Read-Host "New StatFax shared password" -AsSecureString
+$plain = [Net.NetworkCredential]::new('', $secure).Password
+$bytes = [Text.Encoding]::UTF8.GetBytes($plain)
+$sha256 = [Security.Cryptography.SHA256]::Create()
+$hash = -join ($sha256.ComputeHash($bytes) | ForEach-Object { $_.ToString('x2') })
+$hash | gh secret set SITE_PASSWORD_SHA256
+$sha256.Dispose()
+$plain = $null; $hash = $null; $secure = $null
+```
+
+Then deploy and verify the locked screen appears before any model board or slate request:
+
+```powershell
+gh workflow run deploy.yml --ref main
+gh run list --workflow deploy.yml --limit 1
+```
+
+The quick lock is a client-side privacy screen, not server-side authentication: a determined visitor can inspect the static bundle or request public Pages artifacts directly. Use Cloudflare Access or private hosting if the data itself must be inaccessible. Changing the shared password invalidates existing browser sessions after the new deployment because the stored hash no longer matches.
 
 The Worker accepts only approved production/local origins and rate-limits paid AI and Savant routes. `ALERT_WEBHOOK_URL` accepts a Discord/Slack-compatible JSON webhook. Without it, Worker health reports alerts as optional/unconfigured and GitHub's built-in failure notification remains active.
 

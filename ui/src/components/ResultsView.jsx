@@ -277,7 +277,7 @@ function ModelResults({ meta }) {
         <Kpi label="Graded picks" value={num(N)} sub={`${hits} HR · ${dates.length} days`} />
         {m && (forwardMetrics?.ready
           ? <Kpi label="OOS Brier vs baseline" value={forwardMetrics.brier.toFixed(4)} sub={`${signedPct(forwardMetrics.brierSkill, 0)} skill · n=${forwardMetrics.n} · ${forwardMetrics.dates} dates`} accent="var(--accent)" />
-          : <Kpi label="Forward probability audit" value="Collecting" sub={`${forwardMetrics?.n || 0}/${forwardMetrics?.requirements?.readyRows || 300} frozen picks · CV Brier ${Number.isFinite(m.cvBrier) ? m.cvBrier.toFixed(4) : '—'}`} accent="var(--accent)" />)}
+          : <Kpi label="Forward probability audit" value="Collecting" sub={`${forwardMetrics?.n || 0}/${forwardMetrics?.requirements?.readyRows || 300} frozen batter projections · CV Brier ${Number.isFinite(m.cvBrier) ? m.cvBrier.toFixed(4) : '—'}`} accent="var(--accent)" />)}
       </div>
 
       <RankPerformance summary={rankPerformance} />
