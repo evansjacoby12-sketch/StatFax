@@ -228,6 +228,7 @@ jobs:
       - name: Generate slate (live MLB + Savant)
         env:
           ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+          SPORTSGAMEODDS_API_KEY: ${{ secrets.SPORTSGAMEODDS_API_KEY }}
           ODDS_REFRESH_MINUTES: ${{ vars.ODDS_REFRESH_MINUTES || '1440' }}
         run: |
           npm run build-model
@@ -251,6 +252,7 @@ jobs:
           NFL_TARGET_SEASON: ${{ vars.NFL_TARGET_SEASON }}
           NFL_TARGET_SEASON_TYPE: ${{ vars.NFL_TARGET_SEASON_TYPE }}
           NFL_TARGET_WEEK: ${{ vars.NFL_TARGET_WEEK }}
+          SPORTSGAMEODDS_API_KEY: ${{ secrets.SPORTSGAMEODDS_API_KEY }}
         run: |
           if [ ! -f dist/nfl/history.json ] || ! node -e "const h=require('./dist/nfl/history.json');process.exit(h.version>=2?0:1)"; then npm run nfl:history; fi
           npm run nfl:backtest
