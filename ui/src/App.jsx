@@ -126,7 +126,7 @@ export default function App() {
   const favorConsistency = false
   // Keep the visible board live. The server's frozen bundle remains evidence,
   // not a device-specific ranking mode.
-  const [comboLock, setComboLock] = useState(() => store.load('comboLock', true))
+  const comboLock = true
   const betaCeil = false
   const [watchlist, setWatchlist] = useState(() => new Set(store.load('watchlist', [])))
   const [slipIds, setSlipIds] = useState(() => store.load('slip', []))
@@ -161,7 +161,6 @@ export default function App() {
   useEffect(() => store.save('watchlist', [...watchlist]), [watchlist])
   useEffect(() => store.save('slip', slipIds), [slipIds])
   useEffect(() => store.save('liveUpdates', liveUpdates), [liveUpdates])
-  useEffect(() => store.save('comboLock', comboLock), [comboLock])
   useEffect(() => store.save('sport', sport), [sport])
   useEffect(() => {
     setFilters((current) => {
@@ -925,8 +924,6 @@ export default function App() {
             embedded
             liveUpdates={liveUpdates}
             onToggleLiveUpdates={() => setLiveUpdates((v) => !v)}
-            comboLock={comboLock}
-            onToggleComboLock={() => setComboLock((v) => !v)}
             eliLevel={eliLevel}
             onSetEli={setEliLevel}
             onClose={() => setShowSettings(false)}

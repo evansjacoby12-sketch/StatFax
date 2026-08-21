@@ -213,11 +213,11 @@ function toComboRow(b, applyLock = false) {
     hrDueScore: hrSetup(b).n,
     consistency: consistencyFactor(b),
   }
-  // Morning combo lock (opt-in via the comboLock setting): if the server pinned
-  // this bat's strategy-ranking inputs at the lock (b.comboFreeze — see
-  // server/parlay-combos freezeComboInputs), use those verbatim so the board's
-  // leg selection is frozen for the day and matches the graded record. When the
-  // lock is OFF the board re-ranks live from current heat/park/edge signals.
+  // Morning combo lock: if the server pinned this bat's strategy-ranking inputs
+  // at the lock (b.comboFreeze — see server/parlay-combos freezeComboInputs),
+  // use those verbatim so the board's leg selection is frozen for the day and
+  // matches the graded record. Ensures the combos displayed match the outcomes
+  // graded in Results next day.
   if (applyLock && b.comboFreeze) Object.assign(row, b.comboFreeze)
   return row
 }

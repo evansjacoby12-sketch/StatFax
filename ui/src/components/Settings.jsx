@@ -4,7 +4,6 @@ import Icon from './Icon.jsx'
 // policy stays deterministic so a forgotten device toggle cannot change calls.
 export default function Settings({
   liveUpdates, onToggleLiveUpdates,
-  comboLock, onToggleComboLock,
   eliLevel, onSetEli,
   onClose,
   embedded = false,
@@ -19,13 +18,6 @@ export default function Settings({
           desc: 'Show live scores and refresh the slate every 60 seconds. Off keeps a stable pregame view with manual refresh.',
           on: liveUpdates,
           toggle: onToggleLiveUpdates,
-        },
-        {
-          icon: 'Lock',
-          label: 'Morning combo lock',
-          desc: 'Freeze parlay combos at the morning lock time so the legs you see match the settled outcomes next day. Off ranks combos live.',
-          on: comboLock,
-          toggle: onToggleComboLock,
         },
       ],
     },
