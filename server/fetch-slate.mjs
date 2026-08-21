@@ -4774,31 +4774,48 @@ async function main() {
         frozen++;
       }
       console.log(`[lock] morning lock (${ml.at}): ${frozen} rows frozen, ${changed} kept fresh on pitcher change`);
-    } else if (new Date().getUTCHours() >= MORNING_LOCK_HOUR) {
-      const rows = {};
-      for (const key of Object.keys(scoredBatters)) {
-        if (!key.includes('-')) continue;
-        const row = scoredBatters[key];
-        if (!row || row.playerId == null || started(row.gamePk)) continue;
-        const id = `${row.playerId}-${row.gamePk}`;
-        if (rows[id]) continue;
-        const f = { pitcherId: row.pitcher?.id ?? null };
-        for (const k of LOCK_FIELDS) if (row[k] !== undefined) f[k] = row[k];
-        // Pin the strategy-ranking inputs (heat, park-air, edge signals, HR-due,
-        // pos/neg) as of the lock, and apply to this run's row too, so the combo
-        // board is frozen from lock time — not just the displayed scores.
-        const cf = freezeComboInputs(row);
-        if (cf) { f.comboFreeze = cf; row.comboFreeze = cf; }
-        rows[id] = f;
+    } else {
+      const gameTimes = (games || [])
+        .map((g) => g.gameDate ? Date.parse(g.gameDate) : null)
+        .filter(Number.isFinite);
+      const earliestGameTime = gameTimes.length ? Math.min(...gameTimes) : null;
+      const offsetMinutes = +(process.env.MORNING_LOCK_OFFSET_MINUTES ?? 30);
+      const now = new Date().getTime();
+
+      let shouldLock = false;
+      if (earliestGameTime != null) {
+        const lockTime = earliestGameTime - (offsetMinutes * 60 * 1000);
+        shouldLock = now >= lockTime;
+      } else {
+        shouldLock = new Date().getUTCHours() >= MORNING_LOCK_HOUR;
       }
-      if (Object.keys(rows).length) {
-        backtestLog.morningLock = {
-          date,
-          at: new Date().toISOString(),
-          rows,
-          hrResilience: structuredClone(hrResiliencePolicy),
-        };
-        console.log(`[lock] morning board locked at ${backtestLog.morningLock.at} (${Object.keys(rows).length} batters)`);
+
+      if (shouldLock) {
+        const rows = {};
+        for (const key of Object.keys(scoredBatters)) {
+          if (!key.includes('-')) continue;
+          const row = scoredBatters[key];
+          if (!row || row.playerId == null || started(row.gamePk)) continue;
+          const id = `${row.playerId}-${row.gamePk}`;
+          if (rows[id]) continue;
+          const f = { pitcherId: row.pitcher?.id ?? null };
+          for (const k of LOCK_FIELDS) if (row[k] !== undefined) f[k] = row[k];
+          // Pin the strategy-ranking inputs (heat, park-air, edge signals, HR-due,
+          // pos/neg) as of the lock, and apply to this run's row too, so the combo
+          // board is frozen from lock time — not just the displayed scores.
+          const cf = freezeComboInputs(row);
+          if (cf) { f.comboFreeze = cf; row.comboFreeze = cf; }
+          rows[id] = f;
+        }
+        if (Object.keys(rows).length) {
+          backtestLog.morningLock = {
+            date,
+            at: new Date().toISOString(),
+            rows,
+            hrResilience: structuredClone(hrResiliencePolicy),
+          };
+          console.log(`[lock] morning board locked at ${backtestLog.morningLock.at} (${Object.keys(rows).length} batters)`);
+        }
       }
     }
   } catch (e) { console.warn(`[lock] morning lock skipped: ${e?.message}`); }
