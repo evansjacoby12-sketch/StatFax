@@ -40,8 +40,8 @@ export function buildCompatibleCalibrationLog(log, {
   modelVersion = HR_MODEL_VERSION,
   probabilityPipelineVersion = HR_PROBABILITY_PIPELINE_VERSION,
   lookbackDays = 30,
-  minExactRows = 750,
-  minExactDates = 5,
+  minExactRows = 2500,
+  minExactDates = 10,
 } = {}) {
   const { dates: allDates, records: sourceRecords } = datesAndRecords(log);
   const dates = allDates.slice(-lookbackDays);

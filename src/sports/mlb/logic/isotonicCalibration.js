@@ -234,7 +234,6 @@ export function fitIsotonicFromBacktest(backtestLog, opts = {}) {
 // ---------------------------------------------------------------------------
 // fitIsotonicAdaptive — CV-selected bucket width
 // ---------------------------------------------------------------------------
-
 /** Candidate bucket widths, coarse → fine. The selector starts coarse and only
  *  adopts a finer grid when it MEASURABLY improves cross-validated Brier. */
 const ADAPTIVE_BUCKET_SIZES = [20, 15, 12, 10, 8, 6, 5];
@@ -242,7 +241,7 @@ const ADAPTIVE_BUCKET_SIZES = [20, 15, 12, 10, 8, 6, 5];
 /** A finer grid must beat the current incumbent's CV Brier by at least this
  *  much to be adopted. Keeps day-to-day bucket choice stable (their own CV gap
  *  between bucket 15 and 10 was ~0.0008, so this is ~1/3 of a real signal). */
-const ADAPTIVE_BRIER_EPS = 0.0003;
+const ADAPTIVE_BRIER_EPS = 0.0001;
 
 /** Below this many reconciled rows there isn't enough data to CV-select a grid
  *  without chasing noise — fall back to the plain fit at the proven default. */
