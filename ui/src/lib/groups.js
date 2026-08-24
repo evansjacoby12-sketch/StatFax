@@ -36,8 +36,8 @@ import { NAME_SUFFIXES } from './format.js'
 // Re-export the engine's blast threshold for any UI that references it.
 export { BLAST_ELITE }
 
-// Only 2/3/4-leg combos are displayed and graded (engine SIZES === [2,3,4]).
-const SIZES = [2, 3, 4]
+// Only 2/3-leg combos are displayed and graded (engine SIZES === [2,3]).
+const SIZES = [2, 3]
 
 // Per-leg weakness checks (shared by Parlay Combos + SGP). A leg trips a flag on
 // a sub-PRIME grade, low barrel, an HR-stingy arm, or a pitcher's park; it's a

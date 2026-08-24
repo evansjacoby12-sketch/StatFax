@@ -32,7 +32,7 @@
 
 import { HOT_HEAT } from './constants.js'
 
-export const SIZES = [2, 3, 4]
+export const SIZES = [2, 3]
 export const BLAST_ELITE = 25 // elite blast rate (≈ top ~8% of the slate)
 
 // ── Per-leg field derivation (shared by both adapters) ──────────────────────
@@ -222,19 +222,12 @@ export const STRATEGIES = [
   // yields nothing in the frozen graded record and exists purely as a live board
   // aid (track a value combo via Live Combos / My Tickets, not the scorecard).
   { key: 'value',     rank: (b) => b.edge ?? -Infinity, require: (b) => Number.isFinite(b.edge) && b.edge > 0 },
-  // Power Ready (beta) — every leg carries the POWER READY signal (ceiling ≥75 +
-  // matchup ≥60 + form ≥35 + a real recent sample; see ui/src/lib/powerReady.js).
+  // Power Ready — every leg carries the POWER READY signal (ceiling ≥70 +
+  // matchup ≥70 + form ≥60 + a real recent sample; see ui/src/lib/powerReady.js).
   // Ranks on the model's calibrated HR prob so the combo pairs the MOST likely-
-  // to-cash bats within the signal pool. BETA + advisory: it's built and logged
-  // server-side so its combo hit-rate forward-validates alongside the other
-  // strategies, but the UI only shows it when the beta switch is on (CombosView),
-  // and it never touches any score/probability. Graduates off (beta) when its logged
-  // all-hit rate clears the field (see the strategy audit / validate-ceil).
-  { key: 'powerReady', beta: true, rank: (b) => b.hrProb ?? b.score ?? 0, require: (b) => b.powerReady === true },
-  // Barrel Ready (beta) — the hot-form complement to Power Ready. Every leg
-  // carries the BARREL READY signal (solid power + genuinely hot form, no matchup
-  // gate). Ranks on calibrated HR prob. Same beta gating + forward-testing.
-  { key: 'barrelReady', beta: true, rank: (b) => b.hrProb ?? b.score ?? 0, require: (b) => b.barrelReady === true },
+  // to-cash bats within the signal pool. Advisory only: it never touches any
+  // score/probability.
+  { key: 'powerReady', rank: (b) => b.hrProb ?? b.score ?? 0, require: (b) => b.powerReady === true },
   // Edge Stack was CUT 2026-07-09: 0-for-24 all-hit over 23 graded days, and its
   // gate (≥2 matchup-signal booleans) isn't logged, so it can't be re-tuned on
   // data without becoming a duplicate of precision. Dropped rather than cloned.
