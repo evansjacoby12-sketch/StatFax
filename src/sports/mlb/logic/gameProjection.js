@@ -134,7 +134,20 @@ function lineupOffense(lineup, pitcher) {
   const platoonFactor = Number.isFinite(splitObp) && Number.isFinite(splitSlg)
     ? clamp(0.5 * (splitObp / 0.315) + 0.5 * (splitSlg / 0.400), 0.84, 1.18)
     : 1
-  const platoonWeight = 0.20 * platoonCoverage
+  const splitFactors = batterProfiles
+    .map(p => p.splitCovered && Number.isFinite(p.splitObp) && Number.isFinite(p.splitSlg)
+      ? 0.5 * (p.splitObp / 0.315) + 0.5 * (p.splitSlg / 0.400)
+      : null
+    )
+    .filter(Number.isFinite)
+  let splitVariance = 0
+  if (splitFactors.length > 1) {
+    const splitMean = splitFactors.reduce((sum, v) => sum + v, 0) / splitFactors.length
+    const splitSqDiff = splitFactors.reduce((sum, v) => sum + (v - splitMean) ** 2, 0)
+    splitVariance = splitSqDiff / splitFactors.length
+  }
+  const sd = Math.sqrt(splitVariance)
+  const platoonWeight = clamp(0.20 + 2.5 * sd, 0.20, 0.35) * platoonCoverage
   const seasonCoverage = lineup.rows.length
     ? lineup.rows.filter((row) => Number.isFinite(row.season?.obp) && Number.isFinite(row.season?.slg)).length / lineup.rows.length
     : 0
@@ -192,6 +205,10 @@ function starterRunFactor(pitcher) {
   }
   const estimatedEra = weightedMean(components)
   let quality = estimatedEra == null ? 1 : clamp(estimatedEra / 4.25, 0.72, 1.35)
+  if (Number.isFinite(workload.expectedIP)) {
+    const tttoPenalty = 1 + 0.015 * Math.max(0, workload.expectedIP - 4.5)
+    quality = clamp(quality * tttoPenalty, 0.72, 1.35)
+  }
   if (Number.isFinite(xStats.xwOba)) {
     const contact = clamp(xStats.xwOba / 0.320, 0.8, 1.22)
     quality = 0.8 * quality + 0.2 * contact
@@ -217,9 +234,10 @@ function bullpenRunFactor(opponentTeamId, bullpenHR9, bullpenRunProfiles, bullpe
   const factor = Number.isFinite(profileFactor)
     ? clamp(profileFactor, 0.78, 1.28)
     : fallbackFactor
+  const derivedFactor = 1 + 0.05 * (availability?.unavailableShare ?? 0) + 0.02 * (availability?.taxedShare ?? 0)
   const availabilityFactor = Number.isFinite(availability?.factor)
     ? clamp(availability.factor, 1, 1.07)
-    : 1
+    : clamp(derivedFactor, 1, 1.07)
   const profileCoverage = Number.isFinite(profile?.coverage) ? clamp(profile.coverage, 0, 1) : 0
   const availabilityCoverage = Number.isFinite(availability?.coverage) ? clamp(availability.coverage, 0, 1) : 0
   return {
@@ -555,7 +573,10 @@ export function gameTotalProbabilities(
   const totalMean = Number.isFinite(awayExpectedRuns) && Number.isFinite(homeExpectedRuns)
     ? awayExpectedRuns + homeExpectedRuns
     : projectedTotal
-  const distribution = poissonDistribution(totalMean, 50)
+  const dispersion = 3.5 // Match MLB_GAME_SCORE_DISPERSION
+  const awayDist = negativeBinomialDistribution(Number.isFinite(awayExpectedRuns) ? awayExpectedRuns : totalMean / 2, dispersion)
+  const homeDist = negativeBinomialDistribution(Number.isFinite(homeExpectedRuns) ? homeExpectedRuns : totalMean / 2, dispersion)
+  const distribution = convolveDistributions(awayDist, homeDist)
   let over = 0
   let under = 0
   let push = 0
@@ -865,6 +886,12 @@ function teamProjection({
   const pitchingBaseRuns = starterProjectedER + bullpenProjectedER
   const pitchingFactor = pitchingBaseRuns / baseRunsPerTeam
   const lineupStrengthFactor = offense.factor * teamScoring.factor * situational.factor
+  const goAo = pitcher?.season?.goAo
+  let flyBallMatchupMultiplier = 1
+  if (Number.isFinite(goAo) && goAo > 0 && pitcher?.season?.ip >= 15 && Number.isFinite(environment.hrFactor)) {
+    const tilt = (1.15 - goAo) * 0.25 * (environment.hrFactor - 1)
+    flyBallMatchupMultiplier = clamp(1 + tilt, 0.95, 1.05)
+  }
   const homeFieldRunEdge = isHome
     ? MLB_GAME_HOME_FIELD_RUN_EDGE
     : -MLB_GAME_HOME_FIELD_RUN_EDGE
@@ -872,6 +899,7 @@ function teamProjection({
     pitchingBaseRuns
     * lineupStrengthFactor
     * environment.factor
+    * flyBallMatchupMultiplier
     + homeFieldRunEdge
   )
   const expectedRuns = clamp(

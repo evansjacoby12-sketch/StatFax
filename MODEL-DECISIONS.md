@@ -62,6 +62,12 @@ Authority: `src/sports/mlb/logic/kBrain.js`; current model version is 4.
 Authority: `src/sports/mlb/logic/gameProjection.js` and `gameMarketDecision.js`; current model version is 11.
 
 - Team runs begin with opposing-starter expected runs over expected innings plus bullpen runs for the remainder, then apply lineup strength, park/weather, contextual matchup factors, and a small home-field run edge.
+- **Enhancements (2026-08-24)**:
+  - **TTTO**: Dynamic starter quality penalty scaling based on workload (`expectedIP`), up to +4.5% for deep-workload starters.
+  - **Platoon**: Dynamic split-weighting derived from starting lineup platoon split variance (scaling split factor weight from 20% to 35%).
+  - **Bullpen**: Refined bullpen availability fallback using unavailable and taxed reliever shares when the default index is absent.
+  - **Totals**: Upgraded Over/Under pricing to convolve home/away Negative Binomial score distributions (capturing run clustering and dispersion) instead of raw Poisson.
+  - **Matchup**: Integrated a Ballpark-Pitcher GB/FB matchup coupling (`goAo` index coupled with weather carrying factor `environment.hrFactor`).
 - Win probability is a logistic transform of projected run differential (slope 0.45). A one-run edge is roughly 61%, two runs roughly 71%, and three runs roughly 79% before rounding.
 - Total pricing uses the independent Poisson scoring contract at the decimal projected total.
 - Sportsbook no-vig probabilities and prices measure edge/expected ROI and market quality. They do not define the raw run projection.
