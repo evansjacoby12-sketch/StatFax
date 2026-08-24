@@ -974,6 +974,7 @@ function teamProjection({
         coverage: round(bullpen.coverage, 4),
       },
       parkWeatherHrFactor: round(environment.hrFactor),
+      flyBallMatchupMultiplier: round(flyBallMatchupMultiplier, 4),
       runEnvironmentFactor: round(environment.factor, 4),
       parkRunFactor: Number.isFinite(environment.rawParkFactor) ? round(environment.rawParkFactor, 4) : null,
       weatherRunFactor: Number.isFinite(environment.weatherFactor) ? round(environment.weatherFactor, 4) : null,

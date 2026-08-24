@@ -1329,10 +1329,14 @@ function validateGameProjectionRecord(prefix, projection, errors, gameIds = null
         && Number.isFinite(input.pitchingFactor)
         && Math.abs(input.pitchingBaseRuns / input.baseRunsPerTeam - input.pitchingFactor) > 0.002
       ) errors.push(`${at}.pitchingFactor: must match pitchingBaseRuns divided by baseRunsPerTeam`)
+      const flyBallMultiplier = Number.isFinite(input.flyBallMatchupMultiplier)
+        ? input.flyBallMatchupMultiplier
+        : 1
       const expectedBeforeCap = (
         input.pitchingBaseRuns
         * input.lineupStrengthFactor
         * input.runEnvironmentFactor
+        * flyBallMultiplier
         + input.homeFieldRunEdge
       )
       if (
