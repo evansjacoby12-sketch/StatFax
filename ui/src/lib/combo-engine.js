@@ -197,7 +197,7 @@ export const STRATEGIES = [
   // Hot Hand — heat × recent-form multiplier. Best in the graded record:
   // 14.9% all-hit, 45% legs. Ranks on heat, not score, so it surfaces different
   // bats than mix/matchup.
-  { key: 'hot',       rank: (b) => (b.heat ?? 0) * (b.heatMult ?? 1),                            require: (b) => (b.heat ?? 0) >= 58 },
+  { key: 'hot',       rank: (b) => (b.heat ?? 0) * (b.heatMult ?? 1),                            require: (b) => (b.heat ?? 0) >= 74 },
   // Best Mix — score + barrel + heat blend. 11.1% all-hit, 36% legs.
   { key: 'mix',       rank: mixRank,                                                              require: null },
   // Park & Air — park × weather × hand factor. 9.5% all-hit, 43% legs.

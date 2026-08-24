@@ -218,8 +218,8 @@ test('identical leg sets from different strategies dedupe within a size', () => 
   // Two games, both bats PRIME + hot + barrelKing → top, mix, stack, hot all pick
   // the same two legs; they should collapse to a single 2-leg combo.
   const rows = [
-    row({ playerId: 1, gamePk: 1, score: 80, grade: 'PRIME', hot: true, barrelKing: true, barrel: 15, heat: 70 }),
-    row({ playerId: 2, gamePk: 2, score: 78, grade: 'PRIME', hot: true, barrelKing: true, barrel: 14, heat: 68 }),
+    row({ playerId: 1, gamePk: 1, score: 80, grade: 'PRIME', hot: true, barrelKing: true, barrel: 15, heat: 80 }),
+    row({ playerId: 2, gamePk: 2, score: 78, grade: 'PRIME', hot: true, barrelKing: true, barrel: 14, heat: 78 }),
   ]
   const twoLeg = buildCombos(rows).filter((c) => c.size === 2)
   const sigs = twoLeg.map((c) => sig(c.strategy, c.size, c.legs.map((l) => l.playerId)))
@@ -242,8 +242,8 @@ test('known data-health warnings remove a leg from every combo strategy', () => 
 
 test('Core Pair is supplemental and does not suppress an existing strategy', () => {
   const rows = [
-    row({ playerId: 1, gamePk: 1, score: 80, grade: 'PRIME', hrProb: 0.24, hot: true, heat: 70 }),
-    row({ playerId: 2, gamePk: 2, score: 78, grade: 'PRIME', hrProb: 0.21, hot: true, heat: 68 }),
+    row({ playerId: 1, gamePk: 1, score: 80, grade: 'PRIME', hrProb: 0.24, hot: true, heat: 80 }),
+    row({ playerId: 2, gamePk: 2, score: 78, grade: 'PRIME', hrProb: 0.21, hot: true, heat: 78 }),
   ]
   const strategies = buildCombos(rows, { sizes: [2] }).map((combo) => combo.strategy)
   assert.ok(strategies.includes('core'))

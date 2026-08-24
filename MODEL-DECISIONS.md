@@ -45,6 +45,8 @@ change; do not reintroduce an untracked post-process adjustment.
 
 - Power Ready is graduated out of beta to a production combo strategy. Its gate thresholds are retuned to `CEIL >= 70 · MS >= 70 · FORM >= 60` based on a validation sweep of 7,484 reconciled bats (cashing individual legs at 20.9% vs 16.0% under beta gates, achieving a +9.8pt lift).
 - Barrel Ready is cut from the parlay combo strategies menu due to low historical cashing performance (11.11% leg hit rate) caused by the lack of a matchup gate. The `BARREL READY` badge remains active as a display-only/advisory form signal.
+- Hot Hand require gate is optimized and retuned to `HEAT >= 74` (originally `>= 58`) based on a 30-day parameter sweep, raising its leg accuracy from 22.00% to 26.19% and parlay cashing rate from 6.67% to 11.43% (+71.3% relative lift).
+
 
 ## K Brain
 
