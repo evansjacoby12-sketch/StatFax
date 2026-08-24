@@ -7,7 +7,7 @@
 
 // Single source of truth for the gate thresholds — the signal AND the readable
 // criteria breakdown both read these, so a label can never drift from the logic.
-export const POWER_READY_GATES = { ceiling: 75, matchup: 60, form: 35, bbe: 6, swings: 25 }
+export const POWER_READY_GATES = { ceiling: 70, matchup: 70, form: 60, bbe: 6, swings: 25 }
 
 /**
  * The four gates as a labeled, human-readable checklist for display:

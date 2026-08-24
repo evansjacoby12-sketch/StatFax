@@ -164,10 +164,10 @@ export default function App() {
   useEffect(() => store.save('sport', sport), [sport])
   useEffect(() => {
     setFilters((current) => {
-      if (!current.badges.has('powerReady') && !current.badges.has('barrelReady')) return current
+      if (!current.badges.has('barrelReady')) return current
       return {
         ...current,
-        badges: new Set([...current.badges].filter((key) => key !== 'powerReady' && key !== 'barrelReady')),
+        badges: new Set([...current.badges].filter((key) => key !== 'barrelReady')),
       }
     })
   }, [])

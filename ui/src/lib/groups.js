@@ -149,8 +149,7 @@ const STRAT_META = {
   park:      { label: 'Park & Air',   icon: 'CloudSun',   desc: 'park × weather × hand boosts HR' },
   value:     { label: 'Value',        icon: 'DollarSign', desc: 'the +EV pairing — bats the market underprices (model HR% > the fair line)' },
   edge:      { label: 'Edge Stack',   icon: 'Swords',     desc: '2+ matchup signals converge (pitch type, zones, platoon, fly-ball)' },
-  powerReady: { label: 'Power Ready (beta)', icon: 'Gauge',    desc: 'every leg carries the POWER READY (beta) signal — elite ceiling + soft matchup + live form. Unvalidated beta; forward-testing its hit rate.' },
-  barrelReady: { label: 'Barrel Ready (beta)', icon: 'CircleDotDashed', desc: 'every leg carries the BARREL READY (beta) signal — solid power + genuinely hot form (no matchup gate). Unvalidated beta; forward-testing its hit rate.' },
+  powerReady: { label: 'Power Ready', icon: 'Gauge',    desc: 'every leg carries the POWER READY signal — ceiling ≥70 + matchup ≥70 + form ≥60.' },
 }
 
 // Map a live scored batter → the engine's canonical combo row. `ref` carries the

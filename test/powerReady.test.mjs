@@ -12,9 +12,9 @@ const ready = (overrides = {}) => ({
 
 test('powerReady requires ceiling, matchup, form, and a recent sample', () => {
   assert.equal(powerReadySignal(ready()), true)
-  assert.equal(powerReadySignal(ready({ ceilScore: 74 })), false)
-  assert.equal(powerReadySignal(ready({ formScore: 34 })), false)
-  assert.equal(powerReadySignal(ready({ matchupScore: 59 })), false)
+  assert.equal(powerReadySignal(ready({ ceilScore: 69 })), false)
+  assert.equal(powerReadySignal(ready({ formScore: 59 })), false)
+  assert.equal(powerReadySignal(ready({ matchupScore: 69 })), false)
   assert.equal(powerReadySignal(ready({ recentBarrel: { recentBBE: 5 } })), false)
 })
 

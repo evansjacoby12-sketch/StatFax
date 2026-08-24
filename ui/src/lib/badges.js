@@ -17,7 +17,7 @@ export function gradeColor(label) {
 // `lucide` field is the lucide-react icon name; tone drives color.
 export const BADGES = [
   { key: 'precision', label: 'Precision', lucide: 'Focus', color: 'var(--accent)', tone: 'good', desc: 'Meets every precision gate: pitch mix ≥7, heat ≥48, HR due 5/6+, 8+ positive trends, ≤3 negatives' },
-  { key: 'powerReady', label: 'Power Ready (beta)', lucide: 'Gauge', color: '#a8a9cf', tone: 'warn', desc: 'Beta advisory signal: ceiling ≥75, matchup ≥60 and form ≥35 with a real recent contact sample. Logged for forward validation; it does not add a probability bonus.' },
+  { key: 'powerReady', label: 'Power Ready', lucide: 'Gauge', color: '#a8a9cf', tone: 'good', desc: 'Data-validated power readiness: ceiling ≥70, matchup ≥70, and form ≥60 with a real recent contact sample.' },
   { key: 'barrelReady', label: 'Barrel Ready (beta)', lucide: 'CircleDotDashed', color: '#c69a57', tone: 'warn', desc: 'Beta advisory signal: solid power (ceiling ≥70) AND genuinely hot form (form ≥60) with a real recent contact sample — no matchup gate. The hot-form complement to Power Ready. Logged for forward validation; it does not add a probability bonus.' },
   { key: 'sleeper', label: 'Sleeper', lucide: 'MoonStar', color: '#9085bd', tone: 'good', desc: 'Under-the-radar HR profile: STRONG/LEAN grade with PRIME-adjacent form — heat ≥48, HR setup 3/6+, and hot or rising power. This badge does not use sportsbook price.' },
   { key: 'hot', label: 'Hot', lucide: 'Flame', color: 'var(--b-hot)', tone: 'good', desc: 'On a hot streak — recent power surge' },

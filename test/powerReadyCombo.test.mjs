@@ -16,15 +16,15 @@ const slate = () => [
   ...[5, 6, 7, 8, 9, 10].map((i) => bat(i, { pr: true, score: 72, prob: 0.28 - (i - 5) * 0.01 })),
 ]
 
-test('powerReady is a beta strategy (off by default)', () => {
-  assert.equal(STRATEGIES.find((s) => s.key === 'powerReady')?.beta, true)
-  const off = buildCombos(slate(), { includeBeta: false }).filter((c) => c.strategy === 'powerReady')
-  assert.equal(off.length, 0)
+test('powerReady is a production strategy (on by default)', () => {
+  assert.equal(STRATEGIES.find((s) => s.key === 'powerReady')?.beta, undefined)
+  const on = buildCombos(slate(), { includeBeta: false }).filter((c) => c.strategy === 'powerReady')
+  assert.ok(on.length > 0, 'expected powerReady combos')
 })
 
-test('with includeBeta, powerReady builds from ONLY signal bats, ranked by hrProb', () => {
-  const on = buildCombos(slate(), { includeBeta: true }).filter((c) => c.strategy === 'powerReady')
-  assert.ok(on.length > 0, 'expected powerReady combos when includeBeta is on')
+test('powerReady builds from ONLY signal bats, ranked by hrProb', () => {
+  const on = buildCombos(slate(), { includeBeta: false }).filter((c) => c.strategy === 'powerReady')
+  assert.ok(on.length > 0, 'expected powerReady combos')
   // every leg carries the signal (the score-92 non-PR bats are excluded)
   assert.ok(on.every((c) => c.legs.every((l) => l.powerReady === true)))
   // ranked by calibrated HR prob — the two highest-prob PR bats lead the 2-leg

@@ -41,6 +41,11 @@ external-context probability deltas are not part of production. Rollback means
 restoring the removed versioned subsystem and its validation gate in one reviewed
 change; do not reintroduce an untracked post-process adjustment.
 
+### Power Ready Graduation & Barrel Ready Cut — 2026-08-24
+
+- Power Ready is graduated out of beta to a production combo strategy. Its gate thresholds are retuned to `CEIL >= 70 · MS >= 70 · FORM >= 60` based on a validation sweep of 7,484 reconciled bats (cashing individual legs at 20.9% vs 16.0% under beta gates, achieving a +9.8pt lift).
+- Barrel Ready is cut from the parlay combo strategies menu due to low historical cashing performance (11.11% leg hit rate) caused by the lack of a matchup gate. The `BARREL READY` badge remains active as a display-only/advisory form signal.
+
 ## K Brain
 
 Authority: `src/sports/mlb/logic/kBrain.js`; current model version is 4.

@@ -23,7 +23,7 @@ export default function CombosView({ batters, onSelect, favorConsistency = false
   // (list AND scorecard tallies) when the beta
   // switch is on, so non-beta users see zero influence from an unvalidated signal.
   const betaCeil = false
-  const showCombo = (c) => betaCeil || !['powerReady', 'barrelReady'].includes(c?.strategy)
+  const showCombo = (c) => betaCeil || !['barrelReady'].includes(c?.strategy)
   const [log, setLog] = useState(null)
   const [err, setErr] = useState(null)
   const [comboDay, setComboDay] = useState(null)

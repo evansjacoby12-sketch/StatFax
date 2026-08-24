@@ -64,7 +64,7 @@ export default function Filters({ value, onChange, gradeCounts, games, badgeCoun
 
   const activeMore =
     v.gamePks.size + (v.confirmedOnly ? 1 : 0) + (v.watchedOnly ? 1 : 0) + (v.hotOnly ? 1 : 0) + (v.precisionOnly ? 1 : 0) + (v.sleepersOnly ? 1 : 0) + v.badges.size
-  const visibleBadges = BADGES.filter((b) => betaEnabled || (b.key !== 'powerReady' && b.key !== 'barrelReady'))
+  const visibleBadges = BADGES.filter((b) => betaEnabled || (b.key !== 'barrelReady'))
   const badgeDefs = visibleBadges.filter((b) => v.badges.has(b.key))
   const hiddenSignalCount = visibleBadges.filter((b) => !MOBILE_PRIMARY_SIGNALS.has(b.key) && !v.badges.has(b.key)).length
 

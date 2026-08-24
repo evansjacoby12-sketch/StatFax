@@ -519,7 +519,7 @@ function BetaCeiling({ b }) {
         {big('Ceiling', ceil)}
         {big('Form', form)}
       </div>
-      <SignalChecklist title="Power Ready" badge="POWER READY (beta)" crit={powerReadyCriteria(b)} meaning={SIGNAL_MEANING.powerReady[level] ?? SIGNAL_MEANING.powerReady.eli5} />
+      <SignalChecklist title="Power Ready" badge="POWER READY" crit={powerReadyCriteria(b)} meaning={SIGNAL_MEANING.powerReady[level] ?? SIGNAL_MEANING.powerReady.eli5} />
       <SignalChecklist title="Barrel Ready" badge="BARREL READY (beta)" crit={barrelReadyCriteria(b)} meaning={SIGNAL_MEANING.barrelReady[level] ?? SIGNAL_MEANING.barrelReady.eli5} />
       <div className="beta-ceil-explain" aria-label="Ceiling and form explanation">
         <div className="beta-ceil-explain-head">
@@ -529,7 +529,7 @@ function BetaCeiling({ b }) {
         <div className="beta-ceil-explain-row"><b>Ceiling</b><span>{explain.ceiling}</span></div>
         <div className="beta-ceil-explain-row"><b>Form</b><span>{explain.form}</span></div>
         <small>
-          {b.powerReady ? 'Together, these helped trigger POWER READY (beta). ' : ''}
+          {b.powerReady ? 'Together, these helped trigger POWER READY. ' : ''}
           They describe contact quality and do not directly raise the HR probability.
         </small>
       </div>
@@ -1139,7 +1139,7 @@ function DrawerHeader({ b, color, onClose, watched, inSlip, onToggleWatch, onTog
 function MobileDrawerHeader({ b, color, onClose, watched, inSlip, onToggleWatch, onToggleSlip }) {
   const [signalsOpen, setSignalsOpen] = useState(false)
   const allSignals = activeBadges(b).filter((signal) =>
-    store.load('betaCeil', false) || (signal.key !== 'powerReady' && signal.key !== 'barrelReady'))
+    store.load('betaCeil', false) || (signal.key !== 'barrelReady'))
   const hiddenSignalCount = Math.max(0, allSignals.length - 3)
   const shownSignals = signalsOpen ? allSignals : allSignals.slice(0, 3)
   const market = b.vegasImpliedProb
