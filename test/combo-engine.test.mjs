@@ -60,15 +60,15 @@ test('edgeCount counts matchup signals (Edge strategy cut; helper still used for
   assert.equal(stratByKey.edge, undefined) // strategy removed
 })
 
-test('matchup gate at hr9 >= 1.3; rank = score × hr9', () => {
-  assert.equal(stratByKey.matchup.require(row({ pitcherHr9: 1.2 })), false)
-  assert.equal(stratByKey.matchup.require(row({ pitcherHr9: 1.3 })), true)
+test('matchup gate at hr9 >= 1.4; rank = score × hr9', () => {
+  assert.equal(stratByKey.matchup.require(row({ pitcherHr9: 1.35 })), false)
+  assert.equal(stratByKey.matchup.require(row({ pitcherHr9: 1.4 })), true)
   assert.equal(stratByKey.matchup.rank(row({ score: 60, pitcherHr9: 1.5 })), 90)
 })
 
-test('park gate at air >= 1.08; rank = score × air', () => {
-  assert.equal(stratByKey.park.require(row({ air: 1.05 })), false)
-  assert.equal(stratByKey.park.require(row({ air: 1.08 })), true)
+test('park gate at air >= 1.05; rank = score × air', () => {
+  assert.equal(stratByKey.park.require(row({ air: 1.04 })), false)
+  assert.equal(stratByKey.park.require(row({ air: 1.05 })), true)
   assert.ok(Math.abs(stratByKey.park.rank(row({ score: 50, air: 1.2 })) - 60) < 1e-9)
 })
 
@@ -422,4 +422,40 @@ test('buildSGPRecords waits for complete confirmed game lineups', () => {
     buildSGPRecords([{ ...ready[0], lineupConfirmed: false }, ready[1]], { sizes: [2] }).length,
     0,
   )
+})
+
+test('Core Pair selection consumes exposure caps for subsequent strategies', () => {
+  const rows = [
+    row({ playerId: 1, gamePk: 1, score: 95, grade: 'PRIME', hrProb: 0.25, consistency: 0.95, heat: 90, heatMult: 1 }),
+    row({ playerId: 2, gamePk: 2, score: 85, grade: 'PRIME', hrProb: 0.20, consistency: 0.90, heat: 85, heatMult: 1 }),
+    row({ playerId: 3, gamePk: 3, score: 75, grade: 'STRONG', hrProb: 0.18, consistency: 0.90, heat: 80, heatMult: 1 }),
+    row({ playerId: 4, gamePk: 4, score: 70, grade: 'STRONG', hrProb: 0.17, consistency: 0.90, heat: 75, heatMult: 1 }),
+  ]
+  const combos = buildCombos(rows, { maxPerBat: 1, sizes: [2] })
+  const core = combos.find(c => c.strategy === 'core')
+  const hot = combos.find(c => c.strategy === 'hot')
+  assert.ok(core)
+  assert.ok(hot)
+  assert.deepEqual(core.legs.map(l => l.playerId), [1, 2])
+  assert.ok(!hot.legs.some(l => l.playerId === 1 || l.playerId === 2))
+})
+
+test('buildCombos dynamically scales exposure caps down on small slates', () => {
+  const rows = [
+    row({ playerId: 1, gamePk: 100, score: 90, grade: 'PRIME', hrProb: 0.22, heat: 90 }),
+    row({ playerId: 2, gamePk: 101, score: 85, grade: 'PRIME', hrProb: 0.20, heat: 85 }),
+    row({ playerId: 3, gamePk: 100, score: 80, grade: 'STRONG', hrProb: 0.19, heat: 80 }),
+    row({ playerId: 4, gamePk: 101, score: 75, grade: 'STRONG', hrProb: 0.18, heat: 75 }),
+  ]
+  const combos = buildCombos(rows, { maxPerBat: 2, globalMaxPerBat: 4, sizes: [2] })
+  const used = {}
+  const nonCore = combos.filter(c => c.strategy !== 'core')
+  for (const c of nonCore) {
+    for (const l of c.legs) {
+      used[l.playerId] = (used[l.playerId] || 0) + 1
+    }
+  }
+  for (const pid of Object.keys(used)) {
+    assert.ok(used[pid] <= 1, `Player ${pid} used ${used[pid]} times, expected cap at 1`)
+  }
 })

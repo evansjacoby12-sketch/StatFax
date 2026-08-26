@@ -47,6 +47,13 @@ change; do not reintroduce an untracked post-process adjustment.
 - Barrel Ready is cut from the parlay combo strategies menu due to low historical cashing performance (11.11% leg hit rate) caused by the lack of a matchup gate. The `BARREL READY` badge remains active as a display-only/advisory form signal.
 - Hot Hand require gate is optimized and retuned to `HEAT >= 74` (originally `>= 58`) based on a 30-day parameter sweep, raising its leg accuracy from 22.00% to 26.19% and parlay cashing rate from 6.67% to 11.43% (+71.3% relative lift).
 
+### Parlay Combo Optimizations — 2026-08-26
+
+- Core Pair strategy was modified to consume exposure caps (`maxPerBat` and `globalMaxPerBat`) so that subsequent strategies diversify away from Core legs.
+- Dynamic exposure caps are applied based on slate size: on small slates (<5 unique games), `maxPerBat` is capped at 1 and `globalMaxPerBat` at 2.
+- Park & Air require gate is retuned to `air >= 1.05` (previously `>= 1.08`) based on a historical sweep, improving parlay hit rate and expanding coverage.
+- Soft Matchup require gate is optimized and retuned to `pitcherHr9 >= 1.4` (previously `>= 1.3`) based on a 30-day parameter sweep, improving individual leg accuracy.
+
 
 ## K Brain
 

@@ -201,9 +201,9 @@ export const STRATEGIES = [
   // Best Mix — score + barrel + heat blend. 11.1% all-hit, 36% legs.
   { key: 'mix',       rank: mixRank,                                                              require: null },
   // Park & Air — park × weather × hand factor. 9.5% all-hit, 43% legs.
-  { key: 'park',      rank: (b) => (b.score ?? 0) * (b.air ?? 0),                               require: (b) => Number.isFinite(b.air) && b.air >= 1.08 },
+  { key: 'park',      rank: (b) => (b.score ?? 0) * (b.air ?? 0),                               require: (b) => Number.isFinite(b.air) && b.air >= 1.05 },
   // Soft Matchup — batter quality × pitcher HR/9. Mid-pack: 6.3% all-hit, 31% legs.
-  { key: 'matchup',   rank: (b) => (b.score ?? 0) * (b.pitcherHr9 ?? 0),                        require: (b) => Number.isFinite(b.pitcherHr9) && b.pitcherHr9 >= 1.3 },
+  { key: 'matchup',   rank: (b) => (b.score ?? 0) * (b.pitcherHr9 ?? 0),                        require: (b) => Number.isFinite(b.pitcherHr9) && b.pitcherHr9 >= 1.4 },
   // Precision — the hottest elite-barrel bats: b.hot (recent-ISO power surge) AND
   // barrel ≥ 12%. RE-TUNED 2026-07-07 on 7,143 reconciled bats. The OLD gate
   // (pitch-mix · heat≥48 · HR-due≥5 · pos≥8 · neg≤3) was unvalidatable — HR-due
@@ -396,6 +396,11 @@ export function buildCombos(rows, {
   stickMargin = 0.05,
   includeBeta = false,   // beta strategies (e.g. powerReady) build only when opted in
 } = {}) {
+  // Dynamically scale default caps based on the number of usable unique games in the pool
+  const uniqueGames = new Set((rows || []).map((r) => r.gamePk)).size
+  const limitMaxPerBat = uniqueGames > 0 && uniqueGames < 5 ? 1 : maxPerBat
+  const limitGlobalMaxPerBat = uniqueGames > 0 && uniqueGames < 5 ? 2 : globalMaxPerBat
+
   // Beta strategies are off by default so an unvalidated signal never reaches a
   // non-beta board. The server passes includeBeta:true to LOG them for forward-
   // testing; the client passes the user's beta-switch state.
@@ -432,9 +437,12 @@ export function buildCombos(rows, {
       if (strat.custom === 'corePair') {
         const legs = selectCorePair(usable, size)
         if (legs.length !== size) continue
-        // Supplemental: keep the existing strategy selection and exposure caps
-        // unchanged. The UI labels repeated-bat exposure across every shown card.
         out.push({ strategy: strat.key, size, legs, roles: size === 3 ? ['anchor', 'support', 'volatile'] : ['anchor', 'support'] })
+        // Core Pair selection consumes exposure/diversity caps
+        for (const l of legs) {
+          used[l.playerId] = (used[l.playerId] || 0) + 1
+          usedGlobal[l.playerId] = (usedGlobal[l.playerId] || 0) + 1
+        }
         continue
       }
       if (pool.length < size) continue
@@ -442,8 +450,8 @@ export function buildCombos(rows, {
         const legs = []
         for (let i = 0; i < pool.length && legs.length < size; i++) {
           const b = pool[i]
-          if ((used[b.playerId] || 0) >= maxPerBat) continue
-          if (globalCapped && (usedGlobal[b.playerId] || 0) >= globalMaxPerBat) continue
+          if ((used[b.playerId] || 0) >= limitMaxPerBat) continue
+          if (globalCapped && (usedGlobal[b.playerId] || 0) >= limitGlobalMaxPerBat) continue
           legs.push(b)
         }
         return legs
