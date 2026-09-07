@@ -134,9 +134,24 @@ export function scoreNFLProp(player, marketId) {
 
   if (market.kind === 'touchdown') probability *= weather.factor * defense * role * split * lineup * liveDeployment
   probability = clamp(probability)
-  const rawOdds = player?.markets?.[marketId]?.odds
-  const odds = rawOdds == null || rawOdds === '' ? null : Number(rawOdds)
-  const implied = americanImpliedProbability(odds)
+  const marketEntry = player?.markets?.[marketId]
+  const rawOdds = marketEntry?.odds
+    ?? marketEntry?.overOdds
+    ?? marketEntry?.price
+    ?? marketEntry?.american
+    ?? player?.propOdds?.[marketId]
+    ?? player?.odds?.[marketId]
+    ?? (marketId === 'anytime_td' ? (player?.odds ?? player?.markets?.anytime_td?.odds) : null)
+
+  const parsedOdds = rawOdds == null || rawOdds === '' ? null : Number(rawOdds)
+  const explicitOdds = Number.isFinite(parsedOdds) && parsedOdds !== 0 ? parsedOdds : null
+
+  // For yardage/volume markets with an active line, benchmark against standard -110 juice if unquoted
+  const effectiveOdds = explicitOdds != null
+    ? explicitOdds
+    : (market.kind !== 'touchdown' && line != null ? -110 : null)
+
+  const implied = americanImpliedProbability(effectiveOdds)
   const edge = implied == null ? null : probability - implied
   const score = Math.round(clamp(probability * 100 + (edge == null ? 0 : edge * 75), 0, 100))
   const grade = probabilityGrade(probability, marketId, score, implied != null)
@@ -150,7 +165,7 @@ export function scoreNFLProp(player, marketId) {
     player?.usage?.roleLabel || 'Role not confirmed',
   ]
 
-  return { marketId, eligible, probability, score, grade, line, odds: Number.isFinite(odds) && odds !== 0 ? odds : null, implied, edge, mean, weather, defenseFactor: defense, roleFactor: role, signals: buildNFLSignals(player), reasons }
+  return { marketId, eligible, probability, score, grade, line, odds: effectiveOdds, implied, edge, mean, weather, defenseFactor: defense, roleFactor: role, signals: buildNFLSignals(player), reasons }
 }
 
 export function scoreNFLSnapshot(snapshot, marketId) {
