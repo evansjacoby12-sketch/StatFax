@@ -452,7 +452,7 @@ export default function NFLBoard({ snapshot: suppliedSnapshot = null, view: cont
     const player = snapshot.players.find((item) => item.id === playerId)
     if (!player) return null
     const model = scoreNFLProp(player, legMarketId)
-    return { key, playerId, gameId: player.gameId, name: player.name, marketId: legMarketId, marketLabel: NFL_PROP_MARKET_LIST.find((item) => item.id === legMarketId)?.label || legMarketId, line: model.line, odds: model.odds, probability: model.probability, status: 'pending' }
+    return { key, playerId, gameId: player.gameId, team: player.team, opponent: player.opponent, name: player.name, marketId: legMarketId, marketLabel: NFL_PROP_MARKET_LIST.find((item) => item.id === legMarketId)?.label || legMarketId, line: model.line, odds: model.odds, probability: model.probability, status: 'pending' }
   }).filter(Boolean), [slip, snapshot])
   const saveTicket = (ticketLegs = slipLegs) => {
     const tdLegs = ticketLegs.filter((leg) => isNFLTDMarket(leg.marketId))
