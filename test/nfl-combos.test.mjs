@@ -116,3 +116,19 @@ test('buildNFLComboShowcase applies cross-strategy exposure tracking across card
   assert.ok(signatures.size > 1)
 })
 
+test('buildNFLComboBoard supports gameKey filtering for same-game and cross-game scopes', () => {
+  const bufMiaKey = 'BUF-MIA'
+  const sameGameBoard = buildNFLComboBoard(snapshot, { legs: 2, strategy: 'scorer-core', scope: 'same-game', minGrade: 'SKIP', gameKey: bufMiaKey })
+  for (const combo of sameGameBoard.combos) {
+    assert.equal(new Set(combo.legs.map((l) => l.gameKey)).size, 1)
+    assert.equal(combo.legs[0].gameKey, bufMiaKey)
+  }
+
+  const crossGameBoard = buildNFLComboBoard(snapshot, { legs: 2, strategy: 'scorer-core', scope: 'all', minGrade: 'SKIP', gameKey: bufMiaKey })
+  for (const combo of crossGameBoard.combos) {
+    assert.ok(combo.legs.some((l) => l.gameKey === bufMiaKey))
+    assert.equal(new Set(combo.legs.map((l) => l.gameKey)).size, combo.legs.length)
+  }
+})
+
+

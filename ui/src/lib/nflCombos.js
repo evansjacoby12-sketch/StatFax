@@ -14,7 +14,7 @@ export const NFL_COMBO_STRATEGIES = Object.freeze([
 const GRADE_RANK = { SKIP: 0, LEAN: 1, STRONG: 2, PRIME: 3 }
 const clamp01 = (value) => Math.max(0, Math.min(1, Number(value) || 0))
 
-const gameKey = (player) => player.gameId || [player.team, player.opponent].filter(Boolean).sort().join('-')
+const gameKey = (player) => String(player.gameId || player.gamePk || [player.team, player.opponent].filter(Boolean).sort().join('-'))
 const decimalOdds = (american) => !Number.isFinite(Number(american)) || Number(american) === 0
   ? null
   : Number(american) > 0 ? 1 + Number(american) / 100 : 1 + 100 / Math.abs(Number(american))
@@ -176,8 +176,9 @@ function rationaleFor(legs, strategy, scope) {
   return scope === 'same-game' ? `One-game Anytime TD core averaging ${(averageProbability * 100).toFixed(1)}% per leg with ${signalCount} supporting signals.` : `Anytime TD anchors across ${games} games averaging ${(averageProbability * 100).toFixed(1)}% per leg.`
 }
 
-export function buildNFLComboBoard(snapshot, { legs = 2, strategy = 'scorer-core', scope = 'all', minGrade = 'LEAN', limit = 5, globalExposure = null } = {}) {
+export function buildNFLComboBoard(snapshot, { legs = 2, strategy = 'scorer-core', scope = 'all', minGrade = 'LEAN', limit = 5, globalExposure = null, gameKey: targetGameKey = null, gameId: targetGameId = null } = {}) {
   const legCount = Math.max(2, Math.min(4, Number(legs) || 2))
+  const wantedGameKey = targetGameKey || targetGameId || null
   const candidates = (snapshot?.players || []).flatMap((player) => eligiblePropMarkets(player).map((market) => {
     const model = scoreNFLProp(player, market.id)
     return {
@@ -202,6 +203,7 @@ export function buildNFLComboBoard(snapshot, { legs = 2, strategy = 'scorer-core
   }))
     .filter((candidate) => isNFLTDMarket(candidate.marketId))
     .filter((candidate) => candidate.model.eligible && candidate.probability > 0 && candidate.gameKey)
+    .filter((candidate) => scope !== 'same-game' || !wantedGameKey || candidate.gameKey === String(wantedGameKey))
     .filter((candidate) => candidate.availability?.eligible !== false)
     .filter((candidate) => eligibleForStack(candidate, strategy))
     .filter((candidate) => meetsSelectionFloor(candidate, strategy, scope, minGrade))
@@ -219,8 +221,8 @@ export function buildNFLComboBoard(snapshot, { legs = 2, strategy = 'scorer-core
       return new Set(firstTDGames).size === firstTDGames.length
     })
     .filter((combo) => scope === 'same-game'
-      ? new Set(combo.map((leg) => leg.gameKey)).size === 1
-      : new Set(combo.map((leg) => leg.gameKey)).size === combo.length)
+      ? (new Set(combo.map((leg) => leg.gameKey)).size === 1 && (!wantedGameKey || combo[0].gameKey === String(wantedGameKey)))
+      : (new Set(combo.map((leg) => leg.gameKey)).size === combo.length && (!wantedGameKey || combo.some((leg) => leg.gameKey === String(wantedGameKey)))))
     .map((combo) => {
       const independentProbability = combo.reduce((product, leg) => product * leg.probability, 1)
       const jointFactor = Number(calibration?.jointFactor)
@@ -235,9 +237,6 @@ export function buildNFLComboBoard(snapshot, { legs = 2, strategy = 'scorer-core
       const avgEdge = combo.reduce((sum, leg) => sum + (leg.model.edge || 0), 0) / combo.length
       const rank = combo.reduce((sum, leg) => sum + candidateScore(leg, strategy), 0) / combo.length
         + Math.max(0, avgEdge) * .45
-      // Grade the construction quality from its legs. The all-hit probability
-      // naturally falls as legs are added and should not downgrade a sound
-      // three- or four-leg build merely because multiplication is doing its job.
       const score = Math.max(0, Math.min(100, Math.round(avgScore)))
       const grade = score >= 70 ? 'PRIME' : score >= 58 ? 'STRONG' : score >= 46 ? 'LEAN' : 'SKIP'
       return {
@@ -274,7 +273,7 @@ export function buildNFLComboBoard(snapshot, { legs = 2, strategy = 'scorer-core
   }
 }
 
-export function buildNFLComboShowcase(snapshot, { legs = 2, scope = 'all', minGrade = 'LEAN', playerCap = 1 } = {}) {
+export function buildNFLComboShowcase(snapshot, { legs = 2, scope = 'all', minGrade = 'LEAN', playerCap = 1, gameKey = null } = {}) {
   const globalExposure = { players: new Map(), playerCap }
   return NFL_COMBO_STRATEGIES.map((stack) => {
     if (!stack.scopes.includes(scope)) {
@@ -285,7 +284,7 @@ export function buildNFLComboShowcase(snapshot, { legs = 2, scope = 'all', minGr
         unavailableReason: scope === 'same-game' ? 'This stack is cross-game only.' : 'This stack does not support the selected scope.',
       }
     }
-    const board = buildNFLComboBoard(snapshot, { legs, strategy: stack.id, scope, minGrade, limit: 1, globalExposure })
+    const board = buildNFLComboBoard(snapshot, { legs, strategy: stack.id, scope, minGrade, limit: 1, globalExposure, gameKey })
     const combo = board.combos[0] || null
     if (combo) {
       for (const leg of combo.legs) {
