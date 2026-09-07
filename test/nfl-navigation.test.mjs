@@ -101,7 +101,7 @@ test('NFL Bet Lab shares the core MLB workspace modes without a Saved destinatio
   assert.match(nflLab, /<WorkspaceShell[\s\S]*?embedded[\s\S]*?title="TD Bet Lab"/)
   assert.match(nflLab, /isNFLTDMarket/)
   assert.match(nflLab, /Yardage and reception props stay outside Bet Lab/)
-  assert.match(nflLab, /disabled=\{slipLegs\.length < 2\}/)
+  assert.match(nflLab, /disabled=\{slipLegs\.length < 2/)
   assert.match(nflLab, /nfl-stack-risk/)
   assert.match(nflLab, /stack\.scopes\.includes\(scope\)/)
   assert.match(nflLab, /Best of every stack/i)

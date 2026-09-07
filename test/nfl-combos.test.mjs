@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import snapshot from '../src/sports/nfl/data/demoSlate.js'
-import { buildNFLComboBoard, buildNFLCombos, buildNFLComboShowcase, NFL_COMBO_STRATEGIES } from '../ui/src/lib/nflCombos.js'
+import { buildNFLComboBoard, buildNFLCombos, buildNFLComboShowcase, calculateNFLJointTDProbability, NFL_COMBO_STRATEGIES } from '../ui/src/lib/nflCombos.js'
 
 test('NFL Bet Lab builds deterministic 2-4 leg combos without duplicate players', () => {
   for (const legs of [2, 3, 4]) {
@@ -63,10 +63,10 @@ test('each stack board stays focused on at most five diversified builds', () => 
   }
 })
 
-test('same-game boards disclose an independent baseline until joint calibration is ready', () => {
+test('same-game boards compute structural joint probability and disclose calibration state', () => {
   const board = buildNFLComboBoard(snapshot, { legs: 2, strategy: 'scorer-core', scope: 'same-game', minGrade: 'LEAN' })
   assert.equal(board.calibration.ready, false)
-  assert.ok(board.combos.every((combo) => combo.probabilityMethod === 'independent-baseline' && combo.actionableProbability === false))
+  assert.ok(board.combos.every((combo) => combo.probabilityMethod === 'structural-joint' && combo.actionableProbability === false))
   assert.ok(board.coverage.limitations.some((message) => /joint calibration/i.test(message)))
 })
 
@@ -130,5 +130,66 @@ test('buildNFLComboBoard supports gameKey filtering for same-game and cross-game
     assert.equal(new Set(combo.legs.map((l) => l.gameKey)).size, combo.legs.length)
   }
 })
+
+test('calculateNFLJointTDProbability flags same-game First TD mutual exclusivity', () => {
+  const conflictingLegs = [
+    { name: 'Josh Allen', gameKey: 'BUF-MIA', team: 'BUF', position: 'QB', marketId: 'first_td', probability: 0.18 },
+    { name: 'Tyreek Hill', gameKey: 'BUF-MIA', team: 'MIA', position: 'WR', marketId: 'first_td', probability: 0.15 },
+  ]
+  const result = calculateNFLJointTDProbability(conflictingLegs)
+  assert.equal(result.isValid, false)
+  assert.equal(result.probability, 0)
+  assert.equal(result.correlationType, 'conflict')
+  assert.ok(result.conflictReason.includes('mutually exclusive'))
+})
+
+test('calculateNFLJointTDProbability computes same-team RB cannibalization discount', () => {
+  const sameTeamRBs = [
+    { name: 'James Cook', gameKey: 'BUF-MIA', team: 'BUF', position: 'RB', marketId: 'anytime_td', probability: 0.45 },
+    { name: 'Ray Davis', gameKey: 'BUF-MIA', team: 'BUF', position: 'RB', marketId: 'anytime_td', probability: 0.25 },
+  ]
+  const result = calculateNFLJointTDProbability(sameTeamRBs)
+  assert.equal(result.isValid, true)
+  assert.ok(result.probability < result.independentProbability)
+  assert.equal(result.correlationType, 'cannibalization')
+  assert.ok(result.correlationFactor < 0.90)
+})
+
+test('calculateNFLJointTDProbability computes cross-team shootout synergy uplift', () => {
+  const opposingScorers = [
+    { name: 'Josh Allen', gameKey: 'BUF-MIA', team: 'BUF', position: 'QB', marketId: 'anytime_td', probability: 0.45 },
+    { name: 'Tyreek Hill', gameKey: 'BUF-MIA', team: 'MIA', position: 'WR', marketId: 'anytime_td', probability: 0.42 },
+  ]
+  const result = calculateNFLJointTDProbability(opposingScorers)
+  assert.equal(result.isValid, true)
+  assert.ok(result.probability > result.independentProbability)
+  assert.equal(result.correlationType, 'synergy')
+  assert.ok(result.correlationFactor > 1.02)
+})
+
+test('calculateNFLJointTDProbability treats cross-game legs as independent product', () => {
+  const crossGameLegs = [
+    { name: 'Josh Allen', gameKey: 'BUF-MIA', team: 'BUF', position: 'QB', marketId: 'anytime_td', probability: 0.45 },
+    { name: 'Patrick Mahomes', gameKey: 'KC-BAL', team: 'KC', position: 'QB', marketId: 'anytime_td', probability: 0.30 },
+  ]
+  const result = calculateNFLJointTDProbability(crossGameLegs)
+  assert.equal(result.isValid, true)
+  assert.equal(result.probability, result.independentProbability)
+  assert.equal(result.correlationType, 'independent')
+})
+
+test('calculateNFLJointTDProbability correctly handles mixed multi-game clusters', () => {
+  const mixedLegs = [
+    { name: 'Josh Allen', gameKey: 'BUF-MIA', team: 'BUF', position: 'QB', marketId: 'anytime_td', probability: 0.45 },
+    { name: 'Tyreek Hill', gameKey: 'BUF-MIA', team: 'MIA', position: 'WR', marketId: 'anytime_td', probability: 0.40 },
+    { name: 'Derrick Henry', gameKey: 'KC-BAL', team: 'BAL', position: 'RB', marketId: 'anytime_td', probability: 0.55 },
+  ]
+  const result = calculateNFLJointTDProbability(mixedLegs)
+  assert.equal(result.isValid, true)
+  assert.equal(result.gameClusters.length, 2)
+  assert.ok(result.probability > result.independentProbability)
+  assert.equal(result.correlationType, 'synergy')
+})
+
 
 

@@ -176,6 +176,157 @@ function rationaleFor(legs, strategy, scope) {
   return scope === 'same-game' ? `One-game Anytime TD core averaging ${(averageProbability * 100).toFixed(1)}% per leg with ${signalCount} supporting signals.` : `Anytime TD anchors across ${games} games averaging ${(averageProbability * 100).toFixed(1)}% per leg.`
 }
 
+export function calculateNFLJointTDProbability(legs = []) {
+  if (!Array.isArray(legs) || !legs.length) {
+    return {
+      probability: null,
+      independentProbability: null,
+      correlationFactor: 1,
+      correlationType: 'neutral',
+      correlationLabel: 'No legs',
+      isValid: false,
+      conflictReason: null,
+      gameClusters: [],
+    }
+  }
+
+  const independentProbability = legs.reduce((product, leg) => product * Math.max(0, Math.min(1, Number(leg.probability || 0))), 1)
+
+  const gamesMap = new Map()
+  for (const leg of legs) {
+    const gKey = String(leg.gameKey || leg.gameId || (leg.team && leg.opponent ? [leg.team, leg.opponent].sort().join('-') : 'independent'))
+    if (!gamesMap.has(gKey)) gamesMap.set(gKey, [])
+    gamesMap.get(gKey).push(leg)
+  }
+
+  let totalJointProbability = 1
+  let hasConflict = false
+  let conflictReason = null
+  const clusterSummaries = []
+
+  for (const [gKey, gameLegs] of gamesMap.entries()) {
+    if (gKey === 'independent' || gameLegs.length === 1) {
+      const legProb = Number(gameLegs[0]?.probability || 0)
+      totalJointProbability *= legProb
+      clusterSummaries.push({ gameKey: gKey, count: 1, type: 'single', factor: 1 })
+      continue
+    }
+
+    // Check for mutual exclusivity within the same game
+    const firstTDLegs = gameLegs.filter((leg) => leg.marketId === 'first_td')
+    if (firstTDLegs.length > 1) {
+      hasConflict = true
+      conflictReason = `Multiple First TD scorers (${firstTDLegs.map((l) => l.name).join(', ')}) in the same game are mutually exclusive.`
+      totalJointProbability = 0
+      clusterSummaries.push({ gameKey: gKey, count: gameLegs.length, type: 'conflict', factor: 0 })
+      break
+    }
+
+    const gameIndependent = gameLegs.reduce((prod, leg) => prod * Number(leg.probability || 0), 1)
+    const teamMap = new Map()
+    for (const leg of gameLegs) {
+      const team = leg.team || 'team'
+      if (!teamMap.has(team)) teamMap.set(team, [])
+      teamMap.get(team).push(leg)
+    }
+
+    let gameFactor = 1.0
+
+    // 1. Same-team touchdown budget cannibalization
+    for (const [, teamLegs] of teamMap.entries()) {
+      if (teamLegs.length > 1) {
+        const positions = teamLegs.map((l) => l.position || 'FLEX')
+        const rbCount = positions.filter((p) => p === 'RB').length
+        const passCatchers = positions.filter((p) => ['WR', 'TE'].includes(p)).length
+        const qbCount = positions.filter((p) => p === 'QB').length
+
+        if (rbCount >= 2) {
+          gameFactor *= Math.pow(0.84, rbCount - 1)
+        } else if (passCatchers >= 2) {
+          gameFactor *= Math.pow(0.92, passCatchers - 1)
+        } else if (rbCount >= 1 && passCatchers >= 1) {
+          gameFactor *= 0.94
+        } else if (qbCount >= 1 && passCatchers >= 1) {
+          gameFactor *= 1.02
+        } else {
+          gameFactor *= 0.95
+        }
+      }
+    }
+
+    // 2. Cross-team shootout synergy (opposing offenses in same game)
+    if (teamMap.size >= 2) {
+      gameFactor *= 1.06
+    }
+
+    gameFactor = Math.max(0.50, Math.min(1.25, gameFactor))
+    const gameJoint = Math.max(0.0001, Math.min(0.98, gameIndependent * gameFactor))
+    totalJointProbability *= gameJoint
+
+    clusterSummaries.push({
+      gameKey: gKey,
+      count: gameLegs.length,
+      teams: [...teamMap.keys()],
+      factor: gameFactor,
+      type: gameFactor > 1.02 ? 'synergy' : gameFactor < 0.98 ? 'cannibalization' : 'neutral',
+    })
+  }
+
+  if (hasConflict) {
+    return {
+      probability: 0,
+      independentProbability,
+      correlationFactor: 0,
+      correlationType: 'conflict',
+      correlationLabel: 'Mutually Exclusive',
+      isValid: false,
+      conflictReason,
+      gameClusters: clusterSummaries,
+    }
+  }
+
+  const overallFactor = independentProbability > 0 ? totalJointProbability / independentProbability : 1
+  const pctDiff = Math.round((overallFactor - 1) * 100)
+
+  let correlationType = 'independent'
+  let correlationLabel = 'Independent product'
+
+  if (legs.length > 1 && gamesMap.size === 1) {
+    if (overallFactor > 1.02) {
+      correlationType = 'synergy'
+      correlationLabel = `Shootout synergy (+${pctDiff}%)`
+    } else if (overallFactor < 0.98) {
+      correlationType = 'cannibalization'
+      correlationLabel = `Team TD budget (${pctDiff}%)`
+    } else {
+      correlationType = 'neutral'
+      correlationLabel = 'Same-game joint'
+    }
+  } else if (legs.length > 1 && [...gamesMap.values()].some((arr) => arr.length > 1)) {
+    if (overallFactor > 1.02) {
+      correlationType = 'synergy'
+      correlationLabel = `Correlated SGP (+${pctDiff}%)`
+    } else if (overallFactor < 0.98) {
+      correlationType = 'cannibalization'
+      correlationLabel = `Correlated SGP (${pctDiff}%)`
+    } else {
+      correlationType = 'cluster'
+      correlationLabel = 'Mixed SGP clusters'
+    }
+  }
+
+  return {
+    probability: totalJointProbability,
+    independentProbability,
+    correlationFactor: overallFactor,
+    correlationType,
+    correlationLabel,
+    isValid: true,
+    conflictReason: null,
+    gameClusters: clusterSummaries,
+  }
+}
+
 export function buildNFLComboBoard(snapshot, { legs = 2, strategy = 'scorer-core', scope = 'all', minGrade = 'LEAN', limit = 5, globalExposure = null, gameKey: targetGameKey = null, gameId: targetGameId = null } = {}) {
   const legCount = Math.max(2, Math.min(4, Number(legs) || 2))
   const wantedGameKey = targetGameKey || targetGameId || null
@@ -225,12 +376,13 @@ export function buildNFLComboBoard(snapshot, { legs = 2, strategy = 'scorer-core
       : (new Set(combo.map((leg) => leg.gameKey)).size === combo.length && (!wantedGameKey || combo.some((leg) => leg.gameKey === String(wantedGameKey)))))
     .map((combo) => {
       const independentProbability = combo.reduce((product, leg) => product * leg.probability, 1)
+      const jointCalc = calculateNFLJointTDProbability(combo)
       const jointFactor = Number(calibration?.jointFactor)
       const probability = calibrationReady
         ? bucketCalibrationReady
-          ? calibrateNFLProbability(independentProbability, calibration)
-          : Math.max(.002, Math.min(.98, independentProbability * (Number.isFinite(jointFactor) ? jointFactor : 1)))
-        : independentProbability
+          ? calibrateNFLProbability(jointCalc.probability, calibration)
+          : Math.max(.002, Math.min(.98, jointCalc.probability * (Number.isFinite(jointFactor) ? jointFactor : 1)))
+        : jointCalc.probability
       const prices = combo.map((leg) => decimalOdds(leg.odds))
       const decimal = prices.every(Number.isFinite) ? prices.reduce((product, price) => product * price, 1) : null
       const avgScore = combo.reduce((sum, leg) => sum + leg.model.score, 0) / combo.length
@@ -242,7 +394,7 @@ export function buildNFLComboBoard(snapshot, { legs = 2, strategy = 'scorer-core
       return {
         id: combo.map((leg) => leg.key).sort().join('|'), legs: combo, probability, independentProbability, decimalOdds: decimal,
         americanOdds: americanOdds(decimal), avgEdge, score, grade, rank,
-        buildQuality: { score, grade }, probabilityMethod: calibrationReady ? 'stack-calibrated-joint' : 'independent-baseline',
+        buildQuality: { score, grade }, probabilityMethod: calibrationReady ? 'stack-calibrated-joint' : 'structural-joint',
         actionableProbability: scope !== 'same-game' || calibrationReady,
         evidenceConfidence: combo.some((leg) => leg.evidenceConfidence === 'projected') ? 'projected' : combo.some((leg) => leg.evidenceConfidence === 'confirmed') ? 'confirmed' : 'observed',
         rationale: rationaleFor(combo, strategy, scope), strategy, scope,
