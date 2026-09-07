@@ -3,6 +3,7 @@ import Icon from './Icon.jsx'
 import WorkspaceShell from './WorkspaceShell.jsx'
 import NFLGameRail from './NFLGameRail.jsx'
 import { buildNFLComboBoard, NFL_COMBO_STRATEGIES, decimalOdds, americanOdds, calculateNFLJointTDProbability } from '../lib/nflCombos.js'
+import { calculateQuarterKelly } from '../../../src/sports/nfl/logic/ScoringEngine.js'
 import { isNFLTDMarket } from '../lib/nflTickets.js'
 
 const pct = (value, digits = 1) => value == null ? '—' : `${(value * 100).toFixed(digits)}%`
@@ -23,10 +24,13 @@ function ComboGrid({ stackBoards, slip, onAddCombo }) {
     </article>
     const isAdded = combo.legs.every((leg) => slip.has(leg.key))
     const color = GRADE_COLORS[combo.grade]
+    const kellyUnits = (combo.americanOdds != null && combo.probability > 0)
+      ? calculateQuarterKelly(combo.probability, combo.americanOdds)
+      : null
     return <article className="nfl-combo-card" key={`${stack.id}:${combo.id}`} style={{ '--nfl-combo-grade': color }}>
       <header><div><span className="nfl-combo-rank mono">#1</span><span className="nfl-combo-strategy">{stack.cardLabel || stack.label}</span><span className={`nfl-stack-risk is-${stack.riskTone || 'caution'}`}>{stack.risk}</span>{combo.scope === 'same-game' && <span className="nfl-combo-sgp">Same game</span>}</div><span className="nfl-combo-grade" style={{ color }}>BUILD {combo.grade} · {combo.score}</span></header>
       <div className="nfl-stack-card-intro"><Icon name={stack.icon || 'Layers'} size={12} /><span><b>{stack.label}</b>{stack.description}</span><small>{board.calibration.ready ? `${board.calibration.samples} calibration samples` : 'Calibration collecting'}</small></div>
-      <div className="nfl-combo-metrics"><span><small>{combo.probabilityMethod === 'stack-calibrated-joint' ? 'Calibrated joint' : 'Joint model'}</small><strong className="mono" style={{ color }}>{pct(combo.probability)}</strong></span><span><small>Parlay price</small><strong className="mono">{combo.americanOdds != null ? price(combo.americanOdds) : (combo.probability > 0 && americanOdds(1 / combo.probability) != null ? `Fair ${price(americanOdds(1 / combo.probability))}` : 'Price N/A')}</strong></span><span><small>Evidence</small><strong className="mono">{combo.evidenceConfidence}</strong></span></div>
+      <div className="nfl-combo-metrics"><span><small>{combo.probabilityMethod === 'stack-calibrated-joint' ? 'Calibrated joint' : 'Joint model'}</small><strong className="mono" style={{ color }}>{pct(combo.probability)}</strong></span><span><small>Parlay price</small><strong className="mono">{combo.americanOdds != null ? price(combo.americanOdds) : (combo.probability > 0 && americanOdds(1 / combo.probability) != null ? `Fair ${price(americanOdds(1 / combo.probability))}` : 'Price N/A')}</strong></span><span><small>{kellyUnits != null && kellyUnits > 0 ? 'Kelly size' : 'Evidence'}</small><strong className="mono">{kellyUnits != null && kellyUnits > 0 ? `${kellyUnits}u` : combo.evidenceConfidence}</strong></span></div>
       <ol className="nfl-combo-legs">{combo.legs.map((leg, legIndex) => <li key={leg.key}><span className="nfl-combo-ord mono">{legIndex + 1}</span><div><b>{leg.name}</b><small>{leg.team} vs {leg.opponent} · {leg.marketLabel}</small><span>{leg.model.signals?.slice(0, 2).map((signal) => <em key={signal.key}>{signal.text}</em>)}</span></div><aside><strong className="mono">{pct(leg.probability)}</strong><small className="mono">{legPriceDisplay(leg)}</small></aside></li>)}</ol>
       <p className="nfl-combo-why"><Icon name="Sparkles" size={13} />{combo.rationale}</p>
       <footer><button type="button" className={isAdded ? 'active' : ''} onClick={() => onAddCombo(combo)}><Icon name={isAdded ? 'Check' : 'Plus'} size={14} />{isAdded ? 'Combo added' : `Add all ${combo.legs.length} legs`}</button></footer>
@@ -117,6 +121,9 @@ function CustomBuilder({ slipLegs, onToggleLeg, onClearSlip, onSaveTicket }) {
   const combinedAmerican = combinedDecimal ? americanOdds(combinedDecimal) : null
   const impliedProb = combinedDecimal ? 1 / combinedDecimal : null
   const combinedEdge = (allHit != null && impliedProb != null && jointCalc.isValid) ? allHit - impliedProb : null
+  const parlayUnits = (combinedEdge != null && combinedEdge > 0 && combinedAmerican != null)
+    ? calculateQuarterKelly(allHit, combinedAmerican)
+    : null
 
   return <section className="nfl-custom-builder" aria-labelledby="nfl-custom-builder-title">
     <header><div><span className="nfl-eyebrow"><Icon name="Sparkles" size={13} /> Touchdown decision</span><h3 id="nfl-custom-builder-title">Custom TD slip</h3><p>Add Anytime TD, First TD or 2+ TD legs from Signals or a model-built parlay.</p></div><span className="nfl-ticket-count">{slipLegs.length} leg{slipLegs.length === 1 ? '' : 's'}</span></header>
@@ -133,6 +140,9 @@ function CustomBuilder({ slipLegs, onToggleLeg, onClearSlip, onSaveTicket }) {
       <span><small>Combined price</small><b className="mono">{combinedAmerican != null ? price(combinedAmerican) : (fairAmerican != null ? `Fair ${price(fairAmerican)}` : allPriced ? 'Pricing' : 'Missing prices')}</b></span>
       <span><small>Payout multiplier</small><b className="mono">{combinedDecimal != null ? `${combinedDecimal.toFixed(2)}x` : (fairDecimal != null ? `Fair ${fairDecimal.toFixed(2)}x` : '—')}</b></span>
       <span><small>Model edge</small><b className={`mono ${combinedEdge == null ? (allHit != null ? 'neutral' : '') : combinedEdge >= 0 ? 'positive' : 'negative'}`}>{combinedEdge != null ? `${combinedEdge >= 0 ? '+' : ''}${pct(combinedEdge)}` : (allHit != null && jointCalc.isValid ? 'Fair baseline' : '—')}</b></span>
+      {parlayUnits != null && (
+        <span><small>Suggested size</small><b className="mono text-prime">{parlayUnits}u</b></span>
+      )}
     </div>
     {!jointCalc.isValid && jointCalc.conflictReason && (
       <div className="nfl-combo-conflict">

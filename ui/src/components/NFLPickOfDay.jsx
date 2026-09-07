@@ -220,7 +220,7 @@ export default function NFLPickOfDay({
             <div className="nfl-potd-edge-val">
               <strong className="mono">{marketValue(player, model, marketId)}</strong>
               <em className={`mono ${model.edge == null ? '' : model.edge >= 0 ? 'positive' : 'negative'}`}>
-                {model.edge == null ? (model.probability > 0 ? 'Fair baseline' : 'No line') : `${model.edge >= 0 ? '+' : ''}${pct(model.edge)}`}
+                {model.edge == null ? (model.probability > 0 ? 'Fair baseline' : 'No line') : `${model.edge >= 0 ? '+' : ''}${pct(model.edge)}${model.suggestedUnits != null ? ` (${model.suggestedUnits}u)` : ''}`}
               </em>
             </div>
           </div>
