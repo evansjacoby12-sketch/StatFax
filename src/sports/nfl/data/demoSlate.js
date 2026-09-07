@@ -3,7 +3,7 @@ const recent = (rows) => rows.map((row, index) => ({ season: 2025, week: 18 - in
 const sharedMarkets = (anytimeProbability, anytimeOdds, firstProbability, firstOdds, twoPlusProbability = null, twoPlusOdds = null) => {
   const anytimeProb = Number(anytimeProbability) || 0.25
   const twoPlusProb = twoPlusProbability ?? Number((anytimeProb * 0.28).toFixed(3))
-  const twoPlusPrice = twoPlusOdds ?? (anytimeOdds != null ? (anytimeOdds < 0 ? Math.round(Math.abs(anytimeOdds) * 2.2) : Math.round(anytimeOdds * 3.2)) : 350)
+  const twoPlusPrice = twoPlusOdds ?? (anytimeOdds != null ? (anytimeOdds < 0 ? Math.round(Math.abs(anytimeOdds) * 3.6) : Math.round(anytimeOdds * 5.2)) : 550)
   return {
     anytime_td: { probability: anytimeProbability, odds: anytimeOdds, line: 0.5 },
     first_td: { probability: firstProbability, odds: firstOdds, line: 0.5 },
@@ -22,7 +22,7 @@ export const NFL_DEMO_SNAPSHOT = Object.freeze({
       id: 'demo-bal-rb-1', name: 'Derrick Henry', position: 'RB', team: 'BAL', opponent: 'LVR', isHome: true, kickoff: 'Sun · 1:00 PM', teamTotal: 27.5,
       status: 'Goal-line lead', statusTone: 'good', headshotUrl: null,
       propLines: { receptions: 3, receiving_yards: 150, rushing_yards: 82.5, rushing_receiving_yards: 96.5 },
-      markets: { ...sharedMarkets(.642, -140, .184, 450), rushing_yards: { line: 82.5, odds: -110 }, rushing_receiving_yards: { line: 96.5, odds: -115 }, receptions: { line: 3, odds: 105 }, receiving_yards: { line: 150, odds: 325 } },
+      markets: { ...sharedMarkets(.642, -140, .184, 450), rushing_yards: { line: 82.5, odds: -110 }, rushing_receiving_yards: { line: 96.5, odds: -115 }, receptions: { line: 3, odds: 105 }, receiving_yards: { line: 150, odds: 1200 } },
       projections: { anytimeTdProbability: .642, receptions: 2.8, receivingYards: 21, rushingYards: 91, rushingReceivingYards: 112 },
       usage: { snapShare: .78, targetShare: .08, redZoneTouchesL3: 22, redZoneTargetsL3: 1, goalLineTouchesL3: 8, redZoneOpportunityShare: .54, goalLineOpportunityShare: .68 },
       defenseVsPosition: { rank: 29, percentile: .84, label: '4th most RB TDs allowed', allowedPerGame: 1.18, factors: { anytime_td: 1.09, rushing_yards: 1.06 } },
@@ -46,7 +46,7 @@ export const NFL_DEMO_SNAPSHOT = Object.freeze({
       id: 'demo-mia-wr-1', name: 'Tyreek Hill', position: 'WR', team: 'MIA', opponent: 'BUF', isHome: false, kickoff: 'Thu · 8:15 PM', teamTotal: 24.5,
       status: 'Route leader', statusTone: 'good', headshotUrl: null,
       propLines: { receptions: 6.5, receiving_yards: 150, rushing_yards: 40, rushing_receiving_yards: 150 },
-      markets: { ...sharedMarkets(.485, 120, .122, 700), receptions: { line: 6.5, odds: -115 }, receiving_yards: { line: 150, odds: 245 }, rushing_yards: { line: 40, odds: 300 }, rushing_receiving_yards: { line: 150, odds: 225 } },
+      markets: { ...sharedMarkets(.485, 120, .122, 800, null, 750), receptions: { line: 6.5, odds: 105 }, receiving_yards: { line: 150, odds: 950 }, rushing_yards: { line: 40, odds: 1000 }, rushing_receiving_yards: { line: 150, odds: 850 } },
       projections: { anytimeTdProbability: .485, receptions: 7.2, receivingYards: 104, rushingYards: 7, rushingReceivingYards: 111 },
       usage: { snapShare: .94, targetShare: .31, redZoneTargetsL3: 7, redZoneTouchesL3: 2, goalLineTouchesL3: 1, redZoneOpportunityShare: .29, goalLineOpportunityShare: .12 },
       defenseVsPosition: { rank: 19, percentile: .57, label: '19th vs WR TDs', allowedPerGame: .74, factors: { receptions: 1.03, receiving_yards: 1.01 } },
@@ -58,7 +58,7 @@ export const NFL_DEMO_SNAPSHOT = Object.freeze({
       id: 'demo-det-te-1', name: 'Sam LaPorta', position: 'TE', team: 'DET', opponent: 'TB', isHome: true, kickoff: 'Sun · 4:25 PM', teamTotal: 27,
       status: 'Full workload', statusTone: 'good', headshotUrl: null,
       propLines: { receptions: 4.5, receiving_yards: 150, rushing_receiving_yards: 150 },
-      markets: { ...sharedMarkets(.398, 175, .094, 950), receptions: { line: 4.5, odds: -105 }, receiving_yards: { line: 150, odds: 350 }, rushing_receiving_yards: { line: 150, odds: 340 } },
+      markets: { ...sharedMarkets(.398, 175, .094, 950), receptions: { line: 4.5, odds: -105 }, receiving_yards: { line: 150, odds: 3500 }, rushing_receiving_yards: { line: 150, odds: 3500 } },
       projections: { anytimeTdProbability: .398, receptions: 5.4, receivingYards: 72, rushingYards: 0, rushingReceivingYards: 72 },
       usage: { snapShare: .82, targetShare: .22, redZoneTargetsL3: 6, redZoneTouchesL3: 0, goalLineTouchesL3: 0, redZoneOpportunityShare: .25, goalLineOpportunityShare: .16 },
       defenseVsPosition: { rank: 27, percentile: .81, label: '6th most TE TDs allowed', allowedPerGame: .48, factors: { anytime_td: 1.08, receptions: 1.05 } },
@@ -70,7 +70,7 @@ export const NFL_DEMO_SNAPSHOT = Object.freeze({
       id: 'demo-phi-rb-1', name: 'Saquon Barkley', position: 'RB', team: 'PHI', opponent: 'ATL', isHome: true, kickoff: 'Mon · 8:15 PM', teamTotal: 28,
       status: 'Workhorse role', statusTone: 'good', headshotUrl: null,
       propLines: { receptions: 3.5, receiving_yards: 150, rushing_yards: 88.5, rushing_receiving_yards: 112.5 },
-      markets: { ...sharedMarkets(.588, -120, .161, 525), receptions: { line: 3.5, odds: 100 }, receiving_yards: { line: 150, odds: 375 }, rushing_yards: { line: 88.5, odds: -110 }, rushing_receiving_yards: { line: 112.5, odds: -110 } },
+      markets: { ...sharedMarkets(.588, -120, .161, 525), receptions: { line: 3.5, odds: 100 }, receiving_yards: { line: 150, odds: 1500 }, rushing_yards: { line: 88.5, odds: -110 }, rushing_receiving_yards: { line: 112.5, odds: -110 } },
       projections: { anytimeTdProbability: .588, receptions: 3.6, receivingYards: 28, rushingYards: 101, rushingReceivingYards: 129 },
       usage: { snapShare: .9, targetShare: .12, redZoneTargetsL3: 2, redZoneTouchesL3: 19, goalLineTouchesL3: 7, redZoneOpportunityShare: .48, goalLineOpportunityShare: .59 },
       defenseVsPosition: { rank: 26, percentile: .79, label: 'Bottom-7 vs RB scoring', allowedPerGame: 1.04, factors: { anytime_td: 1.08, rushing_yards: 1.04 } },
@@ -82,7 +82,7 @@ export const NFL_DEMO_SNAPSHOT = Object.freeze({
       id: 'demo-cin-wr-1', name: 'Ja\'Marr Chase', position: 'WR', team: 'CIN', opponent: 'KC', isHome: false, kickoff: 'Sun · 4:25 PM', teamTotal: 23.5,
       status: 'Full workload', statusTone: 'neutral', headshotUrl: null,
       propLines: { receptions: 7.5, receiving_yards: 150, rushing_yards: 40, rushing_receiving_yards: 150 },
-      markets: { ...sharedMarkets(.352, 200, .079, 1050), receptions: { line: 7.5, odds: -105 }, receiving_yards: { line: 150, odds: 260 }, rushing_yards: { line: 40, odds: 400 }, rushing_receiving_yards: { line: 150, odds: 250 } },
+      markets: { ...sharedMarkets(.352, 200, .079, 1300), receptions: { line: 7.5, odds: 115 }, receiving_yards: { line: 150, odds: 700 }, rushing_yards: { line: 40, odds: 1200 }, rushing_receiving_yards: { line: 150, odds: 650 } },
       projections: { anytimeTdProbability: .352, receptions: 7.9, receivingYards: 109, rushingYards: 3, rushingReceivingYards: 112 },
       usage: { snapShare: .96, targetShare: .33, redZoneTargetsL3: 8, redZoneTouchesL3: 0, goalLineTouchesL3: 0, redZoneOpportunityShare: .31, goalLineOpportunityShare: .18 },
       defenseVsPosition: { rank: 8, percentile: .28, label: 'Top-8 vs WR scoring', allowedPerGame: .51, factors: { anytime_td: .94, receiving_yards: .96 } },
