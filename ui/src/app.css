@@ -26850,3 +26850,471 @@ button.th:focus-visible {
   .model-ledger-call > div > b { font-size: 10.5px; }
   .model-ledger-outcome { padding-inline: 5px; font-size: 7px; }
 }
+
+/* -------------------------------------------------------------------------- */
+/* NFL Kickoff Countdown, Game Rail & Model Top Pick (POTD)                   */
+/* -------------------------------------------------------------------------- */
+
+/* Feature 2: Kickoff Countdown */
+.nfl-kickoff-countdown {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
+/* Feature 3: NFL Matchup Quick-Filter Bar */
+.nfl-game-rail {
+  width: 100%;
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+.nfl-game-rail-scroll {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 2px 2px 6px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+}
+.nfl-game-rail-scroll::-webkit-scrollbar {
+  height: 4px;
+}
+.nfl-game-rail-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+}
+.nfl-game-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--border-soft);
+  color: var(--text-dim);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  user-select: none;
+  flex-shrink: 0;
+}
+.nfl-game-pill:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.15);
+  color: var(--text);
+}
+.nfl-game-pill.active {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  border-color: var(--accent);
+  color: #fff;
+  box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 25%, transparent);
+}
+.nfl-game-pill-count {
+  padding: 1px 5px;
+  border-radius: 999px;
+  font-size: 9.5px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-faint);
+}
+.nfl-game-pill.active .nfl-game-pill-count {
+  background: var(--accent);
+  color: #0c0d12;
+  font-weight: 800;
+}
+.nfl-game-pill-matchup {
+  font-weight: 700;
+}
+.nfl-game-pill-time {
+  font-size: 10px;
+  color: var(--text-faint);
+  font-weight: 500;
+}
+.nfl-game-pill.active .nfl-game-pill-time {
+  color: rgba(255, 255, 255, 0.75);
+}
+.nfl-game-pill-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 9.5px;
+  font-weight: 800;
+  color: var(--bad);
+  background: color-mix(in srgb, var(--bad) 12%, transparent);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+.nfl-game-pill-final {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--text-faint);
+  background: rgba(255, 255, 255, 0.04);
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+
+/* Feature 4: Model Top Pick Hero Banner (NFLPickOfDay) */
+.nfl-potd-card {
+  position: relative;
+  margin-bottom: 12px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background:
+    radial-gradient(ellipse at top right, color-mix(in srgb, var(--potd-grade-color, var(--prime)) 12%, transparent), transparent 70%),
+    linear-gradient(180deg, rgba(22, 24, 30, 0.95) 0%, rgba(13, 14, 18, 0.98) 100%);
+  border: 1px solid color-mix(in srgb, var(--potd-grade-color, var(--prime)) 32%, var(--border-soft));
+  box-shadow: 0 10px 30px -15px color-mix(in srgb, var(--potd-grade-color, var(--prime)) 35%, transparent),
+              inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: hidden;
+}
+.nfl-potd-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--potd-grade-color, var(--prime)), transparent 60%);
+}
+.nfl-potd-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.nfl-potd-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.nfl-potd-crown {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--potd-grade-color, var(--prime));
+  filter: drop-shadow(0 0 6px var(--potd-grade-color, var(--prime)));
+}
+.nfl-potd-kicker strong {
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #fff;
+}
+.nfl-potd-market-pill {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text);
+}
+.nfl-potd-dismiss {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.nfl-potd-dismiss:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+.nfl-potd-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) auto;
+  gap: 16px;
+  align-items: center;
+}
+.nfl-potd-identity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.nfl-potd-headshot {
+  flex-shrink: 0;
+}
+.nfl-potd-identity-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.nfl-potd-name-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.nfl-potd-player-name {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 850;
+  color: #fff;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.nfl-potd-assessment {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 9.5px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+.nfl-potd-assessment.is-good {
+  background: color-mix(in srgb, var(--prime) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--prime) 40%, transparent);
+  color: var(--prime);
+}
+.nfl-potd-assessment.is-caution {
+  background: color-mix(in srgb, var(--warn) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent);
+  color: var(--warn);
+}
+.nfl-potd-assessment.is-avoid {
+  background: color-mix(in srgb, var(--bad) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--bad) 40%, transparent);
+  color: var(--bad);
+}
+.nfl-potd-matchup-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.nfl-potd-matchup-row b {
+  color: #fff;
+}
+.nfl-potd-numbers {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.nfl-potd-stat-box {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-soft);
+  min-width: 80px;
+  text-align: center;
+}
+.nfl-potd-stat-box.is-prob {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  text-align: left;
+}
+.nfl-potd-gauge {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+.nfl-potd-gauge-copy {
+  display: flex;
+  flex-direction: column;
+}
+.nfl-potd-gauge-copy small,
+.nfl-potd-stat-box small {
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: var(--text-faint);
+  text-transform: uppercase;
+}
+.nfl-potd-gauge-copy strong {
+  font-size: 18px;
+  font-weight: 900;
+  line-height: 1.1;
+}
+.nfl-potd-grade-val {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 4px;
+  font-weight: 850;
+  font-size: 14px;
+}
+.nfl-potd-grade-val b {
+  font-size: 16px;
+  color: #fff;
+}
+.nfl-potd-edge-val {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+}
+.nfl-potd-edge-val strong {
+  font-size: 14px;
+  color: #fff;
+}
+.nfl-potd-edge-val em {
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 700;
+}
+.nfl-potd-edge-val em.positive {
+  color: var(--prime);
+}
+.nfl-potd-edge-val em.negative {
+  color: var(--bad);
+}
+.nfl-potd-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+.nfl-potd-signals {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.nfl-potd-signal-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 3px 7px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  color: var(--text-dim);
+}
+.nfl-potd-signal-chip.is-good {
+  color: var(--prime);
+  border-color: color-mix(in srgb, var(--prime) 30%, transparent);
+  background: color-mix(in srgb, var(--prime) 8%, transparent);
+}
+.nfl-potd-signal-chip.is-warn {
+  color: var(--warn);
+  border-color: color-mix(in srgb, var(--warn) 30%, transparent);
+  background: color-mix(in srgb, var(--warn) 8%, transparent);
+}
+.nfl-potd-signal-chip.is-bad {
+  color: var(--bad);
+  border-color: color-mix(in srgb, var(--bad) 30%, transparent);
+  background: color-mix(in srgb, var(--bad) 8%, transparent);
+}
+.nfl-potd-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.nfl-potd-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: 1px solid transparent;
+}
+.nfl-potd-btn.is-research {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: var(--text);
+}
+.nfl-potd-btn.is-research:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+.nfl-potd-btn.is-slip {
+  background: var(--accent);
+  color: #0c0d12;
+  box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+.nfl-potd-btn.is-slip:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+.nfl-potd-btn.is-slip.is-added {
+  background: var(--prime);
+  color: #0c0d12;
+  box-shadow: 0 0 10px color-mix(in srgb, var(--prime) 30%, transparent);
+}
+.nfl-potd-btn.is-watch {
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--border-soft);
+  color: var(--text-faint);
+}
+.nfl-potd-btn.is-watch:hover {
+  color: var(--text);
+}
+.nfl-potd-btn.is-watch.is-watched {
+  color: var(--warn);
+  border-color: color-mix(in srgb, var(--warn) 40%, transparent);
+  background: color-mix(in srgb, var(--warn) 12%, transparent);
+}
+
+@media (max-width: 768px) {
+  .nfl-potd-body {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .nfl-potd-numbers {
+    justify-content: space-between;
+    width: 100%;
+  }
+  .nfl-potd-stat-box {
+    flex: 1;
+    min-width: 0;
+    padding: 6px 8px;
+  }
+  .nfl-potd-stat-box.is-prob {
+    flex: 1.3;
+  }
+  .nfl-potd-footer {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .nfl-potd-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+  .nfl-potd-actions .is-slip {
+    flex: 1;
+    justify-content: center;
+  }
+}

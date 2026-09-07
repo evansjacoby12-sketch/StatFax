@@ -33,6 +33,42 @@ function FirstPitchCountdown({ games = [] }) {
   )
 }
 
+function KickoffCountdown({ games = [] }) {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 30_000)
+    return () => clearInterval(t)
+  }, [])
+  if (games.some((g) => g.isLive || g.status?.state === 'in' || (g.live && g.live.isLive))) return null
+  const next = games
+    .filter((g) => !g.isFinal && g.status?.state !== 'post' && (!g.live || !g.live.isFinal))
+    .map((g) => Date.parse(g.date || g.kickoffAt || g.gameDate))
+    .filter((t) => Number.isFinite(t) && t > now)
+    .sort((a, b) => a - b)[0]
+  if (!next) return null
+  const mins = Math.max(1, Math.round((next - now) / 60_000))
+  let label = ''
+  if (mins >= 1440) {
+    const d = Math.floor(mins / 1440)
+    const h = Math.floor((mins % 1440) / 60)
+    label = h > 0 ? `${d}d ${h}h` : `${d}d`
+  } else if (mins >= 60) {
+    const h = Math.floor(mins / 60)
+    const m = mins % 60
+    label = m > 0 ? `${h}h ${m}m` : `${h}h`
+  } else {
+    label = `${mins}m`
+  }
+  return (
+    <>
+      <span className="dot-sep">·</span>
+      <span className="first-pitch nfl-kickoff-countdown" title="Time until next scheduled NFL kickoff">
+        <Icon name="Clock" size={11} style={{ color: 'var(--accent)' }} /> kickoff in {label}
+      </span>
+    </>
+  )
+}
+
 function SportSwitcher({ sport = 'mlb', onChange }) {
   return (
     <div className="sport-switcher" role="group" aria-label="Sport">
@@ -559,6 +595,7 @@ export default function Header({
               <span>{sport === 'nfl' ? 'players' : 'batters'}</span>
             </span>
             {sport === 'mlb' && <FirstPitchCountdown games={games} />}
+            {sport === 'nfl' && <KickoffCountdown games={games} />}
             {sport === 'nfl' && <span className="nfl-header-demo"><Icon name={meta.sourceMode === 'demo' ? 'Beaker' : 'Activity'} size={10} /> {meta.sourceMode === 'demo' ? 'demo slate' : 'live feed'}</span>}
             {sport === 'mlb' && meta.morningLockAt && (
               <>

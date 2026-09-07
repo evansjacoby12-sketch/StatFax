@@ -7,6 +7,8 @@ import { NFL_COMBO_STRATEGIES } from '../lib/nflCombos.js'
 import SportMarketRail from './SportMarketRail.jsx'
 import SportMultiFilterBar from './SportMultiFilterBar.jsx'
 import SportSignalRail from './SportSignalRail.jsx'
+import NFLGameRail from './NFLGameRail.jsx'
+import NFLPickOfDay from './NFLPickOfDay.jsx'
 import NFL_DEMO_SNAPSHOT from '../../../src/sports/nfl/data/demoSlate.js'
 import { NFL_PROP_MARKET_LIST, eligiblePropMarkets, eligibilityReason } from '../../../src/sports/nfl/logic/propEligibility.js'
 import { scoreNFLSnapshot, scoreNFLProp } from '../../../src/sports/nfl/logic/ScoringEngine.js'
@@ -261,7 +263,6 @@ function BoardRow({ player, rank, marketId, watched, inSlip, onSelect, onToggleW
     </div>
   )
 }
-
 function PlayerResearch({ player, marketId, onClose, inSlip, onToggleSlip }) {
   const eliLevel = useEliLevel()
   const [tab, setTab] = useState('overview')
@@ -339,6 +340,7 @@ export default function NFLBoard({ snapshot: suppliedSnapshot = null, view: cont
   const [watched, setWatched] = useState(() => new Set(readStorage('statfax:nfl:watchlist', [])))
   const [slip, setSlip] = useState(() => new Set(readStorage('statfax:nfl:slip', [])))
   const [tickets, setTickets] = useState(() => readStorage('statfax:nfl:tickets', []))
+  const [potdDismissed, setPotdDismissed] = useState(() => readStorage('statfax:nfl:potd:dismissed', false))
   const snapshotStale = snapshot.generatedAt && Date.now() - Date.parse(snapshot.generatedAt) > 45 * 60 * 1000
 
   useEffect(() => {
@@ -353,18 +355,29 @@ export default function NFLBoard({ snapshot: suppliedSnapshot = null, view: cont
   useEffect(() => { if (typeof window !== 'undefined') window.localStorage.setItem('statfax:nfl:watchlist', JSON.stringify([...watched])) }, [watched])
   useEffect(() => { if (typeof window !== 'undefined') window.localStorage.setItem('statfax:nfl:slip', JSON.stringify([...slip])) }, [slip])
   useEffect(() => { if (typeof window !== 'undefined') window.localStorage.setItem('statfax:nfl:tickets', JSON.stringify(tickets)) }, [tickets])
+  useEffect(() => { if (typeof window !== 'undefined') window.localStorage.setItem('statfax:nfl:potd:dismissed', JSON.stringify(potdDismissed)) }, [potdDismissed])
   useEffect(() => { setTickets((current) => current.map((ticket) => settleNFLTicket(ticket, snapshot))) }, [snapshot])
 
   const teams = useMemo(() => [...new Set(snapshot.players.map((player) => player.team))].sort(), [snapshot])
   const games = useMemo(() => {
     const matchups = new Map()
     for (const player of snapshot.players) {
-      const key = gameKeyFor(player)
+      const key = String(gameKeyFor(player))
       if (!key || matchups.has(key)) continue
-      const label = player.isHome ? `${player.opponent} @ ${player.team}` : `${player.team} @ ${player.opponent}`
-      matchups.set(key, label)
+      const awayTeam = player.isHome ? player.opponent : player.team
+      const homeTeam = player.isHome ? player.team : player.opponent
+      const label = `${awayTeam} @ ${homeTeam}`
+      matchups.set(key, {
+        id: key,
+        label,
+        awayTeam,
+        homeTeam,
+        kickoff: player.kickoff || '',
+        isLive: Boolean(player.live?.isLive),
+        isFinal: Boolean(player.live?.isFinal),
+      })
     }
-    return [...matchups].map(([id, label]) => ({ id, label }))
+    return [...matchups.values()]
   }, [snapshot])
   useEffect(() => {
     const valid = new Set(games.map((item) => String(item.id)))
@@ -373,6 +386,24 @@ export default function NFLBoard({ snapshot: suppliedSnapshot = null, view: cont
       return next.size === current.size ? current : next
     })
   }, [games])
+  const handleSelectGame = (gameId) => {
+    setGameFilters((current) => {
+      if (current.has(gameId) && current.size === 1) {
+        return new Set()
+      }
+      return new Set([gameId])
+    })
+  }
+  const topModelPick = useMemo(() => {
+    const scored = scoreNFLSnapshot(snapshot, marketId)
+    const eligible = scored.filter((p) => {
+      const status = (p.status || '').toLowerCase()
+      if (status.includes('out') || status.includes('inactive') || status.includes('ir')) return false
+      if (p.model?.grade === 'SKIP') return false
+      return true
+    })
+    return eligible[0] || scored[0] || null
+  }, [snapshot, marketId])
   const filteredPool = useMemo(() => {
     const normalized = query.trim().toLowerCase()
     return scoreNFLSnapshot(snapshot, marketId)
@@ -440,8 +471,21 @@ export default function NFLBoard({ snapshot: suppliedSnapshot = null, view: cont
       <SportMarketRail sport="nfl" markets={NFL_PROP_MARKET_LIST} value={marketId} onChange={setMarketId} icons={MARKET_ICONS} ariaLabel="NFL prop market" />
       {marketId === 'first_td' && <div className="nfl-variance-note"><Icon name="TriangleAlert" size={14} /><span><b>First TD is high variance.</b> Listed offense receives {pct(snapshot.firstTdReserve?.listedOffense ?? .86, 0)}; other offense {pct(snapshot.firstTdReserve?.otherOffense ?? .06, 0)}, defense/special teams {pct(snapshot.firstTdReserve?.defenseSpecialTeams ?? .06, 0)}, and no touchdown {pct(snapshot.firstTdReserve?.noTouchdown ?? .02, 0)} are modeled separately.</span></div>}
       {marketId === 'two_plus_td' && <div className="nfl-variance-note"><Icon name="Flame" size={14} /><span><b>2+ TD is calibrated separately.</b> Multi-score probability is evaluated independently from Anytime TD.</span></div>}
+      <NFLGameRail games={games} selectedGameIds={gameFilters} onSelectGame={handleSelectGame} onClear={() => setGameFilters(new Set())} />
       <SportSignalRail sport="nfl" filters={NFL_SIGNAL_FILTERS} values={signalFilters} counts={signalCounts} total={filteredPool.length} onToggleFilter={toggleSignalFilter} onClear={() => setSignalFilters(new Set())} open={signalsOpen} onToggleOpen={() => setSignalsOpen((open) => !open)} />
       <div className="nfl-layout"><section className="nfl-board-panel" aria-label="Ranked NFL props">
+      {!potdDismissed && topModelPick && (
+        <NFLPickOfDay
+          player={topModelPick}
+          marketId={marketId}
+          watched={watched.has(topModelPick.id)}
+          inSlip={slip.has(nflLegKey(topModelPick.id, marketId))}
+          onSelect={setSelected}
+          onToggleWatch={(item) => toggleSet(setWatched, item.id)}
+          onToggleSlip={(item) => toggleSet(setSlip, nflLegKey(item.id, marketId))}
+          onDismiss={() => setPotdDismissed(true)}
+        />
+      )}
       <SportMultiFilterBar sport="nfl" className="nfl-prop-filters" searchValue={query} onSearch={setQuery} searchPlaceholder="Search players, teams, matchups" filters={propFilters}><button className={`nfl-two-filter ${twoPlusOnly ? 'active' : ''}`} aria-pressed={twoPlusOnly} onClick={() => setTwoPlusOnly((value) => !value)}><Icon name="Flame" size={13} />2+ TD filter</button></SportMultiFilterBar>
       {!!players.length && <div className="board nfl-decision-board"><div className="board-head decision-ladder-head nfl-decision-ladder-head"><div className="th dl-rank" title="Rank by model score">Rank</div><div className="th dl-identity">Player identity</div><div className="th dl-verdict">Model verdict</div><div className="th dl-proof">Key evidence</div><div className="th dl-actions">Actions</div></div><div className="board-body">{players.map((player, index) => <BoardRow key={player.id} player={player} rank={index + 1} marketId={marketId} watched={watched.has(player.id)} inSlip={slip.has(`${player.id}:${marketId}`)} onSelect={setSelected} onToggleWatch={(item) => toggleSet(setWatched, item.id)} onToggleSlip={(item) => toggleSet(setSlip, `${item.id}:${marketId}`)} />)}</div></div>}
       {!players.length && <div className="nfl-empty"><Icon name="Search" size={22} /><b>No eligible players match</b><button onClick={() => { setQuery(''); setPositionFilters(new Set()); setTeamFilters(new Set()); setGameFilters(new Set()); setTwoPlusOnly(false); setSignalFilters(new Set()) }}>Clear filters</button></div>}
