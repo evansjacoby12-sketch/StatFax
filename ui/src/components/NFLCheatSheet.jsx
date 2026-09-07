@@ -4,6 +4,7 @@ import CommandTabs from './CommandTabs.jsx'
 import WorkspaceShell from './WorkspaceShell.jsx'
 import { NFL_PROP_MARKET_LIST, eligiblePropMarkets } from '../../../src/sports/nfl/logic/propEligibility.js'
 import { scoreNFLProp } from '../../../src/sports/nfl/logic/ScoringEngine.js'
+import { americanOdds } from '../lib/nflCombos.js'
 
 const pct = (value, digits = 1) => value == null ? '—' : `${(value * 100).toFixed(digits)}%`
 const price = (value) => value == null ? 'No price' : value > 0 ? `+${value}` : String(value)
@@ -14,6 +15,28 @@ const PAGES = [
   { id: 'rushing', label: 'Rushing', icon: 'Zap', markets: ['rushing_yards', 'rushing_receiving_yards'] },
   { id: 'passing', label: 'Passing', icon: 'BarChart3', markets: ['passing_yards', 'passing_rushing_yards'] },
 ]
+
+function cheatPrice(model, marketId) {
+  if (!model) return '—'
+  if (marketId.includes('td')) {
+    if (model.odds != null) return price(model.odds)
+    if (model.probability != null && model.probability > 0) {
+      const fair = americanOdds(1 / model.probability)
+      return fair ? `Fair ${price(fair)}` : 'No price'
+    }
+    return 'No price'
+  }
+  const lineStr = model.line != null ? `O ${model.line}` : null
+  const oddsStr = model.odds != null ? `(${price(model.odds)})` : null
+  if (lineStr && oddsStr) return `${lineStr} ${oddsStr}`
+  if (lineStr) return lineStr
+  if (oddsStr) return oddsStr
+  if (model.probability != null && model.probability > 0) {
+    const fair = americanOdds(1 / model.probability)
+    return fair ? `Fair ${price(fair)}` : 'No price'
+  }
+  return 'No price'
+}
 
 function MarketBoard({ snapshot, marketId }) {
   const market = NFL_PROP_MARKET_LIST.find((item) => item.id === marketId)
@@ -26,7 +49,7 @@ function MarketBoard({ snapshot, marketId }) {
   if (!rows.length) return null
   return <section className="splits-card nfl-cheat-card">
     <h4 className="splits-h"><Icon name={marketId.includes('td') ? 'Target' : marketId.includes('rece') ? 'Radio' : marketId.includes('rush') ? 'Zap' : 'BarChart3'} size={14} />{market?.label}<span className="splits-sub dim">model probability</span></h4>
-    <ol className="splits-list">{rows.map(({ player, model }, index) => <li className="splits-row static nfl-cheat-row" key={`${player.id}:${marketId}`}><span className="splits-rank mono">{index + 1}</span><span className="splits-name">{player.name}<small>{player.position} · {player.team} vs {player.opponent}</small></span><span className="nfl-cheat-grade" style={{ color: GRADE_COLORS[model.grade] }}>{model.grade}</span><span className="nfl-cheat-price mono">{model.line != null && !marketId.includes('td') ? `O ${model.line}` : price(model.odds)}</span><span className="splits-val mono">{pct(model.probability)}</span></li>)}</ol>
+    <ol className="splits-list">{rows.map(({ player, model }, index) => <li className="splits-row static nfl-cheat-row" key={`${player.id}:${marketId}`}><span className="splits-rank mono">{index + 1}</span><span className="splits-name">{player.name}<small>{player.position} · {player.team} vs {player.opponent}</small></span><span className="nfl-cheat-grade" style={{ color: GRADE_COLORS[model.grade] }}>{model.grade}</span><span className="nfl-cheat-price mono">{cheatPrice(model, marketId)}</span><span className="splits-val mono">{pct(model.probability)}</span></li>)}</ol>
   </section>
 }
 

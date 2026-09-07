@@ -3,7 +3,7 @@ import Icon from './Icon.jsx'
 import { ProbRing } from './atoms.jsx'
 import CommandTabs from './CommandTabs.jsx'
 import NFLBetLab from './NFLBetLab.jsx'
-import { NFL_COMBO_STRATEGIES } from '../lib/nflCombos.js'
+import { NFL_COMBO_STRATEGIES, americanOdds } from '../lib/nflCombos.js'
 import SportMarketRail from './SportMarketRail.jsx'
 import SportMultiFilterBar from './SportMultiFilterBar.jsx'
 import SportSignalRail from './SportSignalRail.jsx'
@@ -72,8 +72,26 @@ const readStorage = (key, fallback) => {
 }
 
 function marketValue(player, model, marketId) {
-  if (['anytime_td', 'first_td', 'two_plus_td'].includes(marketId)) return odds(model.odds)
-  return model.line == null ? '—' : `${number(model.line, marketId === 'receptions' ? 1 : 1)} line`
+  if (!model) return '—'
+  const isTD = ['anytime_td', 'first_td', 'two_plus_td'].includes(marketId)
+  if (isTD) {
+    if (model.odds != null) return odds(model.odds)
+    if (model.probability != null && model.probability > 0) {
+      const fair = americanOdds(1 / model.probability)
+      return fair ? `Fair ${odds(fair)}` : '—'
+    }
+    return '—'
+  }
+  const lineStr = model.line != null ? `O ${number(model.line, marketId === 'receptions' ? 1 : 1)}` : null
+  const oddsStr = model.odds != null ? `(${odds(model.odds)})` : null
+  if (lineStr && oddsStr) return `${lineStr} ${oddsStr}`
+  if (lineStr) return lineStr
+  if (oddsStr) return oddsStr
+  if (model.probability != null && model.probability > 0) {
+    const fair = americanOdds(1 / model.probability)
+    return fair ? `Fair ${odds(fair)}` : '—'
+  }
+  return '—'
 }
 
 function liveLabel(player) {

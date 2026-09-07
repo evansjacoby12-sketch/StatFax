@@ -1,9 +1,15 @@
 const recent = (rows) => rows.map((row, index) => ({ season: 2025, week: 18 - index, ...row }))
 
-const sharedMarkets = (anytimeProbability, anytimeOdds, firstProbability, firstOdds) => ({
-  anytime_td: { probability: anytimeProbability, odds: anytimeOdds, line: 0.5 },
-  first_td: { probability: firstProbability, odds: firstOdds, line: 0.5 },
-})
+const sharedMarkets = (anytimeProbability, anytimeOdds, firstProbability, firstOdds, twoPlusProbability = null, twoPlusOdds = null) => {
+  const anytimeProb = Number(anytimeProbability) || 0.25
+  const twoPlusProb = twoPlusProbability ?? Number((anytimeProb * 0.28).toFixed(3))
+  const twoPlusPrice = twoPlusOdds ?? (anytimeOdds != null ? (anytimeOdds < 0 ? Math.round(Math.abs(anytimeOdds) * 2.2) : Math.round(anytimeOdds * 3.2)) : 350)
+  return {
+    anytime_td: { probability: anytimeProbability, odds: anytimeOdds, line: 0.5 },
+    first_td: { probability: firstProbability, odds: firstOdds, line: 0.5 },
+    two_plus_td: { probability: twoPlusProb, odds: twoPlusPrice, line: 1.5 },
+  }
+}
 
 export const NFL_DEMO_SNAPSHOT = Object.freeze({
   version: 1,

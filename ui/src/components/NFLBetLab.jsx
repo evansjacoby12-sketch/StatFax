@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import Icon from './Icon.jsx'
 import WorkspaceShell from './WorkspaceShell.jsx'
 import NFLGameRail from './NFLGameRail.jsx'
-import { buildNFLComboBoard, NFL_COMBO_STRATEGIES } from '../lib/nflCombos.js'
+import { buildNFLComboBoard, NFL_COMBO_STRATEGIES, decimalOdds, americanOdds } from '../lib/nflCombos.js'
 import { isNFLTDMarket } from '../lib/nflTickets.js'
 
 const pct = (value, digits = 1) => value == null ? '—' : `${(value * 100).toFixed(digits)}%`
@@ -102,10 +102,21 @@ function ComboExplorer({ snapshot, games, selectedGameKey, onSelectGame, slip, o
 
 function CustomBuilder({ slipLegs, onToggleLeg, onClearSlip, onSaveTicket }) {
   const allHit = slipLegs.length ? slipLegs.reduce((product, leg) => product * Number(leg.probability || 0), 1) : null
-  const average = slipLegs.length ? slipLegs.reduce((sum, leg) => sum + Number(leg.probability || 0), 0) / slipLegs.length : null
+  const decimalPrices = slipLegs.map((leg) => decimalOdds(leg.odds))
+  const allPriced = slipLegs.length > 0 && decimalPrices.every(Number.isFinite)
+  const combinedDecimal = allPriced ? decimalPrices.reduce((product, price) => product * price, 1) : null
+  const combinedAmerican = combinedDecimal ? americanOdds(combinedDecimal) : null
+  const impliedProb = combinedDecimal ? 1 / combinedDecimal : null
+  const combinedEdge = (allHit != null && impliedProb != null) ? allHit - impliedProb : null
+
   return <section className="nfl-custom-builder" aria-labelledby="nfl-custom-builder-title">
     <header><div><span className="nfl-eyebrow"><Icon name="Sparkles" size={13} /> Touchdown decision</span><h3 id="nfl-custom-builder-title">Custom TD slip</h3><p>Add Anytime TD, First TD or 2+ TD legs from Signals or a model-built parlay.</p></div><span className="nfl-ticket-count">{slipLegs.length} leg{slipLegs.length === 1 ? '' : 's'}</span></header>
-    <div className="nfl-builder-metrics"><span><small>All-hit model</small><b className="mono">{pct(allHit)}</b></span><span><small>Average leg</small><b className="mono">{pct(average)}</b></span><span><small>Pricing</small><b>{slipLegs.length && slipLegs.every((leg) => leg.odds != null) ? 'Complete' : 'Missing prices'}</b></span></div>
+    <div className="nfl-builder-metrics">
+      <span><small>All-hit model</small><b className="mono">{pct(allHit)}</b></span>
+      <span><small>Combined price</small><b className="mono">{combinedAmerican != null ? price(combinedAmerican) : allPriced ? 'Pricing' : 'Missing prices'}</b></span>
+      <span><small>Payout multiplier</small><b className="mono">{combinedDecimal != null ? `${combinedDecimal.toFixed(2)}x` : '—'}</b></span>
+      <span><small>Model edge</small><b className={`mono ${combinedEdge == null ? '' : combinedEdge >= 0 ? 'positive' : 'negative'}`}>{combinedEdge == null ? '—' : `${combinedEdge >= 0 ? '+' : ''}${pct(combinedEdge)}`}</b></span>
+    </div>
     {slipLegs.length ? <><ol className="nfl-builder-legs">{slipLegs.map((leg, index) => <li key={leg.key}><span className="nfl-combo-ord mono">{index + 1}</span><div><b>{leg.name}</b><small>{leg.team && leg.opponent ? `${leg.team} vs ${leg.opponent} · ` : ''}{leg.marketLabel}</small></div><aside><strong className="mono">{pct(leg.probability)}</strong><small className="mono">{price(leg.odds)}</small></aside><button type="button" onClick={() => onToggleLeg(leg.key)} aria-label={`Remove ${leg.name} from slip`}><Icon name="X" size={14} /></button></li>)}</ol>{slipLegs.length === 1 && <p className="nfl-combo-why"><Icon name="Info" size={13} />Add one more touchdown leg to create a parlay.</p>}</> : <div className="nfl-ticket-empty"><Icon name="Plus" size={18} /><b>Your TD slip is empty</b><span>Add a touchdown parlay here or choose an individual TD prop from Signals.</span></div>}
     <footer><button type="button" onClick={onClearSlip} disabled={!slipLegs.length}>Clear</button><button type="button" className="primary" onClick={() => onSaveTicket(slipLegs)} disabled={slipLegs.length < 2}><Icon name="Bookmark" size={14} />Track TD parlay</button></footer>
   </section>

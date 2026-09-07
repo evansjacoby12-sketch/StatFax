@@ -15,11 +15,11 @@ const GRADE_RANK = { SKIP: 0, LEAN: 1, STRONG: 2, PRIME: 3 }
 const clamp01 = (value) => Math.max(0, Math.min(1, Number(value) || 0))
 
 const gameKey = (player) => String(player.gameId || player.gamePk || [player.team, player.opponent].filter(Boolean).sort().join('-'))
-const decimalOdds = (american) => !Number.isFinite(Number(american)) || Number(american) === 0
+export const decimalOdds = (american) => !Number.isFinite(Number(american)) || Number(american) === 0
   ? null
   : Number(american) > 0 ? 1 + Number(american) / 100 : 1 + 100 / Math.abs(Number(american))
 
-function americanOdds(decimal) {
+export function americanOdds(decimal) {
   if (!Number.isFinite(decimal) || decimal <= 1) return null
   return Math.round(decimal >= 2 ? (decimal - 1) * 100 : -100 / (decimal - 1))
 }
