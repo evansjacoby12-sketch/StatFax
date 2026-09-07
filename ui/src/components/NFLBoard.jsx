@@ -14,7 +14,7 @@ import { NFL_PROP_MARKET_LIST, eligiblePropMarkets, eligibilityReason } from '..
 import { scoreNFLSnapshot, scoreNFLProp } from '../../../src/sports/nfl/logic/ScoringEngine.js'
 import { assessNFLSignals } from '../../../src/sports/nfl/logic/signals.js'
 import { loadNFLSnapshot } from '../../../src/sports/nfl/api/NFLService.js'
-import { isNFLTDMarket, nflLegKey, settleNFLTicket } from '../lib/nflTickets.js'
+import { isNFLTDMarket, nflLegKey, settleNFLTicket, summarizeNFLTickets, filterNFLTickets, nflTicketsCSV, ticketExportText, nflTicketProfit } from '../lib/nflTickets.js'
 import { useEliLevel } from '../lib/eliLevel.js'
 import { nflSignalCaption, nflSignalText } from '../lib/nflExplanations.js'
 import { SPORT_UI } from '../lib/sportUi.js'
@@ -171,7 +171,17 @@ function SignalAssessmentPanel({ signals = [], eliLevel }) {
   </div>
 }
 
-function NFLPerformance({ snapshot }) {
+const PERF_SUBTABS = [
+  { id: 'overview', label: 'Model & Stacks', icon: 'Gauge' },
+  { id: 'tickets', label: 'My Tickets', icon: 'Bookmark' },
+]
+
+function NFLPerformance({ snapshot, tickets = [], onRemoveTicket, onClearTickets, onOpenBetLab }) {
+  const [subTab, setSubTab] = useState('overview')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [copiedId, setCopiedId] = useState(null)
+
   const performance = snapshot.modelPerformance
   const markets = Object.entries(performance?.markets || {})
   const quality = snapshot.dataQuality || {}
@@ -190,27 +200,178 @@ function NFLPerformance({ snapshot }) {
   const stackPerformance = Object.entries(performance?.stacks || {})
   const snapshotStale = snapshot.generatedAt && Date.now() - Date.parse(snapshot.generatedAt) > 45 * 60 * 1000
   const healthIssues = [...(health?.issues || []), ...(snapshotStale ? [{ id: 'pipeline', label: 'Pipeline', message: 'Published slate is more than 45 minutes old' }] : [])]
+
+  const ticketSummary = useMemo(() => summarizeNFLTickets(tickets), [tickets])
+  const filteredTickets = useMemo(() => filterNFLTickets(tickets, { status: statusFilter, query: searchQuery }), [tickets, statusFilter, searchQuery])
+
+  const handleExportCSV = () => {
+    const csv = nflTicketsCSV(tickets)
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', `statfax-nfl-tickets-${new Date().toISOString().slice(0, 10)}.csv`)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
+  const handleShareTicket = async (ticket) => {
+    const text = ticketExportText(ticket)
+    try {
+      if (navigator.clipboard) {
+        await navigator.clipboard.writeText(text)
+        setCopiedId(ticket.id)
+        setTimeout(() => setCopiedId(null), 2000)
+      }
+    } catch {}
+  }
+
   return <section className="nfl-performance" aria-labelledby="nfl-performance-title">
-    <header><div><span className="nfl-eyebrow"><Icon name="Gauge" size={13} /> Model validation</span><h2 id="nfl-performance-title">NFL Model Performance</h2><p>Walk-forward results use only information available before each game.</p></div><span className="nfl-performance-updated">{performance?.generatedAt ? `Updated ${new Date(performance.generatedAt).toLocaleDateString()}` : 'Awaiting backtest'}</span></header>
-    <div className="nfl-coverage-grid" aria-label="NFL data coverage">{coverage.map(([label, ready]) => <div key={label} className={ready ? 'is-ready' : 'is-limited'}><Icon name={ready ? 'CircleCheck' : 'TriangleAlert'} size={15} /><span><b>{label}</b><small>{ready ? 'Connected' : 'Limited'}</small></span></div>)}</div>
-    {healthIssues.length > 0 && <div className="nfl-health-alert" role="status" aria-live="polite"><Icon name="TriangleAlert" size={16} /><span><b>{healthIssues.length} feed{healthIssues.length === 1 ? '' : 's'} need attention</b><small>{healthIssues.map((issue) => `${issue.label}: ${issue.message}`).join(' · ')}</small></span></div>}
-    <section className="nfl-tracking-summary" aria-label="Season tracking"><header><span><Icon name="LineChart" size={14} /> Season tracking</span><small>{tracking?.updatedAt ? `Updated ${new Date(tracking.updatedAt).toLocaleString()}` : 'Starts with the next slate'}</small></header><div><span><b className="mono">{Number(tracking?.open || 0).toLocaleString()}</b><small>Open forecasts</small></span><span><b className="mono">{Number(tracking?.settled || 0).toLocaleString()}</b><small>Settled forecasts</small></span><span><b className="mono">{trackingStacks.reduce((sum, stack) => sum + Number(stack.boards || 0), 0).toLocaleString()}</b><small>Frozen stack boards</small></span><span><b className="mono">{trackingStacks.reduce((sum, stack) => sum + Number(stack.settled || 0), 0).toLocaleString()}</b><small>Settled stack builds</small></span></div></section>
-    <div className="nfl-live-validation-grid">
-      <section className={`nfl-live-validation is-${tdValidation?.status || 'collecting'}`} aria-label="Touchdown calibration health"><header><span><Icon name="Activity" size={14} /> Live TD calibration</span><em>{tdValidation?.status || 'collecting'}</em></header><div><span><b className="mono">{Number(tdValidation?.touchdownsObserved || 0).toLocaleString()}</b><small>Touchdowns observed</small></span><span><b className="mono">{pct(tdValidation?.recent?.predicted)}</b><small>Recent predicted</small></span><span><b className="mono">{pct(tdValidation?.recent?.observed)}</b><small>Recent observed</small></span><span><b className="mono">{pct(tdValidation?.recent?.ece)}</b><small>Calibration error</small></span></div><footer>{tdValidation?.reasons?.length ? tdValidation.reasons.join(' · ') : Number(tdValidation?.recent?.samples || 0) < 25 ? `${Number(tdValidation?.recent?.samples || 0)} of 25 TD outcomes needed for a drift verdict` : 'No material TD probability drift detected'} · Stack drift {stackValidation?.status || 'collecting'} ({Number(stackValidation?.recent?.samples || 0)} recent)</footer></section>
-      <section className={`nfl-live-validation is-${refresh?.status || 'limited'}`} aria-label="NFL refresh readiness"><header><span><Icon name="RefreshCw" size={14} /> Weekly launch refresh</span><em>{refresh?.phase || 'monitoring'}</em></header><div><span><b className="mono">{refresh?.minutesToKickoff == null ? '—' : refresh.minutesToKickoff > 1440 ? `${Math.round(refresh.minutesToKickoff / 1440)}d` : `${Math.max(0, refresh.minutesToKickoff)}m`}</b><small>Next kickoff</small></span><span><b className="mono">{refresh?.cadenceMinutes || 30}m</b><small>Refresh target</small></span><span><b className="mono">{(refresh?.checks || []).filter((check) => check.ready).length}/{(refresh?.checks || []).length}</b><small>Feeds current</small></span><span><b className="mono">{refresh?.missing?.length || 0}</b><small>Required missing</small></span></div><footer>{refresh?.message || 'Awaiting refresh status'}</footer></section>
-    </div>
-    {trackingMarkets.length > 0 && <div className="nfl-season-market-grid" aria-label="Season results by market">{trackingMarkets.map(([id, metric]) => <article key={id}><b>{NFL_PROP_MARKET_LIST.find((market) => market.id === id)?.shortLabel || id}</b><span><strong className="mono">{metric.brier != null ? metric.brier.toFixed(3) : metric.mae != null ? metric.mae.toFixed(1) : '—'}</strong><small>{metric.brier != null ? 'Brier' : 'MAE'}</small></span><span><strong className="mono">{pct(metric.roi)}</strong><small>ROI · {metric.roiSamples || 0}</small></span></article>)}</div>}
-    {stackPerformance.length > 0 && <section className="nfl-stack-performance" aria-label="TD stack validation"><header><span><Icon name="Layers" size={14} /> TD stack validation</span><small>Leakage-safe · two-leg cross-game baseline</small></header><div>{stackPerformance.map(([id, metric]) => {
-      const stack = NFL_COMBO_STRATEGIES.find((item) => item.id === id)
-      const result = metric.scopes?.all?.byLegCount?.['2'] || metric.scopes?.all?.byLegCount?.[2] || {}
-      return <article key={id}><span><b>{stack?.label || metric.label || id}</b><em className={`is-${stack?.riskTone || 'caution'}`}>{stack?.risk}</em></span><div><strong className="mono">{pct(result.observed)}</strong><small>Observed all-hit</small></div><div><strong className="mono">{pct(result.predicted)}</strong><small>Raw independent</small></div><footer>{Number(result.samples || 0).toLocaleString()} historical builds · Brier {result.brier == null ? '—' : result.brier.toFixed(3)}</footer></article>
-    })}</div></section>}
-    {markets.length ? <div className="nfl-performance-grid">{markets.map(([id, metric]) => {
-      const market = NFL_PROP_MARKET_LIST.find((item) => item.id === id)
-      const primary = metric.type === 'probability' ? (metric.brier == null ? '—' : metric.brier.toFixed(3)) : (metric.mae == null ? '—' : metric.mae.toFixed(1))
-      const secondary = metric.type === 'probability' ? 'Brier score' : 'Mean absolute error'
-      return <article key={id}><header><Icon name={MARKET_ICONS[id] || 'Activity'} size={15} /><b>{market?.label || id.replaceAll('_', ' ')}</b></header><strong className="mono">{primary}</strong><span>{secondary}</span><footer><small>{Number(metric.samples || 0).toLocaleString()} forecasts</small>{metric.type === 'projection' && metric.correction != null && <em className="mono">Correction {metric.correction >= 0 ? '+' : ''}{metric.correction.toFixed(1)}</em>}</footer></article>
-    })}</div> : <div className="nfl-performance-empty"><Icon name="Database" size={22} /><b>No NFL backtest loaded</b><span>The slate remains available, but performance grading will appear after the history evaluation runs.</span></div>}
+    <header>
+      <div>
+        <span className="nfl-eyebrow"><Icon name="Gauge" size={13} /> Model results & tracking</span>
+        <h2 id="nfl-performance-title">NFL Performance & Graded Combos</h2>
+        <p>Walk-forward calibration, closing line value, Brier accuracy, and tracked parlay grading.</p>
+      </div>
+      <CommandTabs
+        tabs={PERF_SUBTABS.map((t) => t.id === 'tickets' ? { ...t, label: `My Tickets (${tickets.length})` } : t)}
+        value={subTab}
+        onChange={setSubTab}
+        label="Performance sub-navigation"
+        className="nfl-perf-subnav"
+      />
+    </header>
+
+    {subTab === 'tickets' && (
+      <div className="nfl-ticket-center">
+        <div className="nfl-ticket-stats">
+          <span><small>Settled</small><b className="mono">{ticketSummary.won}/{ticketSummary.settled}</b></span>
+          <span><small>Hit Rate</small><b className={`mono ${ticketSummary.hitRate >= 0.5 ? 'tone-good' : ''}`}>{pct(ticketSummary.hitRate)}</b></span>
+          <span><small>Net Units</small><b className={`mono ${ticketSummary.profit != null ? ticketSummary.profit >= 0 ? 'tone-good' : 'tone-bad' : ''}`}>{ticketSummary.profit != null ? `${ticketSummary.profit >= 0 ? '+' : ''}${ticketSummary.profit.toFixed(2)}u` : '—'}</b></span>
+          <span><small>ROI</small><b className={`mono ${ticketSummary.roi != null ? ticketSummary.roi >= 0 ? 'tone-good' : 'tone-bad' : ''}`}>{ticketSummary.roi != null ? `${ticketSummary.roi >= 0 ? '+' : ''}${pct(ticketSummary.roi)}` : '—'}</b></span>
+        </div>
+
+        <div className="nfl-ticket-filters">
+          <input
+            type="search"
+            placeholder="Search tracked players or markets…"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+            <option value="all">All statuses ({tickets.length})</option>
+            <option value="pending">Pending / Upcoming</option>
+            <option value="live">Live in-game</option>
+            <option value="won">Cashed / Won</option>
+            <option value="lost">Lost</option>
+          </select>
+          <button type="button" className="nfl-ticket-export" onClick={handleExportCSV} disabled={!tickets.length}>
+            <Icon name="Download" size={13} /> Export CSV
+          </button>
+        </div>
+
+        {filteredTickets.length > 0 ? (
+          <div className="nfl-ticket-history-list">
+            {filteredTickets.map((ticket) => {
+              const isWon = ticket.status === 'won'
+              const isLost = ticket.status === 'lost'
+              const isLive = ticket.status === 'live'
+              const profit = nflTicketProfit(ticket)
+              return (
+                <article key={ticket.id} className={`nfl-ticket-history-card ${isWon ? 'is-won' : isLost ? 'is-lost' : isLive ? 'is-live' : 'is-pending'}`}>
+                  <header>
+                    <span>
+                      <b>TD Parlay · {ticket.legs?.length || 0} legs</b>
+                      <small>{ticket.createdAt ? new Date(ticket.createdAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Logged ticket'}</small>
+                    </span>
+                    <em className={`mono ${isWon ? 'tone-good' : isLost ? 'tone-bad' : isLive ? 'tone-warn' : ''}`}>
+                      {ticket.status}
+                    </em>
+                  </header>
+
+                  <ul className="nfl-ticket-legs-list">
+                    {(ticket.legs || []).map((leg, index) => {
+                      const legWon = leg.status === 'won'
+                      const legLost = leg.status === 'lost'
+                      const legLive = leg.status === 'live'
+                      return (
+                        <li key={`${ticket.id}-${leg.key || index}`}>
+                          <div>
+                            <span className="mono">{index + 1}.</span>
+                            <strong>{leg.name}</strong>
+                            <small>{leg.team ? `${leg.team} · ` : ''}{leg.marketLabel || leg.marketId}</small>
+                          </div>
+                          <aside>
+                            {leg.currentValue != null && <em className="mono">{leg.currentValue} {leg.marketId?.includes('td') ? 'TD' : 'yds'}</em>}
+                            <span className={`nfl-leg-status-pill ${legWon ? 'is-won' : legLost ? 'is-lost' : legLive ? 'is-live' : 'is-pending'}`}>
+                              <Icon name={legWon ? 'Check' : legLost ? 'X' : legLive ? 'Activity' : 'Clock'} size={10} />
+                              {leg.status || 'pending'}
+                            </span>
+                          </aside>
+                        </li>
+                      )
+                    })}
+                  </ul>
+
+                  <footer>
+                    <span>
+                      <small>Result</small>
+                      <b className={`mono ${profit != null ? profit >= 0 ? 'tone-good' : 'tone-bad' : ''}`}>
+                        {profit != null ? `${profit >= 0 ? '+' : ''}${profit.toFixed(2)}u` : isWon ? 'Won' : isLost ? 'Lost' : 'Pending kickoff'}
+                      </b>
+                    </span>
+                    <div className="nfl-ticket-card-actions">
+                      <button type="button" onClick={() => handleShareTicket(ticket)} title="Copy ticket summary">
+                        <Icon name={copiedId === ticket.id ? 'Check' : 'Share2'} size={12} /> {copiedId === ticket.id ? 'Copied' : 'Share'}
+                      </button>
+                      <button type="button" onClick={() => onRemoveTicket?.(ticket.id)} title="Delete ticket">
+                        <Icon name="Trash2" size={12} />
+                      </button>
+                    </div>
+                  </footer>
+                </article>
+              )
+            })}
+          </div>
+        ) : (
+          <div className="nfl-ticket-empty">
+            <Icon name="Bookmark" size={24} />
+            <b>No tracked TD tickets found</b>
+            <span>Track a combination from Bet Lab or save custom slips to audit future and graded parlay outcomes.</span>
+            {onOpenBetLab && (
+              <button type="button" className="nfl-drawer-cta" onClick={onOpenBetLab}>
+                <Icon name="Beaker" size={14} /> Open Bet Lab
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    )}
+
+    {subTab === 'overview' && (
+      <>
+        <div className="nfl-coverage-grid" aria-label="NFL data coverage">{coverage.map(([label, ready]) => <div key={label} className={ready ? 'is-ready' : 'is-limited'}><Icon name={ready ? 'CircleCheck' : 'TriangleAlert'} size={15} /><span><b>{label}</b><small>{ready ? 'Connected' : 'Limited'}</small></span></div>)}</div>
+        {healthIssues.length > 0 && <div className="nfl-health-alert" role="status" aria-live="polite"><Icon name="TriangleAlert" size={16} /><span><b>{healthIssues.length} feed{healthIssues.length === 1 ? '' : 's'} need attention</b><small>{healthIssues.map((issue) => `${issue.label}: ${issue.message}`).join(' · ')}</small></span></div>}
+        <section className="nfl-tracking-summary" aria-label="Season tracking"><header><span><Icon name="LineChart" size={14} /> Season tracking</span><small>{tracking?.updatedAt ? `Updated ${new Date(tracking.updatedAt).toLocaleString()}` : 'Starts with the next slate'}</small></header><div><span><b className="mono">{Number(tracking?.open || 0).toLocaleString()}</b><small>Open forecasts</small></span><span><b className="mono">{Number(tracking?.settled || 0).toLocaleString()}</b><small>Settled forecasts</small></span><span><b className="mono">{trackingStacks.reduce((sum, stack) => sum + Number(stack.boards || 0), 0).toLocaleString()}</b><small>Frozen stack boards</small></span><span><b className="mono">{trackingStacks.reduce((sum, stack) => sum + Number(stack.settled || 0), 0).toLocaleString()}</b><small>Settled stack builds</small></span></div></section>
+        <div className="nfl-live-validation-grid">
+          <section className={`nfl-live-validation is-${tdValidation?.status || 'collecting'}`} aria-label="Touchdown calibration health"><header><span><Icon name="Activity" size={14} /> Live TD calibration</span><em>{tdValidation?.status || 'collecting'}</em></header><div><span><b className="mono">{Number(tdValidation?.touchdownsObserved || 0).toLocaleString()}</b><small>Touchdowns observed</small></span><span><b className="mono">{pct(tdValidation?.recent?.predicted)}</b><small>Recent predicted</small></span><span><b className="mono">{pct(tdValidation?.recent?.observed)}</b><small>Recent observed</small></span><span><b className="mono">{pct(tdValidation?.recent?.ece)}</b><small>Calibration error</small></span></div><footer>{tdValidation?.reasons?.length ? tdValidation.reasons.join(' · ') : Number(tdValidation?.recent?.samples || 0) < 25 ? `${Number(tdValidation?.recent?.samples || 0)} of 25 TD outcomes needed for a drift verdict` : 'No material TD probability drift detected'} · Stack drift {stackValidation?.status || 'collecting'} ({Number(stackValidation?.recent?.samples || 0)} recent)</footer></section>
+          <section className={`nfl-live-validation is-${refresh?.status || 'limited'}`} aria-label="NFL refresh readiness"><header><span><Icon name="RefreshCw" size={14} /> Weekly launch refresh</span><em>{refresh?.phase || 'monitoring'}</em></header><div><span><b className="mono">{refresh?.minutesToKickoff == null ? '—' : refresh.minutesToKickoff > 1440 ? `${Math.round(refresh.minutesToKickoff / 1440)}d` : `${Math.max(0, refresh.minutesToKickoff)}m`}</b><small>Next kickoff</small></span><span><b className="mono">{refresh?.cadenceMinutes || 30}m</b><small>Refresh target</small></span><span><b className="mono">{(refresh?.checks || []).filter((check) => check.ready).length}/{(refresh?.checks || []).length}</b><small>Feeds current</small></span><span><b className="mono">{refresh?.missing?.length || 0}</b><small>Required missing</small></span></div><footer>{refresh?.message || 'Awaiting refresh status'}</footer></section>
+        </div>
+        {trackingMarkets.length > 0 && <div className="nfl-season-market-grid" aria-label="Season results by market">{trackingMarkets.map(([id, metric]) => <article key={id}><b>{NFL_PROP_MARKET_LIST.find((market) => market.id === id)?.shortLabel || id}</b><span><strong className="mono">{metric.brier != null ? metric.brier.toFixed(3) : metric.mae != null ? metric.mae.toFixed(1) : '—'}</strong><small>{metric.brier != null ? 'Brier' : 'MAE'}</small></span><span><strong className="mono">{pct(metric.roi)}</strong><small>ROI · {metric.roiSamples || 0}</small></span></article>)}</div>}
+        {stackPerformance.length > 0 && <section className="nfl-stack-performance" aria-label="TD stack validation"><header><span><Icon name="Layers" size={14} /> TD stack validation</span><small>Leakage-safe · two-leg cross-game baseline</small></header><div>{stackPerformance.map(([id, metric]) => {
+          const stack = NFL_COMBO_STRATEGIES.find((item) => item.id === id)
+          const result = metric.scopes?.all?.byLegCount?.['2'] || metric.scopes?.all?.byLegCount?.[2] || {}
+          return <article key={id}><span><b>{stack?.label || metric.label || id}</b><em className={`is-${stack?.riskTone || 'caution'}`}>{stack?.risk}</em></span><div><strong className="mono">{pct(result.observed)}</strong><small>Observed all-hit</small></div><div><strong className="mono">{pct(result.predicted)}</strong><small>Raw independent</small></div><footer>{Number(result.samples || 0).toLocaleString()} historical builds · Brier {result.brier == null ? '—' : result.brier.toFixed(3)}</footer></article>
+        })}</div></section>}
+        {markets.length ? <div className="nfl-performance-grid">{markets.map(([id, metric]) => {
+          const market = NFL_PROP_MARKET_LIST.find((item) => item.id === id)
+          const primary = metric.type === 'probability' ? (metric.brier == null ? '—' : metric.brier.toFixed(3)) : (metric.mae == null ? '—' : metric.mae.toFixed(1))
+          const secondary = metric.type === 'probability' ? 'Brier score' : 'Mean absolute error'
+          return <article key={id}><header><Icon name={MARKET_ICONS[id] || 'Activity'} size={15} /><b>{market?.label || id.replaceAll('_', ' ')}</b></header><strong className="mono">{primary}</strong><span>{secondary}</span><footer><small>{Number(metric.samples || 0).toLocaleString()} forecasts</small>{metric.type === 'projection' && metric.correction != null && <em className="mono">Correction {metric.correction >= 0 ? '+' : ''}{metric.correction.toFixed(1)}</em>}</footer></article>
+        })}</div> : <div className="nfl-performance-empty"><Icon name="Database" size={22} /><b>No NFL backtest loaded</b><span>The slate remains available, but performance grading will appear after the history evaluation runs.</span></div>}
+      </>
+    )}
   </section>
 }
 
@@ -485,7 +646,7 @@ export default function NFLBoard({ snapshot: suppliedSnapshot = null, view: cont
   return <div className="nfl-workspace nfl-prop-workspace">
     <div className="nfl-workspace-head"><div><span className="nfl-eyebrow"><Icon name="Shield" size={13} /> NFL prop engine</span><h1>NFL Signals</h1><p>Slate-ranked QB, RB, WR and TE signals powered by role, matchup, form, lineup, weather, price and live pace.</p></div><CommandTabs tabs={SPORT_UI.nfl.primaryViews} value={view} onChange={setView} label="NFL view" className="nfl-view-tabs" variant="workspace" /></div>
     <div className={`nfl-demo-banner is-${snapshotStale ? 'critical' : snapshot.dataHealth?.status || 'ready'}`} role="status" aria-live="polite"><Icon name={snapshotStale || snapshot.dataHealth?.status === 'critical' || !snapshot.dataQuality?.playByPlay ? 'TriangleAlert' : 'CircleCheck'} size={15} /><span><b>{snapshotStale ? 'NFL pipeline update delayed' : snapshot.source?.mode === 'demo' ? 'Demo slate' : snapshot.dataHealth?.status === 'ready' ? 'All NFL feeds healthy' : snapshot.dataQuality?.playByPlay ? 'NFL core data connected' : 'NFL data connected · limited context'}</b> {snapshotStale ? 'The published slate is more than 45 minutes old. Open Performance for feed details.' : snapshot.dataHealth?.issues?.length ? `${snapshot.dataHealth.issues.length} supporting feed${snapshot.dataHealth.issues.length === 1 ? '' : 's'} limited. Open Performance for details.` : 'Red-zone, depth, availability, weather, defense and tracking coverage are active.'}</span></div>
-    {view === 'performance' ? <NFLPerformance snapshot={snapshot} /> : view === 'bet-lab' ? <div className="nfl-bet-lab-workspace"><NFLBetLab snapshot={snapshot} slip={slip} slipLegs={slipLegs} tab={betLabView} onTabChange={setBetLabView} onAddCombo={addComboToSlip} onToggleLeg={(key) => toggleSet(setSlip, key)} onSaveTicket={saveTicket} /></div> : <>
+    {view === 'performance' ? <NFLPerformance snapshot={snapshot} tickets={tickets} onRemoveTicket={(id) => setTickets((curr) => curr.filter((t) => t.id !== id))} onClearTickets={() => setTickets([])} onOpenBetLab={openBetLabBuilder} /> : view === 'bet-lab' ? <div className="nfl-bet-lab-workspace"><NFLBetLab snapshot={snapshot} slip={slip} slipLegs={slipLegs} tab={betLabView} onTabChange={setBetLabView} onAddCombo={addComboToSlip} onToggleLeg={(key) => toggleSet(setSlip, key)} onSaveTicket={saveTicket} /></div> : <>
       <SportMarketRail sport="nfl" markets={NFL_PROP_MARKET_LIST} value={marketId} onChange={setMarketId} icons={MARKET_ICONS} ariaLabel="NFL prop market" />
       {marketId === 'first_td' && <div className="nfl-variance-note"><Icon name="TriangleAlert" size={14} /><span><b>First TD is high variance.</b> Listed offense receives {pct(snapshot.firstTdReserve?.listedOffense ?? .86, 0)}; other offense {pct(snapshot.firstTdReserve?.otherOffense ?? .06, 0)}, defense/special teams {pct(snapshot.firstTdReserve?.defenseSpecialTeams ?? .06, 0)}, and no touchdown {pct(snapshot.firstTdReserve?.noTouchdown ?? .02, 0)} are modeled separately.</span></div>}
       {marketId === 'two_plus_td' && <div className="nfl-variance-note"><Icon name="Flame" size={14} /><span><b>2+ TD is calibrated separately.</b> Multi-score probability is evaluated independently from Anytime TD.</span></div>}

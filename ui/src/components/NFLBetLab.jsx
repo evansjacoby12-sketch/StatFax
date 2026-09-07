@@ -15,7 +15,7 @@ const TABS = [
   { id: 'same-game', label: 'Same game', icon: 'Zap' },
 ]
 
-function ComboGrid({ stackBoards, slip, onAddCombo }) {
+function ComboGrid({ stackBoards, slip, onAddCombo, onSaveTicket }) {
   return <div className="nfl-combo-grid nfl-stack-showcase">{stackBoards.map(({ stack, board, combo, unavailableReason }) => {
     if (!combo) return <article className="nfl-combo-card nfl-stack-unavailable" key={stack.id} style={{ '--nfl-combo-grade': 'var(--skip)' }}>
       <header><div><span className="nfl-combo-rank mono">#1</span><span className="nfl-combo-strategy">{stack.cardLabel || stack.label}</span><span className={`nfl-stack-risk is-${stack.riskTone || 'caution'}`}>{stack.risk}</span></div><span className="nfl-combo-grade">Unavailable</span></header>
@@ -33,7 +33,12 @@ function ComboGrid({ stackBoards, slip, onAddCombo }) {
       <div className="nfl-combo-metrics"><span><small>{combo.probabilityMethod === 'stack-calibrated-joint' ? 'Calibrated joint' : 'Joint model'}</small><strong className="mono" style={{ color }}>{pct(combo.probability)}</strong></span><span><small>Parlay price</small><strong className="mono">{combo.americanOdds != null ? price(combo.americanOdds) : (combo.probability > 0 && americanOdds(1 / combo.probability) != null ? `Fair ${price(americanOdds(1 / combo.probability))}` : 'Price N/A')}</strong></span><span><small>{kellyUnits != null && kellyUnits > 0 ? 'Kelly size' : 'Evidence'}</small><strong className="mono">{kellyUnits != null && kellyUnits > 0 ? `${kellyUnits}u` : combo.evidenceConfidence}</strong></span></div>
       <ol className="nfl-combo-legs">{combo.legs.map((leg, legIndex) => <li key={leg.key}><span className="nfl-combo-ord mono">{legIndex + 1}</span><div><b>{leg.name}</b><small>{leg.team} vs {leg.opponent} · {leg.marketLabel}</small><span>{leg.model.signals?.slice(0, 2).map((signal) => <em key={signal.key}>{signal.text}</em>)}</span></div><aside><strong className="mono">{pct(leg.probability)}</strong><small className="mono">{legPriceDisplay(leg)}</small></aside></li>)}</ol>
       <p className="nfl-combo-why"><Icon name="Sparkles" size={13} />{combo.rationale}</p>
-      <footer><button type="button" className={isAdded ? 'active' : ''} onClick={() => onAddCombo(combo)}><Icon name={isAdded ? 'Check' : 'Plus'} size={14} />{isAdded ? 'Combo added' : `Add all ${combo.legs.length} legs`}</button></footer>
+      <footer>
+        <button type="button" className={isAdded ? 'active' : ''} onClick={() => onAddCombo(combo)}><Icon name={isAdded ? 'Check' : 'Plus'} size={14} />{isAdded ? 'Combo added' : `Add all ${combo.legs.length} legs`}</button>
+        {onSaveTicket && (
+          <button type="button" onClick={() => onSaveTicket(combo.legs)} title="Track this build directly in My Tickets"><Icon name="Bookmark" size={13} />Track ticket</button>
+        )}
+      </footer>
     </article>
   })}</div>
 }
@@ -43,7 +48,7 @@ function legPriceDisplay(leg) {
   return leg.odds != null ? price(leg.odds) : (fair != null ? `Fair ${price(fair)}` : 'No price')
 }
 
-function ComboExplorer({ snapshot, games, selectedGameKey, onSelectGame, slip, onAddCombo, scope, legCount, setLegCount, minGrade, setMinGrade }) {
+function ComboExplorer({ snapshot, games, selectedGameKey, onSelectGame, slip, onAddCombo, onSaveTicket, scope, legCount, setLegCount, minGrade, setMinGrade }) {
   const selectedGame = useMemo(() => games.find((g) => g.id === selectedGameKey) || null, [games, selectedGameKey])
   const stackBoards = useMemo(() => {
     const globalExposure = { players: new Map(), playerCap: 1 }
@@ -105,7 +110,7 @@ function ComboExplorer({ snapshot, games, selectedGameKey, onSelectGame, slip, o
       </span>
       <small>{availableCount} of {NFL_COMBO_STRATEGIES.length} stacks available · {calibratedCount} calibrated</small>
     </div>
-    <ComboGrid stackBoards={stackBoards} slip={slip} onAddCombo={onAddCombo} />
+    <ComboGrid stackBoards={stackBoards} slip={slip} onAddCombo={onAddCombo} onSaveTicket={onSaveTicket} />
   </section>
 }
 
@@ -193,9 +198,9 @@ export default function NFLBetLab({ snapshot, slip, slipLegs, tab, onTabChange, 
       <span><b>TD-only rule</b> Every leg is Anytime TD, First TD or 2+ TD. Yardage and reception props stay outside Bet Lab.</span>
       <span><b>Variance & Correlation</b> Same-game touchdown correlation accounts for team TD budgets and cross-team shootout synergy. First TD scorers in the same game are mutually exclusive.</span>
     </div>
-    {tab === 'explore' && <ComboExplorer snapshot={snapshot} games={games} selectedGameKey={selectedGameKey} onSelectGame={setSelectedGameKey} slip={slip} onAddCombo={onAddCombo} scope="all" legCount={legCount} setLegCount={setLegCount} minGrade={minGrade} setMinGrade={setMinGrade} />}
+    {tab === 'explore' && <ComboExplorer snapshot={snapshot} games={games} selectedGameKey={selectedGameKey} onSelectGame={setSelectedGameKey} slip={slip} onAddCombo={onAddCombo} onSaveTicket={onSaveTicket} scope="all" legCount={legCount} setLegCount={setLegCount} minGrade={minGrade} setMinGrade={setMinGrade} />}
     {tab === 'builder' && <CustomBuilder slipLegs={tdSlipLegs} onToggleLeg={onToggleLeg} onClearSlip={clearTDSlip} onSaveTicket={onSaveTicket} />}
-    {tab === 'same-game' && <ComboExplorer snapshot={snapshot} games={games} selectedGameKey={selectedGameKey} onSelectGame={setSelectedGameKey} slip={slip} onAddCombo={onAddCombo} scope="same-game" legCount={legCount} setLegCount={setLegCount} minGrade={minGrade} setMinGrade={setMinGrade} />}
+    {tab === 'same-game' && <ComboExplorer snapshot={snapshot} games={games} selectedGameKey={selectedGameKey} onSelectGame={setSelectedGameKey} slip={slip} onAddCombo={onAddCombo} onSaveTicket={onSaveTicket} scope="same-game" legCount={legCount} setLegCount={setLegCount} minGrade={minGrade} setMinGrade={setMinGrade} />}
   </WorkspaceShell>
 }
 
