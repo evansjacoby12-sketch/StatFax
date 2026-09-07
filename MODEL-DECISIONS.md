@@ -118,6 +118,10 @@ Authority: `server/sports/nfl/fetch-nfl-slate.mjs`, `server/sports/nfl/preseason
 - Listed starters with zero preseason work are rest-protected. Absence alone cannot lower a projection.
 - Qualified role movement is capped at ±4% for TD markets and ±3% for yardage/reception markets. It changes lineup role factors, not the historical calibration artifact.
 - ESPN box-score attempts, carries, targets and play-by-play-derived scoring-area opportunities are observed. Complete snap and route participation is unavailable in the public ESPN response and remains null unless a verified, timestamped, source-labeled overlay supplies it.
+- **Market line benchmarking & fair odds fallbacks (2026-09-07)**:
+  - Over/under yardage and volume prop markets benchmark against standard American -110 juice (52.38% implied break-even) when an active line is posted but specific bookmaker juice is unquoted.
+  - Touchdown markets (`anytime_td`, `first_td`, `two_plus_td`) compute edge against posted American sportsbook odds when available. When unquoted, the UI computes and explicitly labels fair odds (`Fair +...`) and fair multiplier baselines without manufacturing an artificial positive edge.
+  - Multi-field odds resolution supports `odds`, `overOdds`, `price`, `american`, and `propOdds`.
 - Rollback: remove the preseason role application in `fetch-nfl-slate.mjs`, retain `preseason.json` as a non-scoring observation ledger, and revert the snapshot model version to the prior NFL contract.
 
 ## Required proof for a production model change
