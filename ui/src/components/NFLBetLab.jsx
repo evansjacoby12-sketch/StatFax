@@ -34,11 +34,20 @@ function ComboGrid({ stackBoards, slip, onAddCombo }) {
 }
 
 function ComboExplorer({ snapshot, slip, onAddCombo, scope, legCount, setLegCount, minGrade, setMinGrade }) {
-  const stackBoards = useMemo(() => NFL_COMBO_STRATEGIES.map((stack) => {
-    if (!stack.scopes.includes(scope)) return { stack, board: null, combo: null, unavailableReason: scope === 'same-game' ? 'This stack is cross-game only.' : 'This stack does not support the selected scope.' }
-    const board = buildNFLComboBoard(snapshot, { legs: legCount, strategy: stack.id, scope, minGrade, limit: 1 })
-    return { stack, board, combo: board.combos[0] || null, unavailableReason: null }
-  }), [legCount, minGrade, scope, snapshot])
+  const stackBoards = useMemo(() => {
+    const globalExposure = { players: new Map(), playerCap: 1 }
+    return NFL_COMBO_STRATEGIES.map((stack) => {
+      if (!stack.scopes.includes(scope)) return { stack, board: null, combo: null, unavailableReason: scope === 'same-game' ? 'This stack is cross-game only.' : 'This stack does not support the selected scope.' }
+      const board = buildNFLComboBoard(snapshot, { legs: legCount, strategy: stack.id, scope, minGrade, limit: 1, globalExposure })
+      const combo = board.combos[0] || null
+      if (combo) {
+        for (const leg of combo.legs) {
+          globalExposure.players.set(leg.playerId, (globalExposure.players.get(leg.playerId) || 0) + 1)
+        }
+      }
+      return { stack, board, combo, unavailableReason: null }
+    })
+  }, [legCount, minGrade, scope, snapshot])
   const availableCount = stackBoards.filter((entry) => entry.combo).length
   const calibratedCount = stackBoards.filter((entry) => entry.board?.calibration?.ready).length
   return <section className="nfl-combo-explorer" aria-label={scope === 'same-game' ? 'NFL same-game combinations' : 'NFL combination explorer'}>

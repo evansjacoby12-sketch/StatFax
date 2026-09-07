@@ -96,12 +96,19 @@ function stackCalibration(snapshot, strategy, scope, legCount) {
   return scopeResult?.byLegCount?.[String(legCount)] || scopeResult?.byLegCount?.[legCount] || null
 }
 
-function selectDiversified(combos, limit = 5) {
+function selectDiversified(combos, limit = 5, globalExposure = null) {
   const selected = []
   const playerExposure = new Map()
   const teamExposure = new Map()
   const gameExposure = new Map()
-  const caps = { player: Math.max(2, Math.ceil(limit * .25)), team: Math.max(4, Math.ceil(limit * .5)), game: Math.max(4, Math.ceil(limit * .5)) }
+  const caps = {
+    player: Math.max(2, Math.ceil(limit * .25)),
+    team: Math.max(4, Math.ceil(limit * .5)),
+    game: Math.max(4, Math.ceil(limit * .5)),
+    globalPlayer: globalExposure?.playerCap ?? 1,
+  }
+
+  // Pass 1: Select combos that satisfy both local per-strategy and global cross-strategy caps
   for (const combo of combos) {
     const players = [...new Set(combo.legs.map((leg) => leg.playerId))]
     const teams = [...new Set(combo.legs.map((leg) => leg.team))]
@@ -109,12 +116,34 @@ function selectDiversified(combos, limit = 5) {
     if (players.some((id) => (playerExposure.get(id) || 0) >= caps.player)) continue
     if (teams.some((id) => (teamExposure.get(id) || 0) >= caps.team)) continue
     if (games.some((id) => (gameExposure.get(id) || 0) >= caps.game)) continue
+    if (globalExposure?.players && players.some((id) => (globalExposure.players.get(id) || 0) >= caps.globalPlayer)) continue
+
     selected.push(combo)
     players.forEach((id) => playerExposure.set(id, (playerExposure.get(id) || 0) + 1))
     teams.forEach((id) => teamExposure.set(id, (teamExposure.get(id) || 0) + 1))
     games.forEach((id) => gameExposure.set(id, (gameExposure.get(id) || 0) + 1))
     if (selected.length >= limit) break
   }
+
+  // Pass 2: If quota not filled, relax global constraints to keep the stack populated
+  if (selected.length < limit) {
+    for (const combo of combos) {
+      if (selected.includes(combo)) continue
+      const players = [...new Set(combo.legs.map((leg) => leg.playerId))]
+      const teams = [...new Set(combo.legs.map((leg) => leg.team))]
+      const games = [...new Set(combo.legs.map((leg) => leg.gameKey))]
+      if (players.some((id) => (playerExposure.get(id) || 0) >= caps.player)) continue
+      if (teams.some((id) => (teamExposure.get(id) || 0) >= caps.team)) continue
+      if (games.some((id) => (gameExposure.get(id) || 0) >= caps.game)) continue
+
+      selected.push(combo)
+      players.forEach((id) => playerExposure.set(id, (playerExposure.get(id) || 0) + 1))
+      teams.forEach((id) => teamExposure.set(id, (teamExposure.get(id) || 0) + 1))
+      games.forEach((id) => gameExposure.set(id, (gameExposure.get(id) || 0) + 1))
+      if (selected.length >= limit) break
+    }
+  }
+
   return { selected, caps, exposure: { players: Object.fromEntries(playerExposure), teams: Object.fromEntries(teamExposure), games: Object.fromEntries(gameExposure) } }
 }
 
@@ -147,7 +176,7 @@ function rationaleFor(legs, strategy, scope) {
   return scope === 'same-game' ? `One-game Anytime TD core averaging ${(averageProbability * 100).toFixed(1)}% per leg with ${signalCount} supporting signals.` : `Anytime TD anchors across ${games} games averaging ${(averageProbability * 100).toFixed(1)}% per leg.`
 }
 
-export function buildNFLComboBoard(snapshot, { legs = 2, strategy = 'scorer-core', scope = 'all', minGrade = 'LEAN', limit = 5 } = {}) {
+export function buildNFLComboBoard(snapshot, { legs = 2, strategy = 'scorer-core', scope = 'all', minGrade = 'LEAN', limit = 5, globalExposure = null } = {}) {
   const legCount = Math.max(2, Math.min(4, Number(legs) || 2))
   const candidates = (snapshot?.players || []).flatMap((player) => eligiblePropMarkets(player).map((market) => {
     const model = scoreNFLProp(player, market.id)
@@ -229,7 +258,7 @@ export function buildNFLComboBoard(snapshot, { legs = 2, strategy = 'scorer-core
     seen.add(signature)
     return true
   })
-  const diversified = selectDiversified(unique, limit)
+  const diversified = selectDiversified(unique, limit, globalExposure)
   const minimumReady = Math.min(6, limit)
   const limitations = []
   if (candidates.length < legCount) limitations.push('Not enough eligible stack candidates')
@@ -243,6 +272,28 @@ export function buildNFLComboBoard(snapshot, { legs = 2, strategy = 'scorer-core
     exposure: { caps: diversified.caps, ...diversified.exposure },
     calibration: { ready: calibrationReady, samples: Number(calibration?.samples || 0), jointFactor: Number.isFinite(Number(calibration?.jointFactor)) ? Number(calibration.jointFactor) : null, method: calibrationReady ? bucketCalibrationReady ? 'stack-calibrated-buckets' : 'stack-calibrated-shrunk-joint' : 'independent-baseline' },
   }
+}
+
+export function buildNFLComboShowcase(snapshot, { legs = 2, scope = 'all', minGrade = 'LEAN', playerCap = 1 } = {}) {
+  const globalExposure = { players: new Map(), playerCap }
+  return NFL_COMBO_STRATEGIES.map((stack) => {
+    if (!stack.scopes.includes(scope)) {
+      return {
+        stack,
+        board: null,
+        combo: null,
+        unavailableReason: scope === 'same-game' ? 'This stack is cross-game only.' : 'This stack does not support the selected scope.',
+      }
+    }
+    const board = buildNFLComboBoard(snapshot, { legs, strategy: stack.id, scope, minGrade, limit: 1, globalExposure })
+    const combo = board.combos[0] || null
+    if (combo) {
+      for (const leg of combo.legs) {
+        globalExposure.players.set(leg.playerId, (globalExposure.players.get(leg.playerId) || 0) + 1)
+      }
+    }
+    return { stack, board, combo, unavailableReason: null }
+  })
 }
 
 export function buildNFLCombos(snapshot, options = {}) {

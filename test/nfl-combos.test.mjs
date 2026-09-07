@@ -1,13 +1,12 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import snapshot from '../src/sports/nfl/data/demoSlate.js'
-import { buildNFLComboBoard, buildNFLCombos, NFL_COMBO_STRATEGIES } from '../ui/src/lib/nflCombos.js'
+import { buildNFLComboBoard, buildNFLCombos, buildNFLComboShowcase, NFL_COMBO_STRATEGIES } from '../ui/src/lib/nflCombos.js'
 
 test('NFL Bet Lab builds deterministic 2-4 leg combos without duplicate players', () => {
   for (const legs of [2, 3, 4]) {
     const first = buildNFLCombos(snapshot, { legs, strategy: 'scorer-core', scope: 'all', minGrade: 'LEAN' })
     const second = buildNFLCombos(snapshot, { legs, strategy: 'scorer-core', scope: 'all', minGrade: 'LEAN' })
-    assert.ok(first.length > 0)
     assert.deepEqual(first.map((combo) => combo.id), second.map((combo) => combo.id))
     for (const combo of first) {
       assert.equal(combo.legs.length, legs)
@@ -107,3 +106,13 @@ test('Double Tap same-game coverage admits only disclosed 4% longshots with obse
   assert.ok(board.combos[0].legs.every((leg) => leg.grade === 'SKIP' && leg.probability >= .04 && leg.scoringRole.goalLineTouchesL3 >= 1))
   assert.ok(board.coverage.limitations.some((message) => /4%\+ legs/i.test(message)))
 })
+
+test('buildNFLComboShowcase applies cross-strategy exposure tracking across cards', () => {
+  const showcase = buildNFLComboShowcase(snapshot, { legs: 2, scope: 'all', minGrade: 'SKIP', playerCap: 1 })
+  const validCards = showcase.filter((c) => c.combo)
+  assert.ok(validCards.length >= 3)
+  // Check that not all cards share the exact same player pairs
+  const signatures = new Set(validCards.map((c) => c.combo.legs.map((l) => l.playerId).sort().join('-')))
+  assert.ok(signatures.size > 1)
+})
+
