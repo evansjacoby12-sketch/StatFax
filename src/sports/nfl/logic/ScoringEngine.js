@@ -12,6 +12,32 @@ export function americanImpliedProbability(odds) {
   return value < 0 ? Math.abs(value) / (Math.abs(value) + 100) : 100 / (value + 100)
 }
 
+export function deviggedImpliedProbability(overOdds, underOdds) {
+  const over = americanImpliedProbability(overOdds)
+  const under = americanImpliedProbability(underOdds)
+  if (over == null) return null
+  if (under == null) {
+    return Math.max(0.005, Math.min(0.995, over / 1.045))
+  }
+  const total = over + under
+  return total > 0 ? over / total : over
+}
+
+export function calculateQuarterKelly(probability, americanOddsValue, fraction = 0.25) {
+  const prob = Number(probability)
+  const odds = Number(americanOddsValue)
+  if (!Number.isFinite(prob) || !Number.isFinite(odds) || prob <= 0 || prob >= 1) return null
+  const decimal = odds > 0 ? 1 + odds / 100 : 1 + 100 / Math.abs(odds)
+  const b = decimal - 1
+  if (b <= 0) return null
+  const q = 1 - prob
+  const fullKelly = (b * prob - q) / b
+  if (fullKelly <= 0) return 0
+  const quarterKelly = fullKelly * fraction
+  const units = Math.round(quarterKelly * 10 * 4) / 4
+  return Math.max(0.25, Math.min(2.0, units))
+}
+
 function touchdownProbability(player, marketId) {
   const explicit = Number(player?.markets?.[marketId]?.probability)
   if (Number.isFinite(explicit)) return clamp(explicit)
@@ -19,6 +45,16 @@ function touchdownProbability(player, marketId) {
   if (marketId === 'anytime_td') return clamp(anytime)
   if (marketId === 'first_td') return clamp(Number(player?.projections?.firstTdProbability ?? anytime * 0.27), 0.005, 0.45)
   const lambda = -Math.log(Math.max(0.001, 1 - clamp(anytime)))
+
+  // Negative-Binomial overdispersion for lead goal-line rushers / alpha red-zone targets
+  const goalLine = Number(player?.usage?.goalLineOpportunityShare || player?.usage?.goalToGoOpportunityShare || 0)
+  const touchesL3 = Number(player?.usage?.goalLineTouchesL3 || 0)
+  if (goalLine >= 0.35 || touchesL3 >= 3) {
+    const alpha = 0.20
+    const p0 = Math.pow(1 + alpha * lambda, -1 / alpha)
+    const p1 = lambda * Math.pow(1 + alpha * lambda, -(1 / alpha + 1))
+    return clamp(1 - p0 - p1, 0.002, 0.65)
+  }
   return clamp(1 - Math.exp(-lambda) * (1 + lambda), 0.002, 0.65)
 }
 
@@ -129,13 +165,30 @@ function spreadGameScriptFactor(player, marketId) {
   return 1
 }
 
-function probabilityGrade(probability, marketId, score, hasPrice) {
-  if (hasPrice) return score >= 72 ? 'PRIME' : score >= 58 ? 'STRONG' : score >= 45 ? 'LEAN' : 'SKIP'
-  const bands = marketId === 'first_td' ? [.12, .08, .045]
-    : marketId === 'two_plus_td' ? [.18, .10, .055]
-      : marketId === 'anytime_td' ? [.48, .36, .24]
-        : [.65, .57, .50]
-  return probability >= bands[0] ? 'PRIME' : probability >= bands[1] ? 'STRONG' : probability >= bands[2] ? 'LEAN' : 'SKIP'
+function probabilityGrade(probability, marketId, score, hasPrice, { historyGames = 0, roleRank = 1, isConfirmed = false, edge = 0 } = {}) {
+  let grade
+  if (hasPrice) {
+    grade = score >= 72 ? 'PRIME' : score >= 58 ? 'STRONG' : score >= 45 ? 'LEAN' : 'SKIP'
+  } else {
+    const bands = marketId === 'first_td' ? [.12, .08, .045]
+      : marketId === 'two_plus_td' ? [.18, .10, .055]
+        : marketId === 'anytime_td' ? [.48, .36, .24]
+          : [.65, .57, .50]
+    grade = probability >= bands[0] ? 'PRIME' : probability >= bands[1] ? 'STRONG' : probability >= bands[2] ? 'LEAN' : 'SKIP'
+  }
+
+  // Standardization Gate 1: PRIME requires verified positive edge (when priced) and primary role
+  if (grade === 'PRIME') {
+    if (hasPrice && edge <= 0) grade = 'STRONG'
+    if (roleRank > 2 && !isConfirmed) grade = 'STRONG'
+  }
+
+  // Standardization Gate 2: Thin history (< 3 games) cannot claim PRIME or STRONG
+  if (historyGames > 0 && historyGames < 3 && ['PRIME', 'STRONG'].includes(grade)) {
+    grade = 'LEAN'
+  }
+
+  return grade
 }
 
 export function scoreNFLProp(player, marketId) {
@@ -180,15 +233,37 @@ export function scoreNFLProp(player, marketId) {
   const parsedOdds = rawOdds == null || rawOdds === '' ? null : Number(rawOdds)
   const explicitOdds = Number.isFinite(parsedOdds) && parsedOdds !== 0 ? parsedOdds : null
 
+  const parsedUnder = marketEntry?.underOdds == null || marketEntry?.underOdds === '' ? null : Number(marketEntry?.underOdds)
+  const explicitUnder = Number.isFinite(parsedUnder) && parsedUnder !== 0 ? parsedUnder : null
+
   // For yardage/volume markets with an active line, benchmark against standard -110 juice if unquoted
   const effectiveOdds = explicitOdds != null
     ? explicitOdds
     : (market.kind !== 'touchdown' && line != null ? -110 : null)
+  const effectiveUnder = explicitUnder != null
+    ? explicitUnder
+    : (effectiveOdds === -110 ? -110 : null)
 
-  const implied = americanImpliedProbability(effectiveOdds)
+  const rawImplied = americanImpliedProbability(effectiveOdds)
+  const implied = deviggedImpliedProbability(effectiveOdds, effectiveUnder)
   const edge = implied == null ? null : probability - implied
   const score = Math.round(clamp(probability * 100 + (edge == null ? 0 : edge * 75), 0, 100))
-  const grade = probabilityGrade(probability, marketId, score, implied != null)
+
+  const historyCount = Number(player?.historyMatch?.games ?? player?.recentGames?.length ?? 0)
+  const roleRank = Number(player?.roleRank ?? player?.usage?.roleRank ?? 1)
+  const isConfirmed = Boolean(player?.lineup?.confirmed)
+
+  const grade = probabilityGrade(probability, marketId, score, implied != null, {
+    historyGames: historyCount,
+    roleRank,
+    isConfirmed,
+    edge: edge ?? 0,
+  })
+
+  const suggestedUnits = effectiveOdds != null && edge != null && edge > 0
+    ? calculateQuarterKelly(probability, effectiveOdds)
+    : null
+
   const reasons = [
     `${Math.round((role - 1) * 100)}% role adjustment`,
     `${Math.round((rawLineup - 1) * 100)}% lineup projection adjustment`,
@@ -197,11 +272,32 @@ export function scoreNFLProp(player, marketId) {
     weather.label,
     teamEnv !== 1 ? `${Math.round((teamEnv - 1) * 100)}% team total scoring adjustment` : null,
     gameScript !== 1 ? `${Math.round((gameScript - 1) * 100)}% spread script adjustment` : null,
+    historyCount > 0 && historyCount < 3 ? 'Thin sample (<3 games) · capped at LEAN' : null,
+    roleRank > 2 && !isConfirmed ? 'Rotational role · capped below PRIME' : null,
     `${player.isHome ? 'Home' : 'Away'} split ${Number(player?.splits?.activeEdge || 0) >= 0 ? '+' : ''}${Math.round(Number(player?.splits?.activeEdge || 0) * 100)}%`,
     player?.usage?.roleLabel || 'Role not confirmed',
   ].filter(Boolean)
 
-  return { marketId, eligible, probability, score, grade, line, odds: effectiveOdds, implied, edge, mean, weather, defenseFactor: defense, roleFactor: role, signals: buildNFLSignals(player), reasons }
+  return {
+    marketId,
+    eligible,
+    probability,
+    score,
+    grade,
+    line,
+    odds: effectiveOdds,
+    underOdds: effectiveUnder,
+    implied,
+    rawImplied,
+    edge,
+    suggestedUnits,
+    mean,
+    weather,
+    defenseFactor: defense,
+    roleFactor: role,
+    signals: buildNFLSignals(player),
+    reasons,
+  }
 }
 
 export function scoreNFLSnapshot(snapshot, marketId) {

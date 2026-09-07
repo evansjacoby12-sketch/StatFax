@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import NFL_DEMO_SNAPSHOT from '../src/sports/nfl/data/demoSlate.js'
 import { loadNFLSnapshot, mergeNFLLiveUpdate, validateNFLSnapshot } from '../src/sports/nfl/api/NFLService.js'
 import { isPropEligible, eligiblePropMarkets } from '../src/sports/nfl/logic/propEligibility.js'
-import { scoreNFLProp, scoreNFLSnapshot } from '../src/sports/nfl/logic/ScoringEngine.js'
+import { scoreNFLProp, scoreNFLSnapshot, deviggedImpliedProbability, calculateQuarterKelly } from '../src/sports/nfl/logic/ScoringEngine.js'
 import { assessNFLSignals, buildNFLSignals, nflStreakSignals } from '../src/sports/nfl/logic/signals.js'
 import { nflWeatherImpact } from '../src/sports/nfl/logic/weather.js'
 
@@ -198,4 +198,45 @@ test('spread game script bias boosts rush volume for heavy favorites and pass vo
   const dogPass = scoreNFLProp({ ...hill, spread: +8.5 }, 'receiving_yards')
   const favPass = scoreNFLProp({ ...hill, spread: -8.5 }, 'receiving_yards')
   assert.ok(dogPass.mean > favPass.mean)
+})
+
+test('deviggedImpliedProbability extracts true fair market implied probability', () => {
+  assert.equal(deviggedImpliedProbability(-110, -110), 0.5)
+  const twoSided = deviggedImpliedProbability(120, -140)
+  assert.ok(twoSided > 0.40 && twoSided < 0.46)
+
+  const singleSided = deviggedImpliedProbability(150)
+  assert.ok(singleSided < (100 / 250))
+  assert.equal(deviggedImpliedProbability(null), null)
+})
+
+test('calculateQuarterKelly sizes units responsibly and rejects negative EV', () => {
+  const plusEV = calculateQuarterKelly(0.55, 100)
+  assert.ok(plusEV >= 0.25 && plusEV <= 0.75)
+
+  const heavyEdge = calculateQuarterKelly(0.65, 120)
+  assert.ok(heavyEdge >= 0.75 && heavyEdge <= 2.0)
+
+  const minusEV = calculateQuarterKelly(0.40, 100)
+  assert.equal(minusEV, 0)
+  assert.equal(calculateQuarterKelly(null, 100), null)
+})
+
+test('sample gates and thin history cap unproven players to LEAN', () => {
+  const henry = player('Derrick Henry')
+  const thinPlayer = {
+    ...henry,
+    historyMatch: { games: 1 },
+    recentGames: [{ season: 2025, week: 1, rushingYards: 120, totalTds: 2 }],
+  }
+  const result = scoreNFLProp(thinPlayer, 'anytime_td')
+  assert.equal(result.grade, 'LEAN')
+  assert.ok(result.reasons.some((reason) => reason.includes('Thin sample (<3 games)')))
+})
+
+test('negative binomial model expands multi-TD tails for goal-line workhorses', () => {
+  const henry = player('Derrick Henry')
+  const goalLineHammer = scoreNFLProp({ ...henry, usage: { ...henry.usage, goalLineOpportunityShare: 0.60, goalLineTouchesL3: 7 } }, 'two_plus_td')
+  const committeeBack = scoreNFLProp({ ...henry, usage: { ...henry.usage, goalLineOpportunityShare: 0.10, goalLineTouchesL3: 0 } }, 'two_plus_td')
+  assert.ok(goalLineHammer.probability > committeeBack.probability)
 })
