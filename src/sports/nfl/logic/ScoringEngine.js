@@ -97,6 +97,38 @@ function splitFactor(player) {
   return clamp(1 + Number(player?.splits?.activeEdge || 0), 0.9, 1.1)
 }
 
+function teamTotalFactor(player, marketId) {
+  const teamTotal = Number(player?.teamTotal ?? player?.impliedTotal ?? player?.game?.teamTotal)
+  if (!Number.isFinite(teamTotal) || teamTotal <= 0) return 1
+  const leagueAvgTotal = 21.5
+  const ratio = (teamTotal - leagueAvgTotal) / leagueAvgTotal
+  if (['anytime_td', 'first_td', 'two_plus_td'].includes(marketId)) {
+    return clamp(1 + ratio * 0.45, 0.82, 1.22)
+  }
+  return clamp(1 + ratio * 0.25, 0.88, 1.12)
+}
+
+function spreadGameScriptFactor(player, marketId) {
+  const spread = Number(player?.spread ?? player?.game?.spread ?? player?.lineup?.spread)
+  if (!Number.isFinite(spread) || spread === 0) return 1
+  const isFavorite = spread < -1.5
+  const isUnderdog = spread > 1.5
+  const passMarkets = ['passing_yards', 'receiving_yards', 'receptions', 'passing_rushing_yards']
+  const rushMarkets = ['rushing_yards', 'rushing_receiving_yards']
+
+  if (isFavorite) {
+    const favMagnitude = Math.min(14, Math.abs(spread)) / 14
+    if (rushMarkets.includes(marketId)) return 1 + favMagnitude * 0.06
+    if (passMarkets.includes(marketId)) return 1 - favMagnitude * 0.04
+    if (player.position === 'RB' && ['anytime_td', 'first_td', 'two_plus_td'].includes(marketId)) return 1 + favMagnitude * 0.05
+  } else if (isUnderdog) {
+    const dogMagnitude = Math.min(14, Math.abs(spread)) / 14
+    if (passMarkets.includes(marketId)) return 1 + dogMagnitude * 0.06
+    if (rushMarkets.includes(marketId)) return 1 - dogMagnitude * 0.04
+  }
+  return 1
+}
+
 function probabilityGrade(probability, marketId, score, hasPrice) {
   if (hasPrice) return score >= 72 ? 'PRIME' : score >= 58 ? 'STRONG' : score >= 45 ? 'LEAN' : 'SKIP'
   const bands = marketId === 'first_td' ? [.12, .08, .045]
@@ -118,6 +150,8 @@ export function scoreNFLProp(player, marketId) {
   const lineup = player?.lineup?.projectionAdjusted ? 1 : rawLineup
   const liveDeployment = liveDeploymentFactor(player, marketId)
   const split = splitFactor(player)
+  const teamEnv = teamTotalFactor(player, marketId)
+  const gameScript = spreadGameScriptFactor(player, marketId)
   let probability
   let line = propLineFor(player, marketId)
   let mean = null
@@ -127,12 +161,12 @@ export function scoreNFLProp(player, marketId) {
     if (marketId === 'two_plus_td') probability = calibrateNFLProbability(probability, player?.modelCalibration?.two_plus_td)
   } else {
     mean = projectionMean(player, market)
-    mean = liveMean(player, market, mean) * weather.factor * defense * role * split * lineup * liveDeployment
+    mean = liveMean(player, market, mean) * weather.factor * defense * role * split * lineup * liveDeployment * teamEnv * gameScript
     const scale = distributionScale(market, mean)
     probability = logistic((mean - line) / scale)
   }
 
-  if (market.kind === 'touchdown') probability *= weather.factor * defense * role * split * lineup * liveDeployment
+  if (market.kind === 'touchdown') probability *= weather.factor * defense * role * split * lineup * liveDeployment * teamEnv * gameScript
   probability = clamp(probability)
   const marketEntry = player?.markets?.[marketId]
   const rawOdds = marketEntry?.odds
@@ -161,9 +195,11 @@ export function scoreNFLProp(player, marketId) {
     `${Math.round((liveDeployment - 1) * 100)}% live deployment adjustment`,
     `${Math.round((defense - 1) * 100)}% defense-vs-${player.position} adjustment`,
     weather.label,
+    teamEnv !== 1 ? `${Math.round((teamEnv - 1) * 100)}% team total scoring adjustment` : null,
+    gameScript !== 1 ? `${Math.round((gameScript - 1) * 100)}% spread script adjustment` : null,
     `${player.isHome ? 'Home' : 'Away'} split ${Number(player?.splits?.activeEdge || 0) >= 0 ? '+' : ''}${Math.round(Number(player?.splits?.activeEdge || 0) * 100)}%`,
     player?.usage?.roleLabel || 'Role not confirmed',
-  ]
+  ].filter(Boolean)
 
   return { marketId, eligible, probability, score, grade, line, odds: effectiveOdds, implied, edge, mean, weather, defenseFactor: defense, roleFactor: role, signals: buildNFLSignals(player), reasons }
 }

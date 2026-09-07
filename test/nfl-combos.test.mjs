@@ -97,7 +97,7 @@ test('Double Tap same-game coverage admits only disclosed 4% longshots with obse
   const players = snapshot.players.slice(0, 2).map((player, index) => ({
     ...player,
     gameId: 'same-game', team: index ? 'AWY' : 'HME', opponent: index ? 'HME' : 'AWY',
-    markets: { ...player.markets, two_plus_td: { probability: .041 } },
+    markets: { ...player.markets, two_plus_td: { probability: .032 } },
     historyMatch: { games: 8 }, lineup: null,
     usage: { ...player.usage, goalLineTouchesL3: 1, endZoneTargetsL3: 0, redZoneTargetsL3: 0 },
   }))

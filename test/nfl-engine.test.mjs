@@ -19,8 +19,8 @@ test('eligibility enforces positions and exact minimum lines', () => {
   assert.equal(isPropEligible(hill, 'receiving_yards'), true)
   assert.equal(isPropEligible(hill, 'rushing_yards'), true)
   assert.ok(eligiblePropMarkets(allen).some((market) => market.id === 'passing_rushing_yards'))
-  assert.equal(isPropEligible({ ...hill, propLines: { ...hill.propLines, receiving_yards: 149.5 } }, 'receiving_yards'), false)
-  assert.equal(isPropEligible({ ...hill, propLines: { ...hill.propLines, receiving_yards: 150 } }, 'receiving_yards'), true)
+  assert.equal(isPropEligible({ ...hill, propLines: { ...hill.propLines, receiving_yards: 24.5 } }, 'receiving_yards'), false)
+  assert.equal(isPropEligible({ ...hill, propLines: { ...hill.propLines, receiving_yards: 25 } }, 'receiving_yards'), true)
 })
 
 test('2+ TD probability uses multi-score math and remains below Anytime TD', () => {
@@ -174,4 +174,28 @@ test('live observed snaps and routes override pregame deployment after a real sa
   const baseline = scoreNFLProp(basePlayer, 'rushing_yards')
   const expanded = scoreNFLProp({ ...basePlayer, live: { ...basePlayer.live, observedSnapShare: .9 } }, 'rushing_yards')
   assert.ok(expanded.mean > baseline.mean)
+})
+
+test('team total scaling increases touchdown and yardage expectation for high-scoring offenses', () => {
+  const henry = player('Derrick Henry')
+  const highScoring = scoreNFLProp({ ...henry, teamTotal: 30.5 }, 'anytime_td')
+  const lowScoring = scoreNFLProp({ ...henry, teamTotal: 16.5 }, 'anytime_td')
+  assert.ok(highScoring.probability > lowScoring.probability)
+  assert.ok(highScoring.reasons.some((reason) => reason.includes('team total scoring adjustment')))
+
+  const highRush = scoreNFLProp({ ...henry, teamTotal: 30.5 }, 'rushing_yards')
+  const lowRush = scoreNFLProp({ ...henry, teamTotal: 16.5 }, 'rushing_yards')
+  assert.ok(highRush.mean > lowRush.mean)
+})
+
+test('spread game script bias boosts rush volume for heavy favorites and pass volume for underdogs', () => {
+  const henry = player('Derrick Henry')
+  const favorite = scoreNFLProp({ ...henry, spread: -8.5 }, 'rushing_yards')
+  const underdog = scoreNFLProp({ ...henry, spread: +8.5 }, 'rushing_yards')
+  assert.ok(favorite.mean > underdog.mean)
+
+  const hill = player('Tyreek Hill')
+  const dogPass = scoreNFLProp({ ...hill, spread: +8.5 }, 'receiving_yards')
+  const favPass = scoreNFLProp({ ...hill, spread: -8.5 }, 'receiving_yards')
+  assert.ok(dogPass.mean > favPass.mean)
 })
