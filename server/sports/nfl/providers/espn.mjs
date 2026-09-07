@@ -342,8 +342,27 @@ export async function fetchESPNRoster(teamAbbr, fetchImpl = fetch, teamId = null
   try {
     return parseESPNRoster(await getJSON(`${ESPN_BASE}/teams/${teamAbbr.toLowerCase()}/roster`, fetchImpl), teamAbbr)
   } catch (error) {
-    if (!teamId) throw error
-    return parseESPNRoster(await getJSON(`${ESPN_BASE}/teams/${teamId}/roster`, fetchImpl), teamAbbr)
+    if (teamId) {
+      try {
+        return parseESPNRoster(await getJSON(`${ESPN_BASE}/teams/${teamId}/roster`, fetchImpl), teamAbbr)
+      } catch {}
+    }
+    try {
+      const bundle = await fetchESPNDepthBundle(teamAbbr, fetchImpl)
+      if (bundle?.players?.length) {
+        return bundle.players.map((player) => ({
+          id: `espn-${player.espnId}`,
+          espnId: String(player.espnId),
+          name: player.name,
+          position: player.position,
+          team: teamAbbr,
+          headshotUrl: null,
+          rosterStatus: player.status || 'Active',
+          injury: null,
+        }))
+      }
+    } catch {}
+    throw error
   }
 }
 

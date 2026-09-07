@@ -87,6 +87,14 @@ test('ESPN providers use JSON depth charts and numeric roster fallback', async (
   }, '1')
   assert.match(rosterURLs[1], /teams\/1\/roster/)
   assert.equal(players.length, 3)
+
+  const fallbackPlayers = await fetchESPNRoster('ARI', async (url) => {
+    if (url.includes('/depthcharts')) return new Response(JSON.stringify(depthPayload), { status: 200 })
+    return new Response('{}', { status: 404 })
+  }, '22')
+  assert.equal(fallbackPlayers.length, 1)
+  assert.equal(fallbackPlayers[0].espnId, '7')
+  assert.equal(fallbackPlayers[0].team, 'ARI')
 })
 
 test('weather forecast chooses the kickoff hour and health reports missing feeds', () => {
