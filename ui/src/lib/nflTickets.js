@@ -45,9 +45,10 @@ export function settleNFLTicket(ticket, snapshot) {
   const legs = ticket.legs.map((leg) => settleNFLLeg(leg, byId.get(leg.playerId)))
   const statuses = new Set(legs.map((leg) => leg.status))
   const status = statuses.has('lost') ? 'lost'
-    : [...statuses].every((value) => value === 'won' || value === 'void') ? 'won'
-      : statuses.has('live') || statuses.has('won') ? 'live' : 'pending'
-  return { ...ticket, legs, status, settledAt: ['won', 'lost'].includes(status) ? ticket.settledAt || new Date().toISOString() : null }
+    : [...statuses].every((value) => value === 'void') ? 'void'
+      : [...statuses].every((value) => value === 'won' || value === 'void') ? 'won'
+        : statuses.has('live') || statuses.has('won') ? 'live' : 'pending'
+  return { ...ticket, legs, status, settledAt: ['won', 'lost', 'void'].includes(status) ? ticket.settledAt || new Date().toISOString() : null }
 }
 
 export function ticketExportText(ticket) {
@@ -96,4 +97,3 @@ export function nflTicketsCSV(tickets = []) {
   const rows = tickets.flatMap((ticket) => (ticket.legs || []).map((leg) => [ticket.id, ticket.createdAt, ticket.status, nflTicketProfit(ticket), leg.name, leg.marketLabel, leg.line, leg.odds, leg.probability, leg.status, leg.currentValue]))
   return [header, ...rows].map((row) => row.map(csvCell).join(',')).join('\n')
 }
-
