@@ -22,11 +22,13 @@ export const SPORT_UI = Object.freeze({
     primaryViews: [
       { id: 'signals', label: 'Signals', icon: 'Zap' },
       { id: 'bet-lab', label: 'Bet Lab', icon: 'Beaker' },
+      { id: 'fantasy', label: 'Fantasy Lab', icon: 'Trophy' },
       { id: 'performance', label: 'Performance', icon: 'Gauge' },
     ],
     mobileViews: [
       { id: 'signals', label: 'Signals', icon: 'Zap' },
       { id: 'bet-lab', label: 'Bet Lab', icon: 'Beaker' },
+      { id: 'fantasy', label: 'Fantasy', icon: 'Trophy' },
       { id: 'performance', label: 'Performance', icon: 'Gauge' },
     ],
   }),
