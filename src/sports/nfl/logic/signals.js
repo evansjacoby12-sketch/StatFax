@@ -1,3 +1,5 @@
+import { getRefereeCrew } from './referee.js'
+
 const STREAK_FIELDS = {
   touchdown: (game) => Number(game.totalTds ?? 0) > 0,
   receptions: (game) => Number(game.receptions ?? 0) >= 3,
@@ -14,8 +16,8 @@ const SIGNAL_PRIORITY = {
   'preseason-role-rising': 95, 'preseason-role-watch': 76, 'preseason-rest-protected': 68,
   'end-zone-alpha': 94, 'goal-to-go-dominator': 93, 'role-inheritance': 92, 'opportunity-spike': 91, 'drive-participation': 90,
   'qb-keeper-threat': 89, 'tprr-alpha': 88, 'red-zone-hammer': 87, 'goal-line-package': 86, 'goal-line': 85, 'air-yards-leader': 84, 'defense-funnel': 83,
-  'separation-edge': 82, 'yac-creator': 81, 'rushing-over-expected': 80, 'clean-pocket': 78, 'rz-targets': 77, 'rz-touches': 76,
-  'route-participation': 72, 'target-share': 71, 'snap-share': 70, 'lineup-confirmed': 69,
+  'ref-flag-heavy': 82, 'separation-edge': 82, 'yac-creator': 81, 'rushing-over-expected': 80, 'ref-dpi-edge': 79, 'clean-pocket': 78, 'rz-targets': 77, 'rz-touches': 76,
+  'ref-let-them-play': 75, 'route-participation': 72, 'target-share': 71, 'snap-share': 70, 'lineup-confirmed': 69,
 }
 
 const ASSESSMENT_ORDER = { avoid: 3, caution: 2, good: 1 }
@@ -123,6 +125,18 @@ export function nflRoleSignals(player) {
   if (Number(lineup.routesPerDropback) >= .75) signals.push({ key: 'route-participation', text: `${Math.round(lineup.routesPerDropback * 100)}% routes/dropback`, tone: 'strong' })
   if (lineup.redZone?.goalLinePackage) signals.push({ key: 'goal-line-package', text: 'Goal-line package', tone: 'prime' })
   if (lineup.restrictions?.snapLimit != null) signals.push({ key: 'snap-limit', text: `Snap limit ${Math.round(lineup.restrictions.snapLimit * 100)}%`, tone: Number(lineup.restrictions.snapLimit) <= .65 ? 'bad' : 'warn' })
+  const crew = getRefereeCrew(player.referee || player.game?.referee)
+  if (crew) {
+    if (crew.flagsPerGame <= 10.8) {
+      signals.push({ key: 'ref-let-them-play', text: `${crew.name} crew · low flags (${crew.flagsPerGame}/gm)`, tone: 'strong' })
+    } else if (crew.flagsPerGame >= 14.5) {
+      signals.push({ key: 'ref-flag-heavy', text: `${crew.name} crew · high flags (${crew.flagsPerGame}/gm)`, tone: 'warn' })
+    }
+    const isPassCatcher = ['WR', 'TE'].includes(player?.position)
+    if (isPassCatcher && crew.dpiPerGame >= 2.8 && (Number(usage.targetShare || 0) >= 0.20 || Number(usage.airYardsShare || 0) >= 0.25)) {
+      signals.push({ key: 'ref-dpi-edge', text: `${crew.name} crew · high DPI (${crew.dpiPerGame}/gm)`, tone: 'prime' })
+    }
+  }
   return signals
 }
 

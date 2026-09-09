@@ -1,0 +1,201 @@
+{
+  "_meta": {
+    "description": "Per-referee crew adjustments applied to NFL game pace, penalty rates, deep-pass conversion, and scoring models. 1.0 = neutral baseline (league average 12.2 flags/game, 102 penalty yards/game).",
+    "range": "0.96 to 1.04. Conservative bounded multipliers applied to situational scoring adjustments in the engine.",
+    "generatedAt": "2026-09-09"
+  },
+  "_default": {
+    "flagsPerGame": 12.2,
+    "penaltyYardsPerGame": 102.0,
+    "dpiPerGame": 2.1,
+    "offHoldingPerGame": 2.8,
+    "totalScoreFactor": 1.0,
+    "passFactor": 1.0,
+    "rushFactor": 1.0,
+    "tdFactor": 1.0,
+    "homeBiasYards": 0.0,
+    "style": "Balanced"
+  },
+  "crews": {
+    "Bill Vinovich": {
+      "flagsPerGame": 9.8,
+      "penaltyYardsPerGame": 84.2,
+      "dpiPerGame": 1.1,
+      "offHoldingPerGame": 1.9,
+      "totalScoreFactor": 1.025,
+      "passFactor": 1.01,
+      "rushFactor": 1.02,
+      "tdFactor": 1.02,
+      "homeBiasYards": 2.1,
+      "style": "Let Them Play"
+    },
+    "Clay Martin": {
+      "flagsPerGame": 10.4,
+      "penaltyYardsPerGame": 88.0,
+      "dpiPerGame": 1.3,
+      "offHoldingPerGame": 2.1,
+      "totalScoreFactor": 1.02,
+      "passFactor": 1.01,
+      "rushFactor": 1.015,
+      "tdFactor": 1.015,
+      "homeBiasYards": 3.4,
+      "style": "Let Them Play"
+    },
+    "Tra Blake": {
+      "flagsPerGame": 11.2,
+      "penaltyYardsPerGame": 94.0,
+      "dpiPerGame": 1.7,
+      "offHoldingPerGame": 2.4,
+      "totalScoreFactor": 1.015,
+      "passFactor": 1.01,
+      "rushFactor": 1.01,
+      "tdFactor": 1.01,
+      "homeBiasYards": 4.1,
+      "style": "Fast Tempo"
+    },
+    "Scott Novak": {
+      "flagsPerGame": 14.6,
+      "penaltyYardsPerGame": 124.0,
+      "dpiPerGame": 3.4,
+      "offHoldingPerGame": 3.2,
+      "totalScoreFactor": 1.03,
+      "passFactor": 1.03,
+      "rushFactor": 0.98,
+      "tdFactor": 1.03,
+      "homeBiasYards": 5.2,
+      "style": "DPI Heavy"
+    },
+    "Alex Kemp": {
+      "flagsPerGame": 13.2,
+      "penaltyYardsPerGame": 114.2,
+      "dpiPerGame": 3.1,
+      "offHoldingPerGame": 2.9,
+      "totalScoreFactor": 1.02,
+      "passFactor": 1.025,
+      "rushFactor": 0.99,
+      "tdFactor": 1.02,
+      "homeBiasYards": 6.8,
+      "style": "Deep Pass Edge"
+    },
+    "Land Clark": {
+      "flagsPerGame": 13.9,
+      "penaltyYardsPerGame": 116.0,
+      "dpiPerGame": 2.9,
+      "offHoldingPerGame": 3.1,
+      "totalScoreFactor": 1.015,
+      "passFactor": 1.02,
+      "rushFactor": 0.985,
+      "tdFactor": 1.015,
+      "homeBiasYards": 4.5,
+      "style": "Secondary Strict"
+    },
+    "Carl Cheffers": {
+      "flagsPerGame": 15.2,
+      "penaltyYardsPerGame": 128.5,
+      "dpiPerGame": 2.8,
+      "offHoldingPerGame": 3.6,
+      "totalScoreFactor": 0.98,
+      "passFactor": 0.99,
+      "rushFactor": 0.97,
+      "tdFactor": 0.98,
+      "homeBiasYards": 6.2,
+      "style": "Flag Heavy"
+    },
+    "Shawn Hochuli": {
+      "flagsPerGame": 14.4,
+      "penaltyYardsPerGame": 119.0,
+      "dpiPerGame": 2.6,
+      "offHoldingPerGame": 3.3,
+      "totalScoreFactor": 0.985,
+      "passFactor": 0.99,
+      "rushFactor": 0.98,
+      "tdFactor": 0.99,
+      "homeBiasYards": 7.4,
+      "style": "Strict Flags"
+    },
+    "Brad Allen": {
+      "flagsPerGame": 13.8,
+      "penaltyYardsPerGame": 112.0,
+      "dpiPerGame": 2.3,
+      "offHoldingPerGame": 3.0,
+      "totalScoreFactor": 1.0,
+      "passFactor": 1.0,
+      "rushFactor": 1.0,
+      "tdFactor": 1.0,
+      "homeBiasYards": 18.4,
+      "style": "Home Whistle"
+    },
+    "John Hussey": {
+      "flagsPerGame": 11.6,
+      "penaltyYardsPerGame": 96.0,
+      "dpiPerGame": 1.8,
+      "offHoldingPerGame": 2.3,
+      "totalScoreFactor": 1.005,
+      "passFactor": 1.0,
+      "rushFactor": 1.01,
+      "tdFactor": 1.005,
+      "homeBiasYards": 14.2,
+      "style": "Home Friendly"
+    },
+    "Ron Torbert": {
+      "flagsPerGame": 11.8,
+      "penaltyYardsPerGame": 98.5,
+      "dpiPerGame": 2.0,
+      "offHoldingPerGame": 2.6,
+      "totalScoreFactor": 1.01,
+      "passFactor": 1.005,
+      "rushFactor": 1.005,
+      "tdFactor": 1.01,
+      "homeBiasYards": 3.8,
+      "style": "Balanced"
+    },
+    "Clete Blakeman": {
+      "flagsPerGame": 13.5,
+      "penaltyYardsPerGame": 110.5,
+      "dpiPerGame": 2.7,
+      "offHoldingPerGame": 2.9,
+      "totalScoreFactor": 1.01,
+      "passFactor": 1.015,
+      "rushFactor": 0.99,
+      "tdFactor": 1.01,
+      "homeBiasYards": 5.1,
+      "style": "Pass Heavy Flow"
+    },
+    "Adrian Hill": {
+      "flagsPerGame": 12.1,
+      "penaltyYardsPerGame": 101.0,
+      "dpiPerGame": 2.1,
+      "offHoldingPerGame": 2.7,
+      "totalScoreFactor": 1.0,
+      "passFactor": 1.0,
+      "rushFactor": 1.0,
+      "tdFactor": 1.0,
+      "homeBiasYards": 4.0,
+      "style": "Balanced"
+    },
+    "Alan Eck": {
+      "flagsPerGame": 12.4,
+      "penaltyYardsPerGame": 103.0,
+      "dpiPerGame": 2.2,
+      "offHoldingPerGame": 2.8,
+      "totalScoreFactor": 1.0,
+      "passFactor": 1.0,
+      "rushFactor": 1.0,
+      "tdFactor": 1.0,
+      "homeBiasYards": 4.8,
+      "style": "Standard"
+    },
+    "Craig Wrolstad": {
+      "flagsPerGame": 12.0,
+      "penaltyYardsPerGame": 100.0,
+      "dpiPerGame": 2.0,
+      "offHoldingPerGame": 2.7,
+      "totalScoreFactor": 1.0,
+      "passFactor": 1.0,
+      "rushFactor": 1.0,
+      "tdFactor": 1.0,
+      "homeBiasYards": 3.5,
+      "style": "Balanced"
+    }
+  }
+}

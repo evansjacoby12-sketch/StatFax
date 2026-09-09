@@ -1,6 +1,7 @@
 import { NFL_PROP_MARKETS, isPropEligible, propLineFor } from './propEligibility.js'
 import { buildNFLSignals } from './signals.js'
 import { nflWeatherImpact } from './weather.js'
+import { nflRefereeImpact } from './referee.js'
 import { calibrateNFLProbability } from './calibration.js'
 
 const clamp = (value, min = 0.001, max = 0.999) => Math.max(min, Math.min(max, value))
@@ -421,19 +422,20 @@ export function scoreNFLProp(player, marketId) {
   const split = splitFactor(player)
   const teamEnv = teamTotalFactor(player, marketId)
   const gameScript = spreadGameScriptFactor(player, marketId)
+  const referee = nflRefereeImpact(player.referee || player.game?.referee, marketId, player)
   let probability
   let line = propLineFor(player, marketId)
   let mean = null
 
   if (market.kind === 'touchdown') {
     probability = touchdownProbability(player, marketId)
-    probability *= weather.factor * defense * role * split * lineup * liveDeployment * teamEnv * gameScript
+    probability *= weather.factor * defense * role * split * lineup * liveDeployment * teamEnv * gameScript * referee.factor
     if (marketId === 'two_plus_td') {
       probability = calibrateNFLProbability(probability, player?.modelCalibration?.two_plus_td)
     }
   } else {
     mean = projectionMean(player, market)
-    mean = liveMean(player, market, mean) * weather.factor * defense * role * split * lineup * liveDeployment * teamEnv * gameScript
+    mean = liveMean(player, market, mean) * weather.factor * defense * role * split * lineup * liveDeployment * teamEnv * gameScript * referee.factor
 
     if (market.id === 'receptions') {
       // Discrete Poisson CDF for integer receptions
@@ -495,6 +497,7 @@ export function scoreNFLProp(player, marketId) {
     `${Math.round((liveDeployment - 1) * 100)}% live deployment adjustment`,
     `${Math.round((defense - 1) * 100)}% defense-vs-${player.position} adjustment`,
     weather.label,
+    referee.factor !== 1.0 ? referee.label : null,
     teamEnv !== 1 ? `${Math.round((teamEnv - 1) * 100)}% team total scoring adjustment` : null,
     gameScript !== 1 ? `${Math.round((gameScript - 1) * 100)}% spread script adjustment` : null,
     historyCount > 0 && historyCount < 3 ? 'Thin sample (<3 games) · capped at LEAN' : null,
@@ -520,6 +523,7 @@ export function scoreNFLProp(player, marketId) {
     weather,
     defenseFactor: defense,
     roleFactor: role,
+    referee,
     signals: buildNFLSignals(player),
     reasons,
   }

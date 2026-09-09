@@ -145,8 +145,16 @@ Authority: `server/sports/nfl/fetch-nfl-slate.mjs`, `server/sports/nfl/preseason
   - **Quarter-Kelly Sizing**: Recommended unit allocations use conservative Quarter-Kelly ($f^* \times 0.25$, bounded between $0.25\text{u}$ and $2.00\text{u}$ in clean quarter-unit steps). Negative expected value yields $0\text{u}$ / unrecommended.
   - **Sample & Lineup Gates**: Thin player histories ($< 3$ regular-season games) are capped at `LEAN` with an explicit reason (`Thin sample (<3 games) · capped at LEAN`). Unconfirmed rotational players (depth order $> 2$) are capped below `PRIME`. `PRIME` tier strictly requires verified positive edge ($\text{Edge} > 0$).
   - **Same-Game TD Joint Correlation**: Touchdown parlays partition legs into game clusters. Multiple First TD scorers in the same game evaluate to $P=0$ and flag an invalid ticket conflict. Same-team combinations apply touch budget cannibalization ($0.84\times$ for multi-RB, $0.92\times$ for multi-WR/TE, $0.94\times$ for RB+WR), while opposing offensive scorers receive cross-team shootout synergy ($1.06\times$).
-  - **Vegas Implied Total & Script Biasing**: Team scoring environment scales touchdown probability ($\pm 24\%$) and yardages ($\pm 14\%$) relative to league average ($21.5\text{ pts}$). Spread-based game-script biasing adjusts rush volume ($+8\%$) and RB TD rates ($+6\%$) for heavy favorites ($\le -1.5$), and pass/receiving volume ($+8\%$) for heavy underdogs ($\ge +1.5$).
-- Rollback: switch `ScoringEngine.js` back to flat logistic curves and simple grade bands, remove preseason role application in `fetch-nfl-slate.mjs`, and revert the snapshot model version.
+- **Officiating & Referee Crew Modeling (v2)**:
+  - Authority: `src/sports/nfl/logic/referee.js` and `src/sports/nfl/data/referee-crews.json`.
+  - Integrates multi-year validated head referee crew tendencies (penalty rates, DPI frequency, offensive holding rates, home-whistle bias, and over/under total impact).
+  - Multipliers are conservative and bounded in $[0.95, 1.05]$:
+    - **Let Them Play Crews** (e.g. Bill Vinovich, Clay Martin, $\le 10.5$ flags/gm): $+2.5\%$ game pace and scoring efficiency boost.
+    - **DPI-Heavy Crews** (e.g. Scott Novak, Alex Kemp, Land Clark, $\ge 2.8$ DPI/gm): $+2-3\%$ pass yardage and red-zone passing TD conversion boost for outside deep threats.
+    - **Flag-Heavy / Strict Crews** (e.g. Carl Cheffers, Shawn Hochuli, $\ge 14.5$ flags/gm): $-2-3\%$ drag on rushing efficiency due to drive stalls and holding penalties.
+    - **Home-Whistle Bias** (e.g. Brad Allen, John Hussey, $+14-18\text{ yds}$ disparity): $\pm 1\%$ home/away adjustment.
+  - Signals: `ref-let-them-play` (low flags), `ref-dpi-edge` (high secondary DPI), `ref-flag-heavy` (penalty risk warning).
+- Rollback: switch `ScoringEngine.js` back to flat logistic curves and simple grade bands, remove preseason role application in `fetch-nfl-slate.mjs`, remove referee crew multipliers, and revert the snapshot model version.
 
 ## Required proof for a production model change
 
