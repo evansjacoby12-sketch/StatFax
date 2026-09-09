@@ -109,27 +109,44 @@ Authority: `src/sports/mlb/logic/firstInningProjection.js` on top of Forecast V1
 - Game Combo Lab all-hit probability is the independent product of the already-produced leg probabilities. Combo price and EV stay unavailable until a real NRFI price is stored. Seven-day 2-leg and 3-leg records are reconstructed deterministically from frozen pregame calls; results grade the recipe but never select its legs.
 - Rollback for Game Combo Lab v1 is removal of its BetLab tab and derived UI engine. Forecast V11, NRFI/YRFI, and their tracking records remain unchanged.
 
-## NFL TD engine and preseason role layer
+## NFL TD & Props engine (Scoring Engine v2)
 
-Authority: `server/sports/nfl/fetch-nfl-slate.mjs`, `server/sports/nfl/preseason.mjs`, and `src/sports/nfl/logic/ScoringEngine.js`. Snapshot model version: `nfl-td-v4-preseason-role-1`.
+Authority: `server/sports/nfl/fetch-nfl-slate.mjs`, `server/sports/nfl/preseason.mjs`, and `src/sports/nfl/logic/ScoringEngine.js`. Snapshot model version: `nfl-scoring-engine-v2`.
 
 - Preseason games are role evidence only and never enter regular-season probability calibration or historical backtests.
 - One preseason game can emit a visible WATCH signal but cannot adjust Week 1. An adjustment requires repeated opportunity evidence across at least two games or an official depth-chart promotion.
 - Listed starters with zero preseason work are rest-protected. Absence alone cannot lower a projection.
 - Qualified role movement is capped at ±4% for TD markets and ±3% for yardage/reception markets. It changes lineup role factors, not the historical calibration artifact.
 - ESPN box-score attempts, carries, targets and play-by-play-derived scoring-area opportunities are observed. Complete snap and route participation is unavailable in the public ESPN response and remains null unless a verified, timestamped, source-labeled overlay supplies it.
-- **Market line benchmarking & fair odds fallbacks (2026-09-07)**:
+- **Mathematical Foundations & Continuous Yardage Modeling (v2)**:
+  - Continuous yardage props (passing, rushing, receiving, rushing + receiving, passing + rushing) are modeled via a **Parametric Lognormal Cumulative Distribution Function (CDF)** rather than symmetric logistic curves, properly reflecting right-skewed, strictly positive football production:
+    $$P(Y > L) = 1 - \Phi\left(\frac{\ln(L) - (\ln(\mu) - \frac{1}{2}\sigma^2)}{\sigma}\right), \quad \sigma = \sqrt{\ln(1 + CV^2)}$$
+  - Market-specific Coefficients of Variation ($CV$): Passing (0.28), Combo Pass+Rush (0.26), Rushing (0.38 for bellcows with $\ge 75\%$ snaps, 0.52 for committees), Receiving (0.44 for WR alphas with $\ge 25\%$ target share, 0.58 for secondary options), Combo Rush+Rec (0.36).
+  - High-precision Abramowitz & Stegun polynomial approximation of $\Phi(z)$ ($|\text{error}| < 7.5\times 10^{-8}$).
+- **Discrete Poisson Modeling for Integer Receptions (v2)**:
+  - Reception props ($3.5, 4.5, 5.5, 6.5, \dots$) are modeled with an **exact discrete Poisson summation**:
+    $$P(K > L) = 1 - \sum_{k=0}^{\lfloor L \rfloor} \frac{\lambda^k e^{-\lambda}}{k!}$$
+- **Touchdown Modeling Across Markets (v2)**:
+  - **Anytime TD**: Calibrated from goal-line opportunity share, red-zone target share, conversion efficiency, and defense red-zone allowance.
+  - **First TD**: Models scripted drive-1 target share and position-specific opening drive tendencies (RB $0.30\times$, WR $0.25\times$, TE $0.22\times$ of anytime probability).
+  - **2+ TD (Multi-TD)**: Zero-Inflated Negative Binomial (ZINB) / Gamma-mixture overdispersion ($\alpha = 0.22$) for goal-line workhorses ($\ge 30\%$ goal-to-go share or $\ge 3$ goal-line touches in last 3 games); standard Poisson for committee rushers.
+- **3-Factor Composite 0-100 Rank Matrix (v2)**:
+  - Rank Score $= 0.50 \cdot \text{LikelihoodScore} + 0.30 \cdot \text{RoleScore} + 0.20 \cdot \text{MatchupScore}$.
+  - Likelihood Score ($50\%$): Evaluates the player's true model production probability and scoring likelihood on the field, independent of sportsbook price or juice.
+  - Role Score ($30\%$): Position-aware volume dominance normalized to true NFL ceilings (RB: snap + carry/goal-line + RZ; WR/TE: snap + target share + RZ; QB: snap + RZ).
+  - Matchup Score ($20\%$): Opponent defense vulnerability vs position ($60\%$), team total scoring environment ($25\%$), and spread game-script bias ($15\%$).
+  - Tier Grades (`PRIME`, `STRONG`, `LEAN`, `SKIP`) are driven by true model likelihood and volume rank, ensuring superstars (like AJ Brown, Tyreek Hill, Ja'Marr Chase) earn top-tier grades based on real-world football dominance.
+- **Market line benchmarking & fair odds fallbacks**:
   - Over/under yardage and volume prop markets benchmark against standard American -110 juice (52.38% implied break-even) when an active line is posted but specific bookmaker juice is unquoted.
   - Touchdown markets (`anytime_td`, `first_td`, `two_plus_td`) compute edge against posted American sportsbook odds when available. When unquoted, the UI computes and explicitly labels fair odds (`Fair +...`) and fair multiplier baselines without manufacturing an artificial positive edge.
   - Multi-field odds resolution supports `odds`, `overOdds`, `price`, `american`, and `propOdds`.
-- **Full Model Standardization & Bankroll Sizing (2026-09-07)**:
+- **Full Model Standardization & Bankroll Sizing**:
   - **De-Vigged Fair Probability**: Two-sided quotes are normalized via $P_{\text{over}} / (P_{\text{over}} + P_{\text{under}})$; single-sided quotes strip standard 4.5% book hold. Model Edge is strictly fair alpha: $\text{Edge} = P_{\text{model}} - P_{\text{fair}}$.
   - **Quarter-Kelly Sizing**: Recommended unit allocations use conservative Quarter-Kelly ($f^* \times 0.25$, bounded between $0.25\text{u}$ and $2.00\text{u}$ in clean quarter-unit steps). Negative expected value yields $0\text{u}$ / unrecommended.
   - **Sample & Lineup Gates**: Thin player histories ($< 3$ regular-season games) are capped at `LEAN` with an explicit reason (`Thin sample (<3 games) · capped at LEAN`). Unconfirmed rotational players (depth order $> 2$) are capped below `PRIME`. `PRIME` tier strictly requires verified positive edge ($\text{Edge} > 0$).
-  - **Overdispersed Multi-TD Distribution**: 2+ TD props for lead goal-line rushers ($\ge 35\%$ goal-to-go share or $\ge 3$ goal-line touches in last 3 games) use an overdispersed Negative-Binomial model ($\alpha = 0.20$) to properly capture multi-touchdown clustering.
   - **Same-Game TD Joint Correlation**: Touchdown parlays partition legs into game clusters. Multiple First TD scorers in the same game evaluate to $P=0$ and flag an invalid ticket conflict. Same-team combinations apply touch budget cannibalization ($0.84\times$ for multi-RB, $0.92\times$ for multi-WR/TE, $0.94\times$ for RB+WR), while opposing offensive scorers receive cross-team shootout synergy ($1.06\times$).
-  - **Vegas Implied Total & Script Biasing**: Team scoring environment scales touchdown probability ($\pm 22\%$) and yardages ($\pm 12\%$) relative to league average ($21.5\text{ pts}$). Spread-based game-script biasing adjusts rush volume ($+6\%$) and RB TD rates ($+5\%$) for heavy favorites ($\le -1.5$), and pass/receiving volume ($+6\%$) for heavy underdogs ($\ge +1.5$).
-- Rollback: remove the preseason role application in `fetch-nfl-slate.mjs`, retain `preseason.json` as a non-scoring observation ledger, and revert the snapshot model version to the prior NFL contract.
+  - **Vegas Implied Total & Script Biasing**: Team scoring environment scales touchdown probability ($\pm 24\%$) and yardages ($\pm 14\%$) relative to league average ($21.5\text{ pts}$). Spread-based game-script biasing adjusts rush volume ($+8\%$) and RB TD rates ($+6\%$) for heavy favorites ($\le -1.5$), and pass/receiving volume ($+8\%$) for heavy underdogs ($\ge +1.5$).
+- Rollback: switch `ScoringEngine.js` back to flat logistic curves and simple grade bands, remove preseason role application in `fetch-nfl-slate.mjs`, and revert the snapshot model version.
 
 ## Required proof for a production model change
 

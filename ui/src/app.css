@@ -16887,9 +16887,22 @@ button.th:focus-visible {
 }
 .sport-signal-chip.active svg,
 .sport-signal-chip.active b { color: var(--signal-color); }
-.sport-signal-chip.zero-count:not(.active) { opacity: .48; }
-.sport-signal-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.nfl-prop-filters { grid-template-columns: minmax(210px, 1fr) 130px 120px 150px 132px; align-items: stretch; }
+.nfl-filter-controls-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.nfl-filter-controls-wrap .nfl-prop-filters {
+  flex: 1 1 540px;
+  margin-bottom: 0;
+}
+.nfl-grade-spectrum-rail {
+  flex: 0 0 auto;
+  max-width: 100%;
+}
+.nfl-prop-filters { grid-template-columns: minmax(180px, 1.2fr) 110px 110px 110px 135px 120px; align-items: stretch; }
 .nfl-prop-filters .select-wrap {
   width: 100%;
   height: 40px;

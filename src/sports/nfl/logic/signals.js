@@ -13,8 +13,8 @@ const SIGNAL_PRIORITY = {
   'snap-limit': 100, 'scoring-role-lost': 99, 'preseason-role-falling': 99, 'quick-pressure-risk': 98, 'protection-mismatch': 97, 'committee-risk': 96,
   'preseason-role-rising': 95, 'preseason-role-watch': 76, 'preseason-rest-protected': 68,
   'end-zone-alpha': 94, 'goal-to-go-dominator': 93, 'role-inheritance': 92, 'opportunity-spike': 91, 'drive-participation': 90,
-  'qb-keeper-threat': 89, 'goal-line-package': 88, 'goal-line': 87, 'air-yards-leader': 86, 'defense-funnel': 85,
-  'separation-edge': 84, 'yac-creator': 83, 'rushing-over-expected': 82, 'rz-targets': 80, 'rz-touches': 79,
+  'qb-keeper-threat': 89, 'tprr-alpha': 88, 'red-zone-hammer': 87, 'goal-line-package': 86, 'goal-line': 85, 'air-yards-leader': 84, 'defense-funnel': 83,
+  'separation-edge': 82, 'yac-creator': 81, 'rushing-over-expected': 80, 'clean-pocket': 78, 'rz-targets': 77, 'rz-touches': 76,
   'route-participation': 72, 'target-share': 71, 'snap-share': 70, 'lineup-confirmed': 69,
 }
 
@@ -110,6 +110,9 @@ export function nflRoleSignals(player) {
   if (tracking && n(tracking.averageSeparation) >= 3.2) signals.push({ key: 'separation-edge', text: `${n(tracking.averageSeparation).toFixed(1)} yd separation`, tone: 'strong' })
   if (opponentDefense.trackingVerified === true && n(lineup.offensiveLine?.passProtectionFactor) <= .94 && n(opponentDefense.pressureRate) >= .28) signals.push({ key: 'protection-mismatch', text: `${pct(opponentDefense.pressureRate)} opponent pressure rate`, tone: 'bad' })
   if (opponentDefense.trackingVerified === true && n(opponentDefense.quickPressureRate) >= .25) signals.push({ key: 'quick-pressure-risk', text: `${pct(opponentDefense.quickPressureRate)} quick-pressure rate`, tone: 'bad' })
+  if (n(usage.targetShare) >= .28 && Number(lineup.routesPerDropback || usage.snapShare || 0) >= .70) signals.push({ key: 'tprr-alpha', text: `${pct(usage.targetShare)} target earner`, tone: 'prime' })
+  if (n(usage.redZoneOpportunityShare) >= .45) signals.push({ key: 'red-zone-hammer', text: `${pct(usage.redZoneOpportunityShare)} team red-zone share`, tone: 'prime' })
+  if (Number(lineup.offensiveLine?.passProtectionFactor || 0) >= 1.05) signals.push({ key: 'clean-pocket', text: 'Clean pocket protection', tone: 'strong' })
   if (Number(usage.redZoneTargetsL3) >= 5) signals.push({ key: 'rz-targets', text: `${usage.redZoneTargetsL3} RZ targets L3`, tone: 'prime' })
   if (Number(usage.redZoneTouchesL3) >= 10) signals.push({ key: 'rz-touches', text: `${usage.redZoneTouchesL3} RZ touches L3`, tone: 'prime' })
   if (Number(usage.goalLineTouchesL3) >= 4) signals.push({ key: 'goal-line', text: 'Goal-line role', tone: 'strong' })
