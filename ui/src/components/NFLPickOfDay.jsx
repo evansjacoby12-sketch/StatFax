@@ -6,6 +6,7 @@ import { nflSignalText } from '../lib/nflExplanations.js'
 import { assessNFLSignals } from '../../../src/sports/nfl/logic/signals.js'
 import { NFL_PROP_MARKET_LIST } from '../../../src/sports/nfl/logic/propEligibility.js'
 import { americanOdds } from '../lib/nflCombos.js'
+import { getNFLPropSettlement, isNFLTDMarket } from '../lib/nflTickets.js'
 
 const GRADE_COLORS = { PRIME: 'var(--prime)', STRONG: 'var(--strong)', LEAN: 'var(--lean)', SKIP: 'var(--skip)' }
 
@@ -20,9 +21,9 @@ const pct = (value, digits = 1) => value == null ? '—' : `${(value * 100).toFi
 const odds = (value) => value == null ? '—' : value > 0 ? `+${value}` : String(value)
 const number = (value, digits = 0) => value == null || !Number.isFinite(Number(value)) ? '—' : Number(value).toFixed(digits)
 
-function marketValue(player, model, marketId) {
+function marketValue(player, model, marketId, side = 'over') {
   if (!model) return '—'
-  const isTD = ['anytime_td', 'first_td', 'two_plus_td'].includes(marketId)
+  const isTD = isNFLTDMarket(marketId)
   if (isTD) {
     if (model.odds != null) return odds(model.odds)
     if (model.probability != null && model.probability > 0) {
@@ -31,8 +32,11 @@ function marketValue(player, model, marketId) {
     }
     return '—'
   }
-  const lineStr = model.line != null ? `O ${number(model.line, marketId === 'receptions' ? 1 : 1)}` : null
-  const oddsStr = model.odds != null ? `(${odds(model.odds)})` : null
+  const effectiveSide = side === 'under' || model.side === 'under' ? 'under' : 'over'
+  const sidePrefix = effectiveSide === 'under' ? 'U' : 'O'
+  const activeOdds = effectiveSide === 'under' ? (model.underOdds ?? model.odds) : (model.overOdds ?? model.odds)
+  const lineStr = model.line != null ? `${sidePrefix} ${number(model.line, marketId === 'receptions' ? 1 : 1)}` : null
+  const oddsStr = activeOdds != null ? `(${odds(activeOdds)})` : null
   if (lineStr && oddsStr) return `${lineStr} ${oddsStr}`
   if (lineStr) return lineStr
   if (oddsStr) return oddsStr
@@ -92,6 +96,8 @@ function compactSignalValue(signal) {
 export default function NFLPickOfDay({
   player,
   marketId = 'anytime_td',
+  side = 'over',
+  onSetSide,
   watched = false,
   inSlip = false,
   onSelect,
@@ -105,6 +111,7 @@ export default function NFLPickOfDay({
   if (!player) return null
 
   const { model } = player
+  const isTD = isNFLTDMarket(marketId)
   const gradeColor = GRADE_COLORS[model.grade] || 'var(--prime)'
   const teamColor = NFL_TEAM_COLORS[player.team] || '#9795cb'
   const assessment = assessNFLSignals(model.signals)
@@ -112,6 +119,7 @@ export default function NFLPickOfDay({
   const score = Math.round(Number(model.score || 0))
   const proofSignals = model.signals.slice(0, 4)
   const hasHeadshot = Boolean(player.headshotUrl && !failedHeadshot)
+  const settlement = getNFLPropSettlement(player, marketId, model.line, side)
 
   return (
     <section
@@ -130,6 +138,31 @@ export default function NFLPickOfDay({
           <strong id="nfl-potd-title">Model Top Pick</strong>
           <span className="dot-sep">·</span>
           <span className="nfl-potd-market-pill">{marketInfo?.label || marketId}</span>
+          {!isTD && onSetSide && (
+            <div className="nfl-side-toggle is-compact" role="group" aria-label="Top pick side selector">
+              <button
+                type="button"
+                className={`side-btn ${side === 'over' ? 'active' : ''}`}
+                onClick={() => onSetSide('over')}
+              >
+                OVER
+              </button>
+              <button
+                type="button"
+                className={`side-btn ${side === 'under' ? 'active' : ''}`}
+                onClick={() => onSetSide('under')}
+              >
+                UNDER
+              </button>
+            </div>
+          )}
+          {settlement.status !== 'pending' && (
+            <span className={`nfl-settlement-badge is-${settlement.status}`}>
+              <Icon name={settlement.status === 'won' ? 'CheckCircle2' : settlement.status === 'lost' ? 'XCircle' : 'Activity'} size={12} />
+              <b>{settlement.status.toUpperCase()}</b>
+              {settlement.label && <small>{settlement.label}</small>}
+            </span>
+          )}
         </div>
         {onDismiss && (
           <button
@@ -218,7 +251,7 @@ export default function NFLPickOfDay({
           <div className="nfl-potd-stat-box is-market">
             <small>MARKET & EDGE</small>
             <div className="nfl-potd-edge-val">
-              <strong className="mono">{marketValue(player, model, marketId)}</strong>
+              <strong className="mono">{marketValue(player, model, marketId, side)}</strong>
               <em className={`mono ${model.edge == null ? '' : model.edge >= 0 ? 'positive' : 'negative'}`}>
                 {model.edge == null ? (model.probability > 0 ? 'Fair baseline' : 'No line') : `${model.edge >= 0 ? '+' : ''}${pct(model.edge)}${model.suggestedUnits != null ? ` (${model.suggestedUnits}u)` : ''}`}
               </em>
@@ -256,10 +289,10 @@ export default function NFLPickOfDay({
           <button
             type="button"
             className={`nfl-potd-btn is-slip ${inSlip ? 'is-added' : ''}`}
-            onClick={() => onToggleSlip?.(player)}
+            onClick={() => onToggleSlip?.(player, side)}
           >
             <Icon name={inSlip ? 'Check' : 'Plus'} size={14} />
-            <span>{inSlip ? 'In Slip' : 'Add to Slip'}</span>
+            <span>{inSlip ? 'In Slip' : isTD ? 'Take TD' : `Take ${side === 'under' ? 'Under' : 'Over'}`}</span>
           </button>
           <button
             type="button"
@@ -275,3 +308,4 @@ export default function NFLPickOfDay({
     </section>
   )
 }
+

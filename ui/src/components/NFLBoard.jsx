@@ -15,7 +15,7 @@ import { NFL_PROP_MARKET_LIST, eligiblePropMarkets, eligibilityReason } from '..
 import { scoreNFLSnapshot, scoreNFLProp } from '../../../src/sports/nfl/logic/ScoringEngine.js'
 import { assessNFLSignals } from '../../../src/sports/nfl/logic/signals.js'
 import { loadNFLSnapshot } from '../../../src/sports/nfl/api/NFLService.js'
-import { isNFLTDMarket, nflLegKey, settleNFLTicket, summarizeNFLTickets, filterNFLTickets, nflTicketsCSV, ticketExportText, nflTicketProfit } from '../lib/nflTickets.js'
+import { isNFLTDMarket, nflLegKey, parseNFLLegKey, getNFLPropSettlement, settleNFLTicket, summarizeNFLTickets, filterNFLTickets, nflTicketsCSV, ticketExportText, nflTicketProfit } from '../lib/nflTickets.js'
 import { useEliLevel } from '../lib/eliLevel.js'
 import { nflSignalCaption, nflSignalText } from '../lib/nflExplanations.js'
 import { SPORT_UI } from '../lib/sportUi.js'
@@ -408,56 +408,154 @@ function PlayerCard({ player, marketId, watched, inSlip, onSelect, onToggleWatch
         </div>
       </button>
       <footer>
+        {!isTD && onSetSide && (
+          <div className="nfl-side-toggle" role="group" aria-label="Over or Under">
+            <button type="button" className={`side-btn ${side === 'over' ? 'active' : ''}`} onClick={(e) => { e.stopPropagation(); onSetSide(player.id, 'over') }}>O</button>
+            <button type="button" className={`side-btn ${side === 'under' ? 'active' : ''}`} onClick={(e) => { e.stopPropagation(); onSetSide(player.id, 'under') }}>U</button>
+          </div>
+        )}
+        <button className={`nfl-card-slip ${inSlip ? 'active' : ''}`} onClick={() => onToggleSlip(player, side)}><Icon name={inSlip ? 'Check' : 'Plus'} size={14} />{inSlip ? 'Added' : isTD ? 'Add to slip' : `Add ${side === 'under' ? 'Under' : 'Over'}`}</button>
         <button className={watched ? 'active' : ''} onClick={() => onToggleWatch(player)} aria-label={`${watched ? 'Stop watching' : 'Watch'} ${player.name}`}><Icon name="Star" size={15} /></button>
-        <button className={`nfl-card-slip ${inSlip ? 'active' : ''}`} onClick={() => onToggleSlip(player)}><Icon name={inSlip ? 'Check' : 'Plus'} size={14} />{inSlip ? 'Added' : 'Add to slip'}</button>
       </footer>
     </article>
   )
 }
 
-function BoardRow({ player, rank, marketId, watched, inSlip, onSelect, onToggleWatch, onToggleSlip }) {
+function BoardRow({ player, rank, marketId, side = 'over', onSetSide, watched, inSlip, onSelect, onToggleWatch, onToggleSlip }) {
   const eliLevel = useEliLevel()
   const { model } = player
+  const isTD = isNFLTDMarket(marketId)
   const color = GRADE_COLORS[model.grade]
   const assessment = assessNFLSignals(model.signals)
   const strongestSignal = model.signals[0] || null
   const score = Math.round(Number(model.score || 0))
-  const stop = (callback) => (event) => { event.stopPropagation(); callback(player) }
+  const stop = (callback) => (event) => { event.stopPropagation(); callback?.(player) }
   const onKeyDown = (event) => {
     if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelect(player) }
   }
   const evidenceTone = (signal) => signal?.assessment === 'avoid' ? 'bad' : signal?.assessment === 'caution' ? 'warn' : 'good'
   const assessmentMeta = ASSESSMENT_META[assessment.level]
   const proofSignals = model.signals.slice(0, 3)
+  const settlement = getNFLPropSettlement(player, marketId, model.line, side)
   const matchup = <><b>{player.team}</b><Icon name="ChevronRight" size={10} aria-hidden="true" /><span>{player.opponent}</span><span className="dl-separator">·</span><span>{player.kickoff}</span><span className="dl-separator">·</span><span>{liveLabel(player)}</span></>
+
   return (
     <div className="board-swipe nfl-board-swipe" data-flip-id={player.id}>
       <div className="mobile-decision-card nfl-mobile-decision-card" style={{ '--dl-color': color }} role="button" tabIndex={0} onClick={() => onSelect(player)} onKeyDown={onKeyDown}>
-        <div className="mobile-dl-main"><PlayerHeadshotSilo player={player} /><div className="mobile-dl-identity-copy"><div className="mobile-dl-name"><span className="mobile-dl-rank mono">{String(rank).padStart(2, '0')}</span><strong>{player.name}</strong><small className="mono">{player.position}</small><span className={`nfl-mobile-risk is-${assessment.level}`}><Icon name={assessmentMeta.icon} size={9} />{assessment.label}</span></div><div className="mobile-dl-matchup">{matchup}</div></div></div>
-        <div className="mobile-dl-verdict"><b className="mono" style={{ color }}>{pct(model.probability)}</b><span style={{ color }}>{model.grade} {score}</span></div>
-        <div className="mobile-dl-evidence">{strongestSignal && <span className={`mobile-dl-signal ${evidenceTone(strongestSignal)}`}><Icon name={signalIcon(strongestSignal)} size={10} />{nflSignalText(strongestSignal, eliLevel)}</span>}<span className="mobile-dl-proof-metrics"><span><b className="mono">{marketValue(player, model, marketId)}</b><small>MARKET</small></span><i /><span className={model.edge == null ? '' : model.edge >= 0 ? 'good' : 'bad'}><b className="mono">{model.edge == null ? (model.probability > 0 ? 'Fair' : '—') : `${model.edge >= 0 ? '+' : ''}${pct(model.edge)}`}</b><small>EDGE</small></span>{model.suggestedUnits != null && <><i /><span className="good"><b className="mono">{model.suggestedUnits}u</b><small>SIZE</small></span></>}</span><Icon className="mobile-dl-disclose" name="ChevronDown" size={14} /></div>
-        <div className="mobile-dl-actions" onClick={(event) => event.stopPropagation()}><button className={watched ? 'watch' : ''} onClick={stop(onToggleWatch)} aria-label={watched ? `Remove ${player.name} from watchlist` : `Watch ${player.name}`}><Icon name="Star" size={16} />{watched ? 'Watching' : 'Watch'}</button><button className={inSlip ? 'slip' : ''} onClick={stop(onToggleSlip)} aria-label={inSlip ? `Remove ${player.name} from slip` : `Add ${player.name} to slip`}><Icon name={inSlip ? 'Check' : 'Plus'} size={17} />{inSlip ? 'Added' : 'Add'}</button></div>
+        <div className="mobile-dl-main">
+          <PlayerHeadshotSilo player={player} />
+          <div className="mobile-dl-identity-copy">
+            <div className="mobile-dl-name">
+              <span className="mobile-dl-rank mono">{String(rank).padStart(2, '0')}</span>
+              <strong>{player.name}</strong>
+              <small className="mono">{player.position}</small>
+              <span className={`nfl-mobile-risk is-${assessment.level}`}><Icon name={assessmentMeta.icon} size={9} />{assessment.label}</span>
+              {settlement.status !== 'pending' && (
+                <span className={`nfl-settlement-badge is-${settlement.status}`}>
+                  <Icon name={settlement.status === 'won' ? 'CheckCircle2' : settlement.status === 'lost' ? 'XCircle' : 'Activity'} size={10} />
+                  <b>{settlement.status.toUpperCase()}</b>
+                  {settlement.label && <small>{settlement.label}</small>}
+                </span>
+              )}
+            </div>
+            <div className="mobile-dl-matchup">{matchup}</div>
+          </div>
+        </div>
+        <div className="mobile-dl-verdict">
+          <b className="mono" style={{ color }}>{pct(model.probability)}</b>
+          <span style={{ color }}>{model.grade} {score}</span>
+        </div>
+        <div className="mobile-dl-evidence">
+          {strongestSignal && <span className={`mobile-dl-signal ${evidenceTone(strongestSignal)}`}><Icon name={signalIcon(strongestSignal)} size={10} />{nflSignalText(strongestSignal, eliLevel)}</span>}
+          <span className="mobile-dl-proof-metrics">
+            <span><b className="mono">{marketValue(player, model, marketId, side)}</b><small>MARKET</small></span>
+            <i />
+            <span className={model.edge == null ? '' : model.edge >= 0 ? 'good' : 'bad'}>
+              <b className="mono">{model.edge == null ? (model.probability > 0 ? 'Fair' : '—') : `${model.edge >= 0 ? '+' : ''}${pct(model.edge)}`}</b>
+              <small>EDGE</small>
+            </span>
+            {model.suggestedUnits != null && <><i /><span className="good"><b className="mono">{model.suggestedUnits}u</b><small>SIZE</small></span></>}
+          </span>
+          <Icon className="mobile-dl-disclose" name="ChevronDown" size={14} />
+        </div>
+        <div className="mobile-dl-actions" onClick={(event) => event.stopPropagation()}>
+          {!isTD && onSetSide && (
+            <div className="nfl-side-toggle is-mobile" role="group" aria-label="Over or Under">
+              <button type="button" className={`side-btn ${side === 'over' ? 'active' : ''}`} onClick={stop(() => onSetSide(player.id, 'over'))}>O</button>
+              <button type="button" className={`side-btn ${side === 'under' ? 'active' : ''}`} onClick={stop(() => onSetSide(player.id, 'under'))}>U</button>
+            </div>
+          )}
+          <button className={watched ? 'watch' : ''} onClick={stop(onToggleWatch)} aria-label={watched ? `Remove ${player.name} from watchlist` : `Watch ${player.name}`}><Icon name="Star" size={16} />{watched ? 'Watching' : 'Watch'}</button>
+          <button className={`nfl-take-btn ${inSlip ? 'is-added' : ''}`} onClick={stop(() => onToggleSlip(player, side))} aria-label={inSlip ? `Remove ${player.name} from slip` : `Take ${player.name}`}>
+            <Icon name={inSlip ? 'Check' : 'Plus'} size={15} />
+            <span>{inSlip ? 'In Slip' : isTD ? 'Take TD' : `Take ${side === 'under' ? 'Under' : 'Over'}`}</span>
+          </button>
+        </div>
       </div>
 
       <div className="decision-ladder-row nfl-decision-ladder-row" style={{ '--dl-color': color, '--dl-accent': `color-mix(in srgb, ${color} 42%, transparent)` }} role="button" tabIndex={0} onClick={() => onSelect(player)} onKeyDown={onKeyDown}>
         <div className="dl-rank mono">{String(rank).padStart(2, '0')}</div>
-        <div className="dl-identity"><div className="dl-name-line"><strong>{player.name}</strong><span className="nfl-position">{player.position}</span><AssessmentBadge signals={model.signals} compact />{player.live?.isLive && <span className="live-tag"><span className="live-dot" /> LIVE</span>}</div><div className="dl-matchup">{matchup}</div></div>
-        <div className="dl-verdict"><div className="dl-grade" style={{ color }}><span>{model.grade}</span><b>{score}</b></div><div className="dl-probability"><ProbRing value={model.probability} color={color} size={64} /><small>MODEL PROB</small></div></div>
-        <div className="dl-proof"><div className="nfl-evidence-cells">{proofSignals.length ? proofSignals.map((signal) => <span key={signal.key} className={`nfl-evidence-cell ${evidenceTone(signal)}`} title={nflSignalText(signal, eliLevel)}><Icon name={signalIcon(signal)} size={11} /><b className="mono">{compactSignalValue(signal)}</b></span>) : <span className="nfl-evidence-cell"><Icon name="Info" size={11} /><b>Limited</b></span>}</div><div className="dl-proof-metrics"><span><small>MARKET</small><b className="mono">{marketValue(player, model, marketId)}</b></span><i /><span><small>EDGE</small><b className={`mono ${model.edge == null ? '' : model.edge >= 0 ? 'positive' : 'negative'}`}>{model.edge == null ? (model.probability > 0 ? 'Fair' : '—') : `${model.edge >= 0 ? '+' : ''}${pct(model.edge)}`}</b></span>{model.suggestedUnits != null && <><i /><span><small>SIZE</small><b className="mono positive">{model.suggestedUnits}u</b></span></>}</div></div>
-        <div className="dl-actions" onClick={(event) => event.stopPropagation()}><button className={watched ? 'watch' : ''} onClick={stop(onToggleWatch)} title={watched ? 'Remove from watchlist' : 'Add to watchlist'} aria-label="Toggle watchlist"><Icon name="Star" size={17} /></button><button className={inSlip ? 'slip' : ''} onClick={stop(onToggleSlip)} title={inSlip ? 'Remove from slip' : 'Add to slip'} aria-label="Toggle prop slip"><Icon name={inSlip ? 'Check' : 'Plus'} size={18} /></button></div>
+        <div className="dl-identity">
+          <div className="dl-name-line">
+            <strong>{player.name}</strong>
+            <span className="nfl-position">{player.position}</span>
+            <AssessmentBadge signals={model.signals} compact />
+            {settlement.status !== 'pending' ? (
+              <span className={`nfl-settlement-badge is-${settlement.status}`}>
+                <Icon name={settlement.status === 'won' ? 'CheckCircle2' : settlement.status === 'lost' ? 'XCircle' : 'Activity'} size={11} />
+                <b>{settlement.status.toUpperCase()}</b>
+                {settlement.label && <small>{settlement.label}</small>}
+              </span>
+            ) : player.live?.isLive ? (
+              <span className="live-tag"><span className="live-dot" /> LIVE</span>
+            ) : null}
+          </div>
+          <div className="dl-matchup">{matchup}</div>
+        </div>
+        <div className="dl-verdict">
+          <div className="dl-grade" style={{ color }}><span>{model.grade}</span><b>{score}</b></div>
+          <div className="dl-probability"><ProbRing value={model.probability} color={color} size={64} /><small>MODEL PROB</small></div>
+        </div>
+        <div className="dl-proof">
+          <div className="nfl-evidence-cells">{proofSignals.length ? proofSignals.map((signal) => <span key={signal.key} className={`nfl-evidence-cell ${evidenceTone(signal)}`} title={nflSignalText(signal, eliLevel)}><Icon name={signalIcon(signal)} size={11} /><b className="mono">{compactSignalValue(signal)}</b></span>) : <span className="nfl-evidence-cell"><Icon name="Info" size={11} /><b>Limited</b></span>}</div>
+          <div className="dl-proof-metrics">
+            <span><small>MARKET</small><b className="mono">{marketValue(player, model, marketId, side)}</b></span>
+            <i />
+            <span><small>EDGE</small><b className={`mono ${model.edge == null ? '' : model.edge >= 0 ? 'positive' : 'negative'}`}>{model.edge == null ? (model.probability > 0 ? 'Fair' : '—') : `${model.edge >= 0 ? '+' : ''}${pct(model.edge)}`}</b></span>
+            {model.suggestedUnits != null && <><i /><span><small>SIZE</small><b className="mono positive">{model.suggestedUnits}u</b></span></>}
+          </div>
+        </div>
+        <div className="dl-actions" onClick={(event) => event.stopPropagation()}>
+          {!isTD && onSetSide && (
+            <div className="nfl-side-toggle" role="group" aria-label="Over or Under">
+              <button type="button" className={`side-btn ${side === 'over' ? 'active' : ''}`} onClick={stop(() => onSetSide(player.id, 'over'))} title="Take Over">O</button>
+              <button type="button" className={`side-btn ${side === 'under' ? 'active' : ''}`} onClick={stop(() => onSetSide(player.id, 'under'))} title="Take Under">U</button>
+            </div>
+          )}
+          <button type="button" className={`nfl-take-btn ${inSlip ? 'is-added' : ''}`} onClick={stop(() => onToggleSlip(player, side))} title={inSlip ? 'Remove from slip' : 'Add to slip'}>
+            <Icon name={inSlip ? 'Check' : 'Plus'} size={14} />
+            <span>{inSlip ? 'In Slip' : isTD ? 'Take TD' : `Take ${side === 'under' ? 'Under' : 'Over'}`}</span>
+          </button>
+          <button type="button" className={`dl-watch-btn ${watched ? 'watch' : ''}`} onClick={stop(onToggleWatch)} title={watched ? 'Remove from watchlist' : 'Add to watchlist'} aria-label="Toggle watchlist">
+            <Icon name="Star" size={16} />
+          </button>
+        </div>
       </div>
     </div>
   )
 }
-function PlayerResearch({ player, marketId, onClose, inSlip, onToggleSlip }) {
+
+function PlayerResearch({ player, marketId, side = 'over', onSetSide, onClose, inSlip, onToggleSlip }) {
   const eliLevel = useEliLevel()
   const [tab, setTab] = useState('overview')
   useEffect(() => { setTab('overview') }, [player?.id])
   if (!player) return null
-  const scoredMarkets = eligiblePropMarkets(player).map((market) => ({ market, model: scoreNFLProp(player, market.id) }))
-  const current = scoreNFLProp(player, marketId)
+  const isTD = isNFLTDMarket(marketId)
+  const scoredMarkets = eligiblePropMarkets(player).map((market) => ({ market, model: scoreNFLProp(player, market.id, { side: isNFLTDMarket(market.id) ? 'over' : side }) }))
+  const current = scoreNFLProp(player, marketId, { side })
   const lineup = player.lineup || {}
   const marketLabel = NFL_PROP_MARKET_LIST.find((market) => market.id === marketId)?.label
+  const settlement = getNFLPropSettlement(player, marketId, current.line, side)
   const researchTabs = [
     { id: 'overview', label: 'Overview', icon: 'Sparkles' },
     { id: 'role', label: 'Role', icon: 'Users' },
@@ -470,18 +568,54 @@ function PlayerResearch({ player, marketId, onClose, inSlip, onToggleSlip }) {
       <header className="nfl-research-header">
         <button className="nfl-drawer-close" onClick={onClose} aria-label="Close"><Icon name="X" size={18} /></button>
         <span className="nfl-drawer-eyebrow">NFL player research · model confidence</span>
-        <div className="nfl-research-identity"><PlayerHeadshotSilo player={player} variant="workspace" /><div className="nfl-research-identity-copy"><div><h2 id="nfl-drawer-title">{player.name}</h2><span className="nfl-position">{player.position}</span><span className={`nfl-live-state ${player.live?.isLive ? 'is-live' : ''}`}><Icon name={player.live?.isLive ? 'Activity' : 'Clock'} size={11} />{liveLabel(player)}</span></div><p><b>{player.team}</b> vs {player.opponent} · {player.kickoff} · {player.isHome ? 'Home' : 'Away'}</p><AssessmentBadge signals={current.signals} /></div></div>
+        <div className="nfl-research-identity">
+          <PlayerHeadshotSilo player={player} variant="workspace" />
+          <div className="nfl-research-identity-copy">
+            <div>
+              <h2 id="nfl-drawer-title">{player.name}</h2>
+              <span className="nfl-position">{player.position}</span>
+              {settlement.status !== 'pending' ? (
+                <span className={`nfl-settlement-badge is-${settlement.status}`}>
+                  <Icon name={settlement.status === 'won' ? 'CheckCircle2' : settlement.status === 'lost' ? 'XCircle' : 'Activity'} size={12} />
+                  <b>{settlement.status.toUpperCase()}</b>
+                  {settlement.label && <small>{settlement.label}</small>}
+                </span>
+              ) : (
+                <span className={`nfl-live-state ${player.live?.isLive ? 'is-live' : ''}`}><Icon name={player.live?.isLive ? 'Activity' : 'Clock'} size={11} />{liveLabel(player)}</span>
+              )}
+            </div>
+            <p><b>{player.team}</b> vs {player.opponent} · {player.kickoff} · {player.isHome ? 'Home' : 'Away'}</p>
+            <AssessmentBadge signals={current.signals} />
+          </div>
+        </div>
         <div className="nfl-research-decision">
-          <div className="nfl-research-market"><small>Selected market</small><b>{marketLabel}</b></div>
-          <div className="nfl-research-score"><span><small>Model</small><strong className="mono">{pct(current.probability)}</strong></span><span><small>Line / odds</small><strong className="mono">{marketValue(player, current, marketId)}</strong></span><span><small>Edge</small><strong className={`mono ${current.edge == null ? '' : current.edge >= 0 ? 'positive' : 'negative'}`}>{current.edge == null ? (current.probability > 0 ? 'Fair baseline' : 'No price') : `${current.edge >= 0 ? '+' : ''}${pct(current.edge)}`}</strong></span>{current.suggestedUnits != null && <span><small>Kelly size</small><strong className="mono tone-good">{current.suggestedUnits}u</strong></span>}</div>
-          <button className={`nfl-drawer-cta ${inSlip ? 'is-added' : ''}`} onClick={() => onToggleSlip(player)}><Icon name={inSlip ? 'Check' : 'Plus'} size={16} />{inSlip ? 'Added to slip' : 'Add to slip'}</button>
+          <div className="nfl-research-market">
+            <small>Selected market</small>
+            <b>{marketLabel}</b>
+            {!isTD && onSetSide && (
+              <div className="nfl-side-toggle is-drawer" role="group" aria-label="Select side">
+                <button type="button" className={`side-btn ${side === 'over' ? 'active' : ''}`} onClick={() => onSetSide('over')}>OVER</button>
+                <button type="button" className={`side-btn ${side === 'under' ? 'active' : ''}`} onClick={() => onSetSide('under')}>UNDER</button>
+              </div>
+            )}
+          </div>
+          <div className="nfl-research-score">
+            <span><small>Model</small><strong className="mono">{pct(current.probability)}</strong></span>
+            <span><small>Line / odds</small><strong className="mono">{marketValue(player, current, marketId, side)}</strong></span>
+            <span><small>Edge</small><strong className={`mono ${current.edge == null ? '' : current.edge >= 0 ? 'positive' : 'negative'}`}>{current.edge == null ? (current.probability > 0 ? 'Fair baseline' : 'No price') : `${current.edge >= 0 ? '+' : ''}${pct(current.edge)}`}</strong></span>
+            {current.suggestedUnits != null && <span><small>Kelly size</small><strong className="mono tone-good">{current.suggestedUnits}u</strong></span>}
+          </div>
+          <button className={`nfl-drawer-cta ${inSlip ? 'is-added' : ''}`} onClick={() => onToggleSlip(player, side)}>
+            <Icon name={inSlip ? 'Check' : 'Plus'} size={16} />
+            {inSlip ? 'In Slip · Tap to Remove' : isTD ? 'Take Anytime TD' : `Take ${side === 'under' ? 'Under' : 'Over'} (${marketValue(player, current, marketId, side)})`}
+          </button>
         </div>
       </header>
       <nav className="nfl-research-tabs" aria-label="Player research sections">{researchTabs.map((item) => <button key={item.id} className={tab === item.id ? 'active' : ''} aria-current={tab === item.id ? 'page' : undefined} onClick={() => setTab(item.id)}><Icon name={item.icon} size={13} />{item.label}</button>)}</nav>
       <div className="nfl-research-body">
         {tab === 'overview' && <div className="nfl-research-view">
           <section className="nfl-research-panel"><header><span><Icon name="ShieldAlert" size={14} /> Betting signal assessment</span><small>Risk first</small></header><SignalAssessmentPanel signals={current.signals} eliLevel={eliLevel} /></section>
-          <section className="nfl-research-panel"><header><span><Icon name="LayoutGrid" size={14} /> Eligible markets</span><small>{scoredMarkets.length} available</small></header><div className="nfl-eligible-grid">{scoredMarkets.map(({ market, model }) => <span key={market.id} className={market.id === marketId ? 'active' : ''} title={eligibilityReason(player, market.id)}><b>{market.shortLabel}</b><em className="mono">{pct(model.probability)}</em><small className="mono">{marketValue(player, model, market.id)}</small></span>)}</div></section>
+          <section className="nfl-research-panel"><header><span><Icon name="LayoutGrid" size={14} /> Eligible markets</span><small>{scoredMarkets.length} available</small></header><div className="nfl-eligible-grid">{scoredMarkets.map(({ market, model }) => <span key={market.id} className={market.id === marketId ? 'active' : ''} title={eligibilityReason(player, market.id)}><b>{market.shortLabel}</b><em className="mono">{pct(model.probability)}</em><small className="mono">{marketValue(player, model, market.id, side)}</small></span>)}</div></section>
           <section className="nfl-research-disclosure"><Icon name="Info" size={14} /><p>Model features reflect the history, role, injury, weather and live-game coverage available for this slate. Missing feeds are shown as limited rather than replaced with invented values.</p></section>
         </div>}
         {tab === 'role' && <div className="nfl-research-view">
@@ -511,6 +645,9 @@ function PlayerResearch({ player, marketId, onClose, inSlip, onToggleSlip }) {
 export default function NFLBoard({ snapshot: suppliedSnapshot = null, view: controlledView = null, onViewChange = null }) {
   const [snapshot, setSnapshot] = useState(() => suppliedSnapshot || NFL_DEMO_SNAPSHOT)
   const [marketId, setMarketId] = useState('anytime_td')
+  const [sides, setSides] = useState(() => ({}))
+  const getSide = (playerId) => sides[playerId] || 'over'
+  const setSide = (playerId, side) => setSides((current) => ({ ...current, [playerId]: side }))
   const [localView, setLocalView] = useState('signals')
   const view = controlledView ?? localView
   const setView = onViewChange || setLocalView
@@ -583,7 +720,7 @@ export default function NFLBoard({ snapshot: suppliedSnapshot = null, view: cont
     })
   }
   const topModelPick = useMemo(() => {
-    const scored = scoreNFLSnapshot(snapshot, marketId)
+    const scored = scoreNFLSnapshot(snapshot, marketId, { side: 'over' })
     const eligible = scored.filter((p) => {
       if (p.live?.isFinal) return false
       const status = (p.status || '').toLowerCase()
@@ -594,7 +731,7 @@ export default function NFLBoard({ snapshot: suppliedSnapshot = null, view: cont
     return eligible[0] || scored.find((p) => !p.live?.isFinal) || null
   }, [snapshot, marketId])
   const gradeCounts = useMemo(() => {
-    const scored = scoreNFLSnapshot(snapshot, marketId)
+    const scored = scoreNFLSnapshot(snapshot, marketId, { side: 'over' })
       .filter((player) => includeFinals || !player.live?.isFinal)
     const counts = { PRIME: 0, STRONG: 0, LEAN: 0, SKIP: 0 }
     for (const player of scored) {
@@ -605,7 +742,13 @@ export default function NFLBoard({ snapshot: suppliedSnapshot = null, view: cont
   }, [includeFinals, marketId, snapshot])
   const filteredPool = useMemo(() => {
     const normalized = query.trim().toLowerCase()
-    return scoreNFLSnapshot(snapshot, marketId)
+    const isTD = isNFLTDMarket(marketId)
+    return (snapshot?.players || [])
+      .map((player) => {
+        const playerSide = isTD ? 'over' : getSide(player.id)
+        return { ...player, model: scoreNFLProp(player, marketId, { side: playerSide }) }
+      })
+      .filter((player) => player.model.eligible)
       .filter((player) => includeFinals || !player.live?.isFinal || gameFilters.has(String(gameKeyFor(player))))
       .filter((player) => gradeFilters.size === 0 || gradeFilters.has(player.model?.grade))
       .filter((player) => positionFilters.size === 0 || positionFilters.has(player.position))
@@ -613,7 +756,8 @@ export default function NFLBoard({ snapshot: suppliedSnapshot = null, view: cont
       .filter((player) => gameFilters.size === 0 || gameFilters.has(String(gameKeyFor(player))))
       .filter((player) => !normalized || `${player.name} ${player.team} ${player.opponent} ${player.position}`.toLowerCase().includes(normalized))
       .filter((player) => !twoPlusOnly || scoreNFLProp(player, 'two_plus_td').probability >= .08)
-  }, [gameFilters, gradeFilters, includeFinals, marketId, positionFilters, query, snapshot, teamFilters, twoPlusOnly])
+      .sort((a, b) => (b.model.score ?? -1) - (a.model.score ?? -1) || a.name.localeCompare(b.name))
+  }, [gameFilters, gradeFilters, includeFinals, marketId, positionFilters, query, snapshot, teamFilters, twoPlusOnly, sides])
   const signalCounts = useMemo(() => Object.fromEntries(NFL_SIGNAL_FILTERS.map((filter) => [filter.id, filteredPool.filter(filter.match).length])), [filteredPool])
   const players = useMemo(() => {
     if (signalFilters.size === 0) return filteredPool
@@ -633,23 +777,41 @@ export default function NFLBoard({ snapshot: suppliedSnapshot = null, view: cont
   const featured = players[0] || null
   const liveCount = players.filter((player) => player.live?.isLive).length
   const toggleSet = (setter, id) => setter((current) => { const next = new Set(current); next.has(id) ? next.delete(id) : next.add(id); return next })
+  const toggleSlipForPlayer = (player, targetSide = null) => {
+    if (!player) return
+    const effectiveSide = targetSide || (isNFLTDMarket(marketId) ? 'over' : getSide(player.id))
+    const key = nflLegKey(player.id, marketId, effectiveSide)
+    toggleSet(setSlip, key)
+  }
   const slipLegs = useMemo(() => [...slip].map((key) => {
-    const separator = key.lastIndexOf(':')
-    const playerId = key.slice(0, separator)
-    const legMarketId = key.slice(separator + 1)
-    const player = snapshot.players.find((item) => item.id === playerId)
+    const parsed = parseNFLLegKey(key)
+    const player = snapshot.players.find((item) => item.id === parsed.playerId)
     if (!player) return null
-    const model = scoreNFLProp(player, legMarketId)
-    return { key, playerId, gameId: player.gameId, team: player.team, opponent: player.opponent, name: player.name, marketId: legMarketId, marketLabel: NFL_PROP_MARKET_LIST.find((item) => item.id === legMarketId)?.label || legMarketId, line: model.line, odds: model.odds, probability: model.probability, status: 'pending' }
+    const model = scoreNFLProp(player, parsed.marketId, { side: parsed.side })
+    const sideLabel = isNFLTDMarket(parsed.marketId) ? '' : ` (${parsed.side.toUpperCase()})`
+    return {
+      key,
+      playerId: player.id,
+      gameId: player.gameId,
+      team: player.team,
+      opponent: player.opponent,
+      name: player.name,
+      side: parsed.side,
+      marketId: parsed.marketId,
+      marketLabel: (NFL_PROP_MARKET_LIST.find((item) => item.id === parsed.marketId)?.label || parsed.marketId) + sideLabel,
+      line: model.line,
+      odds: model.odds,
+      probability: model.probability,
+      status: 'pending',
+    }
   }).filter(Boolean), [slip, snapshot])
   const saveTicket = (ticketLegs = slipLegs) => {
-    const tdLegs = ticketLegs.filter((leg) => isNFLTDMarket(leg.marketId))
-    if (tdLegs.length < 2) return
-    const ticket = settleNFLTicket({ id: `nfl-${Date.now()}`, createdAt: new Date().toISOString(), status: 'pending', legs: tdLegs }, snapshot)
+    if (ticketLegs.length < 1) return
+    const ticket = settleNFLTicket({ id: `nfl-${Date.now()}`, createdAt: new Date().toISOString(), status: 'pending', legs: ticketLegs }, snapshot)
     setTickets((current) => [ticket, ...current].slice(0, 50))
     setSlip((current) => {
       const next = new Set(current)
-      for (const leg of tdLegs) next.delete(leg.key)
+      for (const leg of ticketLegs) next.delete(leg.key)
       return next
     })
   }
@@ -685,11 +847,13 @@ export default function NFLBoard({ snapshot: suppliedSnapshot = null, view: cont
         <NFLPickOfDay
           player={topModelPick}
           marketId={marketId}
+          side={getSide(topModelPick.id)}
+          onSetSide={(nextSide) => setSide(topModelPick.id, nextSide)}
           watched={watched.has(topModelPick.id)}
-          inSlip={slip.has(nflLegKey(topModelPick.id, marketId))}
+          inSlip={slip.has(nflLegKey(topModelPick.id, marketId, getSide(topModelPick.id)))}
           onSelect={setSelected}
           onToggleWatch={(item) => toggleSet(setWatched, item.id)}
-          onToggleSlip={(item) => toggleSet(setSlip, nflLegKey(item.id, marketId))}
+          onToggleSlip={(item, optSide) => toggleSlipForPlayer(item, optSide)}
           onDismiss={() => setPotdDismissed(true)}
         />
       )}
@@ -729,10 +893,36 @@ export default function NFLBoard({ snapshot: suppliedSnapshot = null, view: cont
           </button>
         </SportMultiFilterBar>
       </div>
-      {!!players.length && <div className="board nfl-decision-board"><div className="board-head decision-ladder-head nfl-decision-ladder-head"><div className="th dl-rank" title="Rank by model score">Rank</div><div className="th dl-identity">Player identity</div><div className="th dl-verdict">Model verdict</div><div className="th dl-proof">Key evidence</div><div className="th dl-actions">Actions</div></div><div className="board-body">{players.map((player, index) => <BoardRow key={player.id} player={player} rank={index + 1} marketId={marketId} watched={watched.has(player.id)} inSlip={slip.has(`${player.id}:${marketId}`)} onSelect={setSelected} onToggleWatch={(item) => toggleSet(setWatched, item.id)} onToggleSlip={(item) => toggleSet(setSlip, `${item.id}:${marketId}`)} />)}</div></div>}
+      {!!players.length && <div className="board nfl-decision-board"><div className="board-head decision-ladder-head nfl-decision-ladder-head"><div className="th dl-rank" title="Rank by model score">Rank</div><div className="th dl-identity">Player identity</div><div className="th dl-verdict">Model verdict</div><div className="th dl-proof">Key evidence</div><div className="th dl-actions">Actions</div></div><div className="board-body">{players.map((player, index) => {
+        const playerSide = isNFLTDMarket(marketId) ? 'over' : getSide(player.id)
+        const legKey = nflLegKey(player.id, marketId, playerSide)
+        return (
+          <BoardRow
+            key={player.id}
+            player={player}
+            rank={index + 1}
+            marketId={marketId}
+            side={playerSide}
+            onSetSide={(pId, nextSide) => setSide(pId, nextSide)}
+            watched={watched.has(player.id)}
+            inSlip={slip.has(legKey)}
+            onSelect={setSelected}
+            onToggleWatch={(item) => toggleSet(setWatched, item.id)}
+            onToggleSlip={(item, optSide) => toggleSlipForPlayer(item, optSide)}
+          />
+        )
+      })}</div></div>}
       {!players.length && <div className="nfl-empty"><Icon name="Search" size={22} /><b>No eligible players match</b><button onClick={() => { setQuery(''); setIncludeFinals(false); setGradeFilters(new Set()); setPositionFilters(new Set()); setTeamFilters(new Set()); setGameFilters(new Set()); setTwoPlusOnly(false); setSignalFilters(new Set()) }}>Clear filters</button></div>}
-    </section><aside className="nfl-decision-rail" aria-label="NFL slate summary"><section className="nfl-slate-card"><div><span>Prop engine</span><strong>{snapshot.dataQuality?.playByPlay ? 'Full context ready' : 'Core model ready'}</strong></div><b className="nfl-rating mono">{players.length}</b><ul><li><Icon name="Check" size={12} /> {NFL_PROP_MARKET_LIST.length} position-aware markets</li><li><Icon name="Activity" size={12} /> {liveCount} live player{liveCount === 1 ? '' : 's'} in this view</li><li><Icon name="Shield" size={12} /> {snapshot.dataQuality?.defenseByPosition ? 'Defense splits connected' : 'Defense splits limited'}</li></ul></section>{featured && <section className="nfl-featured-card"><span>Top {NFL_PROP_MARKET_LIST.find((market) => market.id === marketId)?.shortLabel}</span><h2>{featured.name}</h2><p>{featured.team} vs {featured.opponent} · {liveLabel(featured)}</p><div><b className="mono">{pct(featured.model.probability)}</b><em>at</em><b className="mono">{marketValue(featured, featured.model, marketId)}</b></div><button onClick={() => toggleSet(setSlip, nflLegKey(featured.id, marketId))}><Icon name={slip.has(nflLegKey(featured.id, marketId)) ? 'Check' : 'Plus'} size={15} />{slip.has(nflLegKey(featured.id, marketId)) ? 'Added to slip' : 'Add selected prop'}</button></section>}<section className="nfl-builder-card"><header>Active workspace</header><div><span><small>Watchlist</small><b>{watched.size} players</b></span><button type="button" onClick={openBetLabBuilder}><small>Prop slip</small><b>{slip.size} legs · {tickets.length} tracked</b></button></div></section></aside></div>
+    </section><aside className="nfl-decision-rail" aria-label="NFL slate summary"><section className="nfl-slate-card"><div><span>Prop engine</span><strong>{snapshot.dataQuality?.playByPlay ? 'Full context ready' : 'Core model ready'}</strong></div><b className="nfl-rating mono">{players.length}</b><ul><li><Icon name="Check" size={12} /> {NFL_PROP_MARKET_LIST.length} position-aware markets</li><li><Icon name="Activity" size={12} /> {liveCount} live player{liveCount === 1 ? '' : 's'} in this view</li><li><Icon name="Shield" size={12} /> {snapshot.dataQuality?.defenseByPosition ? 'Defense splits connected' : 'Defense splits limited'}</li></ul></section>{featured && <section className="nfl-featured-card"><span>Top {NFL_PROP_MARKET_LIST.find((market) => market.id === marketId)?.shortLabel}</span><h2>{featured.name}</h2><p>{featured.team} vs {featured.opponent} · {liveLabel(featured)}</p><div><b className="mono">{pct(featured.model.probability)}</b><em>at</em><b className="mono">{marketValue(featured, featured.model, marketId, getSide(featured.id))}</b></div><button onClick={() => toggleSlipForPlayer(featured, getSide(featured.id))}><Icon name={slip.has(nflLegKey(featured.id, marketId, getSide(featured.id))) ? 'Check' : 'Plus'} size={15} />{slip.has(nflLegKey(featured.id, marketId, getSide(featured.id))) ? 'Added to slip' : isNFLTDMarket(marketId) ? 'Take TD play' : `Take ${getSide(featured.id) === 'under' ? 'Under' : 'Over'}`}</button></section>}<section className="nfl-builder-card"><header>Active workspace</header><div><span><small>Watchlist</small><b>{watched.size} players</b></span><button type="button" onClick={openBetLabBuilder}><small>Prop slip</small><b>{slip.size} legs · {tickets.length} tracked</b></button></div></section></aside></div>
     </>}
-    <PlayerResearch player={selected} marketId={marketId} onClose={() => setSelected(null)} inSlip={selected ? slip.has(`${selected.id}:${marketId}`) : false} onToggleSlip={(item) => toggleSet(setSlip, `${item.id}:${marketId}`)} />
+    <PlayerResearch
+      player={selected}
+      marketId={marketId}
+      side={selected ? (isNFLTDMarket(marketId) ? 'over' : getSide(selected.id)) : 'over'}
+      onSetSide={selected ? (nextSide) => setSide(selected.id, nextSide) : null}
+      onClose={() => setSelected(null)}
+      inSlip={selected ? slip.has(nflLegKey(selected.id, marketId, getSide(selected.id))) : false}
+      onToggleSlip={(item, optSide) => toggleSlipForPlayer(item, optSide)}
+    />
   </div>
 }

@@ -154,6 +154,10 @@ Authority: `server/sports/nfl/fetch-nfl-slate.mjs`, `server/sports/nfl/preseason
     - **Flag-Heavy / Strict Crews** (e.g. Carl Cheffers, Shawn Hochuli, $\ge 14.5$ flags/gm): $-2-3\%$ drag on rushing efficiency due to drive stalls and holding penalties.
     - **Home-Whistle Bias** (e.g. Brad Allen, John Hussey, $+14-18\text{ yds}$ disparity): $\pm 1\%$ home/away adjustment.
   - Signals: `ref-let-them-play` (low flags), `ref-dpi-edge` (high secondary DPI), `ref-flag-heavy` (penalty risk warning).
+- **Two-Sided Over/Under & Settlement Model (v3)**:
+  - Supports explicit `side: 'over' | 'under'` evaluation across continuous yardage and discrete reception props.
+  - Under probability is strictly complementary ($P_{\text{under}} = 1 - P_{\text{over}}$), evaluated against devigged bookmaker under lines or standard -110 benchmark hold.
+  - Prop settlement (`getNFLPropSettlement` & `settleNFLLeg`) resolves real-world game statistics against posted lines into `won`, `lost`, `live`, `push`, and `void` states.
 - Rollback: switch `ScoringEngine.js` back to flat logistic curves and simple grade bands, remove preseason role application in `fetch-nfl-slate.mjs`, remove referee crew multipliers, and revert the snapshot model version.
 
 ## Required proof for a production model change

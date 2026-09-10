@@ -4,11 +4,27 @@ export function isNFLTDMarket(marketId) {
   return TD_MARKETS.has(marketId)
 }
 
-export function nflLegKey(playerId, marketId) {
-  return `${playerId}:${marketId}`
+export function nflLegKey(playerId, marketId, side = 'over') {
+  if (isNFLTDMarket(marketId)) return `${playerId}:${marketId}`
+  return `${playerId}:${marketId}:${side === 'under' ? 'under' : 'over'}`
 }
 
-function currentValue(player, marketId) {
+export function parseNFLLegKey(key) {
+  if (!key) return { playerId: '', marketId: '', side: 'over' }
+  const parts = String(key).split(':')
+  if (parts.length >= 3) {
+    return { playerId: parts[0], marketId: parts[1], side: parts[2] === 'under' ? 'under' : 'over' }
+  }
+  return { playerId: parts[0] || '', marketId: parts[1] || '', side: 'over' }
+}
+
+export function marketUnitLabel(marketId) {
+  if (marketId === 'receptions') return 'REC'
+  if (isNFLTDMarket(marketId)) return 'TD'
+  return 'YDS'
+}
+
+export function currentNFLStatValue(player, marketId) {
   const stats = player?.live?.stats || {}
   if (marketId === 'passing_yards') return Number(stats.passingYards || 0)
   if (marketId === 'receptions') return Number(stats.receptions || 0)
@@ -16,28 +32,96 @@ function currentValue(player, marketId) {
   if (marketId === 'rushing_yards') return Number(stats.rushingYards || 0)
   if (marketId === 'rushing_receiving_yards') return Number(stats.rushingYards || 0) + Number(stats.receivingYards || 0)
   if (marketId === 'passing_rushing_yards') return Number(stats.passingYards || 0) + Number(stats.rushingYards || 0)
+  if (isNFLTDMarket(marketId)) return Number(stats.totalTds || 0)
   return null
+}
+
+export function getNFLPropSettlement(player, marketId, line = null, side = 'over') {
+  if (!player?.live) return { status: 'pending', value: null, label: null, won: false, decidable: false }
+  const live = player.live || {}
+  const touchdowns = Number(live.stats?.totalTds || 0)
+  const isTD = isNFLTDMarket(marketId)
+  const unit = marketUnitLabel(marketId)
+  const value = isTD ? touchdowns : currentNFLStatValue(player, marketId)
+  const isFinal = Boolean(live.isFinal)
+  const isLive = Boolean(live.isLive)
+
+  if (!isLive && !isFinal) {
+    return { status: 'pending', value: null, label: null, unit, won: false, decidable: false }
+  }
+
+  let won = false
+  let lost = false
+  let push = false
+  let decidable = false
+
+  if (marketId === 'anytime_td') {
+    won = touchdowns >= 1
+    lost = isFinal && !won
+    decidable = won || isFinal
+  } else if (marketId === 'two_plus_td') {
+    won = touchdowns >= 2
+    lost = isFinal && !won
+    decidable = won || isFinal
+  } else if (marketId === 'first_td') {
+    won = Boolean(live.isFirstTdScorer)
+    lost = (Boolean(live.firstTdKnown) && !won) || (isFinal && !won)
+    decidable = won || lost || isFinal
+    if (isFinal && !live.firstTdKnown && !won) {
+      return { status: 'void', value, label: `${touchdowns} ${unit}`, unit, won: false, decidable: true }
+    }
+  } else {
+    const numericLine = Number(line)
+    const effectiveSide = side === 'under' ? 'under' : 'over'
+    if (Number.isFinite(value) && Number.isFinite(numericLine)) {
+      if (value === numericLine && isFinal) {
+        push = true
+        decidable = true
+      } else if (effectiveSide === 'over') {
+        won = value > numericLine
+        lost = isFinal && value <= numericLine
+        decidable = won || isFinal
+      } else {
+        // Under side
+        won = isFinal && value < numericLine
+        lost = value > numericLine
+        decidable = lost || isFinal
+      }
+    } else {
+      decidable = isFinal
+    }
+  }
+
+  const status = push ? 'push' : won ? 'won' : lost ? 'lost' : isLive ? 'live' : 'pending'
+  const statLabel = value != null ? `${value} ${unit}` : null
+
+  return {
+    status,
+    value,
+    line,
+    side,
+    unit,
+    label: statLabel,
+    won,
+    lost,
+    push,
+    decidable,
+    isLive,
+    isFinal,
+  }
 }
 
 export function settleNFLLeg(leg, player) {
   if (!player) return { ...leg, status: 'unavailable', settledAt: null }
-  const live = player.live || {}
-  const touchdowns = Number(live.stats?.totalTds || 0)
-  let won = false
-  let decidable = false
-  if (leg.marketId === 'anytime_td') { won = touchdowns >= 1; decidable = won || live.isFinal }
-  else if (leg.marketId === 'two_plus_td') { won = touchdowns >= 2; decidable = won || live.isFinal }
-  else if (leg.marketId === 'first_td') {
-    won = Boolean(live.isFirstTdScorer)
-    decidable = won || Boolean(live.firstTdKnown) || live.isFinal
-    if (live.isFinal && !live.firstTdKnown && !won) return { ...leg, status: 'void', settledAt: new Date().toISOString() }
-  } else {
-    const value = currentValue(player, leg.marketId)
-    won = Number.isFinite(value) && value > Number(leg.line)
-    decidable = won || live.isFinal
+  const side = leg.side === 'under' ? 'under' : 'over'
+  const settlement = getNFLPropSettlement(player, leg.marketId, leg.line, side)
+  return {
+    ...leg,
+    side,
+    status: settlement.status,
+    currentValue: settlement.value,
+    settledAt: ['won', 'lost', 'void', 'push'].includes(settlement.status) ? (leg.settledAt || new Date().toISOString()) : null,
   }
-  const status = decidable ? (won ? 'won' : 'lost') : live.isLive ? 'live' : 'pending'
-  return { ...leg, status, currentValue: TD_MARKETS.has(leg.marketId) ? touchdowns : currentValue(player, leg.marketId), settledAt: ['won', 'lost', 'void'].includes(status) ? new Date().toISOString() : null }
 }
 
 export function settleNFLTicket(ticket, snapshot) {
@@ -45,14 +129,17 @@ export function settleNFLTicket(ticket, snapshot) {
   const legs = ticket.legs.map((leg) => settleNFLLeg(leg, byId.get(leg.playerId)))
   const statuses = new Set(legs.map((leg) => leg.status))
   const status = statuses.has('lost') ? 'lost'
-    : [...statuses].every((value) => value === 'void') ? 'void'
-      : [...statuses].every((value) => value === 'won' || value === 'void') ? 'won'
+    : [...statuses].every((value) => value === 'void' || value === 'push') ? (statuses.has('push') ? 'push' : 'void')
+      : [...statuses].every((value) => value === 'won' || value === 'void' || value === 'push') ? 'won'
         : statuses.has('live') || statuses.has('won') ? 'live' : 'pending'
-  return { ...ticket, legs, status, settledAt: ['won', 'lost', 'void'].includes(status) ? ticket.settledAt || new Date().toISOString() : null }
+  return { ...ticket, legs, status, settledAt: ['won', 'lost', 'void', 'push'].includes(status) ? ticket.settledAt || new Date().toISOString() : null }
 }
 
 export function ticketExportText(ticket) {
-  const lines = ticket.legs.map((leg) => `${leg.name} — ${leg.marketLabel}${leg.line != null && !TD_MARKETS.has(leg.marketId) ? ` over ${leg.line}` : ''} (${leg.status || 'pending'})`)
+  const lines = ticket.legs.map((leg) => {
+    const sideText = isNFLTDMarket(leg.marketId) ? '' : ` ${leg.side === 'under' ? 'under' : 'over'} ${leg.line}`
+    return `${leg.name} — ${leg.marketLabel}${sideText} (${leg.status || 'pending'})`
+  })
   return [`StatFax NFL ticket · ${ticket.status || 'pending'}`, ...lines].join('\n')
 }
 
@@ -60,7 +147,7 @@ const decimalOdds = (american) => !Number.isFinite(Number(american)) || Number(a
 
 export function nflTicketProfit(ticket) {
   if (!['won', 'lost'].includes(ticket?.status)) return null
-  const activeLegs = (ticket.legs || []).filter((leg) => leg.status !== 'void')
+  const activeLegs = (ticket.legs || []).filter((leg) => leg.status !== 'void' && leg.status !== 'push')
   if (!activeLegs.length) return 0
   const prices = activeLegs.map((leg) => decimalOdds(leg.odds))
   if (prices.some((price) => price == null)) return null
@@ -93,7 +180,8 @@ export function filterNFLTickets(tickets = [], { status = 'all', market = 'all',
 const csvCell = (value) => `"${String(value ?? '').replaceAll('"', '""')}"`
 
 export function nflTicketsCSV(tickets = []) {
-  const header = ['ticket_id', 'created_at', 'ticket_status', 'ticket_profit_units', 'player', 'market', 'line', 'odds', 'probability', 'leg_status', 'result']
-  const rows = tickets.flatMap((ticket) => (ticket.legs || []).map((leg) => [ticket.id, ticket.createdAt, ticket.status, nflTicketProfit(ticket), leg.name, leg.marketLabel, leg.line, leg.odds, leg.probability, leg.status, leg.currentValue]))
+  const header = ['ticket_id', 'created_at', 'ticket_status', 'ticket_profit_units', 'player', 'market', 'side', 'line', 'odds', 'probability', 'leg_status', 'result']
+  const rows = tickets.flatMap((ticket) => (ticket.legs || []).map((leg) => [ticket.id, ticket.createdAt, ticket.status, nflTicketProfit(ticket), leg.name, leg.marketLabel, leg.side || 'over', leg.line, leg.odds, leg.probability, leg.status, leg.currentValue]))
   return [header, ...rows].map((row) => row.map(csvCell).join(',')).join('\n')
 }
+

@@ -406,11 +406,11 @@ function probabilityGrade(probability, marketId, score, { historyGames = 0, role
   return grade
 }
 
-export function scoreNFLProp(player, marketId) {
+export function scoreNFLProp(player, marketId, { side = 'over' } = {}) {
   const market = NFL_PROP_MARKETS[marketId]
   const eligible = isPropEligible(player, marketId)
   if (!market || !eligible) {
-    return { marketId, eligible: false, probability: null, score: null, grade: 'INELIGIBLE', reasons: [] }
+    return { marketId, side, eligible: false, probability: null, score: null, grade: 'INELIGIBLE', reasons: [] }
   }
 
   const weather = nflWeatherImpact(player.weather, marketId)
@@ -447,7 +447,11 @@ export function scoreNFLProp(player, marketId) {
     }
   }
 
-  probability = clamp(probability)
+  const overProbability = clamp(probability)
+  const underProbability = clamp(1 - overProbability)
+  const activeSide = market.kind === 'touchdown' ? 'over' : (side === 'under' ? 'under' : 'over')
+  const activeProbability = activeSide === 'under' ? underProbability : overProbability
+
   const marketEntry = player?.markets?.[marketId]
   const rawOdds = marketEntry?.odds
     ?? marketEntry?.overOdds
@@ -464,31 +468,34 @@ export function scoreNFLProp(player, marketId) {
   const explicitUnder = Number.isFinite(parsedUnder) && parsedUnder !== 0 ? parsedUnder : null
 
   // For yardage/volume markets with an active line, benchmark against standard -110 juice if unquoted
-  const effectiveOdds = explicitOdds != null
+  const effectiveOverOdds = explicitOdds != null
     ? explicitOdds
     : (market.kind !== 'touchdown' && line != null ? -110 : null)
-  const effectiveUnder = explicitUnder != null
+  const effectiveUnderOdds = explicitUnder != null
     ? explicitUnder
-    : (effectiveOdds === -110 ? -110 : null)
+    : (effectiveOverOdds === -110 ? -110 : null)
 
+  const effectiveOdds = activeSide === 'under' ? effectiveUnderOdds : effectiveOverOdds
   const rawImplied = americanImpliedProbability(effectiveOdds)
-  const implied = deviggedImpliedProbability(effectiveOdds, effectiveUnder)
-  const edge = implied == null ? null : probability - implied
+  const overImplied = deviggedImpliedProbability(effectiveOverOdds, effectiveUnderOdds)
+  const underImplied = deviggedImpliedProbability(effectiveUnderOdds, effectiveOverOdds)
+  const implied = activeSide === 'under' ? underImplied : overImplied
+  const edge = implied == null ? null : activeProbability - implied
 
-  const score = calculateCompositeScore(probability, player, defense, teamEnv, gameScript, marketId)
+  const score = calculateCompositeScore(activeProbability, player, defense, teamEnv, gameScript, marketId)
 
   const historyCount = Number(player?.historyMatch?.games ?? player?.recentGames?.length ?? 0)
   const roleRank = Number(player?.roleRank ?? player?.usage?.roleRank ?? 1)
   const isConfirmed = Boolean(player?.lineup?.confirmed)
 
-  const grade = probabilityGrade(probability, marketId, score, {
+  const grade = probabilityGrade(activeProbability, marketId, score, {
     historyGames: historyCount,
     roleRank,
     isConfirmed,
   })
 
   const suggestedUnits = effectiveOdds != null && edge != null && edge > 0
-    ? calculateQuarterKelly(probability, effectiveOdds)
+    ? calculateQuarterKelly(activeProbability, effectiveOdds)
     : null
 
   const reasons = [
@@ -508,13 +515,17 @@ export function scoreNFLProp(player, marketId) {
 
   return {
     marketId,
+    side: activeSide,
     eligible,
-    probability,
+    probability: activeProbability,
+    overProbability,
+    underProbability,
     score,
     grade,
     line,
     odds: effectiveOdds,
-    underOdds: effectiveUnder,
+    overOdds: effectiveOverOdds,
+    underOdds: effectiveUnderOdds,
     implied,
     rawImplied,
     edge,
@@ -529,9 +540,9 @@ export function scoreNFLProp(player, marketId) {
   }
 }
 
-export function scoreNFLSnapshot(snapshot, marketId) {
+export function scoreNFLSnapshot(snapshot, marketId, options = {}) {
   return (snapshot?.players || [])
-    .map((player) => ({ ...player, model: scoreNFLProp(player, marketId) }))
+    .map((player) => ({ ...player, model: scoreNFLProp(player, marketId, options) }))
     .filter((player) => player.model.eligible)
     .sort((a, b) => (b.model.score ?? -1) - (a.model.score ?? -1) || a.name.localeCompare(b.name))
 }
