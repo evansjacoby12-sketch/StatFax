@@ -41,6 +41,7 @@ function cheatPrice(model, marketId) {
 function MarketBoard({ snapshot, marketId }) {
   const market = NFL_PROP_MARKET_LIST.find((item) => item.id === marketId)
   const rows = useMemo(() => (snapshot?.players || [])
+    .filter((player) => !player.live?.isFinal)
     .filter((player) => eligiblePropMarkets(player).some((item) => item.id === marketId))
     .map((player) => ({ player, model: scoreNFLProp(player, marketId) }))
     .filter(({ model }) => Number.isFinite(model.probability))

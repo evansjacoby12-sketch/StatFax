@@ -63,13 +63,14 @@ export default function Filters({ value, onChange, gradeCounts, games, badgeCoun
   }
 
   const activeMore =
-    v.gamePks.size + (v.confirmedOnly ? 1 : 0) + (v.watchedOnly ? 1 : 0) + (v.hotOnly ? 1 : 0) + (v.precisionOnly ? 1 : 0) + (v.sleepersOnly ? 1 : 0) + v.badges.size
+    v.gamePks.size + (v.includeFinals ? 1 : 0) + (v.confirmedOnly ? 1 : 0) + (v.watchedOnly ? 1 : 0) + (v.hotOnly ? 1 : 0) + (v.precisionOnly ? 1 : 0) + (v.sleepersOnly ? 1 : 0) + v.badges.size
   const visibleBadges = BADGES.filter((b) => betaEnabled || (b.key !== 'barrelReady'))
   const badgeDefs = visibleBadges.filter((b) => v.badges.has(b.key))
   const hiddenSignalCount = visibleBadges.filter((b) => !MOBILE_PRIMARY_SIGNALS.has(b.key) && !v.badges.has(b.key)).length
 
   const clearAdvancedFilters = () => onChange({
     gamePks: new Set(),
+    includeFinals: false,
     confirmedOnly: false,
     watchedOnly: false,
     hotOnly: false,
@@ -188,6 +189,13 @@ export default function Filters({ value, onChange, gradeCounts, games, badgeCoun
               }}
             />
           ))}
+          {v.includeFinals && (
+            <FilterChip
+              label="Include finals"
+              icon="CheckCircle2"
+              onClear={() => onChange({ includeFinals: false })}
+            />
+          )}
           {v.confirmedOnly && <FilterChip label="Action ready" onClear={() => onChange({ confirmedOnly: false })} />}
           {v.watchedOnly && <FilterChip label="Watchlist" onClear={() => onChange({ watchedOnly: false })} />}
           {v.hotOnly && <FilterChip label="Heating up" icon="Flame" onClear={() => onChange({ hotOnly: false })} />}
@@ -248,7 +256,7 @@ export default function Filters({ value, onChange, gradeCounts, games, badgeCoun
                 { value: '', label: 'All games' },
                 ...games.map((g) => ({
                   value: g.gamePk,
-                  label: `${g.awayTeam.abbr} @ ${g.homeTeam.abbr}${liveMode && g.isLive ? ' · LIVE' : ''}`,
+                  label: `${g.awayTeam.abbr} @ ${g.homeTeam.abbr}${g.isFinal ? ' · FINAL' : liveMode && g.isLive ? ' · LIVE' : ''}`,
                 })),
               ]}
               />
@@ -257,6 +265,21 @@ export default function Filters({ value, onChange, gradeCounts, games, badgeCoun
             <div className="mobile-quick-block">
               <span className="mobile-filter-section-label">Quick filters</span>
               <div className="mobile-quick-scroll" role="group" aria-label="Quick filters">
+            <button
+              className={`toggle-btn ${v.includeFinals ? 'on' : ''}`}
+              onClick={() => onChange({ includeFinals: !v.includeFinals })}
+              aria-pressed={v.includeFinals}
+              title="Include completed final games on the board"
+              style={v.includeFinals ? {
+                background: 'rgba(151, 149, 203, 0.1)',
+                borderColor: 'var(--accent)',
+                color: 'var(--accent)'
+              } : {}}
+            >
+              <Icon name="CheckCircle2" size={14} />
+              Include finals
+            </button>
+
             <button
               className={`toggle-btn ${v.confirmedOnly ? 'on' : ''}`}
               onClick={() => onChange({ confirmedOnly: !v.confirmedOnly })}

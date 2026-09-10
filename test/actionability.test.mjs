@@ -41,9 +41,16 @@ test('top model pick excludes confirmed non-starters and breaks ties determinist
   assert.equal(selectTopModelPick([laterId, benchedLeader, earlierId]), earlierId)
 })
 
+test('top model pick excludes completed and final games', () => {
+  const finalLeader = { ...batter(1, 99, true, 3), game: { isFinal: true, status: 'Final' }, gameFinal: true }
+  const activeFollower = batter(2, 85, true, 4)
+  assert.equal(selectTopModelPick([finalLeader, activeFollower]), activeFollower)
+})
+
 test('Top Straights and the board have no lineup-based research adjustment', () => {
   const straights = readFileSync(new URL('../ui/src/components/TopStraightsView.jsx', import.meta.url), 'utf8')
   const app = readFileSync(new URL('../ui/src/App.jsx', import.meta.url), 'utf8')
   assert.doesNotMatch(straights, /lineupConfirmed[^\n]*(penalt|addEvidence)/i)
   assert.doesNotMatch(app, /const confirmed = pool|splitProjected/)
 })
+

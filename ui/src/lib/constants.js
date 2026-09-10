@@ -24,6 +24,7 @@ export const DEFAULT_FILTERS = {
   // Open on the decision tier. WATCH/LEAN/SKIP remain one click away in filters.
   grades: new Set(['PRIME', 'STRONG']),
   gamePks: new Set(),
+  includeFinals: false,
   confirmedOnly: false,
   watchedOnly: false,
   hotOnly: false,

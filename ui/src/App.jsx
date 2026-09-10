@@ -81,6 +81,7 @@ function initialFilters() {
     // 'edge' would leave the dropdown blank and silently break sorting).
     sort: SORTS.some((s) => s.key === saved.sort) ? saved.sort : DEFAULT_FILTERS.sort,
     dir: saved.dir || DEFAULT_FILTERS.dir,
+    includeFinals: !!saved.includeFinals,
     confirmedOnly: !!saved.confirmedOnly,
     watchedOnly: !!saved.watchedOnly,
     hotOnly: !!saved.hotOnly,
@@ -151,6 +152,7 @@ export default function App() {
       grades: [...filters.grades],
       sort: filters.sort,
       dir: filters.dir,
+      includeFinals: filters.includeFinals,
       confirmedOnly: filters.confirmedOnly,
       watchedOnly: filters.watchedOnly,
       hotOnly: filters.hotOnly,
@@ -401,7 +403,7 @@ export default function App() {
 
   // Empty-state escape hatch: back to defaults but keep the user's sort.
   const clearFilters = useCallback(() => {
-    setFilters((f) => ({ ...DEFAULT_FILTERS, grades: new Set(DEFAULT_FILTERS.grades), gamePks: new Set(), sort: f.sort, dir: f.dir }))
+    setFilters((f) => ({ ...DEFAULT_FILTERS, grades: new Set(DEFAULT_FILTERS.grades), gamePks: new Set(), sort: f.sort, dir: f.dir, includeFinals: false }))
   }, [])
 
   // Pop up the opposing pitcher's card as an overlay (entry key matches
@@ -507,21 +509,27 @@ export default function App() {
   const gradeCounts = useMemo(() => {
     const c = {}
     for (const b of all) {
+      if (!filters.includeFinals && (b.game?.isFinal || b.gameFinal || b.game?.status === 'Final' || b.game?.status === 'Game Over')) continue
       const g = b.grade?.label || 'SKIP'
       c[g] = (c[g] || 0) + 1
     }
     return c
-  }, [all])
+  }, [all, filters.includeFinals])
 
   const badgeCounts = useMemo(() => {
     const c = {}
-    for (const b of all) for (const def of BADGES) if (b[def.key]) c[def.key] = (c[def.key] || 0) + 1
+    for (const b of all) {
+      if (!filters.includeFinals && (b.game?.isFinal || b.gameFinal || b.game?.status === 'Final' || b.game?.status === 'Game Over')) continue
+      for (const def of BADGES) if (b[def.key]) c[def.key] = (c[def.key] || 0) + 1
+    }
     return c
-  }, [all])
+  }, [all, filters.includeFinals])
 
   const filtered = useMemo(() => {
     const q = normName(filters.q)
     let rows = all.filter((b) => {
+      const isFinal = b.game?.isFinal === true || b.gameFinal === true || b.game?.status === 'Final' || b.game?.status === 'Game Over'
+      if (!filters.includeFinals && isFinal && !filters.gamePks.has(String(b.gamePk))) return false
       if (!filters.grades.has(b.grade?.label || 'SKIP')) return false
       if (filters.gamePks.size && !filters.gamePks.has(String(b.gamePk))) return false
       if (filters.confirmedOnly && !b.lineupConfirmed) return false
@@ -741,7 +749,7 @@ export default function App() {
         ) : view === 'games' ? (
           <GamesView
             games={data.games}
-            batters={filtered}
+            batters={all}
             gameProjections={data.raw?.gameProjections || {}}
             gameProjectionEvaluation={data.raw?.gameProjectionEvaluation || null}
             gameMarketEvaluation={data.raw?.gameMarketEvaluation || null}

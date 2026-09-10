@@ -23,11 +23,12 @@ function matchesLens(batter, lens) {
 export default function ReadyRadar({ batters, badges, onChangeBadges, onSelect }) {
   const activeLens = lensFromBadges(badges)
   const stats = useMemo(() => {
-    const power = batters.filter((b) => b.powerReady)
-    const barrel = batters.filter((b) => b.barrelReady)
-    const both = batters.filter((b) => b.powerReady && b.barrelReady)
+    const activeBatters = (batters || []).filter((b) => !b.game?.isFinal && !b.gameFinal && b.game?.status !== 'Final')
+    const power = activeBatters.filter((b) => b.powerReady)
+    const barrel = activeBatters.filter((b) => b.barrelReady)
+    const both = activeBatters.filter((b) => b.powerReady && b.barrelReady)
     const lens = activeLens || (both.length ? 'both' : power.length ? 'power' : 'barrel')
-    const pool = batters.filter((b) => matchesLens(b, lens))
+    const pool = activeBatters.filter((b) => matchesLens(b, lens))
     const top = pool.slice().sort((a, b) =>
       (b.hrProbability ?? 0) - (a.hrProbability ?? 0) ||
       (b.score ?? 0) - (a.score ?? 0) ||

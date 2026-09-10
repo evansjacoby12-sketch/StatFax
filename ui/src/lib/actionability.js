@@ -33,6 +33,8 @@ export function lineupActionability(batter) {
 
 export function selectTopModelPick(batters = []) {
   const eligible = batters.filter((batter) => {
+    const isFinal = batter?.game?.isFinal === true || batter?.gameFinal === true || batter?.game?.status === 'Final' || batter?.game?.status === 'Game Over'
+    if (isFinal) return false
     const grade = batter?.grade?.label || batter?.grade || 'SKIP'
     return grade !== 'SKIP' && lineupActionability(batter).key !== 'out'
   })

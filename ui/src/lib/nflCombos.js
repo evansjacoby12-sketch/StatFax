@@ -330,7 +330,9 @@ export function calculateNFLJointTDProbability(legs = []) {
 export function buildNFLComboBoard(snapshot, { legs = 2, strategy = 'scorer-core', scope = 'all', minGrade = 'LEAN', limit = 5, globalExposure = null, gameKey: targetGameKey = null, gameId: targetGameId = null } = {}) {
   const legCount = Math.max(2, Math.min(4, Number(legs) || 2))
   const wantedGameKey = targetGameKey || targetGameId || null
-  const candidates = (snapshot?.players || []).flatMap((player) => eligiblePropMarkets(player).map((market) => {
+  const candidates = (snapshot?.players || [])
+    .filter((player) => !player.live?.isFinal)
+    .flatMap((player) => eligiblePropMarkets(player).map((market) => {
     const model = scoreNFLProp(player, market.id)
     return {
       key: nflLegKey(player.id, market.id), playerId: player.id, name: player.name, position: player.position,
