@@ -157,8 +157,15 @@ const batters = [...dedup.values()].map((b) => {
 })
 const meta = { version: d.version, date: d.date, stats: d.stats || {}, modelMetrics: d.modelMetrics || null, ensembleMeta: null, scoreToProb: null, oddsBooks: [] }
 const noop = () => {}
-const live = batters.find((b) => b.liveContext?.isHRThisGame) || batters[0]
-const normal = batters[batters.length - 1] || batters[0]
+const synthBatter = {
+  ...mkBatter(1, 'Smoke Synthetic Batter', false),
+  id: '1-1',
+  game: SYNTH.games[0],
+  opponent: SYNTH.games[0].homeTeam,
+  heatIndex: 70,
+}
+const live = batters.find((b) => b.liveContext?.isHRThisGame) || batters[0] || synthBatter
+const normal = batters[batters.length - 1] || batters[0] || synthBatter
 
 const cases = []
 const add = (name, el) => cases.push([name, el])

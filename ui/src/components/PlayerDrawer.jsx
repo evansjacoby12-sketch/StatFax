@@ -2345,7 +2345,8 @@ function LiveSection({ b }) {
 // ---------------------------------------------------------------------------
 
 export function PlayerCaseVsCaution({ b, explanation, aiGenerated = false }) {
-  const grade = String(b.grade?.label || b.grade || 'SKIP').toUpperCase()
+  if (!b || !explanation) return null
+  const grade = String(b?.grade?.label || b?.grade || 'SKIP').toUpperCase()
   return (
     <div className="explain-decision">
       <div className="explain-decision-strip">
