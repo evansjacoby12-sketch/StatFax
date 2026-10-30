@@ -61,6 +61,7 @@ export const JUMP_BALL_RATINGS = {
   'charles bassey':     { jumper: 'Charles Bassey',     team: 'GSW', heightInches: 82, standingReachInches: 109, wingspanInches: 87, tipWins: 20, tipAttempts: 40, winPct: 0.500, rating: 1490, tier: 'AVERAGE' },
   'goga bitadze':       { jumper: 'Goga Bitadze',       team: 'ORL', heightInches: 83, standingReachInches: 110, wingspanInches: 87, tipWins: 28, tipAttempts: 56, winPct: 0.500, rating: 1490, tier: 'AVERAGE' },
   'adem bona':          { jumper: 'Adem Bona',          team: 'PHI', heightInches: 82, standingReachInches: 108, wingspanInches: 88, tipWins: 12, tipAttempts: 24, winPct: 0.500, rating: 1490, tier: 'AVERAGE' },
+  'ryan kalkbrenner':   { jumper: 'Ryan Kalkbrenner',   team: 'CHA', heightInches: 85, standingReachInches: 114, wingspanInches: 89, tipWins: 18, tipAttempts: 34, winPct: 0.529, rating: 1515, tier: 'ABOVE_AVG' },
 };
 
 export const LEAGUE_AVG_TIP_WIN_PCT = 0.50;
@@ -93,7 +94,7 @@ export const TEAM_PRIMARY_JUMPERS = {
   HOU: 'alperen sengun',
   ORL: 'wendell carter jr',
   LAC: 'brook lopez',
-  CHA: 'mark williams',
+  CHA: 'ryan kalkbrenner',
   PHX: 'mark williams',
   DET: 'jalen duren',
   WAS: 'anthony davis',

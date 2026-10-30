@@ -653,12 +653,12 @@ export const NBA_STARTER_ROSTERS = {
   ],
   "CHA": [
     {
-      "id": "4701232",
-      "name": "Mark Williams",
+      "id": "4576060",
+      "name": "Ryan Kalkbrenner",
       "position": "C",
-      "jersey": "25",
+      "jersey": "11",
       "isStarter": true,
-      "earlyShotShare": 0.16,
+      "earlyShotShare": 0.14,
       "shotMix": {
         "rim": 0.88,
         "mid": 0.12,
@@ -667,8 +667,8 @@ export const NBA_STARTER_ROSTERS = {
       "rimFG": 0.72,
       "midFG": 0.36,
       "threeFG": 0,
-      "seasonUsage": 16,
-      "scriptedSetPlay": "Alley-Oop Lob Finish"
+      "seasonUsage": 14,
+      "scriptedSetPlay": "Alley-Oop Lob Finish / Rim Seal"
     },
     {
       "id": "4433287",
