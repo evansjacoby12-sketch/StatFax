@@ -291,6 +291,10 @@ jobs:
           npm run nfl:slate
           npm run nfl:audit
 
+      - name: Generate NBA slate
+        run: |
+          npm run nba:slate
+
       # Publish rolling state back to R2 (S3-compatible). daily.json is held
       # until the deterministic data-health watchdog has run below. This also lets the NEXT
       # run's reconcile read a fresh "yesterday" snapshot from a DURABLE store
@@ -325,6 +329,11 @@ jobs:
             aws s3 cp "dist/nfl/daily.json" "s3://$R2_BUCKET/nfl/daily.json" --endpoint-url "$ENDPOINT" \
               --content-type application/json --cache-control no-cache \
               && echo "R2: published nfl/daily.json" || echo "R2: failed to publish nfl/daily.json (non-blocking)"
+          fi
+          if [ -f "dist/nba/daily.json" ]; then
+            aws s3 cp "dist/nba/daily.json" "s3://$R2_BUCKET/nba/daily.json" --endpoint-url "$ENDPOINT" \
+              --content-type application/json --cache-control no-cache \
+              && echo "R2: published nba/daily.json" || echo "R2: failed to publish nba/daily.json (non-blocking)"
           fi
           for f in backtest.json tracking.json preseason.json preseason-participation.json readiness.json history.json; do
             if [ -f "dist/nfl/$f" ]; then

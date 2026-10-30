@@ -31,6 +31,11 @@
  *   NBAService.getTeamSeasonStats()    → team-level stat object | null
  */
 
+import NBA_DEMO_SNAPSHOT from '../data/demoSlate.js';
+import { scoreGameFirstBasket } from '../logic/firstBasketEngine.js';
+import { getJumpBallMatchup } from '../data/jumpBalls.js';
+import { getStartersForTeam, TEAM_ABBR_ALIASES } from '../data/teamRosters.js';
+
 const ESPN_NBA = 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba';
 
 // 12-second hard timeout per request — ESPN's CDN sometimes stalls on
@@ -53,10 +58,11 @@ const BATCH_CONCURRENCY = 8;
 async function espnGet(path, throwOnFail = false) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const sep = path.includes('?') ? '&' : '?';
+  const url = `${ESPN_NBA}${path}${sep}_t=${Date.now()}`;
   try {
-    const res = await fetch(`${ESPN_NBA}${path}`, {
-      signal:  controller.signal,
-      headers: { 'Cache-Control': 'no-cache' },
+    const res = await fetch(url, {
+      signal: controller.signal,
     });
     if (!res.ok) {
       if (throwOnFail) throw new Error(`ESPN NBA ${res.status}: ${path}`);
@@ -738,15 +744,16 @@ export const NBAService = {
     }
     return merged;
   },
-
 };
 
-import NBA_DEMO_SNAPSHOT from '../data/demoSlate.js';
-import { scoreGameFirstBasket } from '../logic/firstBasketEngine.js';
-import { getJumpBallMatchup } from '../data/jumpBalls.js';
-import { getStartersForTeam, TEAM_ABBR_ALIASES } from '../data/teamRosters.js';
-
-const DEFAULT_URLS = ['/data/nba/daily.json', './data/nba/daily.json', '/nba/daily.json', '/dist/nba/daily.json'];
+const DEFAULT_URLS = [
+  './data/nba/daily.json',
+  '/data/nba/daily.json',
+  'data/nba/daily.json',
+  './nba/daily.json',
+  '/nba/daily.json',
+  '/dist/nba/daily.json',
+];
 
 export function validateNBASnapshot(snapshot) {
   if (!snapshot || snapshot.sport !== 'nba' || !Array.isArray(snapshot.players)) {
