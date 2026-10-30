@@ -55,6 +55,12 @@ export const JUMP_BALL_RATINGS = {
   'daniel gafford':     { jumper: 'Daniel Gafford',     team: 'DAL', heightInches: 82, standingReachInches: 109, wingspanInches: 86, tipWins: 32, tipAttempts: 73, winPct: 0.438, rating: 1450, tier: 'BELOW_AVG' },
   'yves missi':         { jumper: 'Yves Missi',         team: 'NOP', heightInches: 84, standingReachInches: 111, wingspanInches: 88, tipWins: 14, tipAttempts: 30, winPct: 0.467, rating: 1475, tier: 'AVERAGE' },
   'derik queen':        { jumper: 'Derik Queen',        team: 'NOP', heightInches: 82, standingReachInches: 109, wingspanInches: 86, tipWins: 12, tipAttempts: 25, winPct: 0.480, rating: 1480, tier: 'AVERAGE' },
+  'luka garza':         { jumper: 'Luka Garza',         team: 'BOS', heightInches: 82, standingReachInches: 108, wingspanInches: 86, tipWins: 18, tipAttempts: 36, winPct: 0.500, rating: 1490, tier: 'AVERAGE' },
+  'mo bamba':           { jumper: 'Mo Bamba',           team: 'UTA', heightInches: 84, standingReachInches: 116, wingspanInches: 94, tipWins: 42, tipAttempts: 70, winPct: 0.600, rating: 1560, tier: 'ABOVE_AVG' },
+  'noah clowney':       { jumper: 'Noah Clowney',       team: 'BKN', heightInches: 82, standingReachInches: 109, wingspanInches: 87, tipWins: 15, tipAttempts: 32, winPct: 0.469, rating: 1475, tier: 'AVERAGE' },
+  'charles bassey':     { jumper: 'Charles Bassey',     team: 'GSW', heightInches: 82, standingReachInches: 109, wingspanInches: 87, tipWins: 20, tipAttempts: 40, winPct: 0.500, rating: 1490, tier: 'AVERAGE' },
+  'goga bitadze':       { jumper: 'Goga Bitadze',       team: 'ORL', heightInches: 83, standingReachInches: 110, wingspanInches: 87, tipWins: 28, tipAttempts: 56, winPct: 0.500, rating: 1490, tier: 'AVERAGE' },
+  'adem bona':          { jumper: 'Adem Bona',          team: 'PHI', heightInches: 82, standingReachInches: 108, wingspanInches: 88, tipWins: 12, tipAttempts: 24, winPct: 0.500, rating: 1490, tier: 'AVERAGE' },
 };
 
 export const LEAGUE_AVG_TIP_WIN_PCT = 0.50;
@@ -65,7 +71,7 @@ export const BAYESIAN_PRIOR_WEIGHT_M = 20;   // Shrinkage sample weight (20 tips
 const TEAM_ALIASES = { NO: 'NOP', GS: 'GSW', NY: 'NYK', SA: 'SAS', UTAH: 'UTA', WSH: 'WAS', PHO: 'PHX', BK: 'BKN' };
 
 /**
- * Primary starting center lookup to eliminate file-order bias when resolving jumpers by team
+ * Primary starting center lookup to eliminate file-order bias when resolving jumpers by team (2026-27 Season)
  */
 export const TEAM_PRIMARY_JUMPERS = {
   NOP: 'yves missi',
@@ -74,29 +80,29 @@ export const TEAM_PRIMARY_JUMPERS = {
   CLE: 'jarrett allen',
   ATL: 'onyeka okongwu',
   SAC: 'domantas sabonis',
-  BOS: 'kristaps porzingis',
+  BOS: 'luka garza',
   NYK: 'karl-anthony towns',
-  MIL: 'brook lopez',
+  MIL: 'myles turner',
   PHI: 'joel embiid',
   SAS: 'victor wembanyama',
   OKC: 'chet holmgren',
-  LAL: 'anthony davis',
+  LAL: 'walker kessler',
   DEN: 'nikola jokic',
   MIA: 'bam adebayo',
-  IND: 'myles turner',
+  IND: 'ivica zubac',
   HOU: 'alperen sengun',
   ORL: 'wendell carter jr',
-  LAC: 'ivica zubac',
+  LAC: 'brook lopez',
   CHA: 'mark williams',
-  PHX: 'jusuf nurkic',
+  PHX: 'mark williams',
   DET: 'jalen duren',
-  WAS: 'jonas valanciunas',
-  GSW: 'draymond green',
-  UTA: 'walker kessler',
-  CHI: 'nikola vucevic',
+  WAS: 'anthony davis',
+  GSW: 'kristaps porzingis',
+  UTA: 'jusuf nurkic',
+  CHI: 'nic claxton',
   TOR: 'jakob poeltl',
   DAL: 'dereck lively ii',
-  BKN: 'nic claxton',
+  BKN: 'noah clowney',
   MIN: 'rudy gobert',
 };
 
