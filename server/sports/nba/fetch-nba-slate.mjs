@@ -67,7 +67,7 @@ export async function fetchNBASlate({ outPath = OUTPUT_PATH } = {}) {
       const fair = p.fairOdds ? (String(p.fairOdds).startsWith('+') ? String(p.fairOdds) : (Number(p.fairOdds) > 0 ? `+${p.fairOdds}` : `${p.fairOdds}`)) : 'N/A';
       const odds = p.sportsbookOdds ? (p.sportsbookOdds > 0 ? `+${p.sportsbookOdds}` : `${p.sportsbookOdds}`) : 'N/A';
       const ciText = p.ci90 ? ` [CI: ${p.ci90.lower}%-${p.ci90.upper}%]` : '';
-      console.log(`   ${idx + 1}. [${p.team || 'NBA'}] ${p.name.padEnd(24)} GameProb: ${(prob * 100).toFixed(1)}%${ciText.padEnd(16)} | Fair: ${fair} | Script: ${p.scriptedSetPlay || 'Horns Set'} (${Math.round((p.earlyShotShare || 0.25) * 100)}% early look)`);
+      console.log(`   ${idx + 1}. [${p.team || 'NBA'}] ${p.name.padEnd(24)} GameProb: ${(prob * 100).toFixed(1)}%${ciText.padEnd(16)} | Fair: ${fair} | Early Look: ${Math.round((p.earlyShotShare || 0.25) * 100)}% | USG: ${p.seasonUsage || 20}%`);
     });
   }
 

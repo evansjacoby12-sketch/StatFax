@@ -71,6 +71,10 @@ export const JUMP_BALL_RATINGS = {
   'marvin bagley iii':  { jumper: 'Marvin Bagley III',  team: 'DEN', heightInches: 82, standingReachInches: 109, wingspanInches: 85, tipWins: 22, tipAttempts: 44, winPct: 0.500, rating: 1490, tier: 'AVERAGE' },
   'tobe awaka':         { jumper: 'Tobe Awaka',         team: 'CHI', heightInches: 80, standingReachInches: 106, wingspanInches: 85, tipWins: 4,  tipAttempts: 10, winPct: 0.400, rating: 1430, tier: 'BELOW_AVG' },
   'isaiah jackson':     { jumper: 'Isaiah Jackson',     team: 'LAC', heightInches: 82, standingReachInches: 110, wingspanInches: 87, tipWins: 20, tipAttempts: 38, winPct: 0.526, rating: 1500, tier: 'AVERAGE' },
+  'al horford':         { jumper: 'Al Horford',         team: 'GSW', heightInches: 81, standingReachInches: 106, wingspanInches: 85, tipWins: 30, tipAttempts: 60, winPct: 0.500, rating: 1480, tier: 'AVERAGE' },
+  'paul reed':          { jumper: 'Paul Reed',          team: 'DET', heightInches: 81, standingReachInches: 108, wingspanInches: 86, tipWins: 15, tipAttempts: 30, winPct: 0.500, rating: 1480, tier: 'AVERAGE' },
+  'larry nance jr':     { jumper: 'Larry Nance Jr.',    team: 'IND', heightInches: 80, standingReachInches: 106, wingspanInches: 85, tipWins: 14, tipAttempts: 28, winPct: 0.500, rating: 1475, tier: 'AVERAGE' },
+  'duop reath':         { jumper: 'Duop Reath',         team: 'PHX', heightInches: 82, standingReachInches: 109, wingspanInches: 86, tipWins: 12, tipAttempts: 24, winPct: 0.500, rating: 1485, tier: 'AVERAGE' },
 };
 
 export const LEAGUE_AVG_TIP_WIN_PCT = 0.50;

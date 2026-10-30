@@ -481,10 +481,10 @@ export function scoreGameFirstBasket({
     const isTopTeamOption = player.teamRank === 1;
 
     const eli5 = isTopTeamOption
-      ? `${player.name} is ${player.team}'s primary early option (${(player.earlyShotShare * 100).toFixed(0)}% early shot share, ${player.scriptedSetPlay}). ${tipAdvantage ? `${player.team} holds the opening tip edge (${(player.teamScoresFirstProb * 100).toFixed(0)}%).` : 'Scripted early volume overcomes neutral tip.'}`
+      ? `${player.name} is ${player.team}'s primary early option (${(player.earlyShotShare * 100).toFixed(0)}% early shot share). ${tipAdvantage ? `${player.team} holds the opening tip edge (${(player.teamScoresFirstProb * 100).toFixed(0)}%).` : 'High early possession volume overcomes neutral tip.'}`
       : `${player.name} takes ${(player.earlyShotShare * 100).toFixed(0)}% of early shots (${player.method.primary}). ${player.orebExtensionPct > 25 ? 'Benefits from offensive rebound putback sequence.' : ''}`;
 
-    const eli15 = `Model prob ${(player.gameProb * 100).toFixed(1)}% (${fairGameOdds} fair) = ${(player.teamScoresFirstProb * 100).toFixed(1)}% team tip-conversion × ${(player.teamProb * 100).toFixed(1)}% team share. Script: ${player.scriptedSetPlay} (Make rate ${player.expectedMakeRate}%). OREB extension: ${player.orebExtensionPct}%. TOV risk: ${player.turnoverRate}%. Settlement: ${settlementRule}. Pace: ${pace}.`;
+    const eli15 = `Model prob ${(player.gameProb * 100).toFixed(1)}% (${fairGameOdds} fair) = ${(player.teamScoresFirstProb * 100).toFixed(1)}% team tip-conversion × ${(player.teamProb * 100).toFixed(1)}% team share. Early look rate: ${(player.earlyShotShare * 100).toFixed(0)}% (Make rate ${player.expectedMakeRate}%). OREB extension: ${player.orebExtensionPct}%. TOV risk: ${player.turnoverRate}%. Settlement: ${settlementRule}. Pace: ${pace}.`;
 
     // Bayesian 90% Credible Interval using Logit-Normal Delta Method
     // Produces naturally skewed bounds bounded in (0, 1) rather than symmetric normal approximations

@@ -144,17 +144,48 @@ test('NBA Daily Lineups: buildLiveNBASnapshot replaces injured starters, adjusts
   const porzingisInLineup = gswPlayers.some((p) => p.name === 'Kristaps Porzingis');
   assert.equal(porzingisInLineup, false, 'Injured player Kristaps Porzingis must be excluded from starting 5');
 
-  // 2. Backup center Charles Bassey must be promoted to starting center
-  const bassey = gswPlayers.find((p) => p.name === 'Charles Bassey');
-  assert.ok(bassey, 'Charles Bassey should be promoted to the starting lineup');
-  assert.equal(bassey.isReplacement, true);
-  assert.equal(bassey.replacedPlayer, 'Kristaps Porzingis');
+  // 2. Backup center Al Horford must be promoted to starting center (depth chart priority over deep bench)
+  const horford = gswPlayers.find((p) => p.name === 'Al Horford');
+  assert.ok(horford, 'Al Horford should be promoted to the starting lineup');
+  assert.equal(horford.isReplacement, true);
+  assert.equal(horford.replacedPlayer, 'Kristaps Porzingis');
 
-  // 3. Opening tip matchup must feature Charles Bassey for GSW and Walker Kessler for LAL
-  assert.equal(game.tipMatchup.homeJumper, 'Charles Bassey');
+  // 3. Opening tip matchup must feature Al Horford for GSW and Walker Kessler for LAL
+  assert.equal(game.tipMatchup.homeJumper, 'Al Horford');
   assert.equal(game.tipMatchup.awayJumper, 'Walker Kessler');
 
   // 4. Early shot share across the 5 GSW starters must strictly sum to 1.0 (100%)
   const totalEarlyShare = gswPlayers.reduce((sum, p) => sum + (p.earlyShotShare || 0), 0);
   assert.ok(Math.abs(totalEarlyShare - 1.0) < 0.02, `Total earlyShotShare must sum to ~1.0, got ${totalEarlyShare}`);
 });
+
+test('NBA Depth Chart Hierarchy: verifies true 6th-man rotation promotions over deep bench / two-way players', () => {
+  // GSW SF Jimmy Butler out -> Moses Moody promoted (not Graham Ike)
+  const gswRep = findPositionalReplacement('GSW', { position: 'SF', name: 'Jimmy Butler' }, []);
+  assert.equal(gswRep.name, 'Moses Moody');
+
+  // MIN SG Anthony Edwards out -> Donte DiVincenzo promoted (not Jaylen Clark)
+  const minRep = findPositionalReplacement('MIN', { position: 'SG', name: 'Anthony Edwards' }, []);
+  assert.equal(minRep.name, 'Donte DiVincenzo');
+
+  // ORL PF Paolo Banchero out -> Jonathan Isaac promoted (not Jamal Cain)
+  const orlRep = findPositionalReplacement('ORL', { position: 'PF', name: 'Paolo Banchero' }, []);
+  assert.equal(orlRep.name, 'Jonathan Isaac');
+
+  // LAC SF Brandon Ingram out -> Derrick Jones Jr. promoted (not Cam Christie)
+  const lacRep = findPositionalReplacement('LAC', { position: 'SF', name: 'Brandon Ingram' }, []);
+  assert.equal(lacRep.name, 'Derrick Jones Jr.');
+
+  // CHI C Nic Claxton out -> Zach Collins promoted (not Tobe Awaka)
+  const chiRep = findPositionalReplacement('CHI', { position: 'C', name: 'Nic Claxton' }, []);
+  assert.equal(chiRep.name, 'Zach Collins');
+
+  // DAL C Dereck Lively II out -> Daniel Gafford promoted (not Dwight Powell)
+  const dalRep = findPositionalReplacement('DAL', { position: 'C', name: 'Dereck Lively II' }, []);
+  assert.equal(dalRep.name, 'Daniel Gafford');
+
+  // DET C Jalen Duren out -> Paul Reed promoted (not Tolu Smith)
+  const detRep = findPositionalReplacement('DET', { position: 'C', name: 'Jalen Duren' }, []);
+  assert.equal(detRep.name, 'Paul Reed');
+});
+

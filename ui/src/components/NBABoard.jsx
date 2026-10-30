@@ -254,7 +254,7 @@ export default function NBABoard({
           </span>
           <h1>First Basket Scorer</h1>
           <p>
-            Opening tip-off jump ball models, scripted 1st-possession frequencies,
+            Opening tip-off jump ball models, early possession look rates,
             shot proximity conversion, and de-vigged fair market value.
           </p>
         </div>
@@ -460,7 +460,7 @@ export default function NBABoard({
               )}
 
               <div className="nba-hero-narrative">
-                <strong>Opening Play Tendency:</strong> {topPick.scriptedSetPlay} (Early Shot Share: {(topPick.earlyShotShare * 100).toFixed(0)}% vs {(topPick.seasonUsage || 22)}% full game USG).
+                <strong>Opening Possession Profile:</strong> Early Shot Share {(topPick.earlyShotShare * 100).toFixed(0)}% vs {(topPick.seasonUsage || 22)}% full game USG.
                 <div style={{ marginTop: '0.35rem', color: '#94a3b8' }}>{topPick.eli5}</div>
               </div>
             </div>
@@ -810,12 +810,11 @@ export default function NBABoard({
                                 </div>
                               </div>
 
-                              {/* Scripted set & Early shot share chip */}
+                              {/* Early look & Season usage chip */}
                               <div style={{ margin: '0.4rem 0', fontSize: '0.75rem', color: '#94a3b8' }}>
-                                <span style={{ color: '#cbd5e1', fontWeight: 600 }}>Script: </span>
-                                <span>{player.scriptedSetPlay}</span>
+                                <span style={{ color: '#38bdf8', fontWeight: 600 }}>{(player.earlyShotShare * 100).toFixed(0)}% Early Look Rate</span>
                                 <span style={{ margin: '0 0.35rem', color: '#64748b' }}>·</span>
-                                <span style={{ color: '#38bdf8' }}>{(player.earlyShotShare * 100).toFixed(0)}% early look</span>
+                                <span>{player.seasonUsage || 20}% Season USG</span>
                               </div>
 
                               {/* Shot Mix Mini Bar */}
@@ -991,12 +990,11 @@ export default function NBABoard({
                         </div>
                       </div>
 
-                      {/* Scripted set & Early shot share chip */}
+                      {/* Early look & Season usage chip */}
                       <div style={{ margin: '0.4rem 0', fontSize: '0.75rem', color: '#94a3b8' }}>
-                        <span style={{ color: '#cbd5e1', fontWeight: 600 }}>Script: </span>
-                        <span>{player.scriptedSetPlay}</span>
+                        <span style={{ color: '#38bdf8', fontWeight: 600 }}>{(player.earlyShotShare * 100).toFixed(0)}% Early Look Rate</span>
                         <span style={{ margin: '0 0.35rem', color: '#64748b' }}>·</span>
-                        <span style={{ color: '#38bdf8' }}>{(player.earlyShotShare * 100).toFixed(0)}% early look</span>
+                        <span>{player.seasonUsage || 20}% Season USG</span>
                       </div>
 
                       {/* Shot Mix Mini Bar */}
@@ -1374,7 +1372,7 @@ export default function NBABoard({
                                     {leg.name}
                                   </div>
                                   <div style={{ fontSize: '0.74rem', color: '#94a3b8' }}>
-                                    {leg.team} vs {leg.opponent} · {leg.position} · {leg.scriptedSetPlay || 'Opening Set'}
+                                    {leg.team} vs {leg.opponent} · {leg.position} · {Math.round((leg.earlyShotShare || 0.25) * 100)}% Early Look
                                   </div>
                                 </div>
                               </div>
@@ -1862,7 +1860,7 @@ export default function NBABoard({
                   <span className="nba-step-num">3</span>
                   <div>
                     <div style={{ fontWeight: 700, color: '#f1f5f9', fontSize: '0.84rem' }}>
-                      Scripted Play Action: {inspectedPlayer.scriptedSetPlay}
+                      Early Possession Volume: {(inspectedPlayer.earlyShotShare * 100).toFixed(0)}% Share
                     </div>
                     <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
                       Target takes {(inspectedPlayer.earlyShotShare * 100).toFixed(0)}% of team's shots in min 0-3 (vs {inspectedPlayer.seasonUsage || 22}% season usage).
@@ -1964,7 +1962,7 @@ export default function NBABoard({
                   <span className="mono" style={{ color: '#38bdf8', fontWeight: 700 }}>{settlementRule}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.45rem 0.65rem', background: 'rgba(255,255,255,0.03)', borderRadius: '6px' }}>
-                  <span style={{ color: '#94a3b8' }}>Positional Script Weight:</span>
+                  <span style={{ color: '#94a3b8' }}>Positional Weight:</span>
                   <span className="mono" style={{ color: '#ffffff' }}>×{inspectedPlayer.breakdown?.posWeight?.toFixed(2)}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.45rem 0.65rem', background: 'rgba(255,255,255,0.03)', borderRadius: '6px' }}>
