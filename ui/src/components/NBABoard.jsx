@@ -45,7 +45,7 @@ export default function NBABoard({
   const [selectedPos, setSelectedPos] = useState('all') // 'all' | 'PG' | 'SG' | 'SF' | 'PF' | 'C'
   const [valueFilter, setValueFilter] = useState('all') // 'all' | 'ev' | 'prime' | 'longshot'
   const [selectedGameId, setSelectedGameId] = useState('all')
-  const [groupByGame, setGroupByGame] = useState(true) // Group and sort chronologically by game and time
+  const groupByGame = true // Auto-locked: always grouped and sorted chronologically by game and time
 
   // Bet Lab 2-Leg Parlay State
   const [betLabSubView, setBetLabSubView] = useState('recipes') // 'recipes' | 'builder'
@@ -507,14 +507,12 @@ export default function NBABoard({
                 >
                   <Icon name="Lock" size={12} /> Top 5 Per Game (Auto-Locked)
                 </div>
-                <button
-                  type="button"
-                  className={`nba-filter-pill ${groupByGame ? 'active' : ''}`}
-                  onClick={() => setGroupByGame((v) => !v)}
-                  title="Sort and group games chronologically by tip-off time"
+                <div
+                  className="nba-filter-locked-chip"
+                  title="Sorted and grouped chronologically by game and scheduled tip-off time (auto-locked)"
                 >
-                  <Icon name="Clock" size={12} /> {groupByGame ? 'Sorted by Game & Time' : 'Flat Board'}
-                </button>
+                  <Icon name="Lock" size={12} /> Sorted by Game & Time (Auto-Locked)
+                </div>
               </div>
 
               <div className="nba-pills-group">
