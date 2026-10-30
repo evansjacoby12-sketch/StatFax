@@ -45,7 +45,6 @@ export default function NBABoard({
   const [selectedPos, setSelectedPos] = useState('all') // 'all' | 'PG' | 'SG' | 'SF' | 'PF' | 'C'
   const [valueFilter, setValueFilter] = useState('all') // 'all' | 'ev' | 'prime' | 'longshot'
   const [selectedGameId, setSelectedGameId] = useState('all')
-  const [top3Only, setTop3Only] = useState(true) // Default to Top 3 picks per game (clean, less clutter)
   const [groupByGame, setGroupByGame] = useState(true) // Group and sort chronologically by game and time
 
   // Bet Lab 2-Leg Parlay State
@@ -122,9 +121,11 @@ export default function NBABoard({
 
   const players = useMemo(() => {
     const list = games.flatMap((g) => {
-      // Sort starters within each game by first basket probability
-      const gameStarters = [...g.players].sort((a, b) => (b.gameProb || 0) - (a.gameProb || 0))
-      return gameStarters.map((p, rankInGame) => ({
+      // Sort starters within each game by first basket probability and auto-lock strictly to top 5 picks
+      const gameTop5 = [...g.players]
+        .sort((a, b) => (b.gameProb || 0) - (a.gameProb || 0))
+        .slice(0, 5)
+      return gameTop5.map((p, rankInGame) => ({
         ...p,
         gameId: g.gameId,
         gameTime: g.gameTime,
@@ -133,7 +134,7 @@ export default function NBABoard({
         lineupStatus: g.lineupStatus,
         pace: g.pace,
         gamePickRank: rankInGame + 1,
-        isTop3InGame: rankInGame < 3,
+        isTop5InGame: true,
       }))
     })
     list.sort((a, b) => b.gameProb - a.gameProb)
@@ -154,7 +155,6 @@ export default function NBABoard({
   // Filtered Players
   const filteredPlayers = useMemo(() => {
     return players.filter((p) => {
-      if (top3Only && !p.isTop3InGame) return false
       if (search) {
         const q = search.toLowerCase().trim()
         const matchName = p.name?.toLowerCase().includes(q)
@@ -171,7 +171,7 @@ export default function NBABoard({
       }
       return true
     })
-  }, [players, top3Only, search, selectedPos, selectedGameId, valueFilter])
+  }, [players, search, selectedPos, selectedGameId, valueFilter])
 
   // Toggle parlay slip leg
   const toggleSlipLeg = (player, e) => {
@@ -321,7 +321,7 @@ export default function NBABoard({
         <span className="nba-summary-divider" />
         <span className="nba-summary-item">
           <Icon name="Users" size={13} />
-          <span>Starters Tracked: <strong>{players.filter((p) => p.isStarter).length}</strong></span>
+          <span>Top 5 Picks: <strong>{players.length}</strong> ({games.length * 5} Max)</span>
         </span>
         <span className="nba-summary-divider" />
         <span className="nba-summary-item">
@@ -501,14 +501,12 @@ export default function NBABoard({
             <div className="nba-filter-row-bottom">
               <div className="nba-pills-group">
                 <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>PICKS:</span>
-                <button
-                  type="button"
-                  className={`nba-filter-pill ${top3Only ? 'active nba-top3-active-chip' : ''}`}
-                  onClick={() => setTop3Only((v) => !v)}
-                  title="Filter to Top 3 First Basket picks per game for less clutter"
+                <div
+                  className="nba-filter-locked-chip"
+                  title="First Basket board is auto-locked strictly to the Top 5 picks of each game (unchangeable)"
                 >
-                  <Icon name="Zap" size={12} /> {top3Only ? '⚡ Top 3 Per Game (Clean)' : 'All Starters (10)'}
-                </button>
+                  <Icon name="Lock" size={12} /> Top 5 Per Game (Auto-Locked)
+                </div>
                 <button
                   type="button"
                   className={`nba-filter-pill ${groupByGame ? 'active' : ''}`}
@@ -693,8 +691,8 @@ export default function NBABoard({
                             <Icon name="Clock" size={12} /> Projected Lineups
                           </span>
                         )}
-                        <span className="nba-chip-pill" style={{ background: 'rgba(0, 255, 204, 0.1)', color: 'var(--prime)', borderColor: 'rgba(0, 255, 204, 0.25)' }}>
-                          {top3Only ? 'Top 3 Picks' : `${gamePlayers.length} Starters`}
+                        <span className="nba-chip-pill" style={{ background: 'rgba(0, 255, 204, 0.1)', color: 'var(--prime)', borderColor: 'rgba(0, 255, 204, 0.25)', fontWeight: 700 }}>
+                          <Icon name="Lock" size={11} style={{ marginRight: '0.25rem' }} /> Top 5 Picks
                         </span>
                       </div>
                     </div>
@@ -751,8 +749,8 @@ export default function NBABoard({
                                 </div>
 
                                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.3rem' }}>
-                                  <span className={`nba-game-rank-badge nba-rank-${player.gamePickRank <= 3 ? player.gamePickRank : 'other'}`}>
-                                    {player.gamePickRank === 1 ? '🏆 #1 Game Pick' : player.gamePickRank === 2 ? '⚡ #2 Game Pick' : player.gamePickRank === 3 ? '👀 #3 Game Pick' : `#${player.gamePickRank}`}
+                                  <span className={`nba-game-rank-badge nba-rank-${player.gamePickRank <= 5 ? player.gamePickRank : 'other'}`}>
+                                    {player.gamePickRank === 1 ? '🏆 #1 Game Pick' : player.gamePickRank === 2 ? '⚡ #2 Game Pick' : player.gamePickRank === 3 ? '👀 #3 Game Pick' : player.gamePickRank === 4 ? '🎯 #4 Game Pick' : '🎲 #5 Game Pick'}
                                   </span>
                                   <span
                                     style={{
@@ -936,8 +934,8 @@ export default function NBABoard({
                         </div>
 
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.3rem' }}>
-                          <span className={`nba-game-rank-badge nba-rank-${player.gamePickRank <= 3 ? player.gamePickRank : 'other'}`}>
-                            {player.gamePickRank === 1 ? '🏆 #1 Game Pick' : player.gamePickRank === 2 ? '⚡ #2 Game Pick' : player.gamePickRank === 3 ? '👀 #3 Game Pick' : `#${player.gamePickRank}`}
+                          <span className={`nba-game-rank-badge nba-rank-${player.gamePickRank <= 5 ? player.gamePickRank : 'other'}`}>
+                            {player.gamePickRank === 1 ? '🏆 #1 Game Pick' : player.gamePickRank === 2 ? '⚡ #2 Game Pick' : player.gamePickRank === 3 ? '👀 #3 Game Pick' : player.gamePickRank === 4 ? '🎯 #4 Game Pick' : '🎲 #5 Game Pick'}
                           </span>
                           <span
                             style={{

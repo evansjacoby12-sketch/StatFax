@@ -48,12 +48,12 @@ export async function fetchNBASlate({ outPath = OUTPUT_PATH } = {}) {
   console.log(` Games: ${snapshot.games.length} | Starters: ${snapshot.players.length} | Mode: ${snapshot.source?.mode || 'live'}`);
   console.log(`==========================================================================================`);
 
-  // Display clean top 3 picks per game sorted chronologically
+  // Display auto-locked top 5 picks per game sorted chronologically
   for (const game of snapshot.games) {
     const gamePlayers = snapshot.players
       .filter((p) => p.gameId === game.gameId)
       .sort((a, b) => (b.gameProb || b.modelProb || 0) - (a.gameProb || a.modelProb || 0));
-    const top3 = gamePlayers.slice(0, 3);
+    const top5 = gamePlayers.slice(0, 5);
     const tip = game.tipMatchup;
     const tipProbA = Math.round((tip?.tipProbA ?? tip?.winProbA ?? 0.5) * 100);
     const tipProbB = Math.round((tip?.tipProbB ?? tip?.winProbB ?? 0.5) * 100);
@@ -62,7 +62,7 @@ export async function fetchNBASlate({ outPath = OUTPUT_PATH } = {}) {
     const tipText = `${tipNameA} (${tipProbA}%) vs ${tipNameB} (${tipProbB}%)`;
 
     console.log(`\n🏀 ${game.awayTeam.abbr} @ ${game.homeTeam.abbr} (${game.gameTime || 'TBD'}) -- Tip: ${tipText}`);
-    top3.forEach((p, idx) => {
+    top5.forEach((p, idx) => {
       const prob = p.gameProb ?? p.modelProb ?? 0;
       const fair = p.fairOdds ? (String(p.fairOdds).startsWith('+') ? String(p.fairOdds) : (Number(p.fairOdds) > 0 ? `+${p.fairOdds}` : `${p.fairOdds}`)) : 'N/A';
       const odds = p.sportsbookOdds ? (p.sportsbookOdds > 0 ? `+${p.sportsbookOdds}` : `${p.sportsbookOdds}`) : 'N/A';
