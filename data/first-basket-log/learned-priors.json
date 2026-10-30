@@ -1,0 +1,590 @@
+{
+  "learnedAt": "2026-10-30T02:53:25.031Z",
+  "gamesScored": 3,
+  "modelVersion": "v3",
+  "jumpers": [
+    {
+      "jumper": "Onyeka Okongwu",
+      "tips": 1,
+      "wins": 0,
+      "losses": 1,
+      "observedWinPct": 0
+    },
+    {
+      "jumper": "Jarrett Allen",
+      "tips": 1,
+      "wins": 1,
+      "losses": 0,
+      "observedWinPct": 1
+    },
+    {
+      "jumper": "Yves Missi",
+      "tips": 1,
+      "wins": 0,
+      "losses": 1,
+      "observedWinPct": 0
+    },
+    {
+      "jumper": "Domantas Sabonis",
+      "tips": 1,
+      "wins": 1,
+      "losses": 0,
+      "observedWinPct": 1
+    },
+    {
+      "jumper": "Donovan Clingan",
+      "tips": 1,
+      "wins": 1,
+      "losses": 0,
+      "observedWinPct": 1
+    },
+    {
+      "jumper": "Zach Edey",
+      "tips": 1,
+      "wins": 0,
+      "losses": 1,
+      "observedWinPct": 0
+    }
+  ],
+  "positionAnalysis": {
+    "PG": {
+      "n": 6,
+      "hits": 1,
+      "expectedHits": 0.49,
+      "expectedShare": 16.4,
+      "observedShare": 33.3,
+      "ratio": 2.03
+    },
+    "SG": {
+      "n": 6,
+      "hits": 0,
+      "expectedHits": 0.63,
+      "expectedShare": 21,
+      "observedShare": 0,
+      "ratio": 0
+    },
+    "SF": {
+      "n": 6,
+      "hits": 1,
+      "expectedHits": 0.51,
+      "expectedShare": 16.9,
+      "observedShare": 33.3,
+      "ratio": 1.97
+    },
+    "PF": {
+      "n": 6,
+      "hits": 0,
+      "expectedHits": 0.71,
+      "expectedShare": 23.6,
+      "observedShare": 0,
+      "ratio": 0
+    },
+    "C": {
+      "n": 6,
+      "hits": 1,
+      "expectedHits": 0.66,
+      "expectedShare": 22.1,
+      "observedShare": 33.3,
+      "ratio": 1.51
+    }
+  },
+  "playerLeaders": [
+    {
+      "name": "Zach Edey",
+      "team": "MEM",
+      "position": "C",
+      "games": 1,
+      "hits": 1,
+      "sumP": 0.138,
+      "avgP": 0.138,
+      "oeRatio": 7.25,
+      "learnedAdjustment": 1.085
+    },
+    {
+      "name": "James Harden",
+      "team": "CLE",
+      "position": "PG",
+      "games": 1,
+      "hits": 1,
+      "sumP": 0.11688311688311691,
+      "avgP": 0.11688311688311691,
+      "oeRatio": 8.56,
+      "learnedAdjustment": 1.087
+    },
+    {
+      "name": "Trey Murphy III",
+      "team": "NOP",
+      "position": "SF",
+      "games": 1,
+      "hits": 1,
+      "sumP": 0.11400000000000002,
+      "avgP": 0.11400000000000002,
+      "oeRatio": 8.77,
+      "learnedAdjustment": 1.088
+    },
+    {
+      "name": "Zion Williamson",
+      "team": "NOP",
+      "position": "PF",
+      "games": 1,
+      "hits": 0,
+      "sumP": 0.15800000000000003,
+      "avgP": 0.15800000000000003,
+      "oeRatio": 0,
+      "learnedAdjustment": 0.984
+    },
+    {
+      "name": "Jalen Johnson",
+      "team": "ATL",
+      "position": "PF",
+      "games": 1,
+      "hits": 0,
+      "sumP": 0.14985014985014986,
+      "avgP": 0.14985014985014986,
+      "oeRatio": 0,
+      "learnedAdjustment": 0.985
+    },
+    {
+      "name": "Cameron Boozer",
+      "team": "MEM",
+      "position": "PF",
+      "games": 1,
+      "hits": 0,
+      "sumP": 0.144,
+      "avgP": 0.144,
+      "oeRatio": 0,
+      "learnedAdjustment": 0.986
+    },
+    {
+      "name": "Ja Morant",
+      "team": "POR",
+      "position": "SG",
+      "games": 1,
+      "hits": 0,
+      "sumP": 0.137,
+      "avgP": 0.137,
+      "oeRatio": 0,
+      "learnedAdjustment": 0.986
+    },
+    {
+      "name": "Domantas Sabonis",
+      "team": "SAC",
+      "position": "C",
+      "games": 1,
+      "hits": 0,
+      "sumP": 0.13400000000000004,
+      "avgP": 0.13400000000000004,
+      "oeRatio": 0,
+      "learnedAdjustment": 0.987
+    },
+    {
+      "name": "Donovan Mitchell",
+      "team": "CLE",
+      "position": "SG",
+      "games": 1,
+      "hits": 0,
+      "sumP": 0.1318681318681319,
+      "avgP": 0.1318681318681319,
+      "oeRatio": 0,
+      "learnedAdjustment": 0.987
+    },
+    {
+      "name": "Zach LaVine",
+      "team": "SAC",
+      "position": "SG",
+      "games": 1,
+      "hits": 0,
+      "sumP": 0.12900000000000003,
+      "avgP": 0.12900000000000003,
+      "oeRatio": 0,
+      "learnedAdjustment": 0.987
+    },
+    {
+      "name": "Evan Mobley",
+      "team": "CLE",
+      "position": "PF",
+      "games": 1,
+      "hits": 0,
+      "sumP": 0.1258741258741259,
+      "avgP": 0.1258741258741259,
+      "oeRatio": 0,
+      "learnedAdjustment": 0.988
+    },
+    {
+      "name": "Jarrett Allen",
+      "team": "CLE",
+      "position": "C",
+      "games": 1,
+      "hits": 0,
+      "sumP": 0.10889110889110891,
+      "avgP": 0.10889110889110891,
+      "oeRatio": 0,
+      "learnedAdjustment": 0.989
+    },
+    {
+      "name": "Damian Lillard",
+      "team": "POR",
+      "position": "PG",
+      "games": 1,
+      "hits": 0,
+      "sumP": 0.106,
+      "avgP": 0.106,
+      "oeRatio": 0,
+      "learnedAdjustment": 0.99
+    },
+    {
+      "name": "Donovan Clingan",
+      "team": "POR",
+      "position": "C",
+      "games": 1,
+      "hits": 0,
+      "sumP": 0.101,
+      "avgP": 0.101,
+      "oeRatio": 0,
+      "learnedAdjustment": 0.99
+    },
+    {
+      "name": "Deni Avdija",
+      "team": "POR",
+      "position": "SF",
+      "games": 1,
+      "hits": 0,
+      "sumP": 0.098,
+      "avgP": 0.098,
+      "oeRatio": 0,
+      "learnedAdjustment": 0.99
+    }
+  ],
+  "allPlayers": [
+    {
+      "name": "Zach Edey",
+      "team": "MEM",
+      "position": "C",
+      "games": 1,
+      "hits": 1,
+      "sumP": 0.138,
+      "avgP": 0.138,
+      "oeRatio": 7.25,
+      "learnedAdjustment": 1.085
+    },
+    {
+      "name": "James Harden",
+      "team": "CLE",
+      "position": "PG",
+      "games": 1,
+      "hits": 1,
+      "sumP": 0.11688311688311691,
+      "avgP": 0.11688311688311691,
+      "oeRatio": 8.56,
+      "learnedAdjustment": 1.087
+    },
+    {
+      "name": "Trey Murphy III",
+      "team": "NOP",
+      "position": "SF",
+      "games": 1,
+      "hits": 1,
+      "sumP": 0.11400000000000002,
+      "avgP": 0.11400000000000002,
+      "oeRatio": 8.77,
+      "learnedAdjustment": 1.088
+    },
+    {
+      "name": "Zion Williamson",
+      "team": "NOP",
+      "position": "PF",
+      "games": 1,
+      "hits": 0,
+      "sumP": 0.15800000000000003,
+      "avgP": 0.15800000000000003,
+      "oeRatio": 0,
+      "learnedAdjustment": 0.984
+    },
+    {
+      "name": "Jalen Johnson",
+      "team": "ATL",
+      "position": "PF",
+      "games": 1,
+      "hits": 0,
+      "sumP": 0.14985014985014986,
+      "avgP": 0.14985014985014986,
+      "oeRatio": 0,
+      "learnedAdjustment": 0.985
+    },
+    {
+      "name": "Cameron Boozer",
+      "team": "MEM",
+      "position": "PF",
+      "games": 1,
+      "hits": 0,
+      "sumP": 0.144,
+      "avgP": 0.144,
+      "oeRatio": 0,
+      "learnedAdjustment": 0.986
+    },
+    {
+      "name": "Ja Morant",
+      "team": "POR",
+      "position": "SG",
+      "games": 1,
+      "hits": 0,
+      "sumP": 0.137,
+      "avgP": 0.137,
+      "oeRatio": 0,
+      "learnedAdjustment": 0.986
+    },
+    {
+      "name": "Domantas Sabonis",
+      "team": "SAC",
+      "position": "C",
+      "games": 1,
+      "hits": 0,
+      "sumP": 0.13400000000000004,
+      "avgP": 0.13400000000000004,
+      "oeRatio": 0,
+      "learnedAdjustment": 0.987
+    },
+    {
+      "name": "Donovan Mitchell",
+      "team": "CLE",
+      "position": "SG",
+      "games": 1,
+      "hits": 0,
+      "sumP": 0.1318681318681319,
+      "avgP": 0.1318681318681319,
+      "oeRatio": 0,
+      "learnedAdjustment": 0.987
+    },
+    {
+      "name": "Zach LaVine",
+      "team": "SAC",
+      "position": "SG",
+      "games": 1,
+      "hits": 0,
+      "sumP": 0.12900000000000003,
+      "avgP": 0.12900000000000003,
+      "oeRatio": 0,
+      "learnedAdjustment": 0.987
+    },
+    {
+      "name": "Evan Mobley",
+      "team": "CLE",
+      "position": "PF",
+      "games": 1,
+      "hits": 0,
+      "sumP": 0.1258741258741259,
+      "avgP": 0.1258741258741259,
+      "oeRatio": 0,
+      "learnedAdjustment": 0.988
+    },
+    {
+      "name": "Jarrett Allen",
+      "team": "CLE",
+      "position": "C",
+      "games": 1,
+      "hits": 0,
+      "sumP": 0.10889110889110891,
+      "avgP": 0.10889110889110891,
+      "oeRatio": 0,
+      "learnedAdjustment": 0.989
+    },
+    {
+      "name": "Damian Lillard",
+      "team": "POR",
+      "position": "PG",
+      "games": 1,
+      "hits": 0,
+      "sumP": 0.106,
+      "avgP": 0.106,
+      "oeRatio": 0,
+      "learnedAdjustment": 0.99
+    },
+    {
+      "name": "Donovan Clingan",
+      "team": "POR",
+      "position": "C",
+      "games": 1,
+      "hits": 0,
+      "sumP": 0.101,
+      "avgP": 0.101,
+      "oeRatio": 0,
+      "learnedAdjustment": 0.99
+    },
+    {
+      "name": "Deni Avdija",
+      "team": "POR",
+      "position": "SF",
+      "games": 1,
+      "hits": 0,
+      "sumP": 0.098,
+      "avgP": 0.098,
+      "oeRatio": 0,
+      "learnedAdjustment": 0.99
+    },
+    {
+      "name": "Onyeka Okongwu",
+      "team": "ATL",
+      "position": "C",
+      "games": 1,
+      "hits": 0,
+      "sumP": 0.09390609390609392,
+      "avgP": 0.09390609390609392,
+      "oeRatio": 0,
+      "learnedAdjustment": 0.991
+    },
+    {
+      "name": "De'Andre Hunter",
+      "team": "SAC",
+      "position": "SF",
+      "games": 1,
+      "hits": 0,
+      "sumP": 0.09000000000000001,
+      "avgP": 0.09000000000000001,
+      "oeRatio": 0,
+      "learnedAdjustment": 0.991
+    },
+    {
+      "name": "CJ McCollum",
+      "team": "ATL",
+      "position": "SG",
+      "games": 1,
+      "hits": 0,
+      "sumP": 0.08891108891108891,
+      "avgP": 0.08891108891108891,
+      "oeRatio": 0,
+      "learnedAdjustment": 0.991
+    },
+    {
+      "name": "Yves Missi",
+      "team": "NOP",
+      "position": "C",
+      "games": 1,
+      "hits": 0,
+      "sumP": 0.08600000000000001,
+      "avgP": 0.08600000000000001,
+      "oeRatio": 0,
+      "learnedAdjustment": 0.991
+    },
+    {
+      "name": "Herbert Jones",
+      "team": "NOP",
+      "position": "SG",
+      "games": 1,
+      "hits": 0,
+      "sumP": 0.08300000000000002,
+      "avgP": 0.08300000000000002,
+      "oeRatio": 0,
+      "learnedAdjustment": 0.992
+    },
+    {
+      "name": "Cedric Coward",
+      "team": "MEM",
+      "position": "SF",
+      "games": 1,
+      "hits": 0,
+      "sumP": 0.083,
+      "avgP": 0.083,
+      "oeRatio": 0,
+      "learnedAdjustment": 0.992
+    },
+    {
+      "name": "Ty Jerome",
+      "team": "MEM",
+      "position": "PG",
+      "games": 1,
+      "hits": 0,
+      "sumP": 0.078,
+      "avgP": 0.078,
+      "oeRatio": 0,
+      "learnedAdjustment": 0.992
+    },
+    {
+      "name": "Jeremiah Fears",
+      "team": "NOP",
+      "position": "PG",
+      "games": 1,
+      "hits": 0,
+      "sumP": 0.07700000000000001,
+      "avgP": 0.07700000000000001,
+      "oeRatio": 0,
+      "learnedAdjustment": 0.992
+    },
+    {
+      "name": "Nickeil Alexander-Walker",
+      "team": "ATL",
+      "position": "SF",
+      "games": 1,
+      "hits": 0,
+      "sumP": 0.07692307692307693,
+      "avgP": 0.07692307692307693,
+      "oeRatio": 0,
+      "learnedAdjustment": 0.992
+    },
+    {
+      "name": "Precious Achiuwa",
+      "team": "SAC",
+      "position": "PF",
+      "games": 1,
+      "hits": 0,
+      "sumP": 0.07600000000000001,
+      "avgP": 0.07600000000000001,
+      "oeRatio": 0,
+      "learnedAdjustment": 0.992
+    },
+    {
+      "name": "Jaylen Wells",
+      "team": "MEM",
+      "position": "SG",
+      "games": 1,
+      "hits": 0,
+      "sumP": 0.061,
+      "avgP": 0.061,
+      "oeRatio": 0,
+      "learnedAdjustment": 0.994
+    },
+    {
+      "name": "Dyson Daniels",
+      "team": "ATL",
+      "position": "PG",
+      "games": 1,
+      "hits": 0,
+      "sumP": 0.06093906093906094,
+      "avgP": 0.06093906093906094,
+      "oeRatio": 0,
+      "learnedAdjustment": 0.994
+    },
+    {
+      "name": "Toumani Camara",
+      "team": "POR",
+      "position": "PF",
+      "games": 1,
+      "hits": 0,
+      "sumP": 0.054,
+      "avgP": 0.054,
+      "oeRatio": 0,
+      "learnedAdjustment": 0.995
+    },
+    {
+      "name": "Darius Acuff Jr.",
+      "team": "SAC",
+      "position": "PG",
+      "games": 1,
+      "hits": 0,
+      "sumP": 0.053000000000000005,
+      "avgP": 0.053000000000000005,
+      "oeRatio": 0,
+      "learnedAdjustment": 0.995
+    },
+    {
+      "name": "Peyton Watson",
+      "team": "CLE",
+      "position": "SF",
+      "games": 1,
+      "hits": 0,
+      "sumP": 0.04595404595404596,
+      "avgP": 0.04595404595404596,
+      "oeRatio": 0,
+      "learnedAdjustment": 0.995
+    }
+  ]
+}

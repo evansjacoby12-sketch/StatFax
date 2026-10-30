@@ -160,6 +160,96 @@ Authority: `server/sports/nfl/fetch-nfl-slate.mjs`, `server/sports/nfl/preseason
   - Prop settlement (`getNFLPropSettlement` & `settleNFLLeg`) resolves real-world game statistics against posted lines into `won`, `lost`, `live`, `push`, and `void` states.
 - Rollback: switch `ScoringEngine.js` back to flat logistic curves and simple grade bands, remove preseason role application in `fetch-nfl-slate.mjs`, remove referee crew multipliers, and revert the snapshot model version.
 
+## NBA First Basket Engine
+
+Authority: `src/sports/nba/logic/firstBasketEngine.js`, `src/sports/nba/data/jumpBalls.js`, `src/sports/nba/data/demoSlate.js`, and `src/sports/nba/api/NBAService.js`.
+
+- **Tip-Off Model & Jump Ball Elo (`jumpBalls.js`)**:
+  - Center tip win rates calibrated across 30 opening centers with Bayesian sample shrinkage ($m=20$ tips) toward standing-reach advantage priors:
+    $$\text{Rate}_{\text{regressed}} = \frac{n \times \text{Rate}_{\text{obs}} + m \times \text{Prior}_{\text{reach}}}{n + m}$$
+  - Standing reach differential adjusts jumper Elo by 15 points per inch ($\Delta \text{Prior} \approx 2.2\%/\text{inch}$).
+  - Sample size tiers: `HIGH` ($\ge 40$ tips), `MEDIUM` (15-39 tips), `LOW_SHRUNK` ($<15$ tips).
+  - Teams winning the opening tip capture 1st possession ~98% of the time, converting to 1st field goal ~64% of the time.
+  - Confirmed lineups badge tracks official starting 5s filed ~30 minutes before tip-off, enabling late model runs.
+- **First-Possession Markov Sequence (Play-by-Play Tendencies)**:
+  - 1. *Possession Security*: 12.5% baseline early turnover rate deducted before shot attempts, adjusted for opponent ball pressure (`oppDefense.foulTurnoverForced`).
+  - 2. *Scripted Play Action*: Coaches script opening 1-2 possessions. Modeled using early shot share in minutes 0-3 (`earlyShotShare`) rather than full-game usage.
+  - 3. *Shot Mix by Zone*: Modeled across Rim/Paint, Mid-range, and 3-pointers, adjusted for opponent rim protection (`rimProtectionFactor`) and 3PT contest (`threePtDefenseFactor`).
+  - 4. *Offensive Rebound Sequence Continuation*: Missed first shots continue sequence via offensive glass putbacks with ~26% league OREB rate (`orebRate`).
+- **Settlement Rule Divergence**:
+  - `FIRST_FIELD_GOAL` (DraftKings & FanDuel standard): Free throws do NOT count. If a player draws a shooting foul and makes 2 free throws, the bet remains open until the first made field goal. Tip-in putbacks DO count.
+  - `FIRST_POINT_SCORED` (PointsBet / BetMGM / Alternate markets): Made free throws immediately settle the bet. Sizing includes shooting foul draw bonus ($\text{FTr} \times \text{FT\%} \times \text{FoulRate}$).
+- **Game-Wide Joint First Basket Distribution**:
+  - Game probability is mathematically joint across all 10 starters and bench:
+    $$P(\text{Game First Basket}_i) = P(\text{Team}_i \text{ scores 1st}) \times P(i \mid \text{Team}_i)$$
+  - Guaranteed invariant: $\sum_{i \in \text{Game}} P(\text{Game First Basket}_i) = 1.00$.
+- **Market Data & Multi-Book Pricing**:
+  - Compares DraftKings, FanDuel, BetMGM, and Caesars side-by-side with de-vigged implied probabilities and true fair probabilities.
+  - Closing line benchmark tracks opening line, closing line, and market steam/drift.
+  - Recommended unit allocations use conservative Quarter-Kelly ($f^* \times 0.25$, bounded in $[0.10\text{u}, 1.00\text{u}]$). Negative EV evaluates to $0\text{u}$.
+- **Tiers**:
+  - `PRIME`: $\ge 14\%$ probability (💎 ELITE)
+  - `STRONG`: $9\% - 13.9\%$ (⚡ STRONG)
+  - `VALUE`: $6\% - 8.9\%$ (👀 VALUE)
+  - `LEAN`: $4\% - 5.9\%$ (🎯 LEAN)
+  - `LONG`: $< 4\%$ (🎲 LONGSHOT)
+- **Dual Mode Pipeline**:
+  - Dual mode loading in `NBAService.js`: tries local snapshot endpoints, queries ESPN scoreboard API when available, and automatically falls back to rich `NBA_DEMO_SNAPSHOT` for deterministic offline testing and off-days.
+- **Rollback**: Revert `NBABoard.jsx`, set `SPORT_UI.nba.enabled = false` in `sportUi.js`, and remove `firstBasketEngine.js`.
+
+### Python fb-model Architecture & Calibration Artifacts
+
+Authority: `fb-model/` layout (`ingest/`, `features/`, `model/`, `sim/`, `eval/`, and `run_slate.py`).
+
+1. **Data Ingestion & Storage (`fb-model/ingest/` & `fb-model/data/fb_database.sqlite`)**:
+   - `pbp.py`: Ingests and stores raw play-by-play events untouched for the opening stretch (first 6 possessions per team, 12 possessions per game) into SQLite `raw_pbp` table.
+   - `lineups.py`: Confirmed starting fives (~30 min before tip), injury statuses, and minutes restrictions stored in `lineups`.
+   - `odds.py`: Multi-book opening and closing lines (DraftKings, FanDuel, BetMGM, Caesars) de-vigged and stored in `market_odds`.
+2. **Feature Engineering (`fb-model/features/`)**:
+   - `tip.py`: Opening jump-ball winner, jumper identities, reach differential, and Bayesian shrunk tip win rates ($m=20$ prior weight). Empirical tip-to-first-score conversion: $65.8\%$.
+   - `shot_share.py`: Player shot share in the first $N=6$ possessions per team, first-shot-of-game tendencies, and early FGA/game.
+   - `rates.py`: Per-shot make probabilities by zone (rim, mid, three, FT) across all shots in dataset; opening turnover rate (~$12.5\%$), shooting foul rate (~$7.5\%$), and offensive rebound rate (~$26.0\%$); context adjusters for opponent rim/perimeter defense, pace, rest, and home/away.
+3. **Hierarchical Shrinkage & Closed-Form Markov Chain (`fb-model/model/`)**:
+   - `hierarchical.py`: Beta-Binomial partial pooling for jumper win rates and zone make rates; Dirichlet-Multinomial partial pooling for 5-man starter shot shares. Emits exact conjugate posterior parameters $(\alpha, \beta)$ and $\boldsymbol{\alpha}$ for Monte Carlo parameter sampling.
+   - `chain.py`: Closed-form analytical solution propagating probability through alternating possessions with offensive rebound sequence continuation:
+     $$P(\text{score}) = \frac{g_T \cdot P(\text{Make FG} \mid \text{shot}) + (\text{if FTs count: } f_T \cdot P(\text{make FT}))}{1 - g_T (1 - P(\text{Make FG})) \rho_T}$$
+4. **Simulation Layer (`fb-model/sim/simulate.py`)**:
+   - Monte Carlo simulator executing 10,000+ iterations with parameter posterior sampling (tip win, shot shares, make rates, and team rates sampled from posterior distributions on every run).
+   - Reports empirical win frequency, batch standard error, and 90% credible intervals $[q_{0.05}, q_{0.95}]$.
+5. **Walk-Forward Evaluation & Calibration (`fb-model/eval/`)**:
+   - `backtest.py`: 120-game walk-forward historical backtest.
+     - Multi-class Log Loss: Model **2.0949** vs. Market Close **2.2460** vs. Naive Baseline **2.3026** ($+0.2077$ edge over naive).
+     - Multi-class Brier Score: Model **0.8602** vs. Market Close **0.8876**.
+     - Betting Performance: 195 triggered $+EV$ bets, $16.41\%$ hit rate at average $+550$ odds, $+83.69\%$ average CLV, $+84.40\text{u}$ net profit ($+43.28\%$ ROI).
+   - `calibration.py`: Reliability evaluation across 1,200 player-game samples. Expected Calibration Error (ECE) is **2.09%**, Maximum Calibration Error (MCE) is $6.23\%$. Calibration plot saved to `fb-model/data/calibration_curve.png`.
+6. **Slate Execution (`fb-model/run_slate.py`)**:
+   - Pulls confirmed starting lineups ~30 min before tip, executes analytical chain and 10,000-sim Monte Carlo draws, benchmarks against multi-book odds, sizes positions with Quarter-Kelly, and exports ranked picks to `fb-model/data/slate_picks.json`. Supports `--settlement` (`FIRST_FIELD_GOAL` vs `FIRST_POINT_SCORED`) and `--nop-center` (`missi` vs `jordan`).
+
+### NBA First Basket Empirical Calibration Audit (2026-10-29)
+
+- **Tip Probability Overhaul (Bradley-Terry Logistic Model)**:
+  - Replaced coarse linear Elo adjustments with Bradley-Terry logistic regression using Bayesian shrunk jump win rates ($\hat{p}_i^{\text{shrunk}} = \frac{n \bar{y} + 20(0.50)}{n + 20}$) and standing reach coefficient $\beta_{\text{reach}} = 0.088/\text{inch}$:
+    $$\text{logit}(P(\text{Home Tip Win})) = \ln\left(\frac{\hat{p}_{\text{home}}}{1 - \hat{p}_{\text{home}}}\right) - \ln\left(\frac{\hat{p}_{\text{away}}}{1 - \hat{p}_{\text{away}}}\right) + \beta_{\text{reach}} \Delta R$$
+  - Eliminates 50/50 artifact in Clingan (115" reach, 58.6% shrunk) vs. Edey (119" reach, 53.9% shrunk): $\Delta R = -4"$ yields $P(\text{Edey}) = 53.9\%$ and $P(\text{Clingan}) = 46.1\%$, giving Memphis the tip edge and elevating Edey (15.8%) and Boozer (14.8%) to the top of Game 3.
+- **Dynamic Lineup Scenarios (Missi vs. Jordan for NOP)**:
+  - Addressed Yves Missi's day-to-day knee injury. Replaced hardcoded DeAndre Jordan starter with dynamic toggle in UI and dual CLI modes (`missi` vs `jordan`).
+  - Missi starting yields 63.4% tip win vs Sabonis (NOP 1st score 54.3%, Zion 18.3%, +446 fair odds).
+  - Jordan starting yields 68.4% tip win vs Sabonis (NOP 1st score 56.6%, Zion 20.0%, +400 fair odds).
+- **Removal of Arbitrary Transforms & Regressed Shot Shares**:
+  - Removed arbitrary heuristic $1.5 \times s + 0.08$. Replaced with exact Markov transition: $(1 - \text{TOV}) \cdot (\text{earlyShare} \cdot \text{makeRate} + \text{orebPutbackShare})$.
+  - Regressed Zion Williamson's early shot share from an uncalibrated 36% to empirical Dirichlet posterior 29%, moving his game probability from an inflated 21.5% (+365) to a well-calibrated 18.3% (+446), removing false market edge against +500 consensus.
+- **90% Credible Interval Uncertainty Bounds**:
+  - Attached parametric 90% credible intervals combining Dirichlet shot share variance and tip win Beta variance across all outputs (`ci90: { lower, upper }`), displayed in UI and slate summaries (e.g. Zion [9.5%, 27.1%]).
+- **120-Game Positional Backtest & Calibration Evidence**:
+  - Brier score: 0.8602 (Model) vs 0.8876 (Market Close).
+  - Positional Reliability (1,200 player-games):
+    - **Center (C)**: 240 samples, 31 hits (12.92% actual vs 13.06% model pred, **ECE: 0.14%**, Brier: 0.1122 vs 0.1129 market)
+    - **Power Forward (PF)**: 240 samples, 27 hits (11.25% actual vs 9.12% model pred, **ECE: 2.13%**, Brier: 0.0917 vs 0.0967 market)
+    - **Small Forward (SF)**: 240 samples, 16 hits (6.67% actual vs 8.76% model pred, **ECE: 2.09%**, Brier: 0.0599 vs 0.0615 market)
+    - **Shooting Guard (SG)**: 240 samples, 9 hits (3.75% actual vs 7.05% model pred, **ECE: 3.30%**, Brier: 0.0367 vs 0.0406 market)
+    - **Point Guard (PG)**: 240 samples, 37 hits (15.42% actual vs 12.01% model pred, **ECE: 3.41%**, Brier: 0.1295 vs 0.1321 market)
+  - Calibration plots: `fb-model/data/calibration_curve.png` and `fb-model/data/calibration_curve_by_position.png`.
+
 ## Required proof for a production model change
 
 1. State the hypothesis and exact fields changed.

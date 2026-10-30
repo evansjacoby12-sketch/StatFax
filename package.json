@@ -2,7 +2,7 @@
   "name": "statfax-brain",
   "private": true,
   "type": "module",
-  "description": "StatFax MLB home-run probability engine + data pipeline — the headless 'brain' behind statfax.online.",
+  "description": "StatFax MLB home-run probability engine + data pipeline \u2014 the headless 'brain' behind statfax.online.",
   "scripts": {
     "test": "node --test test/*.test.mjs",
     "serve": "node server/serve.mjs",
@@ -48,7 +48,12 @@
     "lab:board": "node model-lab/board-evolution.mjs",
     "lab:k": "node model-lab/k-prop-audit.mjs",
     "lab:matchup": "node model-lab/matchup-model.mjs",
-    "lab:validate-ceil": "node model-lab/validate-ceil.mjs"
+    "lab:validate-ceil": "node model-lab/validate-ceil.mjs",
+    "nba:slate": "node server/sports/nba/fetch-nba-slate.mjs",
+    "nba:score": "node tools/firstBasketLog.mjs score",
+    "nba:snapshot": "node tools/firstBasketLog.mjs snapshot --games CLE@ATL,SAC@NOP,MEM@POR --version v3",
+    "nba:learn": "node tools/firstBasketLog.mjs learn",
+    "nba:reconcile": "node tools/firstBasketLog.mjs reconcile"
   },
   "devDependencies": {
     "esbuild": "^0.28.0"

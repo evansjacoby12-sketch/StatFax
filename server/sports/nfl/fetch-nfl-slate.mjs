@@ -285,7 +285,15 @@ export async function buildNFLSnapshot({ now = new Date(), fetchImpl = fetch, hi
             downDistance: summary?.situation?.downDistance || null,
             lastPlay: summary?.situation?.lastPlay || null,
             firstTdKnown: Boolean(summary?.firstTouchdown?.known),
-            isFirstTdScorer: Boolean(summary?.firstTouchdown?.espnId && summary.firstTouchdown.espnId === player.espnId),
+            isFirstTdScorer: Boolean(
+              summary?.firstTouchdown?.espnId
+                ? (summary.firstTouchdown.espnId === player.espnId || summary.firstTouchdown.espnId === player.id || `espn-${summary.firstTouchdown.espnId}` === player.id)
+                : summary?.firstTouchdown?.name && (
+                    player.name?.toLowerCase() === summary.firstTouchdown.name.toLowerCase() ||
+                    player.name?.toLowerCase().includes(summary.firstTouchdown.name.toLowerCase()) ||
+                    summary.firstTouchdown.name.toLowerCase().includes(player.name?.toLowerCase())
+                  )
+            ),
             estimatedPossessionsRemaining: Math.max(0, Math.round(12 * (1 - (summary?.progress ?? 0)))),
             stats: { completions: n(liveStats.completions), attempts: n(liveStats.attempts), passingYards: n(liveStats.passingYards), carries: n(liveStats.carries), rushingYards: n(liveStats.rushingYards), receptions: n(liveStats.receptions), receivingYards: n(liveStats.receivingYards), targets: n(liveStats.targets), totalTds: n(liveStats.totalTds) },
           },

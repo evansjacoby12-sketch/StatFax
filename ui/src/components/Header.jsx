@@ -69,18 +69,54 @@ function KickoffCountdown({ games = [] }) {
   )
 }
 
-function SportSwitcher({ sport = 'mlb', onChange }) {
+function TipOffCountdown({ games = [] }) {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 30_000)
+    return () => clearInterval(t)
+  }, [])
+  if (games.some((g) => g.isLive || g.status === 'STATUS_IN_PROGRESS' || g.status === 'in')) return null
+  const next = games
+    .filter((g) => !g.isFinal && g.status !== 'STATUS_FINAL')
+    .map((g) => Date.parse(g.date || g.gameTime || g.kickoffAt))
+    .filter((t) => Number.isFinite(t) && t > now)
+    .sort((a, b) => a - b)[0]
+  if (!next) return null
+  const mins = Math.max(1, Math.round((next - now) / 60_000))
+  let label = ''
+  if (mins >= 1440) {
+    const d = Math.floor(mins / 1440)
+    const h = Math.floor((mins % 1440) / 60)
+    label = h > 0 ? `${d}d ${h}h` : `${d}d`
+  } else if (mins >= 60) {
+    const h = Math.floor(mins / 60)
+    const m = mins % 60
+    label = m > 0 ? `${h}h ${m}m` : `${h}h`
+  } else {
+    label = `${mins}m`
+  }
+  return (
+    <>
+      <span className="dot-sep">·</span>
+      <span className="first-pitch nba-tipoff-countdown" title="Time until next scheduled NBA opening tip">
+        <Icon name="Activity" size={11} style={{ color: 'var(--accent)' }} /> tip in {label}
+      </span>
+    </>
+  )
+}
+
+function SportSwitcher({ sport = 'nba', onChange }) {
   return (
     <div className="sport-switcher" role="group" aria-label="Sport">
       <button
         type="button"
-        className={`sport-option ${sport === 'mlb' ? 'active' : ''}`}
-        aria-pressed={sport === 'mlb'}
-        onClick={() => onChange?.('mlb')}
-        title="MLB model board"
+        className={`sport-option ${sport === 'nba' ? 'active' : ''}`}
+        aria-pressed={sport === 'nba'}
+        onClick={() => onChange?.('nba')}
+        title="NBA First Basket board"
       >
-        <Icon name="CircleDot" size={13} />
-        <span>MLB</span>
+        <Icon name="Activity" size={13} />
+        <span>NBA</span>
       </button>
       <button
         type="button"
@@ -91,6 +127,17 @@ function SportSwitcher({ sport = 'mlb', onChange }) {
       >
         <Icon name="Shield" size={13} />
         <span>NFL</span>
+      </button>
+      <button
+        type="button"
+        className={`sport-option ${sport === 'mlb' ? 'active' : ''} is-offseason`}
+        aria-pressed={sport === 'mlb'}
+        onClick={() => onChange?.('mlb')}
+        title="MLB model board (Season Over · Offseason)"
+      >
+        <Icon name="CircleDot" size={13} />
+        <span>MLB</span>
+        <span className="sport-tag-offseason">OFF</span>
       </button>
     </div>
   )
@@ -145,10 +192,27 @@ function HelpMenu({ sport, onOpenWeather, onOpenGroups, onOpenSplits, onOpenHowT
   }, [open])
 
   const isNFL = sport === 'nfl'
+  const isNBA = sport === 'nba'
 
   // Keep each sport's tools scoped to its own workspace. NFL learning and
   // discovery destinations use football-only content and model fields.
-  const sections = isNFL ? [
+  const sections = isNBA ? [
+    {
+      title: 'NBA First Basket',
+      items: [
+        { label: refreshing ? 'Refreshing NBA Feed…' : 'Refresh NBA Feed', desc: 'Reload games, starting lineups, tip ratings and first basket odds', icon: refreshing ? 'Loader' : 'RefreshCw', fn: onRefresh },
+        { label: liveScores ? 'Live Updates Active' : 'Pregame Status', desc: liveScores ? 'NBA live data refreshes every 30 seconds' : 'No NBA game is live right now', icon: liveScores ? 'Activity' : 'Clock', fn: onToggleLive },
+        { label: eliLevel === 'eli5' ? 'Plain Explanations' : 'Stats Explanations', desc: 'Switch explanation depth on First Basket cards', icon: eliLevel === 'eli5' ? 'Sparkles' : 'BarChart3', fn: onCycleEli },
+      ],
+    },
+    {
+      title: 'First Basket Tools',
+      items: [
+        { label: 'Jump Ball Matchups', desc: 'Opening tip-off battle and starter shot distributions', icon: 'Activity', fn: onOpenSplits },
+        { label: 'First Basket Parlay Lab', desc: 'Multi-game parlays, round-robins, and Kelly sizing', icon: 'Beaker', fn: onOpenGroups },
+      ],
+    },
+  ] : isNFL ? [
     {
       title: 'NFL Board',
       items: [
@@ -575,14 +639,14 @@ export default function Header({
               <span className="brand-name">
                 Stat<span style={{ color: 'var(--accent)', textShadow: '0 0 8px var(--accent-glow)' }}>Fax</span>
               </span>
-              <span className="brand-sub">{sport === 'nfl' ? 'NFL Board' : 'Model Board'}</span>
+              <span className="brand-sub">{sport === 'nfl' ? 'NFL Board' : sport === 'nba' ? 'First Basket' : 'Model Board'}</span>
             </div>
           </div>
           <SportSwitcher sport={sport} onChange={onSportChange} />
         </div>
         <div className="slate-block">
           <div className="slate-meta">
-            <span className="slate-date">{sport === 'nfl' ? (meta.week || 'NFL Demo') : meta.date}</span>
+            <span className="slate-date">{sport === 'nfl' ? (meta.week || 'NFL Demo') : sport === 'nba' ? (meta.label || 'NBA Slate') : meta.date}</span>
             <span className="dot-sep">·</span>
             <span>{counts.games} games</span>
             <span className="dot-sep slate-batters">·</span>
@@ -592,11 +656,12 @@ export default function Header({
                 <span>/</span>
                 <span>{counts.total}</span>
               </span>
-              <span>{sport === 'nfl' ? 'players' : 'batters'}</span>
+              <span>{sport === 'nfl' || sport === 'nba' ? 'players' : 'batters'}</span>
             </span>
             {sport === 'mlb' && <FirstPitchCountdown games={games} />}
             {sport === 'nfl' && <KickoffCountdown games={games} />}
-            {sport === 'nfl' && <span className="nfl-header-demo"><Icon name={meta.sourceMode === 'demo' ? 'Beaker' : 'Activity'} size={10} /> {meta.sourceMode === 'demo' ? 'demo slate' : 'live feed'}</span>}
+            {sport === 'nba' && <TipOffCountdown games={games} />}
+            {(sport === 'nfl' || sport === 'nba') && <span className="nfl-header-demo"><Icon name={meta.sourceMode === 'demo' ? 'Beaker' : 'Activity'} size={10} /> {meta.sourceMode === 'demo' ? 'demo slate' : 'live feed'}</span>}
             {sport === 'mlb' && meta.morningLockAt && (
               <>
                 <span className="dot-sep">·</span>
@@ -626,18 +691,18 @@ export default function Header({
       </div>
 
       <div className="header-right">
-        {sport === 'nfl' && (
-          <div className="metric-pill model-health nfl-feed-health" title={meta.sourceMode === 'demo' ? 'NFL demo fallback' : `NFL feed connected · odds ${meta.oddsStatus || 'unknown'}`}>
+        {(sport === 'nfl' || sport === 'nba') && (
+          <div className="metric-pill model-health nfl-feed-health" title={meta.sourceMode === 'demo' ? `${sport.toUpperCase()} demo fallback` : `${sport.toUpperCase()} feed connected · odds ${meta.oddsStatus || 'ok'}`}>
             <span className="model-health-gauge" aria-hidden="true"><Icon name={meta.sourceMode === 'demo' ? 'Beaker' : 'Activity'} size={15} /></span>
             <span className="model-health-copy">
-              <span className="model-health-main"><strong>{meta.sourceMode === 'demo' ? 'Demo' : 'Live'}</strong><small>NFL feed</small></span>
+              <span className="model-health-main"><strong>{meta.sourceMode === 'demo' ? 'Demo' : 'Live'}</strong><small>{sport.toUpperCase()} feed</small></span>
               <span className="model-health-meta"><span>{meta.sourceMode === 'demo' ? 'Fallback' : meta.oddsStatus === 'ok' ? 'Odds on' : 'Stats on'}</span></span>
             </span>
           </div>
         )}
         <button
           className="metric-pill model-health"
-          style={sport === 'nfl' ? { display: 'none' } : undefined}
+          style={sport === 'nfl' || sport === 'nba' ? { display: 'none' } : undefined}
           onClick={onOpenModel}
           title={
             slateStale

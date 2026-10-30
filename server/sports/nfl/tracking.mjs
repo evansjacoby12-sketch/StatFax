@@ -24,22 +24,25 @@ const playerResultKey = (gameId, playerId) => `${gameId}:${playerId}`
 function frozenLeg(leg) {
   return {
     key: leg.key, playerId: leg.playerId, name: leg.name, position: leg.position, team: leg.team, opponent: leg.opponent,
-    gameId: leg.gameKey, kickoffAt: leg.kickoffAt || null, marketId: leg.marketId, marketLabel: leg.marketLabel,
-    probability: leg.probability, odds: leg.odds, evidenceConfidence: leg.evidenceConfidence,
+    gameId: leg.gameId || leg.gameKey, kickoffAt: leg.kickoffAt || null, marketId: leg.marketId, marketLabel: leg.marketLabel,
+    probability: leg.probability, odds: leg.odds, score: leg.model?.score ?? null, grade: leg.grade ?? null,
+    evidenceConfidence: leg.evidenceConfidence,
   }
 }
 
 function frozenCombo(combo, rank) {
   return {
     id: combo.id, rank, strategy: combo.strategy, scope: combo.scope, probability: combo.probability,
+    score: combo.score ?? null, grade: combo.grade ?? null,
     independentProbability: combo.independentProbability, probabilityMethod: combo.probabilityMethod,
     actionableProbability: combo.actionableProbability, buildQuality: combo.buildQuality, evidenceConfidence: combo.evidenceConfidence,
+    rationale: combo.rationale || null,
     legs: combo.legs.map(frozenLeg), status: 'pending', outcome: null,
   }
 }
 
 function captureBoard(snapshot, strategy, scope, legs) {
-  const board = buildNFLComboBoard(snapshot, { strategy, scope, legs, minGrade: 'LEAN' })
+  const board = buildNFLComboBoard(snapshot, { strategy, scope, legs, minGrade: 'LEAN', allowFinal: true })
   return {
     at: snapshot.generatedAt || new Date().toISOString(), coverage: board.coverage, exposure: board.exposure, calibration: board.calibration,
     combos: board.combos.map((combo, index) => frozenCombo(combo, index + 1)),
@@ -55,25 +58,55 @@ function comboHasStarted(combo, snapshot, now) {
 }
 
 function settleFrozenCombo(combo, snapshot, now) {
-  const players = new Map((snapshot?.players || []).map((player) => [playerResultKey(player.gameId, player.id), player]))
+  const players = new Map()
+  for (const p of snapshot?.players || []) {
+    if (p.gameId && p.id) {
+      players.set(`${p.gameId}:${p.id}`, p)
+      players.set(`${p.gameId}:${String(p.id).replace(/^espn-/, '')}`, p)
+    }
+    if (p.id) {
+      players.set(p.id, p)
+      players.set(String(p.id).replace(/^espn-/, ''), p)
+      players.set(`espn-${p.id}`, p)
+    }
+  }
   const legs = combo.legs.map((leg) => {
-    const player = players.get(playerResultKey(leg.gameId, leg.playerId))
+    const player = players.get(`${leg.gameId}:${leg.playerId}`) ||
+      players.get(leg.playerId) ||
+      players.get(String(leg.playerId).replace(/^espn-/, '')) ||
+      players.get(`espn-${leg.playerId}`)
     if (!player) return { ...leg, status: leg.status || 'pending' }
     const live = player.live || {}
     const touchdowns = Number(live.stats?.totalTds || 0)
-    if (leg.marketId === 'anytime_td' && touchdowns >= 1) return { ...leg, status: 'won', outcome: 1, touchdowns, firstTd: Boolean(live.isFirstTdScorer), settledAt: new Date(now).toISOString() }
-    if (leg.marketId === 'two_plus_td' && touchdowns >= 2) return { ...leg, status: 'won', outcome: 1, touchdowns, firstTd: Boolean(live.isFirstTdScorer), settledAt: new Date(now).toISOString() }
-    if (leg.marketId === 'first_td' && live.isFirstTdScorer) return { ...leg, status: 'won', outcome: 1, touchdowns, firstTd: true, settledAt: new Date(now).toISOString() }
-    if (!live.isFinal) return { ...leg, status: live.isLive ? 'live' : 'pending' }
-    if (leg.marketId === 'first_td' && !live.firstTdKnown) return { ...leg, status: 'void', outcome: null, touchdowns, firstTd: null, settledAt: new Date(now).toISOString() }
-    return { ...leg, status: 'lost', outcome: 0, touchdowns, firstTd: Boolean(live.isFirstTdScorer), settledAt: new Date(now).toISOString() }
+    if (leg.marketId === 'anytime_td' && touchdowns >= 1) return { ...leg, status: 'won', outcome: 1, touchdowns, firstTd: Boolean(live.isFirstTdScorer), settledAt: leg.settledAt || new Date(now).toISOString() }
+    if (leg.marketId === 'two_plus_td' && touchdowns >= 2) return { ...leg, status: 'won', outcome: 1, touchdowns, firstTd: Boolean(live.isFirstTdScorer), settledAt: leg.settledAt || new Date(now).toISOString() }
+    if (leg.marketId === 'first_td' && live.isFirstTdScorer) return { ...leg, status: 'won', outcome: 1, touchdowns, firstTd: true, settledAt: leg.settledAt || new Date(now).toISOString() }
+    if (!live.isFinal) return { ...leg, status: live.isLive ? 'live' : 'pending', touchdowns }
+    if (leg.marketId === 'first_td' && !live.firstTdKnown) return { ...leg, status: 'void', outcome: null, touchdowns, firstTd: null, settledAt: leg.settledAt || new Date(now).toISOString() }
+    return { ...leg, status: 'lost', outcome: 0, touchdowns, firstTd: Boolean(live.isFirstTdScorer), settledAt: leg.settledAt || new Date(now).toISOString() }
   })
+  const wonCount = legs.filter((l) => l.status === 'won').length
+  const lostCount = legs.filter((l) => l.status === 'lost').length
+  const liveCount = legs.filter((l) => l.status === 'live').length
+  const totalLegs = legs.length
   const statuses = legs.map((leg) => leg.status)
-  const status = statuses.includes('lost') ? 'lost'
-    : statuses.every((value) => value === 'won' || value === 'void') ? (statuses.every((value) => value === 'void') ? 'void' : 'won')
-      : statuses.includes('live') || statuses.includes('won') ? 'live' : 'pending'
+  const isLost = lostCount > 0
+  const isWon = !isLost && totalLegs > 0 && statuses.every((s) => s === 'won' || s === 'void' || s === 'push') && wonCount > 0
+  const isVoid = !isLost && !isWon && totalLegs > 0 && statuses.every((s) => s === 'void' || s === 'push')
+  const isLive = !isLost && !isWon && !isVoid && (liveCount > 0 || wonCount > 0)
+  const status = isLost ? 'lost' : isWon ? 'won' : isVoid ? 'void' : isLive ? 'live' : 'pending'
   const outcome = status === 'won' ? 1 : status === 'lost' ? 0 : null
-  return { ...combo, legs, status, outcome, settledAt: terminal(status) ? combo.settledAt || new Date(now).toISOString() : null, brier: outcome == null || !Number.isFinite(Number(combo.probability)) ? null : (Number(combo.probability) - outcome) ** 2 }
+  return {
+    ...combo,
+    legs,
+    status,
+    outcome,
+    wonLegsCount: wonCount,
+    lostLegsCount: lostCount,
+    totalLegs,
+    settledAt: terminal(status) ? combo.settledAt || new Date(now).toISOString() : null,
+    brier: outcome == null || !Number.isFinite(Number(combo.probability)) ? null : (Number(combo.probability) - outcome) ** 2,
+  }
 }
 
 function updateNFLStackBoards(existingBoards = [], snapshots = [], now = new Date()) {
@@ -86,12 +119,13 @@ function updateNFLStackBoards(existingBoards = [], snapshots = [], now = new Dat
       const capture = captureBoard(snapshot, strategy.id, scope, legs)
       if (!capture.combos.length) continue
       const started = capture.combos.some((combo) => comboHasStarted(combo, snapshot, now))
-      if (started) {
-        if (existing) boards.set(id, { ...existing, locked: true, lockedAt: existing.lockedAt || new Date(now).toISOString() })
-        continue
+      if (!existing) {
+        boards.set(id, { id, season: snapshot.meta?.season, week: snapshot.meta?.week, strategy: strategy.id, scope, legs, status: started ? 'live' : 'open', locked: started, lockedAt: started ? new Date(now).toISOString() : null, revisions: 1, opened: capture, closing: capture })
+      } else if (started) {
+        boards.set(id, { ...existing, locked: true, lockedAt: existing.lockedAt || new Date(now).toISOString() })
+      } else {
+        boards.set(id, { ...existing, revisions: Number(existing.revisions || 1) + 1, closing: capture })
       }
-      if (!existing) boards.set(id, { id, season: snapshot.meta?.season, week: snapshot.meta?.week, strategy: strategy.id, scope, legs, status: 'open', locked: false, revisions: 1, opened: capture, closing: capture })
-      else boards.set(id, { ...existing, revisions: Number(existing.revisions || 1) + 1, closing: capture })
     }
   }
   const current = snapshots.filter(Boolean).at(-1)
@@ -222,5 +256,5 @@ export function summarizeNFLTracking(log = {}) {
       if (Number.isFinite(combo.brier)) { bucket.brierTotal += combo.brier; bucket.brierSamples++ }
     }
   }
-  return { updatedAt: log.updatedAt || null, open: (log.records || []).filter((record) => record.status === 'open').length, settled: settled.length, markets: Object.fromEntries(Object.entries(markets).map(([id, value]) => [id, { samples: value.samples, hitRate: value.samples ? value.wins / value.samples : null, brier: value.brierSamples ? value.brierTotal / value.brierSamples : null, mae: value.errorSamples ? value.errorTotal / value.errorSamples : null, profit: value.roiSamples ? value.profit : null, roi: value.roiSamples ? value.profit / value.roiSamples : null, roiSamples: value.roiSamples, calibration: [...value.calibration.values()].map((bin) => ({ ...bin, predicted: bin.predicted / bin.samples, observed: bin.observed / bin.samples })) }])), stacks: Object.fromEntries(Object.entries(stackSummary).map(([key, value]) => [key, { ...value, hitRate: value.settled ? value.wins / value.settled : null, brier: value.brierSamples ? value.brierTotal / value.brierSamples : null }])), validation: { touchdowns: touchdownValidation(log.records || []), stacks: stackValidation(log.stackBoards || []) } }
+  return { updatedAt: log.updatedAt || null, open: (log.records || []).filter((record) => record.status === 'open').length, settled: settled.length, markets: Object.fromEntries(Object.entries(markets).map(([id, value]) => [id, { samples: value.samples, hitRate: value.samples ? value.wins / value.samples : null, brier: value.brierSamples ? value.brierTotal / value.brierSamples : null, mae: value.errorSamples ? value.errorTotal / value.errorSamples : null, profit: value.roiSamples ? value.profit : null, roi: value.roiSamples ? value.profit / value.roiSamples : null, roiSamples: value.roiSamples, calibration: [...value.calibration.values()].map((bin) => ({ ...bin, predicted: bin.predicted / bin.samples, observed: bin.observed / bin.samples })) }])), stacks: Object.fromEntries(Object.entries(stackSummary).map(([key, value]) => [key, { ...value, hitRate: value.settled ? value.wins / value.settled : null, brier: value.brierSamples ? value.brierTotal / value.brierSamples : null }])), stackBoards: log.stackBoards || [], validation: { touchdowns: touchdownValidation(log.records || []), stacks: stackValidation(log.stackBoards || []) } }
 }

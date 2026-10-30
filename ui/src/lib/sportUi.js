@@ -35,18 +35,18 @@ export const SPORT_UI = Object.freeze({
   nba: Object.freeze({
     id: 'nba',
     label: 'NBA',
-    enabled: false,
+    enabled: true,
     primaryViews: [
-      { id: 'signals', label: 'Signals', icon: 'Zap' },
-      { id: 'bet-lab', label: 'Bet Lab', icon: 'Beaker' },
-      { id: 'performance', label: 'Performance', icon: 'Gauge' },
+      { id: 'signals', label: 'Signals', icon: 'Zap', desc: 'First basket board' },
+      { id: 'matchups', label: 'Jump Balls', icon: 'Activity', desc: 'Tip-off & starting 5s' },
+      { id: 'bet-lab', label: 'Bet Lab', icon: 'Beaker', desc: 'First basket parlays' },
     ],
     mobileViews: [
       { id: 'signals', label: 'Signals', icon: 'Zap' },
+      { id: 'matchups', label: 'Jump Balls', icon: 'Activity' },
       { id: 'bet-lab', label: 'Bet Lab', icon: 'Beaker' },
-      { id: 'performance', label: 'Performance', icon: 'Gauge' },
     ],
   }),
 })
 
-export const sportUi = (sport) => SPORT_UI[sport] || SPORT_UI.mlb
+export const sportUi = (sport) => SPORT_UI[sport] || SPORT_UI.nba

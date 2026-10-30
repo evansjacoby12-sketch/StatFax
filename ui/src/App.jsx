@@ -27,6 +27,7 @@ import UpdateBanner from './components/UpdateBanner.jsx'
 import WorkspaceShell from './components/WorkspaceShell.jsx'
 import SportMobileDock from './components/SportMobileDock.jsx'
 import { loadNFLSnapshot } from '../../src/sports/nfl/api/NFLService.js'
+import { loadNBASnapshot } from '../../src/sports/nba/api/NBAService.js'
 import ToastStack, { toast } from './components/Toast.jsx'
 import InstallPrompt from './components/InstallPrompt.jsx'
 import Confetti from './components/Confetti.jsx'
@@ -46,6 +47,7 @@ const LearnCenter = lazy(() => import('./components/LearnCenter.jsx'))
 const NFLBoard = lazy(() => import('./components/NFLBoard.jsx'))
 const NFLLearnCenter = lazy(() => import('./components/NFLLearnCenter.jsx'))
 const NFLCheatSheet = lazy(() => import('./components/NFLCheatSheet.jsx'))
+const NBABoard = lazy(() => import('./components/NBABoard.jsx'))
 
 // Cloudflare Worker base — its /trigger endpoint fires a repository_dispatch
 // that rebuilds the slate on GitHub Actions (the press-and-hold "build" action).
@@ -133,10 +135,17 @@ export default function App() {
   const [slipIds, setSlipIds] = useState(() => store.load('slip', []))
   const [liveUpdates, setLiveUpdates] = useState(() => store.load('liveUpdates', store.load('liveScores', true)))
   const autoRefresh = liveUpdates
-  const [sport, setSport] = useState(() => (store.load('sport', 'mlb') === 'nfl' ? 'nfl' : 'mlb'))
+  const [sport, setSport] = useState(() => {
+    const s = store.load('sport', 'nba')
+    if (s === 'mlb') return 'nba' // MLB season is over
+    return ['nfl', 'nba'].includes(s) ? s : 'nba'
+  })
   const [nflSnapshot, setNflSnapshot] = useState(null)
   const [nflRefreshing, setNflRefreshing] = useState(false)
   const [nflView, setNflView] = useState('signals')
+  const [nbaSnapshot, setNbaSnapshot] = useState(null)
+  const [nbaRefreshing, setNbaRefreshing] = useState(false)
+  const [nbaView, setNbaView] = useState('signals')
   const [view, setView] = useState(() => (staleReturn ? 'board' : (viewFromHash() || store.load('view', 'board'))))
   const liveScores = liveUpdates
   const [eliLevel, setEliLevel] = useState(() => store.load('eliLevel', 'eli5')) // 'eli5' | 'eli15'
@@ -206,6 +215,16 @@ export default function App() {
     const timer = setInterval(refreshNFL, nflHasLiveGames ? LIVE_REFRESH_MS : SLATE_REFRESH_MS)
     return () => clearInterval(timer)
   }, [nflHasLiveGames, refreshNFL, sport])
+
+  const refreshNBA = useCallback(async () => {
+    setNbaRefreshing(true)
+    try { setNbaSnapshot(await loadNBASnapshot({ demoFallback: true })) }
+    finally { setNbaRefreshing(false) }
+  }, [])
+  useEffect(() => {
+    if (sport !== 'nba') return undefined
+    refreshNBA()
+  }, [refreshNBA, sport])
 
   // Publish the sticky chrome height so the board column-header can stick right
   // below it — robust to the filter bar wrapping at any width.
@@ -355,6 +374,7 @@ export default function App() {
     const onOnline = () => {
       toast.success('Back online')
       if (sport === 'nfl') refreshNFL()
+      else if (sport === 'nba') refreshNBA()
       else load()
     }
     window.addEventListener('offline', onOffline)
@@ -363,7 +383,7 @@ export default function App() {
       window.removeEventListener('offline', onOffline)
       window.removeEventListener('online', onOnline)
     }
-  }, [load, refreshNFL, sport])
+  }, [load, refreshNFL, refreshNBA, sport])
 
   // Esc closes the topmost overlay; '/' focuses sport search; number keys switch
   // the visible sport's primary views.
@@ -372,15 +392,17 @@ export default function App() {
       const typing = ['INPUT', 'TEXTAREA'].includes(e.target.tagName)
       if (e.key === '/' && !typing) {
         e.preventDefault()
-        const input = document.querySelector(sport === 'nfl' ? '.sport-filter-search input' : '.search input')
+        const input = document.querySelector(sport === 'nba' ? '.nba-search-input' : (sport === 'nfl' ? '.sport-filter-search input' : '.search input'))
         if (input) { input.focus(); input.select() }
         return
       }
       if (!typing && !e.metaKey && !e.ctrlKey && !e.altKey && ['1', '2', '3', '4', '5'].includes(e.key)) {
-        const nextView = sport === 'nfl'
+        const nextView = sport === 'nba'
+          ? SPORT_UI.nba.primaryViews[+e.key - 1]?.id
+          : sport === 'nfl'
           ? SPORT_UI.nfl.primaryViews[+e.key - 1]?.id
           : ['board', 'games', 'pitchers', 'weather', 'results'][+e.key - 1]
-        if (nextView) (sport === 'nfl' ? setNflView : setView)(nextView)
+        if (nextView) (sport === 'nba' ? setNbaView : sport === 'nfl' ? setNflView : setView)(nextView)
         return
       }
       if (e.key === 'Escape') {
@@ -595,6 +617,51 @@ export default function App() {
   // tie-break (xHR → stable id) so the pick only
   // changes when the numbers actually move, never on iteration-order noise.
   const pick = useMemo(() => selectTopModelPick(all), [all])
+
+  if (sport === 'nba') {
+    const nbaData = nbaSnapshot
+    const nbaPlayers = nbaData?.players || []
+    return (
+      <LiveModeContext.Provider value={false}>
+      <EliLevelContext.Provider value={eliLevel}>
+        <>
+        <div className="app nba-app">
+          <div className="topbar" ref={topbarRef}>
+            <Header
+              sport="nba"
+              onSportChange={(next) => setSport(next)}
+              meta={{ label: nbaData?.meta?.label || 'NBA First Basket', modelMetrics: null, generatedAt: nbaData?.generatedAt || null, sourceMode: nbaData?.source?.mode || 'demo', oddsStatus: 'ok' }}
+              counts={{ games: nbaData?.meta?.games || 0, total: nbaPlayers.length, shown: nbaPlayers.length }}
+              onRefresh={refreshNBA}
+              onToggleLive={() => toast.info('NBA live updates refresh automatically')}
+              onCycleEli={() => setEliLevel((value) => nextEliLevel(value))}
+              liveScores={false}
+              eliLevel={eliLevel}
+              refreshing={nbaRefreshing}
+              gradeCounts={{}}
+              total={nbaPlayers.length}
+              games={nbaData?.games || []}
+              onOpenHowTo={() => toast.info('First Basket: Opening tip win rates, starter shot shares, and +EV edges')}
+              onOpenGuide={() => toast.info('First Basket Guide: Opening possession conversion and Kelly sizing')}
+              onOpenLegend={() => toast.info('Grades: 💎 PRIME (14%+), ⚡ STRONG (9%+), 👀 VALUE (6%+)')}
+              onOpenSplits={() => setNbaView('matchups')}
+            />
+          </div>
+          <main className="main nba-main">
+            <Suspense fallback={<div className="results-loading">Loading NBA workspace…</div>}>
+              <NBABoard snapshot={nbaData} view={nbaView} onViewChange={setNbaView} />
+            </Suspense>
+          </main>
+          <footer className="foot"><span className="dim">StatFax NBA · First Basket Scorer & Opening Possession Intelligence</span></footer>
+          <UpdateBanner />
+          <ToastStack />
+        </div>
+        <SportMobileDock sport="nba" value={nbaView} onChange={setNbaView} tabs={SPORT_UI.nba.mobileViews} />
+        </>
+      </EliLevelContext.Provider>
+      </LiveModeContext.Provider>
+    )
+  }
 
   if (sport === 'nfl') {
     const nflData = nflSnapshot

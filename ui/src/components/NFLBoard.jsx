@@ -4,6 +4,7 @@ import { ProbRing } from './atoms.jsx'
 import CommandTabs from './CommandTabs.jsx'
 import NFLBetLab from './NFLBetLab.jsx'
 import NFLFantasyOptimizer from './NFLFantasyOptimizer.jsx'
+import NFLComboHistory from './NFLComboHistory.jsx'
 import { NFL_COMBO_STRATEGIES, americanOdds } from '../lib/nflCombos.js'
 import SportMarketRail from './SportMarketRail.jsx'
 import SportMultiFilterBar from './SportMultiFilterBar.jsx'
@@ -48,7 +49,7 @@ const NFL_SIGNAL_FILTERS = [
   { id: 'role-risk', label: 'Role Risk', icon: 'TriangleAlert', tone: 'bad', match: (player) => player.model.signals.some((signal) => ['scoring-role-lost', 'protection-mismatch', 'quick-pressure-risk'].includes(signal.key)) },
 ]
 const GRADE_COLORS = { PRIME: 'var(--prime)', STRONG: 'var(--strong)', LEAN: 'var(--lean)', SKIP: 'var(--skip)' }
-const NFL_TEAM_COLORS = {
+export const NFL_TEAM_COLORS = {
   ARI: '#97233f', ATL: '#a71930', BAL: '#6a4c93', BUF: '#2f5fa7', CAR: '#0085ca', CHI: '#c83803', CIN: '#fb4f14', CLE: '#ff3c00',
   DAL: '#5b6f8f', DEN: '#fb4f14', DET: '#0076b6', GB: '#203731', HOU: '#03202f', IND: '#315f91', JAX: '#008e97', KC: '#e31837',
   LAC: '#0080c6', LAR: '#315f91', LVR: '#a5acaf', MIA: '#008e97', MIN: '#4f2683', NE: '#315f91', NO: '#d3bc8d', NYG: '#315f91',
@@ -180,10 +181,11 @@ function SignalAssessmentPanel({ signals = [], eliLevel }) {
 
 const PERF_SUBTABS = [
   { id: 'overview', label: 'Model & Stacks', icon: 'Gauge' },
+  { id: 'combos', label: 'Combo History', icon: 'Layers' },
   { id: 'tickets', label: 'My Tickets', icon: 'Bookmark' },
 ]
 
-function NFLPerformance({ snapshot, tickets = [], onRemoveTicket, onClearTickets, onOpenBetLab }) {
+function NFLPerformance({ snapshot, tickets = [], onRemoveTicket, onClearTickets, onOpenBetLab, onSelect }) {
   const [subTab, setSubTab] = useState('overview')
   const [statusFilter, setStatusFilter] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
@@ -356,6 +358,10 @@ function NFLPerformance({ snapshot, tickets = [], onRemoveTicket, onClearTickets
       </div>
     )}
 
+    {subTab === 'combos' && (
+      <NFLComboHistory snapshot={snapshot} onSelectPlayer={onSelect} />
+    )}
+
     {subTab === 'overview' && (
       <>
         <div className="nfl-coverage-grid" aria-label="NFL data coverage">{coverage.map(([label, ready]) => <div key={label} className={ready ? 'is-ready' : 'is-limited'}><Icon name={ready ? 'CircleCheck' : 'TriangleAlert'} size={15} /><span><b>{label}</b><small>{ready ? 'Connected' : 'Limited'}</small></span></div>)}</div>
@@ -382,9 +388,10 @@ function NFLPerformance({ snapshot, tickets = [], onRemoveTicket, onClearTickets
   </section>
 }
 
-function PlayerCard({ player, marketId, watched, inSlip, onSelect, onToggleWatch, onToggleSlip }) {
+function PlayerCard({ player, marketId, side = 'over', onSetSide, watched, inSlip, onSelect, onToggleWatch, onToggleSlip }) {
   const eliLevel = useEliLevel()
   const { model } = player
+  const isTD = isNFLTDMarket(marketId)
   const color = GRADE_COLORS[model.grade]
   const weather = model.weather
   const isQB = player.position === 'QB'
@@ -394,7 +401,7 @@ function PlayerCard({ player, marketId, watched, inSlip, onSelect, onToggleWatch
         <div className="nfl-card-hero"><PlayerHeadshotSilo player={player} /><div className="nfl-card-hero-copy"><header><div><span className="nfl-card-name">{player.name}</span><span className="nfl-position">{player.position}</span><span className="nfl-grade" style={{ color }}>{model.grade}</span><AssessmentBadge signals={model.signals} compact /></div><small className={`nfl-live-state ${player.live?.isLive ? 'is-live' : ''}`}><Icon name={player.live?.isLive ? 'Activity' : 'Clock'} size={11} />{liveLabel(player)}</small></header><div className="nfl-card-matchup"><b>{player.team}</b><Icon name="ChevronRight" size={10} /><span>{player.opponent}</span><i>·</i><span>{player.kickoff}</span><i>·</i><span>{player.isHome ? 'Home' : 'Away'}</span></div></div></div>
         <div className="nfl-card-price">
           <div><small>Model probability</small><strong className="mono" style={{ color }}>{pct(model.probability)}</strong></div>
-          <div><small>{['anytime_td', 'first_td', 'two_plus_td'].includes(marketId) ? 'Odds / edge' : 'Line / edge'}</small><span><b className="mono">{marketValue(player, model, marketId)}</b><em className={`mono ${model.edge == null ? '' : model.edge >= 0 ? 'positive' : 'negative'}`}>{model.edge == null ? (model.probability > 0 ? 'Fair baseline' : 'No price') : `${model.edge >= 0 ? '+' : ''}${pct(model.edge)}`}</em></span></div>
+          <div><small>{isTD ? 'Odds / edge' : 'Line / edge'}</small><span><b className="mono">{marketValue(player, model, marketId, side)}</b><em className={`mono ${model.edge == null ? '' : model.edge >= 0 ? 'positive' : 'negative'}`}>{model.edge == null ? (model.probability > 0 ? 'Fair baseline' : 'No price') : `${model.edge >= 0 ? '+' : ''}${pct(model.edge)}`}</em></span></div>
         </div>
         <div className="nfl-card-context">
           {isQB && <div className="is-volume"><span><Icon name="Radio" size={12} />Comp / Att</span><b className="mono">{number(player.projections?.completions, 1)} / {number(player.projections?.attempts, 1)}</b></div>}
@@ -836,7 +843,7 @@ export default function NFLBoard({ snapshot: suppliedSnapshot = null, view: cont
   return <div className="nfl-workspace nfl-prop-workspace">
     <div className="nfl-workspace-head"><div><span className="nfl-eyebrow"><Icon name="Shield" size={13} /> NFL prop engine</span><h1>NFL Signals</h1><p>Slate-ranked QB, RB, WR and TE signals powered by role, matchup, form, lineup, weather, price and live pace.</p></div><CommandTabs tabs={SPORT_UI.nfl.primaryViews} value={view} onChange={setView} label="NFL view" className="nfl-view-tabs" variant="workspace" /></div>
     <div className={`nfl-demo-banner is-${snapshotStale ? 'critical' : snapshot.dataHealth?.status || 'ready'}`} role="status" aria-live="polite"><Icon name={snapshotStale || snapshot.dataHealth?.status === 'critical' || !snapshot.dataQuality?.playByPlay ? 'TriangleAlert' : 'CircleCheck'} size={15} /><span><b>{snapshotStale ? 'NFL pipeline update delayed' : snapshot.source?.mode === 'demo' ? 'Demo slate' : snapshot.dataHealth?.status === 'ready' ? 'All NFL feeds healthy' : snapshot.dataQuality?.playByPlay ? 'NFL core data connected' : 'NFL data connected · limited context'}</b> {snapshotStale ? 'The published slate is more than 45 minutes old. Open Performance for feed details.' : snapshot.dataHealth?.issues?.length ? `${snapshot.dataHealth.issues.length} supporting feed${snapshot.dataHealth.issues.length === 1 ? '' : 's'} limited. Open Performance for details.` : 'Red-zone, depth, availability, weather, defense and tracking coverage are active.'}</span></div>
-    {view === 'performance' ? <NFLPerformance snapshot={snapshot} tickets={tickets} onRemoveTicket={(id) => setTickets((curr) => curr.filter((t) => t.id !== id))} onClearTickets={() => setTickets([])} onOpenBetLab={openBetLabBuilder} /> : view === 'bet-lab' ? <div className="nfl-bet-lab-workspace"><NFLBetLab snapshot={snapshot} slip={slip} slipLegs={slipLegs} tab={betLabView} onTabChange={setBetLabView} onAddCombo={addComboToSlip} onToggleLeg={(key) => toggleSet(setSlip, key)} onSaveTicket={saveTicket} /></div> : view === 'fantasy' ? <NFLFantasyOptimizer snapshot={snapshot} /> : <>
+    {view === 'performance' ? <NFLPerformance snapshot={snapshot} tickets={tickets} onRemoveTicket={(id) => setTickets((curr) => curr.filter((t) => t.id !== id))} onClearTickets={() => setTickets([])} onOpenBetLab={openBetLabBuilder} onSelect={setSelected} /> : view === 'bet-lab' ? <div className="nfl-bet-lab-workspace"><NFLBetLab snapshot={snapshot} slip={slip} slipLegs={slipLegs} tab={betLabView} onTabChange={setBetLabView} onAddCombo={addComboToSlip} onToggleLeg={(key) => toggleSet(setSlip, key)} onSaveTicket={saveTicket} /></div> : view === 'fantasy' ? <NFLFantasyOptimizer snapshot={snapshot} /> : <>
       <SportMarketRail sport="nfl" markets={NFL_PROP_MARKET_LIST} value={marketId} onChange={setMarketId} icons={MARKET_ICONS} ariaLabel="NFL prop market" />
       {marketId === 'first_td' && <div className="nfl-variance-note"><Icon name="TriangleAlert" size={14} /><span><b>First TD is high variance.</b> Listed offense receives {pct(snapshot.firstTdReserve?.listedOffense ?? .86, 0)}; other offense {pct(snapshot.firstTdReserve?.otherOffense ?? .06, 0)}, defense/special teams {pct(snapshot.firstTdReserve?.defenseSpecialTeams ?? .06, 0)}, and no touchdown {pct(snapshot.firstTdReserve?.noTouchdown ?? .02, 0)} are modeled separately.</span></div>}
       {marketId === 'two_plus_td' && <div className="nfl-variance-note"><Icon name="Flame" size={14} /><span><b>2+ TD is calibrated separately.</b> Multi-score probability is evaluated independently from Anytime TD.</span></div>}

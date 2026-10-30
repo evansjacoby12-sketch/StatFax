@@ -53,7 +53,7 @@ test('sport UI contracts share navigation primitives without sharing sport state
     readFile(new URL('../ui/src/components/SportMobileDock.jsx', import.meta.url), 'utf8'),
   ])
   for (const sport of ['mlb', 'nfl', 'nba']) assert.match(config, new RegExp(`${sport}: Object\\.freeze`))
-  assert.match(config, /nba:[\s\S]*?enabled: false/)
+  assert.match(config, /nba:[\s\S]*?enabled: true/)
   assert.match(app, /<SportMobileDock sport="nfl" value=\{nflView\}/)
   assert.match(app, /<SportMobileDock sport="mlb" value=\{bottomNavView\}/)
   assert.match(dock, /sportUi\(sport\)/)

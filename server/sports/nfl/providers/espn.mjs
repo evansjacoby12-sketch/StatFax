@@ -289,8 +289,37 @@ export function parseESPNSummary(payload, game) {
   const weather = headerCompetition.weather || payload?.gameInfo?.weather || {}
   const situation = payload?.situation || headerCompetition.situation || {}
   const possession = String(situation.possession || situation.possessionText || '')
-  const firstTouchdownPlay = (payload?.scoringPlays || []).find((play) => /touchdown/i.test(`${play.type?.text || ''} ${play.text || ''}`))
-  const firstTouchdownAthlete = firstTouchdownPlay?.participants?.[0]?.athlete || firstTouchdownPlay?.athletes?.[0] || null
+function extractScorerName(text) {
+  if (!text) return null
+  const clean = text.replace(/\s*\([^)]*\)\s*$/, '').trim()
+  const passToMatch = clean.match(/pass(?:\s+\w+)*\s+to\s+([A-Z][a-zA-Z'.\-]+(?:\s+[A-Z][a-zA-Z'.\-]+)+)(?:\s+for\s+|\s*,)/i)
+  if (passToMatch) return passToMatch[1].trim()
+  const prefixMatch = clean.match(/^([A-Z][a-zA-Z'.\-]+(?:\s+[A-Z][a-zA-Z'.\-]+)+?)\s+(?:\d+\s+Yd|\d+\s+Yard|fumble|interception|kickoff|punt|blocked)/i)
+  if (prefixMatch) return prefixMatch[1].trim()
+  const fallbackMatch = clean.match(/^([A-Z][a-zA-Z'.\-]+(?:\s+[A-Z][a-zA-Z'.\-]+)+)/)
+  if (fallbackMatch) return fallbackMatch[1].trim()
+  return null
+}
+
+  const firstTouchdownPlay = (payload?.scoringPlays || []).find((play) => /touchdown/i.test(`${play.type?.text || ''} ${play.text || ''} ${play.scoringType?.displayName || ''}`))
+  let firstTouchdownAthlete = firstTouchdownPlay?.participants?.[0]?.athlete || firstTouchdownPlay?.athletes?.[0] || null
+
+  if (!firstTouchdownAthlete && firstTouchdownPlay?.text) {
+    const scorerName = extractScorerName(firstTouchdownPlay.text)
+    if (scorerName) {
+      const match = [...byPlayer.values()].find((p) => p.name && (
+        p.name.toLowerCase() === scorerName.toLowerCase() ||
+        p.name.toLowerCase().includes(scorerName.toLowerCase()) ||
+        scorerName.toLowerCase().includes(p.name.toLowerCase())
+      ))
+      if (match) {
+        firstTouchdownAthlete = { id: match.espnId, displayName: match.name }
+      } else {
+        firstTouchdownAthlete = { id: null, displayName: scorerName }
+      }
+    }
+  }
+
   return {
     players: [...byPlayer.values()],
     injuries: (payload?.injuries || []).flatMap((team) => (team.injuries || []).map((injury) => ({

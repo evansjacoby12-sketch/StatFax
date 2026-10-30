@@ -1,0 +1,69 @@
+{
+  "games_evaluated": 120,
+  "sportsbook": "DraftKings",
+  "log_loss": {
+    "model": 2.0949,
+    "market_closing": 2.246,
+    "naive_baseline": 2.3026,
+    "log_loss_improvement_vs_naive": 0.2077
+  },
+  "brier_score": {
+    "model": 0.8602,
+    "market_closing": 0.8876
+  },
+  "positional_breakdown": {
+    "C": {
+      "samples": 240,
+      "actual_hits": 31,
+      "actual_hit_pct": 12.92,
+      "model_mean_pred_pct": 13.06,
+      "model_brier": 0.1122,
+      "market_brier": 0.1129,
+      "brier_improvement_pct": 0.58
+    },
+    "PF": {
+      "samples": 240,
+      "actual_hits": 27,
+      "actual_hit_pct": 11.25,
+      "model_mean_pred_pct": 9.12,
+      "model_brier": 0.0917,
+      "market_brier": 0.0967,
+      "brier_improvement_pct": 5.15
+    },
+    "SF": {
+      "samples": 240,
+      "actual_hits": 16,
+      "actual_hit_pct": 6.67,
+      "model_mean_pred_pct": 8.76,
+      "model_brier": 0.0599,
+      "market_brier": 0.0615,
+      "brier_improvement_pct": 2.6
+    },
+    "SG": {
+      "samples": 240,
+      "actual_hits": 9,
+      "actual_hit_pct": 3.75,
+      "model_mean_pred_pct": 7.05,
+      "model_brier": 0.0367,
+      "market_brier": 0.0406,
+      "brier_improvement_pct": 9.56
+    },
+    "PG": {
+      "samples": 240,
+      "actual_hits": 37,
+      "actual_hit_pct": 15.42,
+      "model_mean_pred_pct": 12.01,
+      "model_brier": 0.1295,
+      "market_brier": 0.1321,
+      "brier_improvement_pct": 1.96
+    }
+  },
+  "betting_performance": {
+    "total_bets": 195,
+    "winning_bets": 32,
+    "hit_rate_pct": 16.41,
+    "net_profit_units": 84.4,
+    "roi_pct": 43.28,
+    "avg_closing_line_value_pct": 83.69
+  }
+}
