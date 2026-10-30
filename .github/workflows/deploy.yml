@@ -318,26 +318,26 @@ jobs:
             if [ -f "dist/$f" ]; then
               aws s3 cp "dist/$f" "s3://$R2_BUCKET/$f" --endpoint-url "$ENDPOINT" \
                 --content-type application/json --cache-control no-cache \
-                && echo "R2: published $f"
+                && echo "R2: published $f" || echo "R2: failed to publish $f (non-blocking)"
             fi
           done
           if [ -f "dist/nfl/daily.json" ]; then
             aws s3 cp "dist/nfl/daily.json" "s3://$R2_BUCKET/nfl/daily.json" --endpoint-url "$ENDPOINT" \
               --content-type application/json --cache-control no-cache \
-              && echo "R2: published nfl/daily.json"
+              && echo "R2: published nfl/daily.json" || echo "R2: failed to publish nfl/daily.json (non-blocking)"
           fi
           for f in backtest.json tracking.json preseason.json preseason-participation.json readiness.json history.json; do
             if [ -f "dist/nfl/$f" ]; then
               aws s3 cp "dist/nfl/$f" "s3://$R2_BUCKET/nfl/$f" --endpoint-url "$ENDPOINT" \
-                --content-type application/json --cache-control no-cache
-              echo "R2: published nfl/$f"
+                --content-type application/json --cache-control no-cache \
+                && echo "R2: published nfl/$f" || echo "R2: failed to publish nfl/$f (non-blocking)"
             fi
           done
           if [ -f "dist/nfl/daily.json" ]; then
             ARCHIVE_KEY="nfl/archive/$(date -u +%Y/%m/%d/%H%M%S)-daily.json"
             aws s3 cp "dist/nfl/daily.json" "s3://$R2_BUCKET/$ARCHIVE_KEY" --endpoint-url "$ENDPOINT" \
-              --content-type application/json --cache-control no-cache
-            echo "R2: archived $ARCHIVE_KEY"
+              --content-type application/json --cache-control no-cache \
+              && echo "R2: archived $ARCHIVE_KEY" || echo "R2: failed to archive $ARCHIVE_KEY (non-blocking)"
           fi
 
       # Deterministic feed/identity checks are the enforcement authority. Any
@@ -369,19 +369,19 @@ jobs:
             if [ -f "dist/$f" ]; then
               aws s3 cp "dist/$f" "s3://$R2_BUCKET/$f" --endpoint-url "$ENDPOINT" \
                 --content-type application/json --cache-control no-cache \
-                && echo "R2: published $f"
+                && echo "R2: published $f" || echo "R2: failed to publish $f (non-blocking)"
             fi
           done
           ARCHIVE_DATE=$(node -e "const d=require('./dist/daily.json');if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(d.date||''))process.exit(1);process.stdout.write(d.date)")
           for f in daily.json backtest-log.json calibration.json mlb-game-results.json mlb-game-history.json first-inning-pitcher-cache.json pregame-freeze.json list-builder-evidence.json board-history.json zone-evaluation.json mlb-data-health.json; do
             if [ -f "dist/$f" ]; then
               aws s3 cp "dist/$f" "s3://$R2_BUCKET/mlb/archive/$ARCHIVE_DATE/$f" --endpoint-url "$ENDPOINT" \
-                --content-type application/json --cache-control no-cache
+                --content-type application/json --cache-control no-cache || true
             fi
           done
           if [ -f "dist/inputs-$ARCHIVE_DATE.json" ]; then
             aws s3 cp "dist/inputs-$ARCHIVE_DATE.json" "s3://$R2_BUCKET/mlb/archive/$ARCHIVE_DATE/inputs-$ARCHIVE_DATE.json" --endpoint-url "$ENDPOINT" \
-              --content-type application/json --cache-control no-cache
+              --content-type application/json --cache-control no-cache || true
           fi
           echo "R2: archived MLB state for $ARCHIVE_DATE"
 
