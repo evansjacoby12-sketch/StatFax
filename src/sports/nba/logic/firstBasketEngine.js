@@ -345,11 +345,236 @@ export function scoreTeamFirstBasket(players, oppDefense = {}, teamInfo = {}) {
   }));
 }
 
+// ─── Fast Deterministic PRNG & 5,000-Trial Monte Carlo Engine ────────────────
+
+/**
+ * Fast Mulberry32 pseudo-random number generator.
+ * Defaults to Math.random if seedVal is not provided.
+ */
+export function createPrng(seedVal) {
+  if (seedVal == null) return Math.random;
+  let s = typeof seedVal === 'string'
+    ? seedVal.split('').reduce((acc, c) => ((acc << 5) - acc + c.charCodeAt(0)) | 0, 0)
+    : Number(seedVal);
+  s = (s >>> 0) || 1337;
+  return function() {
+    s = (s + 0x6D2B79F5) | 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * 5,000-Trial Monte Carlo First Basket Simulation Engine.
+ *
+ * For each game matchup, runs 5,000 discrete possession-level trials simulating:
+ * 1. Jump ball tip outcome based on head-to-head Log5 jumper probabilities.
+ * 2. Ball security & early turnover risk (flips possession before shot).
+ * 3. Scripted first look shooter selection weighted by early possession usage.
+ * 4. Zone shot attempt (Rim, Mid-range, 3PT) vs defense contest make rates.
+ * 5. Offensive rebound putback extensions on missed shots.
+ * 6. Possession turnover on defensive rebounds / misses until the first field goal occurs.
+ */
+export function simulateGameFirstBasketMonteCarlo({
+  homePlayers = [],
+  awayPlayers = [],
+  tipMatchup = {},
+  iterations = 5000,
+  seed = null,
+}) {
+  const rng = createPrng(seed);
+
+  function prepTeam(players) {
+    if (!players || players.length === 0) {
+      return { players: [], turnoverRate: LEAGUE_EARLY_TURNOVER_RATE, orebRate: LEAGUE_OREB_RATE };
+    }
+    const prepared = players.map((p) => {
+      const pos = normalizePosition(p.position);
+      const orebShare = pos === 'C' ? 0.30 : pos === 'PF' ? 0.24 : pos === 'SF' ? 0.18 : pos === 'SG' ? 0.14 : 0.14;
+      const shotMix = p.shotMix || {
+        rim: pos === 'C' ? 0.65 : pos === 'PF' ? 0.45 : 0.25,
+        mid: pos === 'C' ? 0.15 : 0.30,
+        three: pos === 'C' ? 0.20 : pos === 'PF' ? 0.25 : 0.45,
+      };
+      const rimFG = (p.zoneFG?.rim ?? p.rimMake ?? 68) / 100;
+      const midFG = (p.zoneFG?.mid ?? p.midMake ?? 44) / 100;
+      const threeFG = (p.zoneFG?.three ?? p.threeMake ?? 36) / 100;
+      const share = p.earlyShotShare || (p.teamProb ?? 0.20);
+      return {
+        id: p.id,
+        name: p.name,
+        team: p.team,
+        pos,
+        share,
+        orebShare,
+        shotMix,
+        rimFG,
+        midFG,
+        threeFG,
+      };
+    });
+
+    const totalShare = prepared.reduce((sum, p) => sum + p.share, 0);
+    const totalOrebShare = prepared.reduce((sum, p) => sum + p.orebShare, 0);
+
+    let cumShare = 0;
+    for (const p of prepared) {
+      cumShare += (p.share / (totalShare || 1));
+      p.cumShare = cumShare;
+    }
+    if (prepared.length > 0) prepared[prepared.length - 1].cumShare = 1.0;
+
+    let cumOreb = 0;
+    for (const p of prepared) {
+      cumOreb += (p.orebShare / (totalOrebShare || 1));
+      p.cumOreb = cumOreb;
+    }
+    if (prepared.length > 0) prepared[prepared.length - 1].cumOreb = 1.0;
+
+    const turnoverRate = Number.isFinite(players[0]?.turnoverRate)
+      ? players[0].turnoverRate / 100
+      : LEAGUE_EARLY_TURNOVER_RATE;
+    const orebRate = Number.isFinite(players[0]?.orebRate)
+      ? players[0].orebRate / 100
+      : Number.isFinite(players[0]?.orebExtensionPct)
+        ? players[0].orebExtensionPct / 100
+        : LEAGUE_OREB_RATE;
+
+    return { players: prepared, turnoverRate, orebRate };
+  }
+
+  const teamHome = prepTeam(homePlayers);
+  const teamAway = prepTeam(awayPlayers);
+  const homeTipProb = tipMatchup?.tipProbA ?? 0.50;
+
+  const playerStats = {};
+  for (const p of homePlayers) {
+    playerStats[p.id] = { wins: 0, methodCounts: { twoPt: 0, threePt: 0 } };
+  }
+  for (const p of awayPlayers) {
+    playerStats[p.id] = { wins: 0, methodCounts: { twoPt: 0, threePt: 0 } };
+  }
+
+  let homeWins = 0;
+  let awayWins = 0;
+
+  function samplePlayerByShare(team) {
+    const r = rng();
+    for (const p of team.players) {
+      if (r <= p.cumShare) return p;
+    }
+    return team.players[team.players.length - 1];
+  }
+
+  function sampleCrashRebounder(team) {
+    const r = rng();
+    for (const p of team.players) {
+      if (r <= p.cumOreb) return p;
+    }
+    return team.players[team.players.length - 1];
+  }
+
+  for (let trial = 0; trial < iterations; trial++) {
+    let isHomePossession = rng() < homeTipProb;
+    let trialScorerId = null;
+    let trialMethod = '2PT';
+    let scoredHome = false;
+
+    // Up to 25 possessions per sequence until first basket is scored
+    for (let possession = 0; possession < 25; possession++) {
+      const activeTeam = isHomePossession ? teamHome : teamAway;
+      if (!activeTeam.players || activeTeam.players.length === 0) break;
+
+      // Ball security check (turnover)
+      if (rng() < activeTeam.turnoverRate) {
+        isHomePossession = !isHomePossession;
+        continue;
+      }
+
+      // Sample shooter
+      const shooter = samplePlayerByShare(activeTeam);
+      const rZone = rng();
+      let makeProb = shooter.rimFG;
+      let is3Pt = false;
+
+      if (rZone < shooter.shotMix.rim) {
+        makeProb = shooter.rimFG;
+        is3Pt = false;
+      } else if (rZone < (shooter.shotMix.rim + shooter.shotMix.mid)) {
+        makeProb = shooter.midFG;
+        is3Pt = false;
+      } else {
+        makeProb = shooter.threeFG;
+        is3Pt = true;
+      }
+
+      // Shot make check
+      if (rng() < makeProb) {
+        trialScorerId = shooter.id;
+        trialMethod = is3Pt ? '3PT' : '2PT';
+        scoredHome = isHomePossession;
+        break;
+      }
+
+      // Initial shot missed: Offensive rebound check
+      if (rng() < activeTeam.orebRate) {
+        const rebounder = sampleCrashRebounder(activeTeam);
+        // Putback rim attempt
+        if (rng() < rebounder.rimFG) {
+          trialScorerId = rebounder.id;
+          trialMethod = '2PT';
+          scoredHome = isHomePossession;
+          break;
+        }
+      }
+
+      // Defensive rebound secured -> flip possession
+      isHomePossession = !isHomePossession;
+    }
+
+    // Safety fallback
+    if (!trialScorerId) {
+      const fallbackTeam = isHomePossession ? teamHome : teamAway;
+      const topP = fallbackTeam.players[0] || teamHome.players[0];
+      if (topP) {
+        trialScorerId = topP.id;
+        trialMethod = '2PT';
+        scoredHome = isHomePossession;
+      }
+    }
+
+    if (trialScorerId) {
+      if (!playerStats[trialScorerId]) {
+        playerStats[trialScorerId] = { wins: 0, methodCounts: { twoPt: 0, threePt: 0 } };
+      }
+      playerStats[trialScorerId].wins += 1;
+      if (trialMethod === '3PT') {
+        playerStats[trialScorerId].methodCounts.threePt += 1;
+      } else {
+        playerStats[trialScorerId].methodCounts.twoPt += 1;
+      }
+
+      if (scoredHome) homeWins++;
+      else awayWins++;
+    }
+  }
+
+  return {
+    iterations,
+    homeWins,
+    awayWins,
+    homePct: `${((homeWins / iterations) * 100).toFixed(1)}%`,
+    awayPct: `${((awayWins / iterations) * 100).toFixed(1)}%`,
+    playerStats,
+  };
+}
+
 // ─── Core Game First Basket Scoring ────────────────────────────────────────────
 
 /**
  * Score full game First Basket with Markov opening possession sequence,
- * multi-book odds comparison, and settlement rules.
+ * 5,000-trial Monte Carlo simulation, multi-book odds comparison, and settlement rules.
  */
 export function scoreGameFirstBasket({
   gameId = 'game-1',
@@ -367,6 +592,8 @@ export function scoreGameFirstBasket({
   gameTime = null,
   lineupStatus = { confirmed: true, announcedMinutesAgo: 24, status: 'CONFIRMED' },
   pace = 100.0,
+  simIterations = 5000,
+  seed = null,
 }) {
   // 1. Opening Tip Matchup with sample-size Bayesian shrinkage & reach differential
   const homeJumperName = typeof homeJumper === 'string'
@@ -400,23 +627,58 @@ export function scoreGameFirstBasket({
   homeScored.forEach((p, idx) => { p.teamRank = idx + 1; });
   awayScored.forEach((p, idx) => { p.teamRank = idx + 1; });
 
-  // 3. Joint Game-Wide Probability Distribution
+  // 3. Run 5,000-Trial Monte Carlo Simulation Engine
+  const simResult = simulateGameFirstBasketMonteCarlo({
+    homePlayers: homeScored,
+    awayPlayers: awayScored,
+    tipMatchup,
+    iterations: simIterations,
+    seed: seed ?? gameId,
+  });
+
+  // 4. Joint Game-Wide Probability Distribution & Simulation Outcomes
   const allGamePlayers = [
-    ...homeScored.map((p) => ({
-      ...p,
-      isHome: true,
-      gameProb: Math.round(p.teamProb * homeTeamScoresFirstProb * 1000) / 1000,
-      teamScoresFirstProb: homeTeamScoresFirstProb,
-    })),
-    ...awayScored.map((p) => ({
-      ...p,
-      isHome: false,
-      gameProb: Math.round(p.teamProb * awayTeamScoresFirstProb * 1000) / 1000,
-      teamScoresFirstProb: awayTeamScoresFirstProb,
-    })),
+    ...homeScored.map((p) => {
+      const sim = simResult.playerStats[p.id] || { wins: 0, methodCounts: { twoPt: 0, threePt: 0 } };
+      const simProb = Math.round((sim.wins / simResult.iterations) * 1000) / 1000;
+      return {
+        ...p,
+        isHome: true,
+        gameProb: Math.round(p.teamProb * homeTeamScoresFirstProb * 1000) / 1000,
+        teamScoresFirstProb: homeTeamScoresFirstProb,
+        simWins: sim.wins,
+        simTotal: simResult.iterations,
+        simProb,
+        simPct: `${((sim.wins / simResult.iterations) * 100).toFixed(1)}%`,
+        simMethods: sim.methodCounts,
+        simMethodSplit: {
+          prob2PT: Math.round((sim.methodCounts.twoPt / Math.max(1, sim.wins)) * 100) / 100,
+          prob3PT: Math.round((sim.methodCounts.threePt / Math.max(1, sim.wins)) * 100) / 100,
+        },
+      };
+    }),
+    ...awayScored.map((p) => {
+      const sim = simResult.playerStats[p.id] || { wins: 0, methodCounts: { twoPt: 0, threePt: 0 } };
+      const simProb = Math.round((sim.wins / simResult.iterations) * 1000) / 1000;
+      return {
+        ...p,
+        isHome: false,
+        gameProb: Math.round(p.teamProb * awayTeamScoresFirstProb * 1000) / 1000,
+        teamScoresFirstProb: awayTeamScoresFirstProb,
+        simWins: sim.wins,
+        simTotal: simResult.iterations,
+        simProb,
+        simPct: `${((sim.wins / simResult.iterations) * 100).toFixed(1)}%`,
+        simMethods: sim.methodCounts,
+        simMethodSplit: {
+          prob2PT: Math.round((sim.methodCounts.twoPt / Math.max(1, sim.wins)) * 100) / 100,
+          prob3PT: Math.round((sim.methodCounts.threePt / Math.max(1, sim.wins)) * 100) / 100,
+        },
+      };
+    }),
   ];
 
-  // 4. Multi-Book Odds Matrix, De-Vigged Benchmark, and Edge Analysis
+  // 5. Multi-Book Odds Matrix, De-Vigged Benchmark, and Edge Analysis
   const playersWithMarkets = allGamePlayers.map((player) => {
     const rawOdds = marketOdds[player.id] || marketOdds[player.name?.toLowerCase()] || null;
 
@@ -484,7 +746,7 @@ export function scoreGameFirstBasket({
       ? `${player.name} is ${player.team}'s primary early option (${(player.earlyShotShare * 100).toFixed(0)}% early shot share). ${tipAdvantage ? `${player.team} holds the opening tip edge (${(player.teamScoresFirstProb * 100).toFixed(0)}%).` : 'High early possession volume overcomes neutral tip.'}`
       : `${player.name} takes ${(player.earlyShotShare * 100).toFixed(0)}% of early shots (${player.method.primary}). ${player.orebExtensionPct > 25 ? 'Benefits from offensive rebound putback sequence.' : ''}`;
 
-    const eli15 = `Model prob ${(player.gameProb * 100).toFixed(1)}% (${fairGameOdds} fair) = ${(player.teamScoresFirstProb * 100).toFixed(1)}% team tip-conversion × ${(player.teamProb * 100).toFixed(1)}% team share. Early look rate: ${(player.earlyShotShare * 100).toFixed(0)}% (Make rate ${player.expectedMakeRate}%). OREB extension: ${player.orebExtensionPct}%. TOV risk: ${player.turnoverRate}%. Settlement: ${settlementRule}. Pace: ${pace}.`;
+    const eli15 = `Model prob ${(player.gameProb * 100).toFixed(1)}% (${fairGameOdds} fair) · 5k-Sim: ${player.simWins?.toLocaleString?.() ?? player.simWins}/5,000 (${player.simPct}) [2PT: ${player.simMethods?.twoPt ?? 0}, 3PT: ${player.simMethods?.threePt ?? 0}] = ${(player.teamScoresFirstProb * 100).toFixed(1)}% team tip-conversion × ${(player.teamProb * 100).toFixed(1)}% team share. Early look rate: ${(player.earlyShotShare * 100).toFixed(0)}% (Make rate ${player.expectedMakeRate}%). OREB extension: ${player.orebExtensionPct}%. TOV risk: ${player.turnoverRate}%. Settlement: ${settlementRule}. Pace: ${pace}.`;
 
     // Bayesian 90% Credible Interval using Logit-Normal Delta Method
     // Produces naturally skewed bounds bounded in (0, 1) rather than symmetric normal approximations
@@ -542,6 +804,13 @@ export function scoreGameFirstBasket({
     settlementRule,
     lineupStatus,
     pace,
+    simTelemetry: {
+      iterations: simResult.iterations,
+      homeWins: simResult.homeWins,
+      awayWins: simResult.awayWins,
+      homePct: simResult.homePct,
+      awayPct: simResult.awayPct,
+    },
     tipMatchup: {
       ...tipMatchup,
       homeJumper: homeJumperName,

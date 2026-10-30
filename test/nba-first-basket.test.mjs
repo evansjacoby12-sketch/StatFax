@@ -19,6 +19,7 @@ import {
   gradeFromScore,
   devigOddsMarket,
   SETTLEMENT_RULES,
+  simulateGameFirstBasketMonteCarlo,
 } from '../src/sports/nba/logic/firstBasketEngine.js';
 
 import { NBA_DEMO_SNAPSHOT } from '../src/sports/nba/data/demoSlate.js';
@@ -311,4 +312,79 @@ test('firstBasket: multi-book odds de-vigging and line movement', () => {
   assert.ok(wemby.multiBookComparison.betmgm);
   assert.ok(wemby.multiBookComparison.caesars);
 });
+
+test('firstBasket: 5000-trial Monte Carlo simulation engine per game', () => {
+  const homePlayers = [
+    { id: 'h1', name: 'Anthony Davis', position: 'C', earlyShotShare: 0.28, rimFG: 0.72, shotMix: { rim: 0.65, mid: 0.25, three: 0.1 } },
+    { id: 'h2', name: 'Austin Reaves', position: 'PG', earlyShotShare: 0.22, threeFG: 0.38, shotMix: { rim: 0.25, mid: 0.3, three: 0.45 } },
+    { id: 'h3', name: 'Rui Hachimura', position: 'PF', earlyShotShare: 0.18, shotMix: { rim: 0.45, mid: 0.3, three: 0.25 } },
+    { id: 'h4', name: 'DLo Russell', position: 'SG', earlyShotShare: 0.18, shotMix: { rim: 0.2, mid: 0.3, three: 0.5 } },
+    { id: 'h5', name: 'Jarred Vanderbilt', position: 'SF', earlyShotShare: 0.14, shotMix: { rim: 0.6, mid: 0.2, three: 0.2 } },
+  ];
+
+  const awayPlayers = [
+    { id: 'a1', name: 'Nikola Jokic', position: 'C', earlyShotShare: 0.25, rimFG: 0.70, shotMix: { rim: 0.6, mid: 0.25, three: 0.15 } },
+    { id: 'a2', name: 'Jamal Murray', position: 'PG', earlyShotShare: 0.25, threeFG: 0.38, shotMix: { rim: 0.25, mid: 0.35, three: 0.4 } },
+    { id: 'a3', name: 'Michael Porter Jr', position: 'SF', earlyShotShare: 0.20, shotMix: { rim: 0.2, mid: 0.2, three: 0.6 } },
+    { id: 'a4', name: 'Aaron Gordon', position: 'PF', earlyShotShare: 0.16, shotMix: { rim: 0.65, mid: 0.2, three: 0.15 } },
+    { id: 'a5', name: 'Christian Braun', position: 'SG', earlyShotShare: 0.14, shotMix: { rim: 0.45, mid: 0.25, three: 0.3 } },
+  ];
+
+  const simResult = simulateGameFirstBasketMonteCarlo({
+    homePlayers,
+    awayPlayers,
+    tipMatchup: { tipProbA: 0.68, tipProbB: 0.32 },
+    iterations: 5000,
+    seed: 'TEST-SEED-5K',
+  });
+
+  assert.equal(simResult.iterations, 5000);
+  assert.equal(simResult.homeWins + simResult.awayWins, 5000);
+  assert.ok(simResult.homeWins > simResult.awayWins, 'Home team with 68% tip edge should win majority of 5000 simulations');
+
+  // Verify total player wins equal 5,000 exactly
+  let totalPlayerWins = 0;
+  for (const stats of Object.values(simResult.playerStats)) {
+    totalPlayerWins += stats.wins;
+    assert.equal(stats.methodCounts.twoPt + stats.methodCounts.threePt, stats.wins, '2PT + 3PT hits must equal total wins');
+  }
+  assert.equal(totalPlayerWins, 5000, 'Sum of all player wins across 5000 trials must equal 5000');
+
+  // Determinism check: identical seed produces identical win counts
+  const simResult2 = simulateGameFirstBasketMonteCarlo({
+    homePlayers,
+    awayPlayers,
+    tipMatchup: { tipProbA: 0.68, tipProbB: 0.32 },
+    iterations: 5000,
+    seed: 'TEST-SEED-5K',
+  });
+  assert.equal(simResult2.homeWins, simResult.homeWins);
+  assert.equal(simResult2.playerStats.h1.wins, simResult.playerStats.h1.wins);
+
+  // Check integration through scoreGameFirstBasket
+  const game = scoreGameFirstBasket({
+    gameId: 'sim-test-game',
+    homeTeam: { abbr: 'LAL' },
+    awayTeam: { abbr: 'DEN' },
+    homePlayers,
+    awayPlayers,
+    homeJumper: 'Anthony Davis',
+    awayJumper: 'Nikola Jokic',
+    simIterations: 5000,
+  });
+
+  assert.ok(game.simTelemetry);
+  assert.equal(game.simTelemetry.iterations, 5000);
+  assert.equal(game.simTelemetry.homeWins + game.simTelemetry.awayWins, 5000);
+
+  const topPick = game.topPicks[0];
+  assert.ok(topPick.simWins > 0);
+  assert.equal(topPick.simTotal, 5000);
+  assert.ok(topPick.simProb > 0);
+  assert.ok(topPick.simPct.endsWith('%'));
+  assert.ok(topPick.simMethods);
+  assert.equal(topPick.simMethods.twoPt + topPick.simMethods.threePt, topPick.simWins);
+  assert.ok(topPick.eli15.includes('5k-Sim:'));
+});
+
 

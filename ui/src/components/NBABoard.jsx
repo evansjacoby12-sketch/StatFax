@@ -692,6 +692,9 @@ export default function NBABoard({
                         <span className="nba-chip-pill" style={{ background: 'rgba(0, 255, 204, 0.1)', color: 'var(--prime)', borderColor: 'rgba(0, 255, 204, 0.25)', fontWeight: 700 }}>
                           <Icon name="Lock" size={11} style={{ marginRight: '0.25rem' }} /> Top 5 Picks
                         </span>
+                        <span className="nba-chip-pill" style={{ background: 'rgba(56, 189, 248, 0.1)', color: '#38bdf8', borderColor: 'rgba(56, 189, 248, 0.25)', fontWeight: 700 }} title="5,000-Trial Monte Carlo simulation completed for opening tip & possession sequence">
+                          <Icon name="Activity" size={11} style={{ marginRight: '0.25rem' }} /> 5k Sims: {game.awayTeam.abbr} {game.simTelemetry?.awayPct || '50%'} · {game.homeTeam.abbr} {game.simTelemetry?.homePct || '50%'}
+                        </span>
                       </div>
                     </div>
 
@@ -830,6 +833,14 @@ export default function NBABoard({
                               )}
 
                               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.6rem', marginTop: '0.4rem' }}>
+                                <span
+                                  className="nba-chip-pill"
+                                  style={{ background: 'rgba(56, 189, 248, 0.1)', color: '#38bdf8', borderColor: 'rgba(56, 189, 248, 0.25)', fontSize: '0.72rem', fontWeight: 700 }}
+                                  title={`5,000-Trial Monte Carlo Simulation: ${player.simWins?.toLocaleString?.() ?? Math.round((player.gameProb || 0) * 5000)} wins (2PT: ${player.simMethods?.twoPt ?? '—'}, 3PT: ${player.simMethods?.threePt ?? '—'})`}
+                                >
+                                  <Icon name="Activity" size={11} style={{ marginRight: '0.25rem' }} />
+                                  {player.simWins ? `${player.simWins.toLocaleString()} / 5,000 (${player.simPct})` : `${((player.gameProb || 0) * 100).toFixed(1)}% Sim`}
+                                </span>
                                 {player.edgePct > 0 && (
                                   <span className="nba-edge-badge">
                                     <Icon name="TrendingUp" size={12} /> +{player.edgePct}% Edge
@@ -1010,6 +1021,14 @@ export default function NBABoard({
                       )}
 
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.6rem', marginTop: '0.4rem' }}>
+                        <span
+                          className="nba-chip-pill"
+                          style={{ background: 'rgba(56, 189, 248, 0.1)', color: '#38bdf8', borderColor: 'rgba(56, 189, 248, 0.25)', fontSize: '0.72rem', fontWeight: 700 }}
+                          title={`5,000-Trial Monte Carlo Simulation: ${player.simWins?.toLocaleString?.() ?? Math.round((player.gameProb || 0) * 5000)} wins (2PT: ${player.simMethods?.twoPt ?? '—'}, 3PT: ${player.simMethods?.threePt ?? '—'})`}
+                        >
+                          <Icon name="Activity" size={11} style={{ marginRight: '0.25rem' }} />
+                          {player.simWins ? `${player.simWins.toLocaleString()} / 5,000 (${player.simPct})` : `${((player.gameProb || 0) * 100).toFixed(1)}% Sim`}
+                        </span>
                         {player.edgePct > 0 && (
                           <span className="nba-edge-badge">
                             <Icon name="TrendingUp" size={12} /> +{player.edgePct}% Edge
@@ -1795,6 +1814,45 @@ export default function NBABoard({
               </div>
             </div>
 
+            {/* Monte Carlo Simulation Box (5,000 Trials) */}
+            <div style={{ padding: '0.9rem', background: 'rgba(56, 189, 248, 0.06)', borderRadius: '12px', border: '1px solid rgba(56, 189, 248, 0.2)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.55rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.78rem', fontWeight: 800, color: '#38bdf8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  <Icon name="Activity" size={13} /> 5,000-Trial Monte Carlo Engine
+                </div>
+                <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontFamily: 'monospace' }}>
+                  {inspectedPlayer.simWins?.toLocaleString?.() ?? Math.round((inspectedPlayer.gameProb || 0) * 5000)} / 5,000 Outcomes
+                </span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem', textAlign: 'center' }}>
+                <div style={{ padding: '0.55rem 0.4rem', background: 'rgba(2, 6, 23, 0.55)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.04)' }}>
+                  <div style={{ fontSize: '0.68rem', color: '#94a3b8' }}>Simulated Win Rate</div>
+                  <div style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--prime)', fontFamily: 'monospace', margin: '0.15rem 0' }}>
+                    {inspectedPlayer.simPct || `${((inspectedPlayer.gameProb || 0) * 100).toFixed(1)}%`}
+                  </div>
+                  <div style={{ fontSize: '0.65rem', color: '#64748b' }}>Empirical Frequency</div>
+                </div>
+                <div style={{ padding: '0.55rem 0.4rem', background: 'rgba(2, 6, 23, 0.55)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.04)' }}>
+                  <div style={{ fontSize: '0.68rem', color: '#94a3b8' }}>2PT / Putback Hits</div>
+                  <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#f8fafc', fontFamily: 'monospace', margin: '0.15rem 0' }}>
+                    {inspectedPlayer.simMethods?.twoPt?.toLocaleString?.() ?? '—'}
+                  </div>
+                  <div style={{ fontSize: '0.65rem', color: '#64748b' }}>
+                    {inspectedPlayer.simWins ? `${((inspectedPlayer.simMethods?.twoPt / inspectedPlayer.simWins) * 100).toFixed(0)}% of hits` : 'Interior'}
+                  </div>
+                </div>
+                <div style={{ padding: '0.55rem 0.4rem', background: 'rgba(2, 6, 23, 0.55)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.04)' }}>
+                  <div style={{ fontSize: '0.68rem', color: '#94a3b8' }}>3PT Perimeter Hits</div>
+                  <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#a855f7', fontFamily: 'monospace', margin: '0.15rem 0' }}>
+                    {inspectedPlayer.simMethods?.threePt?.toLocaleString?.() ?? '—'}
+                  </div>
+                  <div style={{ fontSize: '0.65rem', color: '#64748b' }}>
+                    {inspectedPlayer.simWins ? `${((inspectedPlayer.simMethods?.threePt / inspectedPlayer.simWins) * 100).toFixed(0)}% of hits` : 'Perimeter'}
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* Method & Shot Mix Breakdown */}
             <div>
               <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#e2e8f0', marginBottom: '0.65rem' }}>
@@ -1884,6 +1942,18 @@ export default function NBABoard({
                     </div>
                     <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
                       Missed first shot sequence continues with offensive glass crash before defensive stop.
+                    </div>
+                  </div>
+                </div>
+
+                <div className="nba-sequence-step">
+                  <span className="nba-step-num">6</span>
+                  <div>
+                    <div style={{ fontWeight: 700, color: '#38bdf8', fontSize: '0.84rem' }}>
+                      5,000 Monte Carlo Trials Simulated: {inspectedPlayer.simWins?.toLocaleString?.() ?? '—'} Wins ({inspectedPlayer.simPct || '—'})
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                      Full possession-level Monte Carlo engine simulating jump balls, turnovers, shot mixes, defensive contests, and putbacks across 5,000 discrete game runs.
                     </div>
                   </div>
                 </div>

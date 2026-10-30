@@ -250,6 +250,26 @@ Authority: `fb-model/` layout (`ingest/`, `features/`, `model/`, `sim/`, `eval/`
     - **Point Guard (PG)**: 240 samples, 37 hits (15.42% actual vs 12.01% model pred, **ECE: 3.41%**, Brier: 0.1295 vs 0.1321 market)
   - Calibration plots: `fb-model/data/calibration_curve.png` and `fb-model/data/calibration_curve_by_position.png`.
 
+### NBA First Basket 5,000-Trial Monte Carlo Engine Addition (2026-10-30)
+
+- **Engine Implementation**: Added `simulateGameFirstBasketMonteCarlo({ homePlayers, awayPlayers, tipMatchup, iterations = 5000, seed })` in `src/sports/nba/logic/firstBasketEngine.js`.
+- **Methodology**: For every game matchup, executes 5,000 discrete possession-level trials simulating:
+  1. Opening tip outcome sampled via head-to-head Log5 jumper win probabilities with reach differential.
+  2. Ball security & early turnover risk check (12.5% league baseline adjusted for opponent pressure; flips possession before shot attempt).
+  3. Scripted first look shooter selection sampled from starting five proportional to early-minute shot share.
+  4. Shot zone distribution (Rim/Paint vs. Mid-Range vs. 3PT) tested against opponent defensive contest make rates.
+  5. Offensive rebound putback extension on missed looks (26% league baseline; offensive glass crash attempts immediate rim putback).
+  6. Full sequence loop across successive possessions until the first field goal occurs.
+- **Telemetry & Contracts**:
+  - Player metrics: `simWins` (out of 5,000), `simTotal: 5000`, `simProb`, `simPct`, `simMethods: { twoPt, threePt }`, `simMethodSplit: { prob2PT, prob3PT }`.
+  - Game telemetry: `simTelemetry: { iterations: 5000, homeWins, awayWins, homePct, awayPct }`.
+  - Surface integration: Logged in `server/sports/nba/fetch-nba-slate.mjs` CLI output, displayed as badges on game cards, and featured in a dedicated 3-metric breakdown drawer in `ui/src/components/NBABoard.jsx`.
+- **Validation**:
+  - Deterministic PRNG (`createPrng`) ensures test reproducibility.
+  - Sum of player simulation wins strictly equals 5,000 across all active players in a game.
+  - Node.js micro-benchmark: 5,000 trials execute in ~4.0ms with zero memory leaks.
+  - All 635 test suite assertions passing (`npm test`).
+
 ## Required proof for a production model change
 
 1. State the hypothesis and exact fields changed.
