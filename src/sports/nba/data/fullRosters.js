@@ -336,10 +336,10 @@ export const NBA_FULL_ROSTERS = {
   ],
   "CHA": [
     {
-      "id": "4396971",
-      "name": "Naz Reid",
+      "id": "4576060",
+      "name": "Ryan Kalkbrenner",
       "pos": "C",
-      "jersey": "0"
+      "jersey": "11"
     },
     {
       "id": "4066218",
@@ -407,12 +407,7 @@ export const NBA_FULL_ROSTERS = {
       "pos": "G",
       "jersey": "4"
     },
-    {
-      "id": "4576060",
-      "name": "Ryan Kalkbrenner",
-      "pos": "C",
-      "jersey": "11"
-    },
+
     {
       "id": "4433287",
       "name": "Brandon Miller",

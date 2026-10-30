@@ -653,22 +653,22 @@ export const NBA_STARTER_ROSTERS = {
   ],
   "CHA": [
     {
-      "id": "4576060",
-      "name": "Ryan Kalkbrenner",
+      "id": "4396971",
+      "name": "Naz Reid",
       "position": "C",
-      "jersey": "11",
+      "jersey": "0",
       "isStarter": true,
-      "earlyShotShare": 0.14,
+      "earlyShotShare": 0.20,
       "shotMix": {
-        "rim": 0.88,
-        "mid": 0.12,
-        "three": 0
+        "rim": 0.42,
+        "mid": 0.18,
+        "three": 0.40
       },
-      "rimFG": 0.72,
-      "midFG": 0.36,
-      "threeFG": 0,
-      "seasonUsage": 14,
-      "scriptedSetPlay": "Alley-Oop Lob Finish / Rim Seal"
+      "rimFG": 0.68,
+      "midFG": 0.44,
+      "threeFG": 0.38,
+      "seasonUsage": 23,
+      "scriptedSetPlay": "Pick-and-Pop 3PT / Rim Attack"
     },
     {
       "id": "4433287",
@@ -676,7 +676,7 @@ export const NBA_STARTER_ROSTERS = {
       "position": "SF",
       "jersey": "24",
       "isStarter": true,
-      "earlyShotShare": 0.28,
+      "earlyShotShare": 0.26,
       "shotMix": {
         "rim": 0.3,
         "mid": 0.3,

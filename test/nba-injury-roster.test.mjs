@@ -187,5 +187,25 @@ test('NBA Depth Chart Hierarchy: verifies true 6th-man rotation promotions over 
   // DET C Jalen Duren out -> Paul Reed promoted (not Tolu Smith)
   const detRep = findPositionalReplacement('DET', { position: 'C', name: 'Jalen Duren' }, []);
   assert.equal(detRep.name, 'Paul Reed');
+
+  // CHA C Naz Reid out -> Ryan Kalkbrenner promoted
+  const chaRep = findPositionalReplacement('CHA', { position: 'C', name: 'Naz Reid' }, []);
+  assert.equal(chaRep.name, 'Ryan Kalkbrenner');
 });
+
+test('NBA Starting Center: Naz Reid is confirmed starting center for CHA', () => {
+  const starters = getStartersForTeam('CHA');
+  const center = starters.find((s) => s.position === 'C');
+  assert.ok(center, 'CHA must have a starting center');
+  assert.equal(center.name, 'Naz Reid');
+  assert.equal(center.id, '4396971');
+  assert.equal(center.jersey, '0');
+
+  const tip = getJumpBallMatchup('WAS', 'CHA', 'Anthony Davis', 'Naz Reid');
+  assert.ok(tip, 'Tip matchup between Anthony Davis and Naz Reid must compute');
+  assert.equal(tip.jumperA.jumper, 'Anthony Davis');
+  assert.equal(tip.jumperB.jumper, 'Naz Reid');
+  assert.ok(tip.tipProbA > tip.tipProbB, 'Anthony Davis should have slight reach/rating edge');
+});
+
 
