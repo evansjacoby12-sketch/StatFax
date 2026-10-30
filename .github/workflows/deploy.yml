@@ -161,6 +161,38 @@ jobs:
           key: inputs-corpus-${{ github.run_id }}
           restore-keys: inputs-corpus-
 
+      # Recover durable MLB state from R2 (using S3 credentials when available)
+      - name: Recover durable MLB state from R2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_BUCKET: ${{ vars.R2_BUCKET }}
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+        run: |
+          if [ -n "$AWS_ACCESS_KEY_ID" ] && [ -n "$R2_ACCOUNT_ID" ] && [ -n "$R2_BUCKET" ]; then
+            ENDPOINT="https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com"
+            mkdir -p dist
+            for f in mlb-game-results.json mlb-game-history.json calibration.json first-inning-pitcher-cache.json pregame-freeze.json list-builder-evidence.json board-history.json zone-cache.json zone-evaluation.json; do
+              if [ ! -s "dist/$f" ] || ! node -e "JSON.parse(require('fs').readFileSync('dist/$f','utf8'))" 2>/dev/null; then
+                aws s3 cp "s3://$R2_BUCKET/$f" "dist/$f.tmp" --endpoint-url "$ENDPOINT" 2>/dev/null || true
+                if [ -s "dist/$f.tmp" ] && node -e "JSON.parse(require('fs').readFileSync('dist/$f.tmp','utf8'))" 2>/dev/null; then
+                  mv "dist/$f.tmp" "dist/$f"
+                  echo "R2: restored $f"
+                else
+                  rm -f "dist/$f.tmp"
+                fi
+              fi
+            done
+          fi
+          if [ ! -s "dist/mlb-game-results.json" ] || ! node -e "JSON.parse(require('fs').readFileSync('dist/mlb-game-results.json','utf8'))" 2>/dev/null; then
+            echo '{"season":2026,"games":[]}' > dist/mlb-game-results.json
+          fi
+          if [ ! -s "dist/mlb-game-history.json" ] || ! node -e "JSON.parse(require('fs').readFileSync('dist/mlb-game-history.json','utf8'))" 2>/dev/null; then
+            echo '{"version":1,"seasons":[]}' > dist/mlb-game-history.json
+          fi
+
       # GitHub caches are acceleration only. Recover any missing optional MLB
       # ledgers from the public durable store before the slate mutates state.
       - name: Recover missing MLB state from R2
