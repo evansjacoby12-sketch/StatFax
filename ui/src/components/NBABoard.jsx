@@ -693,7 +693,7 @@ export default function NBABoard({
                           <Icon name="Lock" size={11} style={{ marginRight: '0.25rem' }} /> Top 5 Picks
                         </span>
                         <span className="nba-chip-pill" style={{ background: 'rgba(56, 189, 248, 0.1)', color: '#38bdf8', borderColor: 'rgba(56, 189, 248, 0.25)', fontWeight: 700 }} title="5,000-Trial Monte Carlo simulation completed for opening tip & possession sequence">
-                          <Icon name="Activity" size={11} style={{ marginRight: '0.25rem' }} /> 5k Sims: {game.awayTeam.abbr} {game.simTelemetry?.awayPct || '50%'} · {game.homeTeam.abbr} {game.simTelemetry?.homePct || '50%'}
+                          <Icon name="Activity" size={11} style={{ marginRight: '0.25rem' }} /> 5k Sims: {g.awayTeam?.abbr} {g.simTelemetry?.awayPct || '50%'} · {g.homeTeam?.abbr} {g.simTelemetry?.homePct || '50%'}
                         </span>
                       </div>
                     </div>

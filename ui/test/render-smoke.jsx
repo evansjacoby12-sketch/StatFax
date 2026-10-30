@@ -31,6 +31,7 @@ import PullToRefresh from '../src/components/PullToRefresh.jsx'
 import BacktestView from '../src/components/BacktestView.jsx'
 import PickOfDay from '../src/components/PickOfDay.jsx'
 import NFLBoard from '../src/components/NFLBoard.jsx'
+import NBABoard from '../src/components/NBABoard.jsx'
 import MlbDataHealthBanner from '../src/components/MlbDataHealthBanner.jsx'
 import ListBuilderView from '../src/components/ListBuilderView.jsx'
 import SlateBrief from '../src/components/SlateBrief.jsx'
@@ -239,6 +240,7 @@ add('SlateBrief.legacy', <SlateBrief brief={{
   date: '2026-07-15', primeCount: 1, strongCount: 2, text: '**TODAY BRIEF** Aaron Judge leads the board.'
 }} />)
 add('NFLBoard', <NFLBoard />)
+add('NBABoard', <NBABoard />)
 
 let failed = 0
 for (const [name, el] of cases) {
