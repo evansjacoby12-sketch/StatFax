@@ -167,7 +167,7 @@ export function getJumperProfile(name, teamAbbr = null) {
     const primaryKey = TEAM_PRIMARY_JUMPERS[cleanTeam];
     if (JUMP_BALL_RATINGS[primaryKey]) {
       const prof = JUMP_BALL_RATINGS[primaryKey];
-      const sampleTier = profile.tipAttempts >= 40 ? 'HIGH' : profile.tipAttempts >= 15 ? 'MEDIUM' : 'LOW_SHRUNK';
+      const sampleTier = prof.tipAttempts >= 40 ? 'HIGH' : prof.tipAttempts >= 15 ? 'MEDIUM' : 'LOW_SHRUNK';
       return { ...prof, sampleTier };
     }
   }

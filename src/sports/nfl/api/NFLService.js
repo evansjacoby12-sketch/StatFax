@@ -1,6 +1,7 @@
 import NFL_DEMO_SNAPSHOT from '../data/demoSlate.js'
 
-const DEFAULT_URLS = ['/data/nfl/daily.json', './data/nfl/daily.json', '/nfl/daily.json', '/dist/nfl/daily.json']
+const BASE = (typeof import.meta !== 'undefined' && import.meta.env?.BASE_URL) || '/'
+const DEFAULT_URLS = [`${BASE}data/nfl/daily.json`, '/data/nfl/daily.json', './data/nfl/daily.json', '/nfl/daily.json', '/dist/nfl/daily.json']
 
 export function validateNFLSnapshot(snapshot) {
   if (!snapshot || snapshot.sport !== 'nfl' || !Array.isArray(snapshot.players)) throw new Error('Invalid NFL snapshot')

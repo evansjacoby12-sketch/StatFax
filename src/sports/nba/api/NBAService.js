@@ -746,7 +746,9 @@ export const NBAService = {
   },
 };
 
+const BASE = (typeof import.meta !== 'undefined' && import.meta.env?.BASE_URL) || '/';
 const DEFAULT_URLS = [
+  `${BASE}data/nba/daily.json`,
   './data/nba/daily.json',
   '/data/nba/daily.json',
   'data/nba/daily.json',
@@ -932,13 +934,19 @@ export function buildLiveNBASnapshot(scoreboardGames, { centerOverrides = {} } =
  * 3. Rich NBA_DEMO_SNAPSHOT fallback (instant offline testing & off-days)
  */
 export async function loadNBASnapshot({ urls = DEFAULT_URLS, fetchImpl = globalThis.fetch, demoFallback = true } = {}) {
+  let staticDemoFallback = null;
+
   // 1. Try static daily.json snapshot URLs
   if (typeof fetchImpl === 'function') {
     for (const url of urls) {
       try {
         const response = await fetchImpl(url, { cache: 'no-store' });
         if (!response.ok) continue;
-        return validateNBASnapshot(await response.json());
+        const snapshot = validateNBASnapshot(await response.json());
+        if (snapshot.source?.mode !== 'demo') {
+          return snapshot;
+        }
+        staticDemoFallback = snapshot;
       } catch {}
     }
   }
@@ -956,7 +964,10 @@ export async function loadNBASnapshot({ urls = DEFAULT_URLS, fetchImpl = globalT
     // ESPN live feed unreachable or offline
   }
 
-  // 3. Fallback to rich demo slate
+  // 3. Fallback to static snapshot or rich demo slate
+  if (staticDemoFallback) {
+    return staticDemoFallback;
+  }
   if (demoFallback) {
     return NBA_DEMO_SNAPSHOT;
   }
