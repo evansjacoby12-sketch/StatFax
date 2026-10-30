@@ -381,6 +381,25 @@ export default function NBABoard({
                         </>
                       )}
                     </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap', marginTop: '0.35rem' }}>
+                      {topPick.injury && (
+                        <span
+                          className={`nba-inj-chip nba-inj-${(topPick.injury.badge || 'gtd').toLowerCase()}`}
+                          title={`${topPick.injury.status || 'Injured'}: ${topPick.injury.detail || 'Day-To-Day'}${topPick.injury.returnDate ? ` (${topPick.injury.returnDate})` : ''}`}
+                        >
+                          <Icon name="AlertCircle" size={11} />
+                          {topPick.injury.badge || 'GTD'} · {topPick.injury.detail || 'Day-To-Day'}
+                        </span>
+                      )}
+                      {topPick.isReplacement && (
+                        <span
+                          className="nba-replacement-chip"
+                          title={`Promoted to starting 5 in place of ${topPick.replacedPlayer || 'injured starter'}`}
+                        >
+                          <Icon name="ArrowUpRight" size={11} /> Starts for {topPick.replacedPlayer?.split(' ').pop() || 'Starter'}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -665,6 +684,15 @@ export default function NBABoard({
                         <span className="nba-chip-pill" style={{ color: '#94a3b8' }}>
                           Pace {g.pace || 100}
                         </span>
+                        {g.lineupStatus?.confirmed ? (
+                          <span className="nba-chip-pill" style={{ background: 'rgba(52, 211, 153, 0.15)', borderColor: 'rgba(52, 211, 153, 0.35)', color: '#34d399', fontWeight: 600 }}>
+                            <Icon name="CheckCircle" size={12} /> Confirmed Starting 5
+                          </span>
+                        ) : (
+                          <span className="nba-chip-pill" style={{ background: 'rgba(56, 189, 248, 0.12)', borderColor: 'rgba(56, 189, 248, 0.3)', color: '#38bdf8' }}>
+                            <Icon name="Clock" size={12} /> Projected Lineups
+                          </span>
+                        )}
                         <span className="nba-chip-pill" style={{ background: 'rgba(0, 255, 204, 0.1)', color: 'var(--prime)', borderColor: 'rgba(0, 255, 204, 0.25)' }}>
                           {top3Only ? 'Top 3 Picks' : `${gamePlayers.length} Starters`}
                         </span>
@@ -699,6 +727,25 @@ export default function NBABoard({
                                     <div className="nba-card-player-sub">
                                       <span>{player.team} · #{player.jersey || '—'} · {player.position}</span>
                                       {player.opponent && <span>vs {player.opponent}</span>}
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap', marginTop: '0.25rem' }}>
+                                      {player.injury && (
+                                        <span
+                                          className={`nba-inj-chip nba-inj-${(player.injury.badge || 'gtd').toLowerCase()}`}
+                                          title={`${player.injury.status || 'Injured'}: ${player.injury.detail || 'Day-To-Day'}${player.injury.returnDate ? ` (${player.injury.returnDate})` : ''}`}
+                                        >
+                                          <Icon name="AlertCircle" size={10} />
+                                          {player.injury.badge || 'GTD'} · {player.injury.detail || 'Day-To-Day'}
+                                        </span>
+                                      )}
+                                      {player.isReplacement && (
+                                        <span
+                                          className="nba-replacement-chip"
+                                          title={`Promoted to starting 5 in place of ${player.replacedPlayer || 'injured starter'}`}
+                                        >
+                                          <Icon name="ArrowUpRight" size={10} /> Starts for {player.replacedPlayer?.split(' ').pop() || 'Starter'}
+                                        </span>
+                                      )}
                                     </div>
                                   </div>
                                 </div>
@@ -866,6 +913,25 @@ export default function NBABoard({
                             <div className="nba-card-player-sub">
                               <span>{player.team} · #{player.jersey || '—'} · {player.position}</span>
                               <span>vs {player.opponent}</span>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap', marginTop: '0.25rem' }}>
+                              {player.injury && (
+                                <span
+                                  className={`nba-inj-chip nba-inj-${(player.injury.badge || 'gtd').toLowerCase()}`}
+                                  title={`${player.injury.status || 'Injured'}: ${player.injury.detail || 'Day-To-Day'}${player.injury.returnDate ? ` (${player.injury.returnDate})` : ''}`}
+                                >
+                                  <Icon name="AlertCircle" size={10} />
+                                  {player.injury.badge || 'GTD'} · {player.injury.detail || 'Day-To-Day'}
+                                </span>
+                              )}
+                              {player.isReplacement && (
+                                <span
+                                  className="nba-replacement-chip"
+                                  title={`Promoted to starting 5 in place of ${player.replacedPlayer || 'injured starter'}`}
+                                >
+                                  <Icon name="ArrowUpRight" size={10} /> Starts for {player.replacedPlayer?.split(' ').pop() || 'Starter'}
+                                </span>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -1134,6 +1200,22 @@ export default function NBABoard({
                         >
                           <span>
                             <strong>{p.name}</strong> ({p.position})
+                            {p.injury && (
+                              <span
+                                className={`nba-inj-chip-mini nba-inj-${(p.injury.badge || 'gtd').toLowerCase()}`}
+                                title={`${p.injury.status}: ${p.injury.detail || 'Day-to-day'}`}
+                              >
+                                {p.injury.badge}
+                              </span>
+                            )}
+                            {p.isReplacement && (
+                              <span
+                                className="nba-replacement-chip-mini"
+                                title={`Starts in place of ${p.replacedPlayer || 'injured starter'}`}
+                              >
+                                REP
+                              </span>
+                            )}
                           </span>
                           <span className="mono" style={{ color: 'var(--prime, #00ffcc)', fontWeight: 700 }}>
                             {(p.gameProb * 100).toFixed(1)}% ({p.fairGameOdds})
@@ -1158,6 +1240,22 @@ export default function NBABoard({
                         >
                           <span>
                             <strong>{p.name}</strong> ({p.position})
+                            {p.injury && (
+                              <span
+                                className={`nba-inj-chip-mini nba-inj-${(p.injury.badge || 'gtd').toLowerCase()}`}
+                                title={`${p.injury.status}: ${p.injury.detail || 'Day-to-day'}`}
+                              >
+                                {p.injury.badge}
+                              </span>
+                            )}
+                            {p.isReplacement && (
+                              <span
+                                className="nba-replacement-chip-mini"
+                                title={`Starts in place of ${p.replacedPlayer || 'injured starter'}`}
+                              >
+                                REP
+                              </span>
+                            )}
                           </span>
                           <span className="mono" style={{ color: 'var(--prime, #00ffcc)', fontWeight: 700 }}>
                             {(p.gameProb * 100).toFixed(1)}% ({p.fairGameOdds})
@@ -1649,6 +1747,27 @@ export default function NBABoard({
                 <div style={{ fontSize: '0.85rem', color: '#94a3b8' }}>
                   {inspectedPlayer.team} · #{inspectedPlayer.jersey || '—'} · {inspectedPlayer.position}
                 </div>
+                {inspectedPlayer.injury && (
+                  <div style={{ marginTop: '0.45rem', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                    <span className={`nba-inj-chip nba-inj-${(inspectedPlayer.injury.badge || 'gtd').toLowerCase()}`}>
+                      <Icon name="AlertCircle" size={11} /> {inspectedPlayer.injury.badge || 'GTD'}
+                    </span>
+                    <span style={{ fontSize: '0.8rem', color: '#fca5a5' }}>
+                      {inspectedPlayer.injury.status}: {inspectedPlayer.injury.detail || 'Day-To-Day'}
+                      {inspectedPlayer.injury.returnDate ? ` (${inspectedPlayer.injury.returnDate})` : ''}
+                    </span>
+                  </div>
+                )}
+                {inspectedPlayer.isReplacement && (
+                  <div style={{ marginTop: '0.45rem', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                    <span className="nba-replacement-chip">
+                      <Icon name="ArrowUpRight" size={11} /> PROMOTED STARTER
+                    </span>
+                    <span style={{ fontSize: '0.8rem', color: '#38bdf8' }}>
+                      Promoted to starting 5 in place of {inspectedPlayer.replacedPlayer} (confirmed out)
+                    </span>
+                  </div>
+                )}
               </div>
               <button
                 type="button"

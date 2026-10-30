@@ -21,8 +21,11 @@ export async function fetchNBASlate({ outPath = OUTPUT_PATH } = {}) {
   try {
     const scoreboard = await NBAService.getScoreboard();
     if (scoreboard && scoreboard.length > 0) {
-      console.log(`[fetch-nba-slate] Retrieved ${scoreboard.length} live games from ESPN. Scoring First Basket model...`);
-      const liveSnap = buildLiveNBASnapshot(scoreboard);
+      console.log(`[fetch-nba-slate] Retrieved ${scoreboard.length} live games from ESPN. Fetching game summaries & injury reports...`);
+      const gameIds = scoreboard.map((g) => g.gameId);
+      const summaries = await NBAService.getGameSummariesBatch(gameIds).catch(() => ({}));
+      console.log(`[fetch-nba-slate] Scoring First Basket model with confirmed lineups and injury adjustments...`);
+      const liveSnap = buildLiveNBASnapshot(scoreboard, { gameSummaries: summaries });
       if (liveSnap && liveSnap.games && liveSnap.games.length > 0) {
         snapshot = validateNBASnapshot(liveSnap);
       }

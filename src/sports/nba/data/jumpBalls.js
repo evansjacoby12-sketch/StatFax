@@ -62,6 +62,15 @@ export const JUMP_BALL_RATINGS = {
   'goga bitadze':       { jumper: 'Goga Bitadze',       team: 'ORL', heightInches: 83, standingReachInches: 110, wingspanInches: 87, tipWins: 28, tipAttempts: 56, winPct: 0.500, rating: 1490, tier: 'AVERAGE' },
   'adem bona':          { jumper: 'Adem Bona',          team: 'PHI', heightInches: 82, standingReachInches: 108, wingspanInches: 88, tipWins: 12, tipAttempts: 24, winPct: 0.500, rating: 1490, tier: 'AVERAGE' },
   'ryan kalkbrenner':   { jumper: 'Ryan Kalkbrenner',   team: 'CHA', heightInches: 85, standingReachInches: 114, wingspanInches: 89, tipWins: 18, tipAttempts: 34, winPct: 0.529, rating: 1515, tier: 'ABOVE_AVG' },
+  'zach collins':       { jumper: 'Zach Collins',       team: 'CHI', heightInches: 83, standingReachInches: 110, wingspanInches: 85, tipWins: 18, tipAttempts: 36, winPct: 0.500, rating: 1480, tier: 'AVERAGE' },
+  'jay huff':           { jumper: 'Jay Huff',           team: 'IND', heightInches: 85, standingReachInches: 113, wingspanInches: 86, tipWins: 12, tipAttempts: 22, winPct: 0.545, rating: 1520, tier: 'ABOVE_AVG' },
+  'isaac jones':        { jumper: 'Isaac Jones',        team: 'DET', heightInches: 81, standingReachInches: 108, wingspanInches: 87, tipWins: 5,  tipAttempts: 10, winPct: 0.500, rating: 1460, tier: 'AVERAGE' },
+  'khaman maluach':     { jumper: 'Khaman Maluach',     team: 'PHX', heightInches: 86, standingReachInches: 116, wingspanInches: 90, tipWins: 15, tipAttempts: 25, winPct: 0.600, rating: 1550, tier: 'ABOVE_AVG' },
+  'precious achiuwa':   { jumper: 'Precious Achiuwa',   team: 'SAC', heightInches: 80, standingReachInches: 107, wingspanInches: 86, tipWins: 10, tipAttempts: 24, winPct: 0.417, rating: 1440, tier: 'BELOW_AVG' },
+  'moussa cisse':       { jumper: 'Moussa Cisse',       team: 'DAL', heightInches: 84, standingReachInches: 112, wingspanInches: 89, tipWins: 14, tipAttempts: 25, winPct: 0.560, rating: 1520, tier: 'ABOVE_AVG' },
+  'marvin bagley iii':  { jumper: 'Marvin Bagley III',  team: 'DEN', heightInches: 82, standingReachInches: 109, wingspanInches: 85, tipWins: 22, tipAttempts: 44, winPct: 0.500, rating: 1490, tier: 'AVERAGE' },
+  'tobe awaka':         { jumper: 'Tobe Awaka',         team: 'CHI', heightInches: 80, standingReachInches: 106, wingspanInches: 85, tipWins: 4,  tipAttempts: 10, winPct: 0.400, rating: 1430, tier: 'BELOW_AVG' },
+  'isaiah jackson':     { jumper: 'Isaiah Jackson',     team: 'LAC', heightInches: 82, standingReachInches: 110, wingspanInches: 87, tipWins: 20, tipAttempts: 38, winPct: 0.526, rating: 1500, tier: 'AVERAGE' },
 };
 
 export const LEAGUE_AVG_TIP_WIN_PCT = 0.50;

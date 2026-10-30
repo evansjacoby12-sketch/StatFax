@@ -35,6 +35,7 @@ import NBA_DEMO_SNAPSHOT from '../data/demoSlate.js';
 import { scoreGameFirstBasket } from '../logic/firstBasketEngine.js';
 import { getJumpBallMatchup } from '../data/jumpBalls.js';
 import { getStartersForTeam, TEAM_ABBR_ALIASES } from '../data/teamRosters.js';
+import { findPositionalReplacement, getFullRosterForTeam } from '../data/fullRosters.js';
 
 const ESPN_NBA = 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba';
 
@@ -215,6 +216,40 @@ export const NBAService = {
       });
     }
     return games;
+  },
+
+  /**
+   * Fetch ESPN game summary for a single game (contains live injury reports & confirmed starting 5).
+   */
+  async getGameSummary(gameId) {
+    if (!gameId) return null;
+    return espnGet(`/summary?event=${gameId}`, false);
+  },
+
+  /**
+   * Fetch ESPN game summaries for an array of games with bounded concurrency.
+   */
+  async getGameSummariesBatch(gameIds) {
+    if (!Array.isArray(gameIds) || gameIds.length === 0) return {};
+    const results = {};
+    const queue = [...gameIds];
+
+    const worker = async () => {
+      while (queue.length > 0) {
+        const id = queue.shift();
+        if (!id) break;
+        try {
+          const summary = await this.getGameSummary(id);
+          if (summary) results[id] = summary;
+        } catch {
+          // Soft failure on individual game summary
+        }
+      }
+    };
+
+    const pool = Array.from({ length: Math.min(BATCH_CONCURRENCY, queue.length) }, () => worker());
+    await Promise.all(pool);
+    return results;
   },
 
   /**
@@ -784,9 +819,55 @@ function formatTipOffTime(isoDate) {
 }
 
 /**
+ * Parse ESPN game summary for team injury reports and official boxscore starting lineups.
+ */
+export function parseGameInjuriesAndStarters(summary) {
+  if (!summary) {
+    return { injuryMap: new Map(), confirmedStartersByTeam: {} };
+  }
+
+  const injuryMap = new Map();
+  for (const teamInj of (summary.injuries || [])) {
+    const rawTeam = (teamInj.team?.abbreviation || '').toUpperCase();
+    const tAbbr = TEAM_ABBR_ALIASES[rawTeam] || rawTeam;
+    for (const inj of (teamInj.injuries || [])) {
+      const id = String(inj.athlete?.id || '');
+      const name = inj.athlete?.displayName || '';
+      const status = String(inj.status || inj.type?.description || '').toLowerCase();
+      const detail = inj.details?.type || inj.details?.detail || inj.details?.fantasyStatus?.description || 'Injured';
+      const returnDate = inj.details?.returnDate || '';
+      const isOut = status === 'out' || status.includes('out') || detail.toLowerCase().includes('surgery') || detail.toLowerCase().includes('out for season');
+      const badge = isOut ? 'OUT' : (status.includes('day') || status.includes('question') ? 'GTD' : (status.includes('doubt') ? 'DTD' : 'PROB'));
+      const rec = { id, name, team: tAbbr, status: inj.status || status, detail, returnDate, isOut, badge };
+      if (id) injuryMap.set(id, rec);
+      if (name) injuryMap.set(name.toLowerCase(), rec);
+    }
+  }
+
+  const confirmedStartersByTeam = {};
+  for (const teamBlock of (summary.boxscore?.players || [])) {
+    const rawTeam = (teamBlock.team?.abbreviation || '').toUpperCase();
+    const tAbbr = TEAM_ABBR_ALIASES[rawTeam] || rawTeam;
+    const starters = (teamBlock.statistics?.[0]?.athletes || [])
+      .filter((a) => a.starter)
+      .map((a) => ({
+        id: String(a.athlete?.id || ''),
+        name: a.athlete?.displayName || '',
+        position: a.athlete?.position?.abbreviation || 'G',
+        jersey: a.athlete?.jersey || null,
+      }));
+    if (starters.length === 5) {
+      confirmedStartersByTeam[tAbbr] = starters;
+    }
+  }
+
+  return { injuryMap, confirmedStartersByTeam };
+}
+
+/**
  * Score live ESPN scoreboard events into a StatFax First Basket snapshot.
  */
-export function buildLiveNBASnapshot(scoreboardGames, { centerOverrides = {} } = {}) {
+export function buildLiveNBASnapshot(scoreboardGames, { centerOverrides = {}, gameSummaries = {} } = {}) {
   if (!Array.isArray(scoreboardGames) || scoreboardGames.length === 0) {
     return null;
   }
@@ -800,30 +881,113 @@ export function buildLiveNBASnapshot(scoreboardGames, { centerOverrides = {} } =
     const homeAbbr = TEAM_ABBR_ALIASES[rawHome] || rawHome;
     const awayAbbr = TEAM_ABBR_ALIASES[rawAway] || rawAway;
 
-    // 1. Resolve Starting Five Lineups with center override support
+    // 1. Resolve Starting Five Lineups with center override support & live injuries
     const homeCenterChoice = centerOverrides[homeAbbr] || centerOverrides[rawHome] || (homeAbbr === 'NOP' ? 'missi' : 'default');
     const awayCenterChoice = centerOverrides[awayAbbr] || centerOverrides[rawAway] || (awayAbbr === 'NOP' ? 'missi' : 'default');
 
-    const rawHomeStarters = getStartersForTeam(homeAbbr, { centerChoice: homeCenterChoice }) || [
-      { id: `${homeAbbr}-1`, name: `${homeAbbr} PG`, position: 'PG', earlyShotShare: 0.28, shotMix: { rim: 0.3, mid: 0.3, three: 0.4 }, seasonUsage: 25 },
-      { id: `${homeAbbr}-2`, name: `${homeAbbr} SG`, position: 'SG', earlyShotShare: 0.22, shotMix: { rim: 0.3, mid: 0.3, three: 0.4 }, seasonUsage: 22 },
-      { id: `${homeAbbr}-3`, name: `${homeAbbr} SF`, position: 'SF', earlyShotShare: 0.18, shotMix: { rim: 0.4, mid: 0.2, three: 0.4 }, seasonUsage: 18 },
-      { id: `${homeAbbr}-4`, name: `${homeAbbr} PF`, position: 'PF', earlyShotShare: 0.16, shotMix: { rim: 0.5, mid: 0.3, three: 0.2 }, seasonUsage: 17 },
-      { id: `${homeAbbr}-5`, name: `${homeAbbr} C`, position: 'C', earlyShotShare: 0.16, shotMix: { rim: 0.7, mid: 0.2, three: 0.1 }, seasonUsage: 18 },
-    ];
+    const summary = gameSummaries[g.gameId] || g.summary || null;
+    const { injuryMap, confirmedStartersByTeam } = parseGameInjuriesAndStarters(summary);
 
-    const rawAwayStarters = getStartersForTeam(awayAbbr, { centerChoice: awayCenterChoice }) || [
-      { id: `${awayAbbr}-1`, name: `${awayAbbr} PG`, position: 'PG', earlyShotShare: 0.28, shotMix: { rim: 0.3, mid: 0.3, three: 0.4 }, seasonUsage: 25 },
-      { id: `${awayAbbr}-2`, name: `${awayAbbr} SG`, position: 'SG', earlyShotShare: 0.22, shotMix: { rim: 0.3, mid: 0.3, three: 0.4 }, seasonUsage: 22 },
-      { id: `${awayAbbr}-3`, name: `${awayAbbr} SF`, position: 'SF', earlyShotShare: 0.18, shotMix: { rim: 0.4, mid: 0.2, three: 0.4 }, seasonUsage: 18 },
-      { id: `${awayAbbr}-4`, name: `${awayAbbr} PF`, position: 'PF', earlyShotShare: 0.16, shotMix: { rim: 0.5, mid: 0.3, three: 0.2 }, seasonUsage: 17 },
-      { id: `${awayAbbr}-5`, name: `${awayAbbr} C`, position: 'C', earlyShotShare: 0.16, shotMix: { rim: 0.7, mid: 0.2, three: 0.1 }, seasonUsage: 18 },
-    ];
+    const hasConfirmedHome = confirmedStartersByTeam[homeAbbr]?.length === 5;
+    const hasConfirmedAway = confirmedStartersByTeam[awayAbbr]?.length === 5;
+    const isConfirmedLineup = hasConfirmedHome && hasConfirmedAway;
 
-    const homeCenter = rawHomeStarters.find((p) => p.position === 'C') || rawHomeStarters[0];
-    const awayCenter = rawAwayStarters.find((p) => p.position === 'C') || rawAwayStarters[0];
+    const resolveTeamStarters = (tAbbr, centerChoice) => {
+      const confirmed = confirmedStartersByTeam[tAbbr];
+      const baselineStarters = getStartersForTeam(tAbbr, { centerChoice }) || [
+        { id: `${tAbbr}-1`, name: `${tAbbr} PG`, position: 'PG', earlyShotShare: 0.28, shotMix: { rim: 0.3, mid: 0.3, three: 0.4 }, seasonUsage: 25 },
+        { id: `${tAbbr}-2`, name: `${tAbbr} SG`, position: 'SG', earlyShotShare: 0.22, shotMix: { rim: 0.3, mid: 0.3, three: 0.4 }, seasonUsage: 22 },
+        { id: `${tAbbr}-3`, name: `${tAbbr} SF`, position: 'SF', earlyShotShare: 0.18, shotMix: { rim: 0.4, mid: 0.2, three: 0.4 }, seasonUsage: 18 },
+        { id: `${tAbbr}-4`, name: `${tAbbr} PF`, position: 'PF', earlyShotShare: 0.16, shotMix: { rim: 0.5, mid: 0.3, three: 0.2 }, seasonUsage: 17 },
+        { id: `${tAbbr}-5`, name: `${tAbbr} C`, position: 'C', earlyShotShare: 0.16, shotMix: { rim: 0.7, mid: 0.2, three: 0.1 }, seasonUsage: 18 },
+      ];
 
-    // 2. Resolve Jump Ball Matchup dynamically from starting centers
+      // Case A: Official boxscore confirmed starters
+      if (confirmed && confirmed.length === 5) {
+        const activeStarters = confirmed.map((c) => {
+          const base = baselineStarters.find(
+            (b) => String(b.id) === String(c.id) || b.name?.toLowerCase() === c.name?.toLowerCase()
+          );
+          const inj = injuryMap.get(String(c.id)) || injuryMap.get(c.name?.toLowerCase());
+          const isRep = !base;
+          const pos = c.position || base?.position || 'SF';
+          const isC = pos === 'C';
+
+          return {
+            id: c.id,
+            name: c.name,
+            position: pos,
+            jersey: c.jersey || base?.jersey || '0',
+            isStarter: true,
+            isReplacement: isRep,
+            replacedPlayer: isRep ? 'Bench Promotion' : null,
+            earlyShotShare: base?.earlyShotShare || 0.18,
+            shotMix: base?.shotMix || (isC ? { rim: 0.75, mid: 0.15, three: 0.10 } : { rim: 0.35, mid: 0.30, three: 0.35 }),
+            rimFG: base?.rimFG || 0.65,
+            midFG: base?.midFG || 0.42,
+            threeFG: base?.threeFG || 0.36,
+            seasonUsage: base?.seasonUsage || 18,
+            scriptedSetPlay: base?.scriptedSetPlay || `${c.name} Primary Attack`,
+            injury: inj ? { badge: inj.badge, status: inj.status, detail: inj.detail, returnDate: inj.returnDate } : null,
+          };
+        });
+
+        const totalShare = activeStarters.reduce((acc, s) => acc + (s.earlyShotShare || 0.2), 0);
+        if (totalShare > 0) {
+          activeStarters.forEach((s) => {
+            s.earlyShotShare = Math.round(((s.earlyShotShare || 0.2) / totalShare) * 1000) / 1000;
+          });
+        }
+        return activeStarters;
+      }
+
+      // Case B: Projected starters with injury checks & next-man-up substitutions
+      const activeStarters = [];
+      const outStarters = [];
+
+      for (const starter of baselineStarters) {
+        const inj = injuryMap.get(String(starter.id)) || injuryMap.get(starter.name?.toLowerCase());
+        if (inj && inj.isOut) {
+          outStarters.push({ starter, inj });
+        } else {
+          activeStarters.push({
+            ...starter,
+            injury: inj ? { badge: inj.badge, status: inj.status, detail: inj.detail, returnDate: inj.returnDate } : null,
+          });
+        }
+      }
+
+      for (const { starter, inj } of outStarters) {
+        const rep = findPositionalReplacement(tAbbr, starter, activeStarters, injuryMap);
+        if (rep) {
+          activeStarters.push(rep);
+        }
+      }
+
+      const totalShare = activeStarters.reduce((acc, s) => acc + (s.earlyShotShare || 0.2), 0);
+      if (totalShare > 0) {
+        activeStarters.forEach((s) => {
+          s.earlyShotShare = Math.round(((s.earlyShotShare || 0.2) / totalShare) * 1000) / 1000;
+        });
+      }
+
+      return activeStarters;
+    };
+
+    const rawHomeStarters = resolveTeamStarters(homeAbbr, homeCenterChoice);
+    const rawAwayStarters = resolveTeamStarters(awayAbbr, awayCenterChoice);
+
+    const homeCenter = rawHomeStarters.find((p) => p.position === 'C') ||
+      rawHomeStarters.find((p) => p.position === 'F-C' || p.position === 'C-F') ||
+      rawHomeStarters.find((p) => p.position === 'PF') ||
+      rawHomeStarters[0];
+
+    const awayCenter = rawAwayStarters.find((p) => p.position === 'C') ||
+      rawAwayStarters.find((p) => p.position === 'F-C' || p.position === 'C-F') ||
+      rawAwayStarters.find((p) => p.position === 'PF') ||
+      rawAwayStarters[0];
+
+    // 2. Resolve Jump Ball Matchup dynamically from active starting centers
     const jumpMatch = getJumpBallMatchup(homeAbbr, awayAbbr, homeCenter.name, awayCenter.name);
 
     const formattedTime = formatTipOffTime(g.date);
@@ -872,7 +1036,12 @@ export function buildLiveNBASnapshot(scoreboardGames, { centerOverrides = {} } =
       homeJumper: jumpMatch.jumperA,
       awayJumper: jumpMatch.jumperB,
       marketOdds: consensusMarketOdds,
-      lineupStatus: { confirmed: true, announcedMinutesAgo: 28, status: 'CONFIRMED' },
+      lineupStatus: {
+        confirmed: isConfirmedLineup,
+        announcedMinutesAgo: isConfirmedLineup ? 28 : null,
+        status: isConfirmedLineup ? 'CONFIRMED' : 'PROJECTED',
+        source: isConfirmedLineup ? 'espn_official_boxscore' : 'statfax_projected',
+      },
       pace: 100.5,
     });
 
@@ -955,7 +1124,9 @@ export async function loadNBASnapshot({ urls = DEFAULT_URLS, fetchImpl = globalT
   try {
     const scoreboard = await NBAService.getScoreboard();
     if (scoreboard && scoreboard.length > 0) {
-      const liveSnapshot = buildLiveNBASnapshot(scoreboard);
+      const gameIds = scoreboard.map((g) => g.gameId);
+      const summaries = await NBAService.getGameSummariesBatch(gameIds).catch(() => ({}));
+      const liveSnapshot = buildLiveNBASnapshot(scoreboard, { gameSummaries: summaries });
       if (liveSnapshot) {
         return validateNBASnapshot(liveSnapshot);
       }
