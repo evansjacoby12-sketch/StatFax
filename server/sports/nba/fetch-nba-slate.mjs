@@ -78,6 +78,7 @@ export async function fetchNBASlate({ outPath = OUTPUT_PATH } = {}) {
         teamStats: teamStatsByTeam,
         zoneStats: nbaContext.zoneStatsByPlayerId,
         opening: {
+          schemaVersion: 2,
           byPlayer: nbaContext.openingByPlayer,
           byTeam: nbaContext.openingByTeam,
           sampleCount: nbaContext.openingSamples,
@@ -137,14 +138,14 @@ export async function fetchNBASlate({ outPath = OUTPUT_PATH } = {}) {
     const tipNameB = tip?.jumperB?.jumper || tip?.jumperB?.name || 'Center B';
     const tipText = `${tipNameA} (${tipProbA}%) vs ${tipNameB} (${tipProbB}%)`;
 
-    const simSummary = game.simTelemetry ? ` | 5k-Sim: ${game.homeTeam.abbr} ${game.simTelemetry.homePct} - ${game.awayTeam.abbr} ${game.simTelemetry.awayPct}` : '';
+    const simSummary = game.simTelemetry ? ` | ${game.simTelemetry.iterations}-trial simulation: ${game.homeTeam.abbr} ${game.simTelemetry.homePct} - ${game.awayTeam.abbr} ${game.simTelemetry.awayPct}` : '';
     console.log(`\n🏀 ${game.awayTeam.abbr} @ ${game.homeTeam.abbr} (${game.gameTime || 'TBD'}) -- Tip: ${tipText}${simSummary}`);
     top5.forEach((p, idx) => {
       const prob = p.gameProb ?? p.modelProb ?? 0;
       const fair = p.fairOdds ? (String(p.fairOdds).startsWith('+') ? String(p.fairOdds) : (Number(p.fairOdds) > 0 ? `+${p.fairOdds}` : `${p.fairOdds}`)) : 'N/A';
       const odds = p.sportsbookOdds ? (p.sportsbookOdds > 0 ? `+${p.sportsbookOdds}` : `${p.sportsbookOdds}`) : 'N/A';
-      const ciText = p.ci90 ? ` [CI: ${p.ci90.lower}%-${p.ci90.upper}%]` : '';
-      const simText = p.simWins != null ? ` | Sim: ${p.simWins}/5000 (${p.simPct})` : '';
+      const ciText = p.ci90 ? ` [MC90 sampling range: ${p.ci90.lower}%-${p.ci90.upper}%]` : '';
+      const simText = p.simWins != null ? ` | Sim: ${p.simWins}/${p.simTotal} (${p.simPct})` : '';
       console.log(`   ${idx + 1}. [${p.team || 'NBA'}] ${p.name.padEnd(24)} GameProb: ${(prob * 100).toFixed(1)}%${ciText.padEnd(16)}${simText} | Fair: ${fair} | Early Look: ${Math.round((p.earlyShotShare || 0.25) * 100)}% | USG: ${p.seasonUsage || 20}%`);
     });
   }

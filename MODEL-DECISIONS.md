@@ -162,14 +162,14 @@ Authority: `server/sports/nfl/fetch-nfl-slate.mjs`, `server/sports/nfl/preseason
 
 ## NBA First Basket Engine
 
-Authority: `src/sports/nba/logic/firstBasketEngine.js`, `src/sports/nba/data/jumpBalls.js`, `src/sports/nba/data/demoSlate.js`, and `src/sports/nba/api/NBAService.js`.
+Live authority: `src/sports/nba/logic/firstBasketEngine.js`, `src/sports/nba/data/jumpBalls.js`, and `src/sports/nba/api/NBAService.js`. `fb-model/` is a legacy research prototype; it is not the live scorer or a valid production backtest source.
 
 - **Tip-Off Model & Jump Ball Elo (`jumpBalls.js`)**:
   - Center tip win rates calibrated across 30 opening centers with Bayesian sample shrinkage ($m=20$ tips) toward standing-reach advantage priors:
     $$\text{Rate}_{\text{regressed}} = \frac{n \times \text{Rate}_{\text{obs}} + m \times \text{Prior}_{\text{reach}}}{n + m}$$
   - Standing reach differential adjusts jumper Elo by 15 points per inch ($\Delta \text{Prior} \approx 2.2\%/\text{inch}$).
   - Sample size tiers: `HIGH` ($\ge 40$ tips), `MEDIUM` (15-39 tips), `LOW_SHRUNK` ($<15$ tips).
-  - Teams winning the opening tip capture 1st possession ~98% of the time, converting to 1st field goal ~64% of the time.
+  - The team winning the opening tip retains the first possession at an approximate 98% rate. Current v6 team-first probability is derived from the matchup's simulated possession sequence; the former fixed tip-to-first-score conversion is no longer used for live rankings.
   - Confirmed lineups badge tracks official starting 5s filed ~30 minutes before tip-off, enabling late model runs.
 - **First-Possession Markov Sequence (Play-by-Play Tendencies)**:
   - 1. *Possession Security*: 12.5% baseline early turnover rate deducted before shot attempts, adjusted for opponent ball pressure (`oppDefense.foulTurnoverForced`).
@@ -198,6 +198,8 @@ Authority: `src/sports/nba/logic/firstBasketEngine.js`, `src/sports/nba/data/jum
 - **Rollback**: Revert `NBABoard.jsx`, set `SPORT_UI.nba.enabled = false` in `sportUi.js`, and remove `firstBasketEngine.js`.
 
 ### Python fb-model Architecture & Calibration Artifacts
+
+This Python implementation is retained for research and historical inspection only. Its outputs and retrospective calibration artifacts do not feed the live NBA First Basket board; `backtest.py` remains blocked until date-aligned pregame snapshots exist.
 
 Authority: `fb-model/` layout (`ingest/`, `features/`, `model/`, `sim/`, `eval/`, and `run_slate.py`).
 
@@ -306,6 +308,24 @@ Authority: `fb-model/` layout (`ingest/`, `features/`, `model/`, `sim/`, `eval/`
 
 - NBA slate query dates and snapshot metadata use `America/Chicago`, independent of the deployment host timezone. ESPN event timestamps remain UTC for identity and sorting, while tip display remains Eastern. This keeps late Central-time games on the correct local slate after UTC midnight.
 - Validation covers the Chicago date transition around UTC midnight. Rollback: revert `nbaDateKeyInZone` use in `NBAService.js` and restore the prior host-local date selection.
+
+### NBA First-Basket Opening Tempo Shadow v1 (2026-10-30)
+
+- **Feature:** capture team-level seconds from the start of the team's first Q1 possession to its first field-goal attempt, from PBP Stats `start_time - shot_time`. Aggregate only observed opening-possession attempts from the opening 120-second window and retain the sample count. Old opening caches are invalidated once so the new timing field is populated.
+- **Policy:** this is shadow-only telemetry. It is attached to each game snapshot, displayed with sample counts, and frozen into pregame evaluation records. `includedInProbability` must remain false; it does not change first-basket probabilities, edges, or picks. Missing values remain null.
+- **Shadow evaluation:** when both team means have at least five attempts and differ by at least one second, the evaluator records whether the team with the quicker historical opening shot scored first. This hit rate is descriptive; promotion requires prospective, date-ordered comparison with the existing team-first probability baseline, sufficient coverage, and improved held-out calibration/rank performance.
+- **Validation / rollback:** parser tests cover clock-to-elapsed-time conversion and sample aggregation; snapshot/log tests validate the shadow-only contract and confirm probability metrics are unchanged. Remove `openingTempoShadow` capture/display/evaluation and restore opening-cache schema 1 while preserving v5 probabilities.
+
+### NBA First Basket Probability Wiring and Evidence Gate v6 (2026-10-30)
+
+- **Version:** `nba-first-basket-v6`. v5 snapshots remain a separate historical cohort; v6 prospective snapshots identify `probabilitySource: monte_carlo_possession_sequence_v1`.
+- **Probability source:** ranked player `gameProb` is now the full-game possession simulation frequency, with 10,000 trials by default. It samples opening tip winner and the 98% tip-winner possession retention rate, team turnovers, player opening-shot shares, zone-specific field-goal makes after opponent defense adjustment, and repeated offensive-rebound putback attempts until the first made field goal. `teamProb` is the scorer's share conditional on that team scoring first. A tip matchup alone does not claim a team-first probability. No sportsbook price is used to select or rank players.
+- **Verified input wiring:** NBA Stats zone rates flow into both the per-team expected-make calculation and the possession simulation. PBP Stats opening-shot counts are shrunk against roster shares for both projected and officially confirmed starters. The opening-tempo feature remains shadow-only.
+- **Tip data integrity:** an explicitly named but unlisted confirmed jumper no longer inherits the team's primary center's record or a fabricated 10-tip prior. Projection/BetLab eligibility requires both named opening jumpers to have non-fallback records with at least 15 tips. Unverified tip data blocks projection and recommendation eligibility.
+- **Sequence and uncertainty:** rebound attempts continue through repeated offensive boards. `FIRST_POINT_SCORED` simulations can settle on made free throws; `FIRST_FIELD_GOAL` does not. The displayed 90% Wilson interval is finite Monte Carlo sampling error only, not parameter or model uncertainty. Whole-game pace remains descriptive and is not a first-basket probability input.
+- **Snapshot contract:** live v6 snapshots must include the simulation source, positive iteration count, zero unresolved trials, and team win counts summing to iterations. Missing/invalid simulations fail snapshot validation.
+- **Validation / promotion:** focused regression tests cover zone-rate sensitivity, confirmed-lineup PBP share blending, unknown-jumper fallbacks, simulation probability parity, and pace invariance. This is a scoring-policy change, not a claim of improved predictive performance. Keep v6 in prospective evaluation until its date-ordered top-pick, Brier/log-loss, calibration, and coverage evidence is sufficient; do not fit from the legacy retrospective Python backtest.
+- **Rollback:** restore `nba-first-basket-v5`, the prior analytical ranking and eligibility contract, and matching v5 snapshot validation/UI. Retain v6 snapshots as a separate immutable cohort.
 
 ## Required proof for a production model change
 

@@ -13,9 +13,9 @@
  * 4. Quarter-Kelly Bankroll Sizing & Confirmed Lineups Window (~30m pre-tip).
  */
 
-import { getJumperProfile, predictJumpBallMatchup, TIP_WIN_CONVERSION_RATE } from '../data/jumpBalls.js';
+import { predictJumpBallMatchup, TIP_WIN_POSSESSION_RATE } from '../data/jumpBalls.js';
 
-export const FIRST_BASKET_MODEL_VERSION = 'nba-first-basket-v5';
+export const FIRST_BASKET_MODEL_VERSION = 'nba-first-basket-v6';
 
 // ─── Constants & Rules ─────────────────────────────────────────────────────────
 
@@ -32,7 +32,8 @@ export const FIRST_BASKET_TIERS = {
   LONG:    0,   // 🎲 LONGSHOT (<4%)
 };
 
-// Positional early possession initiation weights (neutral 1.0; player earlyShare and zone make rates govern conversion)
+  // Neutral positional initiation weights; empirically observed opening share
+  // and zone conversion rates carry the player-specific signal.
 export const FB_POSITION_WEIGHTS = {
   C:  1.00,
   PF: 1.00,
@@ -212,9 +213,15 @@ export function evaluateTeamPossessionSequence({
     };
 
     // Make rates adjusted for opponent defensive resistance
-    const rimMake = clamp((player.rimFG || 0.68) * (oppDefense.rimProtectionFactor || 1.0), 0.50, 0.82);
-    const midMake = clamp((player.midFG || 0.44) * (oppDefense.midDefenseFactor || 1.0), 0.35, 0.55);
-    const threeMake = clamp((player.threeFG || player.seasonStats?.threePointPct || 0.36) * (oppDefense.threePtDefenseFactor || 1.0), 0.28, 0.48);
+    const sourceRate = (zone, fallback) => Number.isFinite(player.zoneFG?.[zone])
+      ? player.zoneFG[zone] / 100
+      : (Number.isFinite(fallback) ? fallback : null);
+    const rimBase = sourceRate('rim', player.rimFG) ?? 0.68;
+    const midBase = sourceRate('mid', player.midFG) ?? 0.44;
+    const threeBase = sourceRate('three', player.threeFG ?? player.seasonStats?.threePointPct) ?? 0.36;
+    const rimMake = clamp(rimBase * (oppDefense.rimProtectionFactor || 1.0), 0.50, 0.82);
+    const midMake = clamp(midBase * (oppDefense.midDefenseFactor || 1.0), 0.35, 0.55);
+    const threeMake = clamp(threeBase * (oppDefense.threePtDefenseFactor || 1.0), 0.28, 0.48);
 
     const expectedMakeRate = (shotMix.rim * rimMake) + (shotMix.mid * midMake) + (shotMix.three * threeMake);
 
@@ -261,10 +268,10 @@ export function evaluateTeamPossessionSequence({
       earlyShare,
       seasonUsage: Number.isFinite(player.seasonStats?.usageProxy) ? player.seasonStats.usageProxy : Math.round(earlyShare * 100),
       shotMix,
-      rimMake: Math.round(rimMake * 100),
-      midMake: Math.round(midMake * 100),
-      threeMake: Math.round(threeMake * 100),
       expectedMakeRate,
+      rimMake,
+      midMake,
+      threeMake,
       rawWeight,
       primaryMethod,
       turnoverRate: teamTurnoverRate,
@@ -304,6 +311,8 @@ export function evaluateTeamPossessionSequence({
       earlyShotShare: r.earlyShare,
       seasonUsage: r.seasonUsage,
       expectedMakeRate: Math.round(r.expectedMakeRate * 1000) / 10,
+      ftRate: Number.isFinite(r.player.ftRate) ? r.player.ftRate : 0.28,
+      ftPct: Number.isFinite(r.player.ftPct) ? r.player.ftPct : 0.78,
       scriptedSetPlay: r.scriptedSetPlay,
       roleContext: r.roleContext,
       method: {
@@ -313,9 +322,9 @@ export function evaluateTeamPossessionSequence({
       },
       shotMix: r.shotMix,
       zoneFG: {
-        rim: r.rimMake,
-        mid: r.midMake,
-        three: r.threeMake,
+        rim: Math.round(r.rimMake * 100),
+        mid: Math.round(r.midMake * 100),
+        three: Math.round(r.threeMake * 100),
       },
       turnoverRate: Math.round(r.turnoverRate * 1000) / 10,
       orebExtensionPct: Math.round(r.orebRate * 1000) / 10,
@@ -347,7 +356,7 @@ export function scoreTeamFirstBasket(players, oppDefense = {}, teamInfo = {}) {
   }));
 }
 
-// ─── Fast Deterministic PRNG & 5,000-Trial Monte Carlo Engine ────────────────
+// ─── Fast Deterministic PRNG & 10,000-Trial Monte Carlo Engine ──────────────
 
 /**
  * Fast Mulberry32 pseudo-random number generator.
@@ -368,9 +377,9 @@ export function createPrng(seedVal) {
 }
 
 /**
- * 5,000-Trial Monte Carlo First Basket Simulation Engine.
+ * 10,000-Trial Monte Carlo First Basket Simulation Engine.
  *
- * For each game matchup, runs 5,000 discrete possession-level trials simulating:
+ * For each game matchup, runs 10,000 discrete possession-level trials simulating:
  * 1. Jump ball tip outcome based on head-to-head Log5 jumper probabilities.
  * 2. Ball security & early turnover risk (flips possession before shot).
  * 3. Scripted first look shooter selection weighted by early possession usage.
@@ -382,7 +391,8 @@ export function simulateGameFirstBasketMonteCarlo({
   homePlayers = [],
   awayPlayers = [],
   tipMatchup = {},
-  iterations = 5000,
+  settlementRule = SETTLEMENT_RULES.FIRST_FIELD_GOAL,
+  iterations = 10000,
   seed = null,
 }) {
   const rng = createPrng(seed);
@@ -399,10 +409,19 @@ export function simulateGameFirstBasketMonteCarlo({
         mid: pos === 'C' ? 0.15 : 0.30,
         three: pos === 'C' ? 0.20 : pos === 'PF' ? 0.25 : 0.45,
       };
-      const rimFG = (p.zoneFG?.rim ?? p.rimMake ?? 68) / 100;
-      const midFG = (p.zoneFG?.mid ?? p.midMake ?? 44) / 100;
-      const threeFG = (p.zoneFG?.three ?? p.threeMake ?? 36) / 100;
-      const share = p.earlyShotShare || (p.teamProb ?? 0.20);
+      const rate = (zoneValue, percentValue, fractionValue, fallback) => {
+        if (Number.isFinite(zoneValue)) return zoneValue / 100;
+        if (Number.isFinite(percentValue)) return percentValue / 100;
+        return Number.isFinite(fractionValue) ? fractionValue : fallback;
+      };
+      const rimFG = rate(p.zoneFG?.rim, p.rimMake, p.rimFG, 0.68);
+      const midFG = rate(p.zoneFG?.mid, p.midMake, p.midFG, 0.44);
+      const threeFG = rate(p.zoneFG?.three, p.threeMake, p.threeFG, 0.36);
+      const share = Number.isFinite(p.earlyShotShare) ? p.earlyShotShare : (p.teamProb ?? 0.20);
+      const mixTotal = (shotMix.rim || 0) + (shotMix.mid || 0) + (shotMix.three || 0);
+      const normalizedShotMix = mixTotal > 0
+        ? { rim: shotMix.rim / mixTotal, mid: shotMix.mid / mixTotal, three: shotMix.three / mixTotal }
+        : { rim: 0.4, mid: 0.2, three: 0.4 };
       return {
         id: p.id,
         name: p.name,
@@ -410,10 +429,12 @@ export function simulateGameFirstBasketMonteCarlo({
         pos,
         share,
         orebShare,
-        shotMix,
+        shotMix: normalizedShotMix,
         rimFG,
         midFG,
         threeFG,
+        ftRate: Number.isFinite(p.ftRate) ? p.ftRate : 0.28,
+        ftPct: Number.isFinite(p.ftPct) ? p.ftPct : 0.78,
       };
     });
 
@@ -452,14 +473,15 @@ export function simulateGameFirstBasketMonteCarlo({
 
   const playerStats = {};
   for (const p of homePlayers) {
-    playerStats[p.id] = { wins: 0, methodCounts: { twoPt: 0, threePt: 0 } };
+    playerStats[p.id] = { wins: 0, methodCounts: { twoPt: 0, threePt: 0, freeThrow: 0 } };
   }
   for (const p of awayPlayers) {
-    playerStats[p.id] = { wins: 0, methodCounts: { twoPt: 0, threePt: 0 } };
+    playerStats[p.id] = { wins: 0, methodCounts: { twoPt: 0, threePt: 0, freeThrow: 0 } };
   }
 
   let homeWins = 0;
   let awayWins = 0;
+  let unresolvedTrials = 0;
 
   function samplePlayerByShare(team) {
     const r = rng();
@@ -478,18 +500,37 @@ export function simulateGameFirstBasketMonteCarlo({
   }
 
   for (let trial = 0; trial < iterations; trial++) {
-    let isHomePossession = rng() < homeTipProb;
+    const openingTipWinnerHome = rng() < homeTipProb;
+    const openingPossessionStaysWithTipWinner = rng() < TIP_WIN_POSSESSION_RATE;
+    let isHomePossession = openingPossessionStaysWithTipWinner
+      ? openingTipWinnerHome : !openingTipWinnerHome;
     let trialScorerId = null;
     let trialMethod = '2PT';
     let scoredHome = false;
 
-    // Up to 25 possessions per sequence until first basket is scored
-    for (let possession = 0; possession < 25; possession++) {
+    // Continue until the first field goal. Never fabricate a fallback scorer.
+    for (let possession = 0; possession < 1000; possession++) {
       const activeTeam = isHomePossession ? teamHome : teamAway;
       if (!activeTeam.players || activeTeam.players.length === 0) break;
 
       // Ball security check (turnover)
       if (rng() < activeTeam.turnoverRate) {
+        isHomePossession = !isHomePossession;
+        continue;
+      }
+
+      const fouledPlayer = samplePlayerByShare(activeTeam);
+      if (rng() < clamp(LEAGUE_SHOOTING_FOUL_RATE * fouledPlayer.ftRate, 0, 1)) {
+        if (settlementRule === SETTLEMENT_RULES.FIRST_POINT_SCORED) {
+          if (rng() < fouledPlayer.ftPct) {
+            trialScorerId = fouledPlayer.id;
+            trialMethod = 'FT';
+            scoredHome = isHomePossession;
+            break;
+          }
+        }
+        // Under FG-only settlement, or after missed free throws, the foul
+        // consumes the possession without settling a first field goal.
         isHomePossession = !isHomePossession;
         continue;
       }
@@ -519,40 +560,36 @@ export function simulateGameFirstBasketMonteCarlo({
         break;
       }
 
-      // Initial shot missed: Offensive rebound check
-      if (rng() < activeTeam.orebRate) {
+      // Keep the possession alive through every offensive rebound and putback
+      // until the defense secures the ball or a field goal is made.
+      let offenseRetainsBall = rng() < activeTeam.orebRate;
+      while (offenseRetainsBall && !trialScorerId) {
         const rebounder = sampleCrashRebounder(activeTeam);
-        // Putback rim attempt
         if (rng() < rebounder.rimFG) {
           trialScorerId = rebounder.id;
           trialMethod = '2PT';
           scoredHome = isHomePossession;
           break;
         }
+        offenseRetainsBall = rng() < activeTeam.orebRate;
       }
-
-      // Defensive rebound secured -> flip possession
-      isHomePossession = !isHomePossession;
+      if (!trialScorerId) isHomePossession = !isHomePossession;
     }
 
-    // Safety fallback
     if (!trialScorerId) {
-      const fallbackTeam = isHomePossession ? teamHome : teamAway;
-      const topP = fallbackTeam.players[0] || teamHome.players[0];
-      if (topP) {
-        trialScorerId = topP.id;
-        trialMethod = '2PT';
-        scoredHome = isHomePossession;
-      }
+      unresolvedTrials++;
+      continue;
     }
 
     if (trialScorerId) {
       if (!playerStats[trialScorerId]) {
-        playerStats[trialScorerId] = { wins: 0, methodCounts: { twoPt: 0, threePt: 0 } };
+        playerStats[trialScorerId] = { wins: 0, methodCounts: { twoPt: 0, threePt: 0, freeThrow: 0 } };
       }
       playerStats[trialScorerId].wins += 1;
       if (trialMethod === '3PT') {
         playerStats[trialScorerId].methodCounts.threePt += 1;
+      } else if (trialMethod === 'FT') {
+        playerStats[trialScorerId].methodCounts.freeThrow += 1;
       } else {
         playerStats[trialScorerId].methodCounts.twoPt += 1;
       }
@@ -562,10 +599,17 @@ export function simulateGameFirstBasketMonteCarlo({
     }
   }
 
+  if (unresolvedTrials > 0) {
+    throw new Error(`First Basket simulation could not resolve ${unresolvedTrials}/${iterations} trials; verify shot and possession inputs.`);
+  }
+
   return {
     iterations,
     homeWins,
     awayWins,
+    unresolvedTrials,
+    homeProb: homeWins / iterations,
+    awayProb: awayWins / iterations,
     homePct: `${((homeWins / iterations) * 100).toFixed(1)}%`,
     awayPct: `${((awayWins / iterations) * 100).toFixed(1)}%`,
     playerStats,
@@ -576,7 +620,7 @@ export function simulateGameFirstBasketMonteCarlo({
 
 /**
  * Score full game First Basket with Markov opening possession sequence,
- * 5,000-trial Monte Carlo simulation, multi-book odds comparison, and settlement rules.
+ * 10,000-trial Monte Carlo simulation, multi-book odds comparison, and settlement rules.
  */
 export function scoreGameFirstBasket({
   gameId = 'game-1',
@@ -594,8 +638,8 @@ export function scoreGameFirstBasket({
   awayOppDefense = {},
   gameTime = null,
   lineupStatus = { confirmed: true, announcedMinutesAgo: 24, status: 'CONFIRMED' },
-  pace = 100.0,
-  simIterations = 5000,
+  pace = null,
+  simIterations = 10000,
   seed = null,
 }) {
   const recommendationEligible = inputQuality?.recommendationEligible === true;
@@ -608,10 +652,6 @@ export function scoreGameFirstBasket({
     : (awayJumper?.name || awayPlayers.find((p) => normalizePosition(p.position) === 'C')?.name || awayPlayers[0]?.name || awayTeam?.abbr);
 
   const tipMatchup = predictJumpBallMatchup(homeJumperName, awayJumperName);
-
-  // Home and Away First Basket probabilities based on tip winner conversion
-  const homeTeamScoresFirstProb = tipMatchup.teamAScoresFirstProb;
-  const awayTeamScoresFirstProb = tipMatchup.teamBScoresFirstProb;
 
   // 2. Sequence Markov evaluation for both teams
   const homeScored = evaluateTeamPossessionSequence({
@@ -631,24 +671,37 @@ export function scoreGameFirstBasket({
   homeScored.forEach((p, idx) => { p.teamRank = idx + 1; });
   awayScored.forEach((p, idx) => { p.teamRank = idx + 1; });
 
-  // 3. Run 5,000-Trial Monte Carlo Simulation Engine
+  // 3. Run the 10,000-trial Monte Carlo probability engine
   const simResult = simulateGameFirstBasketMonteCarlo({
     homePlayers: homeScored,
     awayPlayers: awayScored,
     tipMatchup,
+    settlementRule,
     iterations: simIterations,
     seed: seed ?? gameId,
   });
 
-  // 4. Joint Game-Wide Probability Distribution & Simulation Outcomes
+  // 4. Use the possession simulation as the game-wide probability source.
+  // It samples tip possession, turnovers, player shot shares, zone makes,
+  // offensive rebounds, and alternating possessions before the first basket.
+  const homeTeamScoresFirstProb = simResult.homeProb;
+  const awayTeamScoresFirstProb = simResult.awayProb;
+  tipMatchup.teamAScoresFirstProb = homeTeamScoresFirstProb;
+  tipMatchup.teamBScoresFirstProb = awayTeamScoresFirstProb;
+
   const allGamePlayers = [
     ...homeScored.map((p) => {
-      const sim = simResult.playerStats[p.id] || { wins: 0, methodCounts: { twoPt: 0, threePt: 0 } };
-      const simProb = Math.round((sim.wins / simResult.iterations) * 1000) / 1000;
+      const sim = simResult.playerStats[p.id] || { wins: 0, methodCounts: { twoPt: 0, threePt: 0, freeThrow: 0 } };
+      const simProb = sim.wins / simResult.iterations;
+      const teamProb = simResult.homeWins > 0 ? sim.wins / simResult.homeWins : 0;
       return {
         ...p,
         isHome: true,
-        gameProb: Math.round(p.teamProb * homeTeamScoresFirstProb * 1000) / 1000,
+        score: Math.round(simProb * 100),
+        grade: gradeFromScore(Math.round(simProb * 100)),
+        markovTeamProb: p.teamProb,
+        teamProb,
+        gameProb: simProb,
         teamScoresFirstProb: homeTeamScoresFirstProb,
         simWins: sim.wins,
         simTotal: simResult.iterations,
@@ -658,16 +711,22 @@ export function scoreGameFirstBasket({
         simMethodSplit: {
           prob2PT: Math.round((sim.methodCounts.twoPt / Math.max(1, sim.wins)) * 100) / 100,
           prob3PT: Math.round((sim.methodCounts.threePt / Math.max(1, sim.wins)) * 100) / 100,
+          probFreeThrow: Math.round((sim.methodCounts.freeThrow / Math.max(1, sim.wins)) * 100) / 100,
         },
       };
     }),
     ...awayScored.map((p) => {
-      const sim = simResult.playerStats[p.id] || { wins: 0, methodCounts: { twoPt: 0, threePt: 0 } };
-      const simProb = Math.round((sim.wins / simResult.iterations) * 1000) / 1000;
+      const sim = simResult.playerStats[p.id] || { wins: 0, methodCounts: { twoPt: 0, threePt: 0, freeThrow: 0 } };
+      const simProb = sim.wins / simResult.iterations;
+      const teamProb = simResult.awayWins > 0 ? sim.wins / simResult.awayWins : 0;
       return {
         ...p,
         isHome: false,
-        gameProb: Math.round(p.teamProb * awayTeamScoresFirstProb * 1000) / 1000,
+        score: Math.round(simProb * 100),
+        grade: gradeFromScore(Math.round(simProb * 100)),
+        markovTeamProb: p.teamProb,
+        teamProb,
+        gameProb: simProb,
         teamScoresFirstProb: awayTeamScoresFirstProb,
         simWins: sim.wins,
         simTotal: simResult.iterations,
@@ -677,10 +736,16 @@ export function scoreGameFirstBasket({
         simMethodSplit: {
           prob2PT: Math.round((sim.methodCounts.twoPt / Math.max(1, sim.wins)) * 100) / 100,
           prob3PT: Math.round((sim.methodCounts.threePt / Math.max(1, sim.wins)) * 100) / 100,
+          probFreeThrow: Math.round((sim.methodCounts.freeThrow / Math.max(1, sim.wins)) * 100) / 100,
         },
       };
     }),
   ];
+
+  for (const isHome of [true, false]) {
+    const teamRows = allGamePlayers.filter(player => player.isHome === isHome).sort((a, b) => b.teamProb - a.teamProb);
+    teamRows.forEach((player, index) => { player.teamRank = index + 1; });
+  }
 
   // 5. Multi-Book Odds Matrix, De-Vigged Benchmark, and Edge Analysis
   const playersWithMarkets = allGamePlayers.map((player) => {
@@ -745,33 +810,24 @@ export function scoreGameFirstBasket({
     const isTopTeamOption = player.teamRank === 1;
 
     const eli5 = isTopTeamOption
-      ? `${player.name} is ${player.team}'s primary early option (${(player.earlyShotShare * 100).toFixed(0)}% early shot share). ${tipAdvantage ? `${player.team} holds the opening tip edge (${(player.teamScoresFirstProb * 100).toFixed(0)}%).` : 'High early possession volume overcomes neutral tip.'}`
+      ? `${player.name} is ${player.team}'s primary early option (${(player.earlyShotShare * 100).toFixed(0)}% early shot share). ${tipAdvantage ? `${player.team} has a first-score edge in the possession simulation (${(player.teamScoresFirstProb * 100).toFixed(0)}%).` : 'Their early possession role leads despite a near-even team first-score chance.'}`
       : `${player.name} takes ${(player.earlyShotShare * 100).toFixed(0)}% of early shots (${player.method.primary}). ${player.orebExtensionPct > 25 ? 'Benefits from offensive rebound putback sequence.' : ''}`;
 
-    const eli15 = `Model prob ${(player.gameProb * 100).toFixed(1)}% (${fairGameOdds} fair) · 5k-Sim: ${player.simWins?.toLocaleString?.() ?? player.simWins}/5,000 (${player.simPct}) [2PT: ${player.simMethods?.twoPt ?? 0}, 3PT: ${player.simMethods?.threePt ?? 0}] = ${(player.teamScoresFirstProb * 100).toFixed(1)}% team tip-conversion × ${(player.teamProb * 100).toFixed(1)}% team share. Early look rate: ${(player.earlyShotShare * 100).toFixed(0)}% (Make rate ${player.expectedMakeRate}%). OREB extension: ${player.orebExtensionPct}%. TOV risk: ${player.turnoverRate}%. Settlement: ${settlementRule}. Pace: ${pace}.`;
+    const eli15 = `Model prob ${(player.gameProb * 100).toFixed(1)}% (${fairGameOdds} fair) · possession simulation: ${player.simWins?.toLocaleString?.() ?? player.simWins}/${player.simTotal} (${player.simPct}) [2PT: ${player.simMethods?.twoPt ?? 0}, 3PT: ${player.simMethods?.threePt ?? 0}, FT: ${player.simMethods?.freeThrow ?? 0}] = ${(player.teamScoresFirstProb * 100).toFixed(1)}% team first-score probability × ${(player.teamProb * 100).toFixed(1)}% share conditional on team scoring first. Early look rate: ${(player.earlyShotShare * 100).toFixed(0)}% (Make rate ${player.expectedMakeRate}%). OREB extension: ${player.orebExtensionPct}%. TOV risk: ${player.turnoverRate}%. Settlement: ${settlementRule}.`;
 
-    // Bayesian 90% Credible Interval using Logit-Normal Delta Method
-    // Produces naturally skewed bounds bounded in (0, 1) rather than symmetric normal approximations
-    const mPrior = 25.0; // Dirichlet precision
-    const varTeamShare = (player.teamProb * (1 - player.teamProb)) / (mPrior + 1.0);
-    const varTeamFirst = 0.0035; // Beta tip-to-first-score variance
-    const varGameProb = (player.teamProb * player.teamProb * varTeamFirst) +
-                        (player.teamScoresFirstProb * player.teamScoresFirstProb * varTeamShare);
-    const seProb = Math.sqrt(Math.max(0.0001, varGameProb));
-
-    // Log-odds transformation (Delta Method)
-    const pSafe = Math.max(0.01, Math.min(0.99, player.gameProb));
-    const seLogit = seProb / (pSafe * (1.0 - pSafe));
-    const logitP = Math.log(pSafe / (1.0 - pSafe));
-    const z90 = 1.645;
-    const logitLow = logitP - (z90 * seLogit);
-    const logitHigh = logitP + (z90 * seLogit);
-    const ci90Lower = 1.0 / (1.0 + Math.exp(-logitLow));
-    const ci90Upper = 1.0 / (1.0 + Math.exp(-logitHigh));
-
+    // Wilson 90% interval describes Monte Carlo sampling error only; it is not
+    // a posterior interval over uncertain model parameters.
+    const n = Math.max(1, player.simTotal);
+    const pHat = player.simProb;
+    const z = 1.6448536269514722;
+    const z2 = z * z;
+    const denominator = 1 + z2 / n;
+    const center = (pHat + z2 / (2 * n)) / denominator;
+    const halfWidth = z * Math.sqrt((pHat * (1 - pHat) / n) + (z2 / (4 * n * n))) / denominator;
     const ci90 = {
-      lower: Math.max(0.5, Math.round(ci90Lower * 1000) / 10),
-      upper: Math.min(95.0, Math.round(ci90Upper * 1000) / 10),
+      lower: Math.round(Math.max(0, center - halfWidth) * 1000) / 10,
+      upper: Math.round(Math.min(1, center + halfWidth) * 1000) / 10,
+      type: 'monte_carlo_sampling_error_only',
     };
 
     return {
@@ -794,12 +850,13 @@ export function scoreGameFirstBasket({
         : !recommendationEligible
         ? [
             !inputQuality.lineupConfirmed && 'starting_lineup_unconfirmed',
+            inputQuality.jumpBallCoverage < 1 && 'opening_jumper_history_unverified',
             inputQuality.playerSeasonStatCoverage < 0.8 && 'insufficient_current_player_stats',
             inputQuality.zoneRateCoverage < 0.8 && 'missing_player_zone_shooting_rates',
             inputQuality.teamMatchupCoverage < 1 && 'incomplete_team_matchup_context',
             inputQuality.minimumOpeningHistorySamples < 5 && 'insufficient_opening_play_history',
             inputQuality.openingHistoryAgeSeasons > 1 && 'stale_opening_possession_history',
-            inputQuality.openingSequenceContextSource !== 'observed' && 'opening_sequence_rates_not_observed',
+            inputQuality.openingSequenceContextSource !== 'pbpstats_observed' && 'opening_sequence_rates_not_observed',
             !inputQuality.liveOddsAvailable && 'live_first_basket_odds_unavailable',
           ].filter(Boolean)
         : [],
@@ -816,6 +873,7 @@ export function scoreGameFirstBasket({
 
   return {
     gameId,
+    probabilitySource: 'monte_carlo_possession_sequence_v1',
     gameTime,
     homeTeam,
     awayTeam,
@@ -824,6 +882,7 @@ export function scoreGameFirstBasket({
     pace,
     simTelemetry: {
       iterations: simResult.iterations,
+      unresolvedTrials: simResult.unresolvedTrials,
       homeWins: simResult.homeWins,
       awayWins: simResult.awayWins,
       homePct: simResult.homePct,

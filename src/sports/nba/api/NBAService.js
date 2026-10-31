@@ -112,6 +112,12 @@ function openingHistoryAge(history, currentSeasonStartYear) {
   return years.length ? Math.max(currentSeasonStartYear - Math.min(...years), 0) : null;
 }
 
+function normalizeOpeningPlayerName(name) {
+  return String(name || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim()
+    .replace(/\s+(jr|sr|ii|iii|iv|v)$/, '');
+}
+
 export function nbaDateKeyInZone(date = new Date(), timeZone = 'America/Chicago') {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone, year: 'numeric', month: '2-digit', day: '2-digit',
@@ -807,15 +813,31 @@ export function validateNBASnapshot(snapshot) {
   }
   if (snapshot.source?.mode === 'live' && snapshot.modelVersion === FIRST_BASKET_MODEL_VERSION) {
     if (!Array.isArray(snapshot.games) || !snapshot.market || !snapshot.players.every(p => p.gameId != null && p.inputQuality)) {
-      throw new Error('Invalid NBA v5 snapshot: live players require game identity and input-quality evidence');
+      throw new Error('Invalid NBA v6 snapshot: live players require game identity and input-quality evidence');
     }
     if (!snapshot.games.every(g => g.gameId != null && g.inputQuality && g.status)) {
-      throw new Error('Invalid NBA v5 snapshot: live games require identity, status, and input-quality evidence');
+      throw new Error('Invalid NBA v6 snapshot: live games require identity, status, and input-quality evidence');
     }
     if (!snapshot.games.every(g => typeof g.inputQuality.projectionEligible === 'boolean' && typeof g.inputQuality.recommendationEligible === 'boolean' &&
-      ['playerSeasonStatCoverage', 'teamMatchupCoverage', 'zoneRateCoverage', 'openingTeamCoverage', 'minimumOpeningHistorySamples'].every(k => Number.isFinite(g.inputQuality[k])) &&
+      ['playerSeasonStatCoverage', 'teamMatchupCoverage', 'zoneRateCoverage', 'openingTeamCoverage', 'minimumOpeningHistorySamples', 'jumpBallCoverage'].every(k => Number.isFinite(g.inputQuality[k])) &&
       ['ok', 'partial', 'unavailable'].includes(g.inputQuality.openingDataStatus) && typeof g.inputQuality.zoneSource === 'string')) {
-      throw new Error('Invalid NBA v5 snapshot: eligibility evidence is incomplete');
+      throw new Error('Invalid NBA v6 snapshot: eligibility evidence is incomplete');
+    }
+    if (!snapshot.games.every(g => g.probabilitySource === 'monte_carlo_possession_sequence_v1' &&
+      Number.isInteger(g.simTelemetry?.iterations) && g.simTelemetry.iterations > 0 && g.simTelemetry.unresolvedTrials === 0 &&
+      g.simTelemetry.homeWins + g.simTelemetry.awayWins === g.simTelemetry.iterations)) {
+      throw new Error('Invalid NBA v6 snapshot: possession simulation probability evidence is incomplete');
+    }
+    if (!snapshot.games.every(g => g.openingTempoShadow == null || (
+      g.openingTempoShadow.featureVersion === 1 &&
+      g.openingTempoShadow.source === 'pbpstats_first_opening_possession_shot' &&
+      g.openingTempoShadow.includedInProbability === false &&
+      g.openingTempoShadow.unit === 'seconds_from_possession_start_to_first_field_goal_attempt' &&
+      ['home', 'away'].every(side => g.openingTempoShadow[side] &&
+        (g.openingTempoShadow[side].meanSecondsToFirstShot == null || Number.isFinite(g.openingTempoShadow[side].meanSecondsToFirstShot)) &&
+        Number.isInteger(g.openingTempoShadow[side].sampleCount) && g.openingTempoShadow[side].sampleCount >= 0)
+    ))) {
+      throw new Error('Invalid NBA v6 snapshot: opening tempo shadow evidence is malformed');
     }
   }
   return snapshot;
@@ -923,19 +945,20 @@ export function buildLiveNBASnapshot(scoreboardGames, {
 
     const enrichWithSeasonStats = (players, teamAbbr) => players.map(player => {
       const stats = playerStatsById.get(String(player.id));
-      const playerKey = String(player.name || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-        .toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim().replace(/\s+(jr|sr|ii|iii|iv|v)$/, '');
+      const playerKey = normalizeOpeningPlayerName(player.name);
       const zones = zoneStatsByPlayerId[String(player.id)] || zoneStatsByPlayerId[`name:${playerKey}`];
       const opening = openingTendenciesByTeam[teamAbbr]?.byPlayer?.[playerKey];
       const openingHistory = openingTendenciesByTeam[teamAbbr];
       const historyAge = openingHistoryAge(openingHistory, currentSeasonStartYear);
-      const openingUsable = openingHistory?.status === 'ok' && historyAge != null && historyAge <= 1;
+      const openingUsable = openingHistory?.status === 'ok' && historyAge != null && historyAge <= 1 && Number(openingHistory.sampleCount) > 0;
       if (!stats || !Number.isFinite(stats.gamesPlayed) || stats.gamesPlayed < 1) {
         const withZones = applyZoneStats(player, zones);
         return { ...withZones, openingHistorySamples: openingUsable ? openingHistory.sampleCount : 0,
           openingShotAttempts: opening?.attempts || 0, openingShotMakes: opening?.made || 0,
           openingStartTypes: opening?.startTypes || {},
-          dataSources: { ...(withZones.dataSources || {}), seasonStats: 'unavailable', openingPossessions: openingUsable ? 'pbpstats' : openingHistory ? 'stale_or_incomplete' : 'unavailable' } };
+          dataSources: { ...(withZones.dataSources || {}), seasonStats: 'unavailable',
+            earlyShotShare: openingUsable ? 'pbpstats_shrunk_with_roster_prior' : 'roster_prior',
+            openingPossessions: openingUsable ? 'pbpstats' : openingHistory ? 'stale_or_incomplete' : 'unavailable' } };
       }
       const attempts = Math.max(0, (stats.threesAttemptedPerGame || 0) * stats.gamesPlayed);
       const observed = Number.isFinite(stats.threePointPct) ? stats.threePointPct : null;
@@ -959,7 +982,7 @@ export function buildLiveNBASnapshot(scoreboardGames, {
           seasonGames: stats.gamesPlayed,
           threePointAttempts: attempts,
           threePointPct: shrunkThree,
-          earlyShotShare: 'roster_prior',
+          earlyShotShare: openingUsable ? 'pbpstats_shrunk_with_roster_prior' : 'roster_prior',
           openingPossessions: openingUsable ? 'pbpstats' : openingHistory ? 'stale_or_incomplete' : 'unavailable',
         },
       };
@@ -986,6 +1009,21 @@ export function buildLiveNBASnapshot(scoreboardGames, {
 
     const resolveTeamStarters = (tAbbr, centerChoice) => {
       const confirmed = confirmedStartersByTeam[tAbbr];
+      const applyOpeningHistoryShares = activeStarters => {
+        const history = openingTendenciesByTeam[tAbbr];
+        const historyAge = openingHistoryAge(history, currentSeasonStartYear);
+        const historyN = Number(history?.sampleCount) || 0;
+        if (history?.status !== 'ok' || historyAge == null || historyAge > 1 || historyN <= 0) return;
+        const priorWeight = 20;
+        const posteriorShares = activeStarters.map(player => {
+          const observed = history.byPlayer?.[normalizeOpeningPlayerName(player.name)];
+          const observedAttempts = Number.isFinite(Number(observed?.attempts)) ? Number(observed.attempts) : 0;
+          const priorShare = Number.isFinite(player.earlyShotShare) ? player.earlyShotShare : 0;
+          return (observedAttempts + priorShare * priorWeight) / (historyN + priorWeight);
+        });
+        const sum = posteriorShares.reduce((a, b) => a + b, 0);
+        if (sum > 0) activeStarters.forEach((player, index) => { player.earlyShotShare = posteriorShares[index] / sum; });
+      };
       const baselineStarters = getStartersForTeam(tAbbr, { centerChoice }) || [
         { id: `${tAbbr}-1`, name: `${tAbbr} PG`, position: 'PG', earlyShotShare: 0.28, shotMix: { rim: 0.3, mid: 0.3, three: 0.4 }, seasonUsage: 25 },
         { id: `${tAbbr}-2`, name: `${tAbbr} SG`, position: 'SG', earlyShotShare: 0.22, shotMix: { rim: 0.3, mid: 0.3, three: 0.4 }, seasonUsage: 22 },
@@ -1030,6 +1068,7 @@ export function buildLiveNBASnapshot(scoreboardGames, {
             s.earlyShotShare = Math.round(((s.earlyShotShare || 0.2) / totalShare) * 1000) / 1000;
           });
         }
+        applyOpeningHistoryShares(activeStarters);
         return enrichWithSeasonStats(activeStarters, tAbbr);
       }
 
@@ -1063,17 +1102,7 @@ export function buildLiveNBASnapshot(scoreboardGames, {
         });
       }
 
-      const openingHistory = openingTendenciesByTeam[tAbbr];
-      const historyN = Number(openingHistory?.sampleCount) || 0;
-      if (openingHistory?.status === 'ok' && openingHistoryAge(openingHistory, currentSeasonStartYear) <= 1 && historyN > 0) {
-        const priorWeight = 20;
-        const posteriorShares = activeStarters.map(s => {
-          const observed = openingHistory.byPlayer?.[String(s.name || '').toLowerCase()];
-          return (Number(observed?.attempts) + (s.earlyShotShare || 0) * priorWeight) / (historyN + priorWeight);
-        });
-        const sum = posteriorShares.reduce((a, b) => a + b, 0);
-        if (sum > 0) activeStarters.forEach((s, i) => { s.earlyShotShare = posteriorShares[i] / sum; });
-      }
+      applyOpeningHistoryShares(activeStarters);
 
       return enrichWithSeasonStats(activeStarters, tAbbr);
     };
@@ -1132,6 +1161,23 @@ export function buildLiveNBASnapshot(scoreboardGames, {
     const awayOpeningAge = openingHistoryAge(awayOpening, currentSeasonStartYear);
     const openingHistoryAgeSeasons = homeOpeningAge == null || awayOpeningAge == null
       ? null : Math.max(homeOpeningAge, awayOpeningAge);
+    const jumpBallCoverage = [jumpMatch.jumperA, jumpMatch.jumperB]
+      .filter(profile => !profile?.isFallback && Number(profile?.tipAttempts) >= 15).length / 2;
+    const tempoForTeam = history => {
+      const tempo = history?.openingTempo;
+      return {
+        meanSecondsToFirstShot: tempo?.meanSeconds != null && Number.isFinite(Number(tempo.meanSeconds)) ? Math.round(Number(tempo.meanSeconds) * 100) / 100 : null,
+        sampleCount: Number.isFinite(Number(tempo?.sampleCount)) ? Number(tempo.sampleCount) : 0,
+      };
+    };
+    const openingTempoShadow = {
+      featureVersion: 1,
+      source: 'pbpstats_first_opening_possession_shot',
+      includedInProbability: false,
+      unit: 'seconds_from_possession_start_to_first_field_goal_attempt',
+      home: tempoForTeam(homeOpening),
+      away: tempoForTeam(awayOpening),
+    };
     const openingTeamCoverage = [homeOpening, awayOpening]
       .filter((x, i) => x?.status === 'ok' && [homeOpeningAge, awayOpeningAge][i] != null && [homeOpeningAge, awayOpeningAge][i] <= 1).length / 2;
     const openingDataStatus = openingTeamCoverage === 1 ? 'ok' : openingTeamCoverage > 0 ? 'partial' : 'unavailable';
@@ -1145,6 +1191,7 @@ export function buildLiveNBASnapshot(scoreboardGames, {
       openingDataStatus,
       openingTeamCoverage,
       openingHistoryAgeSeasons,
+      jumpBallCoverage,
       openingHistorySeason: homeOpening?.season && homeOpening.season === awayOpening?.season ? String(homeOpening.season) : null,
       openingTeamSamples: { [homeAbbr]: homeOpening?.sampleCount || 0, [awayAbbr]: awayOpening?.sampleCount || 0 },
       zoneSource: zoneRateCoverage > 0 ? 'nba_stats_leaguedashplayershotlocations' : 'unavailable',
@@ -1153,11 +1200,11 @@ export function buildLiveNBASnapshot(scoreboardGames, {
       liveOddsAvailable: freshMarketAvailable,
       liveOddsAgeMinutes: Number.isFinite(oddsAgeMinutes) ? Math.round(oddsAgeMinutes * 10) / 10 : null,
       projectionEligible: Boolean(
-        lineupConfirmed && statCoverage >= 0.8 && zoneRateCoverage >= 0.8 &&
+        lineupConfirmed && jumpBallCoverage === 1 && statCoverage >= 0.8 && zoneRateCoverage >= 0.8 &&
         [homeTeamStats, awayTeamStats].every(Boolean) && openingTeamCoverage === 1 && openingHistoryAgeSeasons != null && openingHistoryAgeSeasons <= 1 && openingSamples >= 5
       ),
       recommendationEligible: Boolean(
-        lineupConfirmed && statCoverage >= 0.8 && zoneRateCoverage >= 0.8 &&
+        lineupConfirmed && jumpBallCoverage === 1 && statCoverage >= 0.8 && zoneRateCoverage >= 0.8 &&
         [homeTeamStats, awayTeamStats].every(Boolean) && openingTeamCoverage === 1 && openingHistoryAgeSeasons != null && openingHistoryAgeSeasons <= 1 && openingSamples >= 5 &&
         marketStatus?.provider === 'the-odds-api' && freshMarketAvailable
       ),
@@ -1209,6 +1256,7 @@ export function buildLiveNBASnapshot(scoreboardGames, {
     scoredGame.isFinal = Boolean(g.isFinal);
     scoredGame.marketOdds = acceptedMarketOdds;
     scoredGame.inputQuality = inputQuality;
+    scoredGame.openingTempoShadow = openingTempoShadow;
     for (const p of scoredGame.players) {
       const sourcePlayer = playerPool.find(x => String(x.id) === String(p.id) || x.name === p.name);
       p.gameId = g.gameId;

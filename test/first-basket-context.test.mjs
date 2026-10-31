@@ -18,13 +18,13 @@ test('NBA official shot-zone rows become count-backed rates', () => {
   assert.equal(parsed['123'].season, '2026-27');
 });
 
-test('PBP Stats first-possession parser selects possession 1 or 2 and earliest shot by player ID', () => {
+test('PBP Stats first-possession parser selects possession 1 or 2 and captures first-shot tempo', () => {
   const result = parsePbpOpeningShots({ results: [
-    { gid: 'g1', period: 1, poss_num: 1, player: 'Jayson Tatum', player_id: 1628369, shot_time: 700, made: false, start_type: 'OffDeadBall' },
-    { gid: 'g1', period: 1, poss_num: 1, player: 'Jaylen Brown', player_id: 1627759, shot_time: 680, made: true, start_type: 'OffDeadBall' },
-    { gid: 'g1', period: 1, poss_num: 3, player: 'Jayson Tatum', player_id: 1628369, shot_time: 650, made: true, start_type: 'OffSteal' },
-    { gid: 'g2', period: 1, poss_num: 2, player: 'Derrick White', player_id: 1628401, shot_time: 690, made: true, start_type: 'OffDefRebound' },
-    { gid: 'g3', period: 2, poss_num: 1, player: 'Jayson Tatum', player_id: 1628369, shot_time: 700, made: true },
+    { gid: 'g1', period: 1, poss_num: 1, player: 'Jayson Tatum', player_id: 1628369, start_time: 720, shot_time: 700, made: false, start_type: 'OffDeadBall' },
+    { gid: 'g1', period: 1, poss_num: 1, player: 'Jaylen Brown', player_id: 1627759, start_time: 720, shot_time: 680, made: true, start_type: 'OffDeadBall' },
+    { gid: 'g1', period: 1, poss_num: 3, player: 'Jayson Tatum', player_id: 1628369, start_time: 660, shot_time: 650, made: true, start_type: 'OffSteal' },
+    { gid: 'g2', period: 1, poss_num: 2, player: 'Derrick White', player_id: 1628401, start_time: 720, shot_time: 690, made: true, start_type: 'OffDefRebound' },
+    { gid: 'g3', period: 2, poss_num: 1, player: 'Jayson Tatum', player_id: 1628369, start_time: 720, shot_time: 700, made: true },
   ] });
   assert.equal(result.status, 'ok');
   assert.equal(result.sampleCount, 2);
@@ -32,6 +32,7 @@ test('PBP Stats first-possession parser selects possession 1 or 2 and earliest s
   assert.equal(result.byPlayer['jaylen brown'], undefined);
   assert.equal(result.byPlayer['derrick white'].made, 1);
   assert.equal(result.byPlayer['derrick white'].startTypes.OffDefRebound, 1);
+  assert.deepEqual(result.openingTempo, { sampleCount: 2, totalSeconds: 50, meanSeconds: 25 });
 });
 
 test('PBP Stats capped responses are rejected as incomplete', () => {
@@ -57,7 +58,7 @@ test('context fetch combines official zone data and both teams opening history',
     calls.push(String(url));
     if (String(url).includes('stats.nba.com')) return { ok: true, json: async () => ({ resultSets: [{ name: 'ShotLocations', headers: zoneHeaders, rowSet: [zoneRow] }] }) };
     return { ok: true, json: async () => ({ results: [
-      { gid: 'g1', period: 1, poss_num: 1, player: 'Jayson Tatum', player_id: 1628369, shot_time: 700, made: true, start_type: 'OffDeadBall' },
+      { gid: 'g1', period: 1, poss_num: 1, player: 'Jayson Tatum', player_id: 1628369, start_time: 720, shot_time: 700, made: true, start_type: 'OffDeadBall' },
     ] }) };
   };
   const context = await fetchFirstBasketContext([{ homeTeam: { abbr: 'BOS' }, awayTeam: { abbr: 'LAL' } }], {
@@ -68,5 +69,6 @@ test('context fetch combines official zone data and both teams opening history',
   assert.equal(context.openingStatus, 'ok');
   assert.equal(context.openingByTeam.BOS.byPlayer['jayson tatum'].attempts, 2);
   assert.equal(context.openingByTeam.LAL.sampleCount, 2);
+  assert.deepEqual(context.openingByTeam.BOS.openingTempo, { sampleCount: 2, totalSeconds: 40, meanSeconds: 20 });
   assert.equal(calls.filter(x => x.includes('get-shots')).length, 4);
 });

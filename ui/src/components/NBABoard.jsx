@@ -110,7 +110,7 @@ export default function NBABoard({
         lineupStatus: g.lineupStatus,
         inputQuality: g.inputQuality,
         pace: g.pace,
-        simIterations: g.simTelemetry?.iterations || 5000,
+        simIterations: g.simTelemetry?.iterations || 10000,
       })
     })
 
@@ -598,6 +598,15 @@ export default function NBABoard({
               {games.map((g) => {
                 const gamePlayers = filteredPlayers.filter((p) => p.gameId === g.gameId)
                 if (gamePlayers.length === 0) return null
+                const paceLabel = g.pace != null && Number.isFinite(Number(g.pace))
+                  ? `Pace context ${Number(g.pace).toFixed(1)}`
+                  : 'Pace unavailable'
+                const tempoShadow = g.openingTempoShadow
+                const homeTempo = tempoShadow?.home?.meanSecondsToFirstShot
+                const awayTempo = tempoShadow?.away?.meanSecondsToFirstShot
+                const tempoLabel = Number.isFinite(homeTempo) && Number.isFinite(awayTempo)
+                  ? `Opening shot · H ${homeTempo.toFixed(1)}s / A ${awayTempo.toFixed(1)}s`
+                  : 'Opening shot tempo unavailable'
 
                 return (
                   <section key={g.gameId} className="nba-game-section">
@@ -702,8 +711,11 @@ export default function NBABoard({
                             </span>
                           </div>
                         )}
-                        <span className="nba-chip-pill" style={{ color: '#94a3b8' }}>
-                          Pace {g.pace || 100}
+                        <span className="nba-chip-pill" style={{ color: '#94a3b8' }} title="Whole-game pace is shown for context only; it does not change First Basket probabilities.">
+                          {paceLabel}
+                        </span>
+                        <span className="nba-chip-pill" style={{ color: '#a5b4fc' }} title={`Shadow only; excluded from probabilities. Samples — Home: ${tempoShadow?.home?.sampleCount || 0}, Away: ${tempoShadow?.away?.sampleCount || 0}`}>
+                          {tempoLabel}
                         </span>
                         {g.lineupStatus?.confirmed ? (
                           <span className="nba-chip-pill" style={{ background: 'rgba(52, 211, 153, 0.15)', borderColor: 'rgba(52, 211, 153, 0.35)', color: '#34d399', fontWeight: 600 }}>
@@ -717,8 +729,8 @@ export default function NBABoard({
                         <span className="nba-chip-pill" style={{ background: 'rgba(0, 255, 204, 0.1)', color: 'var(--prime)', borderColor: 'rgba(0, 255, 204, 0.25)', fontWeight: 700 }}>
                           <Icon name="Lock" size={11} style={{ marginRight: '0.25rem' }} /> Top 5 Picks
                         </span>
-                        <span className="nba-chip-pill" style={{ background: 'rgba(56, 189, 248, 0.1)', color: '#38bdf8', borderColor: 'rgba(56, 189, 248, 0.25)', fontWeight: 700 }} title="5,000-Trial Monte Carlo simulation completed for opening tip & possession sequence">
-                          <Icon name="Activity" size={11} style={{ marginRight: '0.25rem' }} /> 5k Sims: {g.awayTeam?.abbr} {g.simTelemetry?.awayPct || '50%'} · {g.homeTeam?.abbr} {g.simTelemetry?.homePct || '50%'}
+                        <span className="nba-chip-pill" style={{ background: 'rgba(56, 189, 248, 0.1)', color: '#38bdf8', borderColor: 'rgba(56, 189, 248, 0.25)', fontWeight: 700 }} title="Team first-score probabilities from the possession simulation; these probabilities determine the player rankings.">
+                          <Icon name="Activity" size={11} style={{ marginRight: '0.25rem' }} /> {((g.simTelemetry?.iterations || 10000) / 1000).toFixed(0)}k Sims: {g.awayTeam?.abbr} {g.simTelemetry?.awayPct || '50%'} · {g.homeTeam?.abbr} {g.simTelemetry?.homePct || '50%'}
                         </span>
                       </div>
                     </div>
@@ -812,8 +824,8 @@ export default function NBABoard({
                                     {(displayProb * 100).toFixed(1)}%
                                   </div>
                                   {player.ci90 && (
-                                    <div style={{ fontSize: '0.66rem', color: '#94a3b8', marginTop: '0.15rem', whiteSpace: 'nowrap' }}>
-                                      90% CI: {player.ci90.lower}%–{player.ci90.upper}%
+                                    <div style={{ fontSize: '0.66rem', color: '#94a3b8', marginTop: '0.15rem', whiteSpace: 'nowrap' }} title="Monte Carlo sampling error only; this does not include uncertainty in the model inputs.">
+                                      90% sim range: {player.ci90.lower}%–{player.ci90.upper}%
                                     </div>
                                   )}
                                 </div>
@@ -858,10 +870,10 @@ export default function NBABoard({
                                 <span
                                   className="nba-chip-pill"
                                   style={{ background: 'rgba(56, 189, 248, 0.1)', color: '#38bdf8', borderColor: 'rgba(56, 189, 248, 0.25)', fontSize: '0.72rem', fontWeight: 700 }}
-                                  title={`5,000-Trial Monte Carlo Simulation: ${player.simWins?.toLocaleString?.() ?? Math.round((player.gameProb || 0) * 5000)} wins (2PT: ${player.simMethods?.twoPt ?? '—'}, 3PT: ${player.simMethods?.threePt ?? '—'})`}
+                                  title={`${player.simTotal || 10000}-Trial Monte Carlo probability source: ${player.simWins?.toLocaleString?.() ?? Math.round((player.gameProb || 0) * (player.simTotal || 10000))} wins (2PT: ${player.simMethods?.twoPt ?? '—'}, 3PT: ${player.simMethods?.threePt ?? '—'}, FT: ${player.simMethods?.freeThrow ?? '—'})`}
                                 >
                                   <Icon name="Activity" size={11} style={{ marginRight: '0.25rem' }} />
-                                  {player.simWins ? `${player.simWins.toLocaleString()} / 5,000 (${player.simPct})` : `${((player.gameProb || 0) * 100).toFixed(1)}% Sim`}
+                                  {player.simWins ? `${player.simWins.toLocaleString()} / ${player.simTotal || 10000} (${player.simPct})` : `${((player.gameProb || 0) * 100).toFixed(1)}% Sim`}
                                 </span>
                                 {player.edgePct > 0 && (
                                   <span className="nba-edge-badge">
@@ -1044,10 +1056,10 @@ export default function NBABoard({
                         <span
                           className="nba-chip-pill"
                           style={{ background: 'rgba(56, 189, 248, 0.1)', color: '#38bdf8', borderColor: 'rgba(56, 189, 248, 0.25)', fontSize: '0.72rem', fontWeight: 700 }}
-                          title={`5,000-Trial Monte Carlo Simulation: ${player.simWins?.toLocaleString?.() ?? Math.round((player.gameProb || 0) * 5000)} wins (2PT: ${player.simMethods?.twoPt ?? '—'}, 3PT: ${player.simMethods?.threePt ?? '—'})`}
+                          title={`${player.simTotal || 10000}-Trial Monte Carlo probability source: ${player.simWins?.toLocaleString?.() ?? Math.round((player.gameProb || 0) * (player.simTotal || 10000))} wins (2PT: ${player.simMethods?.twoPt ?? '—'}, 3PT: ${player.simMethods?.threePt ?? '—'}, FT: ${player.simMethods?.freeThrow ?? '—'})`}
                         >
                           <Icon name="Activity" size={11} style={{ marginRight: '0.25rem' }} />
-                          {player.simWins ? `${player.simWins.toLocaleString()} / 5,000 (${player.simPct})` : `${((player.gameProb || 0) * 100).toFixed(1)}% Sim`}
+                          {player.simWins ? `${player.simWins.toLocaleString()} / ${player.simTotal || 10000} (${player.simPct})` : `${((player.gameProb || 0) * 100).toFixed(1)}% Sim`}
                         </span>
                         {player.edgePct > 0 && (
                           <span className="nba-edge-badge">
@@ -1805,8 +1817,8 @@ export default function NBABoard({
                   {(inspectedPlayer.gameProb * 100).toFixed(1)}%
                 </div>
                 {inspectedPlayer.ci90 && (
-                  <div style={{ fontSize: '0.72rem', color: '#38bdf8', marginTop: 2 }}>
-                    90% CI: {inspectedPlayer.ci90.lower}%–{inspectedPlayer.ci90.upper}%
+                  <div style={{ fontSize: '0.72rem', color: '#38bdf8', marginTop: 2 }} title="Monte Carlo sampling error only; this does not include uncertainty in the model inputs.">
+                    90% sim range: {inspectedPlayer.ci90.lower}%–{inspectedPlayer.ci90.upper}%
                   </div>
                 )}
                 <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: 2 }}>Fair: {inspectedPlayer.fairGameOdds}</div>
@@ -1820,14 +1832,14 @@ export default function NBABoard({
               </div>
             </div>
 
-            {/* Monte Carlo Simulation Box (5,000 Trials) */}
+            {/* Monte Carlo Simulation Box */}
             <div style={{ padding: '0.9rem', background: 'rgba(56, 189, 248, 0.06)', borderRadius: '12px', border: '1px solid rgba(56, 189, 248, 0.2)' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.55rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.78rem', fontWeight: 800, color: '#38bdf8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  <Icon name="Activity" size={13} /> 5,000-Trial Monte Carlo Engine
+                  <Icon name="Activity" size={13} /> {inspectedPlayer.simTotal || 10000}-Trial Possession Simulation
                 </div>
                 <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontFamily: 'monospace' }}>
-                  {inspectedPlayer.simWins?.toLocaleString?.() ?? Math.round((inspectedPlayer.gameProb || 0) * 5000)} / 5,000 Outcomes
+                  {inspectedPlayer.simWins?.toLocaleString?.() ?? Math.round((inspectedPlayer.gameProb || 0) * (inspectedPlayer.simTotal || 10000))} / {inspectedPlayer.simTotal || 10000} Outcomes
                 </span>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem', textAlign: 'center' }}>
@@ -1956,10 +1968,10 @@ export default function NBABoard({
                   <span className="nba-step-num">6</span>
                   <div>
                     <div style={{ fontWeight: 700, color: '#38bdf8', fontSize: '0.84rem' }}>
-                      5,000 Monte Carlo Trials Simulated: {inspectedPlayer.simWins?.toLocaleString?.() ?? '—'} Wins ({inspectedPlayer.simPct || '—'})
+                      {inspectedPlayer.simTotal || 10000} Trials Simulated: {inspectedPlayer.simWins?.toLocaleString?.() ?? '—'} Wins ({inspectedPlayer.simPct || '—'})
                     </div>
                     <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
-                      Full possession-level Monte Carlo engine simulating jump balls, turnovers, shot mixes, defensive contests, and putbacks across 5,000 discrete game runs.
+                      Full possession-level Monte Carlo engine simulating jump balls, turnovers, shot mixes, defensive contests, free throws when settlement requires them, and putbacks.
                     </div>
                   </div>
                 </div>

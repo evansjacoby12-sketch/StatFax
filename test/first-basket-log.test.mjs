@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { normName, matchPlayer, parseStarters, scoreSnapshot, scoreLog, learnFromLog } from '../tools/firstBasketLog.mjs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { normName, matchPlayer, parseStarters, scoreSnapshot, scoreLog, learnFromLog, appendPregamePredictions } from '../tools/firstBasketLog.mjs';
 
 const snap = (over = {}) => ({
   date: '2026-10-29', game: 'AAA@BBB', away: 'AAA', home: 'BBB', modelVersion: 'v1', preTip: true,
@@ -49,6 +52,29 @@ test('tip and team-first Brier use the home team probabilities', () => {
   const s = scoreSnapshot(snap(), { scorer: 'Cal Gamma', tipWinner: 'BBB' });
   assert.ok(Math.abs(s.tipBrier - 0.16) < 1e-9);        // (0.6 - 1)^2
   assert.ok(Math.abs(s.teamFirstBrier - 0.2025) < 1e-9); // (0.55 - 1)^2, scorer is on the home team
+});
+
+test('opening tempo stays shadow-only and is evaluated against the actual first-scoring team', () => {
+  const result = { scorer: 'Cal Gamma', scorerTeam: 'BBB' };
+  const baseline = scoreSnapshot(snap(), result);
+  const shadow = snap({ openingTempoShadow: {
+    includedInProbability: false,
+    home: { meanSecondsToFirstShot: 16, sampleCount: 12 },
+    away: { meanSecondsToFirstShot: 20, sampleCount: 11 },
+  } });
+  const scored = scoreSnapshot(shadow, result);
+  assert.equal(scored.brier, baseline.brier);
+  assert.equal(scored.topPick, baseline.topPick);
+  assert.deepEqual(scored.openingTempoShadowResult, {
+    fasterTeam: 'BBB', fasterBySeconds: 4, actualFirstTeam: 'BBB', fasterTeamScoredFirst: true,
+  });
+
+  const tracked = scoreLog([snap({ gameId: 'tempo-game', openingTempoShadow: shadow.openingTempoShadow })], [{
+    date: '2026-10-29', game: 'AAA@BBB', gameId: 'tempo-game', scorer: 'Cal Gamma', scorerTeam: 'BBB',
+    starters: { AAA: ['Ann Alpha', 'Bob Beta'], BBB: ['Cal Gamma Jr.', 'Dee Delta'] },
+  }]);
+  assert.equal(tracked.openingTempoShadow.games, 1);
+  assert.equal(tracked.openingTempoShadow.fasterTeamFirstRate, 1);
 });
 
 test('lineup mismatches are reported both ways', () => {
@@ -111,6 +137,27 @@ test('gameId keeps same-matchup doubleheaders separate in evaluation', () => {
   const out = scoreLog([one, two], results);
   assert.equal(out.scored.length, 2);
   assert.deepEqual(out.scored.map(x => x.gameId).sort(), ['event-1', 'event-2']);
+});
+
+test('prospective NBA prediction log freezes opening-tempo shadow evidence', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'first-basket-tempo-'));
+  const tempo = {
+    featureVersion: 1, source: 'pbpstats_first_opening_possession_shot', includedInProbability: false,
+    unit: 'seconds_from_possession_start_to_first_field_goal_attempt',
+    home: { meanSecondsToFirstShot: 17.5, sampleCount: 21 },
+    away: { meanSecondsToFirstShot: 18.2, sampleCount: 19 },
+  };
+  try {
+    appendPregamePredictions({
+      sport: 'nba', source: { mode: 'live' },
+      games: [{ gameId: 'game-1', date: '2026-10-30T23:00:00Z', status: 'SCHEDULED', homeTeam: { abbr: 'BOS' }, awayTeam: { abbr: 'CHI' }, openingTempoShadow: tempo }],
+      players: [{ gameId: 'game-1', id: 'p1', name: 'Player One', gameProb: 0.2 }],
+    }, { dir, version: 'tempo-test' });
+    const row = JSON.parse(readFileSync(join(dir, 'predictions.jsonl'), 'utf8').trim());
+    assert.deepEqual(row.openingTempoShadow, tempo);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test('missing actual starter evidence blocks aggregate metrics', () => {

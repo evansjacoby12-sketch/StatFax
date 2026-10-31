@@ -6,7 +6,6 @@ import {
   getJumperProfile,
   calculateRegressedTipWinRate,
   JUMP_BALL_RATINGS,
-  TIP_WIN_CONVERSION_RATE,
 } from '../src/sports/nba/data/jumpBalls.js';
 
 import {
@@ -23,7 +22,8 @@ import {
 } from '../src/sports/nba/logic/firstBasketEngine.js';
 
 import { NBA_DEMO_SNAPSHOT } from '../src/sports/nba/data/demoSlate.js';
-import { loadNBASnapshot, validateNBASnapshot, nbaDateKeyInZone } from '../src/sports/nba/api/NBAService.js';
+import { buildLiveNBASnapshot, loadNBASnapshot, validateNBASnapshot, nbaDateKeyInZone } from '../src/sports/nba/api/NBAService.js';
+import { getStartersForTeam } from '../src/sports/nba/data/teamRosters.js';
 
 test('NBA slate date follows Chicago time across UTC midnight', () => {
   assert.equal(nbaDateKeyInZone(new Date('2026-10-31T01:51:00Z')), '20261030');
@@ -41,9 +41,13 @@ test('jumpBalls: jumper lookup and rating profiles', () => {
   const fallback = getJumperProfile('Unknown Center', 'XYZ');
   assert.equal(fallback.isFallback, true);
   assert.equal(fallback.rating, 1500);
+  const unlistedStarter = getJumperProfile('Unlisted Starter', 'BOS');
+  assert.equal(unlistedStarter.isFallback, true);
+  assert.equal(unlistedStarter.tipAttempts, 0);
+  assert.equal(unlistedStarter.standingReachInches, null);
 });
 
-test('jumpBalls: matchup win probability and team 1st scoring advantage', () => {
+test('jumpBalls: matchup tip probability does not claim unsupported team-first probability', () => {
   // Anthony Davis (1640) vs Nikola Jokic (1470)
   const matchup = predictJumpBallMatchup('Anthony Davis', 'Nikola Jokic');
 
@@ -51,9 +55,9 @@ test('jumpBalls: matchup win probability and team 1st scoring advantage', () => 
   assert.ok(matchup.tipProbB < 0.35, `Jokic should have <35% tip win prob, got ${matchup.tipProbB}`);
   assert.ok(Math.abs((matchup.tipProbA + matchup.tipProbB) - 1.0) < 0.002);
 
-  // Winning the tip must give the team an edge in scoring first
-  assert.ok(matchup.teamAScoresFirstProb > matchup.teamBScoresFirstProb);
-  assert.ok(matchup.teamAScoresFirstProb >= 0.53);
+  // A tip matchup alone cannot determine which team scores first.
+  assert.equal(matchup.teamAScoresFirstProb, null);
+  assert.equal(matchup.teamBScoresFirstProb, null);
 });
 
 test('firstBasketEngine: team first basket multinomial logit sums to 1.0', () => {
@@ -171,17 +175,47 @@ test('demoSlate and NBAService: snapshot validity and loading', async () => {
   assert.ok(top1.eli15);
 });
 
-test('NBA v5 snapshot contract requires per-game quality and player game identity', () => {
+test('NBA v6 snapshot contract requires per-game quality, simulation evidence, and player game identity', () => {
   assert.throws(() => validateNBASnapshot({
-    sport: 'nba', modelVersion: 'nba-first-basket-v5', source: { mode: 'live' },
+    sport: 'nba', modelVersion: 'nba-first-basket-v6', source: { mode: 'live' },
     market: {}, games: [{ gameId: '1', status: 'SCHEDULED' }],
     players: [{ id: 'p1', gameId: '1' }],
   }), /input-quality evidence/);
   assert.throws(() => validateNBASnapshot({
-    sport: 'nba', modelVersion: 'nba-first-basket-v5', source: { mode: 'live' }, market: {},
+    sport: 'nba', modelVersion: 'nba-first-basket-v6', source: { mode: 'live' }, market: {},
     games: [{ gameId: '1', status: 'SCHEDULED', inputQuality: { recommendationEligible: false } }],
     players: [{ id: 'p1', gameId: '1', inputQuality: {} }],
   }), /eligibility evidence is incomplete/);
+  const shadowSnapshot = {
+    sport: 'nba', modelVersion: 'nba-first-basket-v6', source: { mode: 'live' }, market: {},
+    games: [{
+      gameId: '1', status: 'SCHEDULED',
+      probabilitySource: 'monte_carlo_possession_sequence_v1',
+      simTelemetry: { iterations: 5000, unresolvedTrials: 0, homeWins: 2600, awayWins: 2400 },
+      inputQuality: {
+        projectionEligible: false, recommendationEligible: false,
+        playerSeasonStatCoverage: 0, teamMatchupCoverage: 0, zoneRateCoverage: 0,
+        openingTeamCoverage: 0, minimumOpeningHistorySamples: 0,
+        jumpBallCoverage: 0,
+        openingDataStatus: 'unavailable', zoneSource: 'unavailable',
+      },
+      openingTempoShadow: {
+        featureVersion: 1,
+        source: 'pbpstats_first_opening_possession_shot',
+        includedInProbability: false,
+        unit: 'seconds_from_possession_start_to_first_field_goal_attempt',
+        home: { meanSecondsToFirstShot: 17.5, sampleCount: 21 },
+        away: { meanSecondsToFirstShot: 18.2, sampleCount: 19 },
+      },
+    }],
+    players: [{ id: 'p1', gameId: '1', inputQuality: {} }],
+  };
+  assert.equal(validateNBASnapshot(shadowSnapshot), shadowSnapshot);
+  shadowSnapshot.games[0].openingTempoShadow.includedInProbability = true;
+  assert.throws(() => validateNBASnapshot(shadowSnapshot), /opening tempo shadow evidence is malformed/);
+  shadowSnapshot.games[0].openingTempoShadow.includedInProbability = false;
+  shadowSnapshot.games[0].simTelemetry.unresolvedTrials = 1;
+  assert.throws(() => validateNBASnapshot(shadowSnapshot), /possession simulation probability evidence is incomplete/);
 });
 
 test('firstBasket: tip-off Bayesian shrinkage and reach differential prior', () => {
@@ -366,7 +400,7 @@ test('firstBasket: 5000-trial Monte Carlo simulation engine per game', () => {
   let totalPlayerWins = 0;
   for (const stats of Object.values(simResult.playerStats)) {
     totalPlayerWins += stats.wins;
-    assert.equal(stats.methodCounts.twoPt + stats.methodCounts.threePt, stats.wins, '2PT + 3PT hits must equal total wins');
+    assert.equal(stats.methodCounts.twoPt + stats.methodCounts.threePt + stats.methodCounts.freeThrow, stats.wins, 'shot methods must equal total wins');
   }
   assert.equal(totalPlayerWins, 5000, 'Sum of all player wins across 5000 trials must equal 5000');
 
@@ -403,8 +437,100 @@ test('firstBasket: 5000-trial Monte Carlo simulation engine per game', () => {
   assert.ok(topPick.simProb > 0);
   assert.ok(topPick.simPct.endsWith('%'));
   assert.ok(topPick.simMethods);
-  assert.equal(topPick.simMethods.twoPt + topPick.simMethods.threePt, topPick.simWins);
-  assert.ok(topPick.eli15.includes('5k-Sim:'));
+  assert.equal(topPick.simMethods.twoPt + topPick.simMethods.threePt + topPick.simMethods.freeThrow, topPick.simWins);
+  assert.equal(topPick.gameProb, topPick.simWins / topPick.simTotal);
+  assert.equal(game.probabilitySource, 'monte_carlo_possession_sequence_v1');
+  assert.equal(game.simTelemetry.unresolvedTrials, 0);
+  assert.equal(topPick.ci90.type, 'monte_carlo_sampling_error_only');
+  assert.ok(topPick.eli15.includes('possession simulation:'));
+});
+
+test('v6 ranked probabilities respond to verified zone rates and reflect the simulation', () => {
+  const player = (id, team, zoneFG) => ({
+    id, name: id, team, position: 'C', isStarter: true, earlyShotShare: 1,
+    shotMix: { rim: 1, mid: 0, three: 0 }, zoneFG,
+  });
+  const makeGame = (homeRate, awayRate, pace = 100) => scoreGameFirstBasket({
+    gameId: 'zone-sensitivity', homeTeam: { abbr: 'H' }, awayTeam: { abbr: 'A' },
+    homePlayers: [player('home', 'H', { rim: homeRate, mid: 42, three: 36 })],
+    awayPlayers: [player('away', 'A', { rim: awayRate, mid: 42, three: 36 })],
+    homeJumper: { name: 'Unknown Home', standingReachInches: 109, tipAttempts: 20, tipWins: 10 },
+    awayJumper: { name: 'Unknown Away', standingReachInches: 109, tipAttempts: 20, tipWins: 10 },
+    pace, simIterations: 10000, seed: 'zone-rate-sensitivity',
+  });
+  const homeAdvantage = makeGame(80, 50);
+  const awayAdvantage = makeGame(50, 80);
+  const paceOnlyChange = makeGame(80, 50, 140);
+  assert.ok(homeAdvantage.tipMatchup.homeScoresFirstProb > 0.5);
+  assert.ok(awayAdvantage.tipMatchup.homeScoresFirstProb < 0.5);
+  assert.equal(homeAdvantage.players.find(p => p.id === 'home').gameProb,
+    homeAdvantage.players.find(p => p.id === 'home').simProb);
+  assert.equal(awayAdvantage.players.find(p => p.id === 'away').gameProb,
+    awayAdvantage.players.find(p => p.id === 'away').simProb);
+  assert.equal(paceOnlyChange.players.find(p => p.id === 'home').gameProb,
+    homeAdvantage.players.find(p => p.id === 'home').gameProb,
+    'whole-game pace is descriptive only for first-basket probabilities');
+});
+
+test('FIRST_POINT_SCORED simulation includes made-free-throw first scorers', () => {
+  const foulPlayer = (id, team) => ({
+    id, name: id, team, position: 'G', isStarter: true, earlyShotShare: 1,
+    shotMix: { rim: 1, mid: 0, three: 0 }, rimFG: 0.6, ftRate: 1, ftPct: 1,
+  });
+  const game = scoreGameFirstBasket({
+    gameId: 'first-point-sim', homeTeam: { abbr: 'H' }, awayTeam: { abbr: 'A' },
+    homePlayers: [foulPlayer('home-ft', 'H')], awayPlayers: [foulPlayer('away-ft', 'A')],
+    settlementRule: SETTLEMENT_RULES.FIRST_POINT_SCORED, simIterations: 10000, seed: 'first-point',
+  });
+  assert.ok(game.players.some(p => p.simMethods.freeThrow > 0));
+  assert.equal(game.players.reduce((sum, p) => sum + p.gameProb, 0), 1);
+  const fgOnlyGame = scoreGameFirstBasket({
+    gameId: 'first-field-goal-sim', homeTeam: { abbr: 'H' }, awayTeam: { abbr: 'A' },
+    homePlayers: [foulPlayer('home-fg', 'H')], awayPlayers: [foulPlayer('away-fg', 'A')],
+    settlementRule: SETTLEMENT_RULES.FIRST_FIELD_GOAL, simIterations: 10000, seed: 'first-point',
+  });
+  assert.equal(fgOnlyGame.players.reduce((sum, p) => sum + p.simMethods.freeThrow, 0), 0);
+});
+
+test('confirmed lineups receive the shrunk PBP opening-shot share', () => {
+  const home = getStartersForTeam('BOS');
+  const away = getStartersForTeam('NYK');
+  const teamBlock = (abbr, players) => ({
+    team: { abbreviation: abbr },
+    statistics: [{ athletes: players.map(p => ({
+      starter: true, athlete: { id: p.id, displayName: p.name, position: { abbreviation: p.position } },
+    })) }],
+  });
+  const game = { gameId: 'confirmed-opening-history', date: '2026-10-31T00:00:00Z',
+    homeTeam: { abbr: 'BOS' }, awayTeam: { abbr: 'NYK' } };
+  const statsById = new Map([...home, ...away].map(p => [String(p.id), {
+    gamesPlayed: 10, threesAttemptedPerGame: 4, threePointPct: 0.36,
+  }]));
+  const zonesById = Object.fromEntries([...home, ...away].map(p => [String(p.id), {
+    rim: { made: 30, attempts: 50 }, mid: { made: 20, attempts: 50 },
+    three: { made: 40, attempts: 100 }, source: 'nba_stats_leaguedashplayershotlocations',
+  }]));
+  const history = players => {
+    const byPlayer = { [players[0].name.toLowerCase()]: { attempts: 8, made: 5 } };
+    return { status: 'ok', season: '2026-27', sampleCount: 10, byPlayer,
+      openingTempo: { sampleCount: 10, totalSeconds: 180, meanSeconds: 18 } };
+  };
+  const snapshot = buildLiveNBASnapshot([game], {
+    gameSummaries: { [game.gameId]: { boxscore: { players: [teamBlock('BOS', home), teamBlock('NYK', away)] } } },
+    playerStatsById: statsById,
+    zoneStatsByPlayerId: zonesById,
+    teamStatsByTeam: { BOS: { pace: 99, opp3PtPct: 0.35 }, NYK: { pace: 101, opp3PtPct: 0.37 } },
+    openingTendenciesByTeam: { BOS: history(home), NYK: history(away) },
+  });
+  const teamPlayers = snapshot.players.filter(p => p.isHome);
+  const observedOpener = teamPlayers.find(p => p.name === home[0].name);
+  assert.ok(snapshot.games[0].lineupStatus.confirmed);
+  assert.ok(observedOpener.earlyShotShare > 0.30, `PBP-shrunk share should be applied, got ${observedOpener.earlyShotShare}`);
+  assert.equal(observedOpener.dataSources.earlyShotShare, 'pbpstats_shrunk_with_roster_prior');
+  assert.equal(observedOpener.zoneFG.rim, 62);
+  assert.ok(!observedOpener.recommendationBlocks.includes('opening_sequence_rates_not_observed'));
+  assert.equal(snapshot.games[0].probabilitySource, 'monte_carlo_possession_sequence_v1');
+  assert.equal(validateNBASnapshot(snapshot), snapshot);
 });
 
 

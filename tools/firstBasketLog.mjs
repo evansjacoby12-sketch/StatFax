@@ -112,6 +112,7 @@ function liveSnapshotRecords(snapshot, version = FIRST_BASKET_MODEL_VERSION) {
         note: 'Captured automatically from the live pregame slate pipeline.',
         lineupStatus: game.lineupStatus || null,
         inputQuality: game.inputQuality || null,
+        openingTempoShadow: game.openingTempoShadow || null,
         tip: {
           tipProbHome: tip.homeTipProb ?? tip.tipProbA ?? null,
           homeScoresFirst: tip.homeScoresFirstProb ?? tip.teamAScoresFirstProb ?? null,
@@ -147,6 +148,7 @@ export function appendPregamePredictions(snapshot, { dir = DEFAULT_DIR, version 
         p.openingHistorySamples, p.openingShotAttempts, p.openingShotMakes, p.openingStartTypes, p.dataSources]),
       lineupStatus: r.lineupStatus,
       inputQuality: r.inputQuality,
+      openingTempoShadow: r.openingTempoShadow,
       tip: r.tip,
     });
     if (prev && signature(prev) === signature(record)) continue;
@@ -197,6 +199,26 @@ export function scoreSnapshot(snap, result) {
     players: players.map(x => ({ ...x, scored: x === hit })),
   };
 
+  const tempo = snap.openingTempoShadow;
+  const homeTempo = tempo?.home;
+  const awayTempo = tempo?.away;
+  const homeSeconds = homeTempo?.meanSecondsToFirstShot;
+  const awaySeconds = awayTempo?.meanSecondsToFirstShot;
+  const actualFirstTeam = hit?.team || result.scorerTeam || null;
+  if (Number.isFinite(homeSeconds) && Number.isFinite(awaySeconds) &&
+      Number(homeTempo.sampleCount) >= 5 && Number(awayTempo.sampleCount) >= 5 &&
+      Math.abs(homeSeconds - awaySeconds) >= 1 && actualFirstTeam) {
+    const fasterTeam = homeSeconds < awaySeconds ? snap.home : snap.away;
+    out.openingTempoShadowResult = {
+      fasterTeam,
+      fasterBySeconds: Math.round(Math.abs(homeSeconds - awaySeconds) * 100) / 100,
+      actualFirstTeam,
+      fasterTeamScoredFirst: actualFirstTeam === fasterTeam,
+    };
+  } else {
+    out.openingTempoShadowResult = null;
+  }
+
   const tipWinner = result.tipWinner ? String(result.tipWinner).toUpperCase() : null;
   if (snap.tip && tipWinner && [snap.home, snap.away].includes(tipWinner)) {
     out.tipBrier = (snap.tip.tipProbHome - (tipWinner === snap.home ? 1 : 0)) ** 2; // coin flip = 0.25
@@ -234,6 +256,15 @@ function summarize(scored) {
     top3Rate: mean(a.map(x => +x.top3)),
     outsideModel: a.filter(x => x.outsideModel).length,
   }));
+}
+
+function summarizeOpeningTempoShadow(scored) {
+  const rows = scored.filter(s => s.openingTempoShadowResult);
+  return {
+    games: rows.length,
+    fasterTeamFirstRate: rows.length ? mean(rows.map(s => +s.openingTempoShadowResult.fasterTeamScoredFirst)) : NaN,
+    meanFasterBySeconds: rows.length ? mean(rows.map(s => s.openingTempoShadowResult.fasterBySeconds)) : NaN,
+  };
 }
 
 function calibrate(scored) {
@@ -309,6 +340,7 @@ export function scoreLog(predictions, results, { includeBackfill = false, versio
       tipBrier: mean(eligibleScored.filter(s => s.tipBrier != null).map(s => s.tipBrier)),
       teamFirstBrier: mean(eligibleScored.filter(s => s.teamFirstBrier != null).map(s => s.teamFirstBrier)),
     },
+    openingTempoShadow: summarizeOpeningTempoShadow(eligibleScored),
   };
 }
 
@@ -357,6 +389,10 @@ export function formatReport(r) {
       L.push('', 'TIP / TEAM-FIRST CALIBRATION  (Brier; a 50/50 guess scores 0.250, lower is better)');
       if (r.tip.games) L.push(`tip winner: ${num(r.tip.tipBrier)} over ${r.tip.games} game(s)`);
       if (Number.isFinite(r.tip.teamFirstBrier)) L.push(`team that scores first: ${num(r.tip.teamFirstBrier)}`);
+    }
+    if (r.openingTempoShadow?.games) {
+      L.push('', 'OPENING TEMPO SHADOW  (descriptive only; not part of probabilities)');
+      L.push(`faster historical first-shot team scored first: ${pct(r.openingTempoShadow.fasterTeamFirstRate, 0)} over ${r.openingTempoShadow.games} game(s); mean gap ${num(r.openingTempoShadow.meanFasterBySeconds, 1)} sec`);
     }
 
     const mism = r.scored.filter(s => s.lineupMismatch && Object.keys(s.lineupMismatch).length);
@@ -675,7 +711,8 @@ async function snapshotFromEngine(game, root) {
       game: `${away}@${home}`,
       tip: {
         homeJumper: jump.jumperA.jumper, awayJumper: jump.jumperB.jumper,
-        tipProbHome: jump.tipProbA, homeScoresFirst: jump.teamAScoresFirstProb,
+        tipProbHome: scored.tipMatchup.homeTipProb,
+        homeScoresFirst: scored.tipMatchup.homeScoresFirstProb,
       },
       players: scored.players.map(p => ({
         name: p.name, team: p.team, position: p.position, pCredit: p.teamProb, pJoint: p.gameProb,

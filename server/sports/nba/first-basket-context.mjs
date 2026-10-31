@@ -53,8 +53,8 @@ export function parseNbaZoneStats(payload) {
 /** Aggregate a team's first Q1 shot from the game's first two alternating possessions. */
 export function parsePbpOpeningShots(payload, { maxShots = 500 } = {}) {
   const shots = payload?.results;
-  if (!Array.isArray(shots)) return { status: 'invalid', byPlayer: {}, sampleCount: 0 };
-  if (shots.length >= maxShots) return { status: 'truncated', byPlayer: {}, sampleCount: shots.length };
+  if (!Array.isArray(shots)) return { status: 'invalid', byPlayer: {}, sampleCount: 0, openingTempo: { sampleCount: 0, totalSeconds: 0, meanSeconds: null } };
+  if (shots.length >= maxShots) return { status: 'truncated', byPlayer: {}, sampleCount: shots.length, openingTempo: { sampleCount: 0, totalSeconds: 0, meanSeconds: null } };
   const firstByTeamPossession = new Map();
   for (const shot of shots) {
     const possessionNo = Number(shot.poss_num);
@@ -71,6 +71,7 @@ export function parsePbpOpeningShots(payload, { maxShots = 500 } = {}) {
   }
   const byPlayer = {};
   const sampleGames = new Set();
+  const firstShotSeconds = [];
   for (const { shot } of firstByTeamPossession.values()) {
     const key = norm(shot.player);
     if (!key) continue;
@@ -80,8 +81,20 @@ export function parsePbpOpeningShots(payload, { maxShots = 500 } = {}) {
     if (shot.made) item.made++; else item.misses++;
     const startType = String(shot.start_type || 'unknown');
     item.startTypes[startType] = (item.startTypes[startType] || 0) + 1;
+    const possessionStart = Number(shot.start_time);
+    const shotTime = Number(shot.shot_time);
+    const elapsed = possessionStart - shotTime;
+    if (Number.isFinite(elapsed) && elapsed >= 0 && elapsed <= 120) firstShotSeconds.push(elapsed);
   }
-  return { status: sampleGames.size ? 'ok' : 'empty', byPlayer, sampleCount: sampleGames.size };
+  const totalSeconds = firstShotSeconds.reduce((sum, value) => sum + value, 0);
+  return {
+    status: sampleGames.size ? 'ok' : 'empty', byPlayer, sampleCount: sampleGames.size,
+    openingTempo: {
+      sampleCount: firstShotSeconds.length,
+      totalSeconds,
+      meanSeconds: firstShotSeconds.length ? totalSeconds / firstShotSeconds.length : null,
+    },
+  };
 }
 
 export function nbaSeasonForDate(date = new Date()) {
@@ -127,7 +140,7 @@ export async function fetchFirstBasketContext(games, {
     let openingSamples = Number(openingCached.sampleCount) || 0;
     let openingStatus = openingCached.status || 'unavailable';
     const cacheAge = Date.now() - Date.parse(openingCached.fetchedAt || '');
-    const openingFresh = openingCached.season === season && Number.isFinite(cacheAge) && cacheAge >= 0 && cacheAge < 24 * 60 * 60 * 1000;
+    const openingFresh = Number(openingCached.schemaVersion) === 2 && openingCached.season === season && Number.isFinite(cacheAge) && cacheAge >= 0 && cacheAge < 24 * 60 * 60 * 1000;
     let openingByTeam = openingCached.byTeam || {};
     let openingHistorySeason = openingCached.dataSeason || null;
     const teams = [...new Map((games || []).flatMap(g => [g.homeTeam, g.awayTeam])
@@ -167,11 +180,13 @@ export async function fetchFirstBasketContext(games, {
       }
       openingHistorySeason = supportedSeasons.join(',') || null;
       const mergeResults = results => {
-        const combined = { status: 'ok', byPlayer: {}, sampleCount: 0 };
+        const combined = { status: 'ok', byPlayer: {}, sampleCount: 0, openingTempo: { sampleCount: 0, totalSeconds: 0, meanSeconds: null } };
         for (const result of results) {
           if (result.status === 'truncated') return { status: 'truncated', byPlayer: {}, sampleCount: result.sampleCount };
           if (result.status === 'invalid') continue;
           combined.sampleCount += result.sampleCount;
+          combined.openingTempo.sampleCount += result.openingTempo?.sampleCount || 0;
+          combined.openingTempo.totalSeconds += result.openingTempo?.totalSeconds || 0;
           for (const [key, stats] of Object.entries(result.byPlayer)) {
             const prior = combined.byPlayer[key] ||= { ...stats, attempts: 0, made: 0, misses: 0, startTypes: {} };
             prior.attempts += stats.attempts; prior.made += stats.made; prior.misses += stats.misses;
@@ -179,6 +194,9 @@ export async function fetchFirstBasketContext(games, {
           }
         }
         if (!combined.sampleCount) combined.status = 'empty';
+        combined.openingTempo.meanSeconds = combined.openingTempo.sampleCount
+          ? combined.openingTempo.totalSeconds / combined.openingTempo.sampleCount
+          : null;
         return combined;
       };
       const probeResult = supportedSeasons.length ? { status: 'fulfilled', value: mergeResults(probeResults) } : null;

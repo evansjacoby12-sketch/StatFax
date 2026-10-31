@@ -212,7 +212,6 @@ export const NBA_DEMO_SNAPSHOT = Object.freeze({
     label: 'NBA First Basket Slate',
     games: scoredGames.length,
     totalPlayers: slateRankedPlayers.length,
-    tipConversionRate: 0.64,
   },
   games: scoredGames,
   players: slateRankedPlayers,

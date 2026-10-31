@@ -1,10 +1,10 @@
 /**
  * jumpBalls.js — NBA opening jump ball database & tip-off ratings
  *
- * Jump ball win rate is the single most predictive exogenous factor
- * in NBA First Basket modeling:
- *   - The team that wins the opening tip gets the 1st possession ~98% of the time.
- *   - The team that wins the opening tip scores the first field goal ~64% of the time.
+ * Opening jumper records estimate who wins the tip. The possession simulator
+ * separately models the ~98% tip-winner possession-retention rate and then
+ * simulates each team's opening scoring sequence; tip winner alone is not a
+ * team-first-basket probability.
  *
  * Ratings and sample sizes calibrated from multi-season opening tip data (2022-2026),
  * player height, standing reach, wingspan, and recorded tip outcomes with
@@ -80,7 +80,8 @@ export const JUMP_BALL_RATINGS = {
 
 export const LEAGUE_AVG_TIP_WIN_PCT = 0.50;
 // Empirical tip-to-first-score rate measured from 54-game NBA play-by-play calibration (dist/nba/pbp-calibration.json)
-export const TIP_WIN_CONVERSION_RATE = 0.609;
+// The opening-tip winner retains the first possession in approximately 98% of games.
+export const TIP_WIN_POSSESSION_RATE = 0.98;
 export const BAYESIAN_PRIOR_WEIGHT_M = 20;   // Shrinkage sample weight (20 tips)
 
 const TEAM_ALIASES = { NO: 'NOP', GS: 'GSW', NY: 'NYK', SA: 'SAS', UTAH: 'UTA', WSH: 'WAS', PHO: 'PHX', BK: 'BKN' };
@@ -182,8 +183,9 @@ export function getJumperProfile(name, teamAbbr = null) {
     }
   }
 
-  // 3. Fallback to primary team center if team provided
-  if (cleanTeam && TEAM_PRIMARY_JUMPERS[cleanTeam]) {
+  // 3. Use a team primary only when no explicit jumper name was requested.
+  // An unknown confirmed starter must not inherit another player's record.
+  if (cleanTeam && !norm && TEAM_PRIMARY_JUMPERS[cleanTeam]) {
     const primaryKey = TEAM_PRIMARY_JUMPERS[cleanTeam];
     if (JUMP_BALL_RATINGS[primaryKey]) {
       const prof = JUMP_BALL_RATINGS[primaryKey];
@@ -196,11 +198,11 @@ export function getJumperProfile(name, teamAbbr = null) {
   return {
     jumper: name || 'Center',
     team: cleanTeam || 'NBA',
-    heightInches: 83,
-    standingReachInches: 109,
-    wingspanInches: 88,
-    tipWins: 5,
-    tipAttempts: 10,
+    heightInches: null,
+    standingReachInches: null,
+    wingspanInches: null,
+    tipWins: 0,
+    tipAttempts: 0,
     winPct: LEAGUE_AVG_TIP_WIN_PCT,
     rating: 1500,
     tier: 'AVERAGE',
@@ -238,19 +240,16 @@ export function predictJumpBallMatchup(jumperA, jumperB) {
   const probA = denominator > 0 ? numerator / denominator : 0.50;
   const probB = 1 - probA;
 
-  // Empirical tip conversion from play-by-play calibration (60.9%):
-  // P(Team A scores 1st) = P(Tip A) * TIP_CONVERSION + P(Tip B) * (1 - TIP_CONVERSION)
-  const teamAScoresFirstProb = (probA * TIP_WIN_CONVERSION_RATE) + (probB * (1 - TIP_WIN_CONVERSION_RATE));
-  const teamBScoresFirstProb = 1 - teamAScoresFirstProb;
-
   return {
     jumperA: { ...profA, regressedRate: a },
     jumperB: { ...profB, regressedRate: b },
     reachDiffInches: reachDiff,
     tipProbA: Math.round(probA * 1000) / 1000,
     tipProbB: Math.round(probB * 1000) / 1000,
-    teamAScoresFirstProb: Math.round(teamAScoresFirstProb * 1000) / 1000,
-    teamBScoresFirstProb: Math.round(teamBScoresFirstProb * 1000) / 1000,
+    // Team-first probabilities require the possession and scoring sequence;
+    // the full First Basket engine supplies them after simulation.
+    teamAScoresFirstProb: null,
+    teamBScoresFirstProb: null,
     favorite: probA >= probB ? profA.team : profB.team,
     edgePct: Math.round(Math.abs(probA - 0.50) * 100 * 10) / 10,
     sampleConfidence: profA?.sampleTier === 'HIGH' && profB?.sampleTier === 'HIGH' ? 'HIGH' : 'REGRESSED_SAMPLE',
