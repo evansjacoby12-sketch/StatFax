@@ -32,7 +32,7 @@
  */
 
 import NBA_DEMO_SNAPSHOT from '../data/demoSlate.js';
-import { scoreGameFirstBasket } from '../logic/firstBasketEngine.js';
+import { scoreGameFirstBasket, FIRST_BASKET_MODEL_VERSION } from '../logic/firstBasketEngine.js';
 import { getJumpBallMatchup } from '../data/jumpBalls.js';
 import { getStartersForTeam, TEAM_ABBR_ALIASES } from '../data/teamRosters.js';
 import { findPositionalReplacement, getFullRosterForTeam } from '../data/fullRosters.js';
@@ -105,6 +105,11 @@ function extractStat(categories, name) {
 function safeNum(val) {
   const n = parseFloat(val);
   return isNaN(n) ? 0 : n;
+}
+
+function openingHistoryAge(history, currentSeasonStartYear) {
+  const years = String(history?.season || '').split(',').map(x => Number(x.slice(0, 4))).filter(Number.isFinite);
+  return years.length ? Math.max(currentSeasonStartYear - Math.min(...years), 0) : null;
 }
 
 // ---------- public API ----------
@@ -796,6 +801,19 @@ export function validateNBASnapshot(snapshot) {
   if (!snapshot || snapshot.sport !== 'nba' || !Array.isArray(snapshot.players)) {
     throw new Error('Invalid NBA snapshot');
   }
+  if (snapshot.source?.mode === 'live' && snapshot.modelVersion === FIRST_BASKET_MODEL_VERSION) {
+    if (!Array.isArray(snapshot.games) || !snapshot.market || !snapshot.players.every(p => p.gameId != null && p.inputQuality)) {
+      throw new Error('Invalid NBA v5 snapshot: live players require game identity and input-quality evidence');
+    }
+    if (!snapshot.games.every(g => g.gameId != null && g.inputQuality && g.status)) {
+      throw new Error('Invalid NBA v5 snapshot: live games require identity, status, and input-quality evidence');
+    }
+    if (!snapshot.games.every(g => typeof g.inputQuality.projectionEligible === 'boolean' && typeof g.inputQuality.recommendationEligible === 'boolean' &&
+      ['playerSeasonStatCoverage', 'teamMatchupCoverage', 'zoneRateCoverage', 'openingTeamCoverage', 'minimumOpeningHistorySamples'].every(k => Number.isFinite(g.inputQuality[k])) &&
+      ['ok', 'partial', 'unavailable'].includes(g.inputQuality.openingDataStatus) && typeof g.inputQuality.zoneSource === 'string')) {
+      throw new Error('Invalid NBA v5 snapshot: eligibility evidence is incomplete');
+    }
+  }
   return snapshot;
 }
 
@@ -867,7 +885,11 @@ export function parseGameInjuriesAndStarters(summary) {
 /**
  * Score live ESPN scoreboard events into a StatFax First Basket snapshot.
  */
-export function buildLiveNBASnapshot(scoreboardGames, { centerOverrides = {}, gameSummaries = {} } = {}) {
+export function buildLiveNBASnapshot(scoreboardGames, {
+  centerOverrides = {}, gameSummaries = {}, marketOddsByGame = {},
+  playerStatsById = new Map(), teamStatsByTeam = {}, zoneStatsByPlayerId = {},
+  openingTendenciesByTeam = {}, marketStatus = null,
+} = {}) {
   if (!Array.isArray(scoreboardGames) || scoreboardGames.length === 0) {
     return null;
   }
@@ -887,10 +909,76 @@ export function buildLiveNBASnapshot(scoreboardGames, { centerOverrides = {}, ga
 
     const summary = gameSummaries[g.gameId] || g.summary || null;
     const { injuryMap, confirmedStartersByTeam } = parseGameInjuriesAndStarters(summary);
+    const gameDateForSeason = new Date(g.date || Date.now());
+    const currentSeasonStartYear = gameDateForSeason.getUTCMonth() >= 8
+      ? gameDateForSeason.getUTCFullYear() : gameDateForSeason.getUTCFullYear() - 1;
 
     const hasConfirmedHome = confirmedStartersByTeam[homeAbbr]?.length === 5;
     const hasConfirmedAway = confirmedStartersByTeam[awayAbbr]?.length === 5;
     const isConfirmedLineup = hasConfirmedHome && hasConfirmedAway;
+
+    const enrichWithSeasonStats = (players, teamAbbr) => players.map(player => {
+      const stats = playerStatsById.get(String(player.id));
+      const playerKey = String(player.name || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim().replace(/\s+(jr|sr|ii|iii|iv|v)$/, '');
+      const zones = zoneStatsByPlayerId[String(player.id)] || zoneStatsByPlayerId[`name:${playerKey}`];
+      const opening = openingTendenciesByTeam[teamAbbr]?.byPlayer?.[playerKey];
+      const openingHistory = openingTendenciesByTeam[teamAbbr];
+      const historyAge = openingHistoryAge(openingHistory, currentSeasonStartYear);
+      const openingUsable = openingHistory?.status === 'ok' && historyAge != null && historyAge <= 1;
+      if (!stats || !Number.isFinite(stats.gamesPlayed) || stats.gamesPlayed < 1) {
+        const withZones = applyZoneStats(player, zones);
+        return { ...withZones, openingHistorySamples: openingUsable ? openingHistory.sampleCount : 0,
+          openingShotAttempts: opening?.attempts || 0, openingShotMakes: opening?.made || 0,
+          openingStartTypes: opening?.startTypes || {},
+          dataSources: { ...(withZones.dataSources || {}), seasonStats: 'unavailable', openingPossessions: openingUsable ? 'pbpstats' : openingHistory ? 'stale_or_incomplete' : 'unavailable' } };
+      }
+      const attempts = Math.max(0, (stats.threesAttemptedPerGame || 0) * stats.gamesPlayed);
+      const observed = Number.isFinite(stats.threePointPct) ? stats.threePointPct : null;
+      // Beta shrinkage: 18 prior attempts at league 3P% keeps the opening-week
+      // rates from swinging on a handful of shots.
+      const shrunkThree = observed == null || attempts <= 0
+        ? null : ((observed * attempts) + (0.36 * 18)) / (attempts + 18);
+      const withZones = applyZoneStats(player, zones);
+      return {
+        ...player,
+        ...withZones,
+        ...(shrunkThree == null ? {} : { threeFG: shrunkThree }),
+        openingHistorySamples: openingUsable ? openingHistory.sampleCount : 0,
+        openingShotAttempts: opening?.attempts || 0,
+        openingShotMakes: opening?.made || 0,
+        openingStartTypes: opening?.startTypes || {},
+        seasonStats: stats,
+        dataSources: {
+          ...(withZones.dataSources || {}),
+          seasonStats: 'espn_current_season',
+          seasonGames: stats.gamesPlayed,
+          threePointAttempts: attempts,
+          threePointPct: shrunkThree,
+          earlyShotShare: 'roster_prior',
+          openingPossessions: openingUsable ? 'pbpstats' : openingHistory ? 'stale_or_incomplete' : 'unavailable',
+        },
+      };
+    });
+
+    function applyZoneStats(player, zones) {
+      if (!zones) return { ...player, dataSources: { ...(player.dataSources || {}), rimAndMidRates: 'roster_prior' } };
+      const posterior = (zone, prior, priorAttempts) => {
+        if (!zone || !(zone.attempts > 0)) return null;
+        return ((zone.made || 0) + prior * priorAttempts) / (zone.attempts + priorAttempts) * 100;
+      };
+      const zoneFG = {
+        rim: posterior(zones.rim, 0.65, 30),
+        mid: posterior(zones.mid, 0.42, 20),
+        three: posterior(zones.three, 0.36, 30),
+      };
+      const verified = [zones.rim, zones.mid, zones.three].every(z => z?.attempts >= 5);
+      return {
+        ...player,
+        zoneFG: { rim: zoneFG.rim ?? player.rimFG * 100, mid: zoneFG.mid ?? player.midFG * 100, three: zoneFG.three ?? player.threeFG * 100 },
+        dataSources: { ...(player.dataSources || {}), rimAndMidRates: verified ? 'nba_stats_zone_shooting' : 'nba_stats_zone_low_sample', zoneAttempts: { rim: zones.rim?.attempts || 0, mid: zones.mid?.attempts || 0, three: zones.three?.attempts || 0 }, zoneSource: zones.source },
+      };
+    }
 
     const resolveTeamStarters = (tAbbr, centerChoice) => {
       const confirmed = confirmedStartersByTeam[tAbbr];
@@ -938,7 +1026,7 @@ export function buildLiveNBASnapshot(scoreboardGames, { centerOverrides = {}, ga
             s.earlyShotShare = Math.round(((s.earlyShotShare || 0.2) / totalShare) * 1000) / 1000;
           });
         }
-        return activeStarters;
+        return enrichWithSeasonStats(activeStarters, tAbbr);
       }
 
       // Case B: Projected starters with injury checks & next-man-up substitutions
@@ -971,7 +1059,19 @@ export function buildLiveNBASnapshot(scoreboardGames, { centerOverrides = {}, ga
         });
       }
 
-      return activeStarters;
+      const openingHistory = openingTendenciesByTeam[tAbbr];
+      const historyN = Number(openingHistory?.sampleCount) || 0;
+      if (openingHistory?.status === 'ok' && openingHistoryAge(openingHistory, currentSeasonStartYear) <= 1 && historyN > 0) {
+        const priorWeight = 20;
+        const posteriorShares = activeStarters.map(s => {
+          const observed = openingHistory.byPlayer?.[String(s.name || '').toLowerCase()];
+          return (Number(observed?.attempts) + (s.earlyShotShare || 0) * priorWeight) / (historyN + priorWeight);
+        });
+        const sum = posteriorShares.reduce((a, b) => a + b, 0);
+        if (sum > 0) activeStarters.forEach((s, i) => { s.earlyShotShare = posteriorShares[i] / sum; });
+      }
+
+      return enrichWithSeasonStats(activeStarters, tAbbr);
     };
 
     const rawHomeStarters = resolveTeamStarters(homeAbbr, homeCenterChoice);
@@ -993,24 +1093,70 @@ export function buildLiveNBASnapshot(scoreboardGames, { centerOverrides = {}, ga
     const formattedTime = formatTipOffTime(g.date);
 
     // Multi-book consensus market pricing (DraftKings, FanDuel, BetMGM, Caesars)
-    const consensusMarketOdds = {
-      'jalen johnson': { draftkings: '+550', fanduel: '+575', betmgm: '+525', caesars: '+550' },
-      'jarrett allen': { draftkings: '+650', fanduel: '+600', betmgm: '+650', caesars: '+625' },
-      'evan mobley': { draftkings: '+600', fanduel: '+650', betmgm: '+600', caesars: '+625' },
-      'donovan mitchell': { draftkings: '+500', fanduel: '+525', betmgm: '+475', caesars: '+500' },
-      'james harden': { draftkings: '+550', fanduel: '+550', betmgm: '+525', caesars: '+550' },
-      'cj mccollum': { draftkings: '+700', fanduel: '+750', betmgm: '+700', caesars: '+725' },
-      'zion williamson': { draftkings: '+450', fanduel: '+475', betmgm: '+450', caesars: '+460' },
-      'domantas sabonis': { draftkings: '+550', fanduel: '+575', betmgm: '+550', caesars: '+525' },
-      'zach lavine': { draftkings: '+700', fanduel: '+750', betmgm: '+700', caesars: '+725' },
-      'trey murphy iii': { draftkings: '+650', fanduel: '+675', betmgm: '+625', caesars: '+650' },
-      'herbert jones': { draftkings: '+900', fanduel: '+950', betmgm: '+900', caesars: '+850' },
-      'zach edey': { draftkings: '+550', fanduel: '+525', betmgm: '+550', caesars: '+500' },
-      'cameron boozer': { draftkings: '+600', fanduel: '+625', betmgm: '+575', caesars: '+600' },
-      'ja morant': { draftkings: '+650', fanduel: '+675', betmgm: '+625', caesars: '+650' },
-      'damian lillard': { draftkings: '+700', fanduel: '+725', betmgm: '+675', caesars: '+700' },
-      'donovan clingan': { draftkings: '+850', fanduel: '+900', betmgm: '+850', caesars: '+800' },
-      'derik queen': { draftkings: '+900', fanduel: '+950', betmgm: '+900', caesars: '+875' },
+    const gameMarket = marketOddsByGame[g.gameId] || null;
+    const marketOdds = {};
+    for (const entry of Object.values(gameMarket?.players || {})) {
+      const name = String(entry.name || '').toLowerCase();
+      if (name && entry.books && Object.keys(entry.books).length) marketOdds[name] = entry.books;
+    }
+    const homeTeamStats = teamStatsByTeam[homeAbbr] || teamStatsByTeam[rawHome] || null;
+    const awayTeamStats = teamStatsByTeam[awayAbbr] || teamStatsByTeam[rawAway] || null;
+    const deriveDefense = stats => {
+      const factor = Number.isFinite(stats?.opp3PtPct) && stats.opp3PtPct > 0
+        ? Math.max(0.92, Math.min(1.08, stats.opp3PtPct / 0.36)) : null;
+      return factor == null ? {} : { threePtDefenseFactor: factor };
+    };
+    const lineupConfirmed = isConfirmedLineup && !g.isLive && !g.isFinal;
+    const playerPool = [...rawHomeStarters, ...rawAwayStarters];
+    const statCoverage = playerPool.length
+      ? playerPool.filter(p => Number.isFinite(p.seasonStats?.gamesPlayed) && p.seasonStats.gamesPlayed >= 3).length / playerPool.length
+      : 0;
+    const zoneRateCoverage = playerPool.length
+      ? playerPool.filter(p => p.dataSources?.rimAndMidRates === 'nba_stats_zone_shooting').length / playerPool.length
+      : 0;
+    const openingSamples = playerPool.every(p => Number.isFinite(p.openingHistorySamples))
+      ? Math.min(...playerPool.map(p => p.openingHistorySamples)) : 0;
+    const oddsAgeMinutes = Number.isFinite(Date.parse(marketStatus?.fetchedAt || ''))
+      ? Math.max(0, (Date.now() - Date.parse(marketStatus.fetchedAt)) / 60000) : Infinity;
+    const freshMarketAvailable = oddsAgeMinutes <= 15 && Object.values(gameMarket?.players || {}).some(entry =>
+      Object.keys(entry.books || {}).length &&
+      (Date.now() - Date.parse(entry.marketUpdatedAt || entry.capturedAt || marketStatus?.fetchedAt || '')) <= 15 * 60 * 1000);
+    const acceptedMarketOdds = freshMarketAvailable ? marketOdds : {};
+    const homeOpening = openingTendenciesByTeam[homeAbbr];
+    const awayOpening = openingTendenciesByTeam[awayAbbr];
+    const homeOpeningAge = openingHistoryAge(homeOpening, currentSeasonStartYear);
+    const awayOpeningAge = openingHistoryAge(awayOpening, currentSeasonStartYear);
+    const openingHistoryAgeSeasons = homeOpeningAge == null || awayOpeningAge == null
+      ? null : Math.max(homeOpeningAge, awayOpeningAge);
+    const openingTeamCoverage = [homeOpening, awayOpening]
+      .filter((x, i) => x?.status === 'ok' && [homeOpeningAge, awayOpeningAge][i] != null && [homeOpeningAge, awayOpeningAge][i] <= 1).length / 2;
+    const openingDataStatus = openingTeamCoverage === 1 ? 'ok' : openingTeamCoverage > 0 ? 'partial' : 'unavailable';
+    const inputQuality = {
+      playerSeasonStatCoverage: statCoverage,
+      teamMatchupCoverage: [homeTeamStats, awayTeamStats].filter(Boolean).length / 2,
+      zoneRateCoverage,
+      lineupConfirmed,
+      openingTendencySource: openingTeamCoverage === 1 ? 'pbpstats_observed' : 'roster_prior',
+      openingSequenceContextSource: openingTeamCoverage === 1 ? 'pbpstats_observed' : 'league_prior',
+      openingDataStatus,
+      openingTeamCoverage,
+      openingHistoryAgeSeasons,
+      openingHistorySeason: homeOpening?.season && homeOpening.season === awayOpening?.season ? String(homeOpening.season) : null,
+      openingTeamSamples: { [homeAbbr]: homeOpening?.sampleCount || 0, [awayAbbr]: awayOpening?.sampleCount || 0 },
+      zoneSource: zoneRateCoverage > 0 ? 'nba_stats_leaguedashplayershotlocations' : 'unavailable',
+      minimumOpeningHistorySamples: openingSamples,
+      liveOddsProvider: marketStatus?.provider || null,
+      liveOddsAvailable: freshMarketAvailable,
+      liveOddsAgeMinutes: Number.isFinite(oddsAgeMinutes) ? Math.round(oddsAgeMinutes * 10) / 10 : null,
+      projectionEligible: Boolean(
+        lineupConfirmed && statCoverage >= 0.8 && zoneRateCoverage >= 0.8 &&
+        [homeTeamStats, awayTeamStats].every(Boolean) && openingTeamCoverage === 1 && openingHistoryAgeSeasons != null && openingHistoryAgeSeasons <= 1 && openingSamples >= 5
+      ),
+      recommendationEligible: Boolean(
+        lineupConfirmed && statCoverage >= 0.8 && zoneRateCoverage >= 0.8 &&
+        [homeTeamStats, awayTeamStats].every(Boolean) && openingTeamCoverage === 1 && openingHistoryAgeSeasons != null && openingHistoryAgeSeasons <= 1 && openingSamples >= 5 &&
+        marketStatus?.provider === 'the-odds-api' && freshMarketAvailable
+      ),
     };
 
     // 3. Score with firstBasketEngine
@@ -1022,42 +1168,61 @@ export function buildLiveNBASnapshot(scoreboardGames, { centerOverrides = {}, ga
         name: g.homeTeam?.name || homeAbbr,
         logo: g.homeTeam?.logo,
         color: g.homeTeam?.color ? `#${g.homeTeam.color}` : '#007A33',
-        record: '2-1',
+        record: null,
       },
       awayTeam: {
         abbr: awayAbbr,
         name: g.awayTeam?.name || awayAbbr,
         logo: g.awayTeam?.logo,
         color: g.awayTeam?.color ? `#${g.awayTeam.color}` : '#006BB6',
-        record: '2-1',
+        record: null,
       },
       homePlayers: rawHomeStarters,
       awayPlayers: rawAwayStarters,
       homeJumper: jumpMatch.jumperA,
       awayJumper: jumpMatch.jumperB,
-      marketOdds: consensusMarketOdds,
+      marketOdds: acceptedMarketOdds,
+      inputQuality,
       lineupStatus: {
-        confirmed: isConfirmedLineup,
-        announcedMinutesAgo: isConfirmedLineup ? 28 : null,
-        status: isConfirmedLineup ? 'CONFIRMED' : 'PROJECTED',
+        confirmed: lineupConfirmed,
+        announcedMinutesAgo: lineupConfirmed ? 28 : null,
+        status: g.isLive ? 'LIVE' : g.isFinal ? 'FINAL' : lineupConfirmed ? 'CONFIRMED' : 'PROJECTED',
         source: isConfirmedLineup ? 'espn_official_boxscore' : 'statfax_projected',
       },
-      pace: 100.5,
+      pace: [homeTeamStats?.pace, awayTeamStats?.pace].filter(Number.isFinite).length
+        ? [homeTeamStats?.pace, awayTeamStats?.pace].filter(Number.isFinite).reduce((a, b) => a + b, 0) /
+          [homeTeamStats?.pace, awayTeamStats?.pace].filter(Number.isFinite).length
+        : null,
+      homeOppDefense: deriveDefense(awayTeamStats),
+      awayOppDefense: deriveDefense(homeTeamStats),
     });
 
     // Tag each player with exact gameTime and date for sorting
     scoredGame.date = g.date;
     scoredGame.gameTime = formattedTime;
-    scoredGame.marketOdds = consensusMarketOdds;
+    scoredGame.status = g.isLive ? 'LIVE' : g.isFinal ? 'FINAL' : 'SCHEDULED';
+    scoredGame.isLive = Boolean(g.isLive);
+    scoredGame.isFinal = Boolean(g.isFinal);
+    scoredGame.marketOdds = acceptedMarketOdds;
+    scoredGame.inputQuality = inputQuality;
     for (const p of scoredGame.players) {
+      const sourcePlayer = playerPool.find(x => String(x.id) === String(p.id) || x.name === p.name);
       p.gameId = g.gameId;
       p.gameTime = formattedTime;
       p.date = g.date;
       p.tipMatchup = scoredGame.tipMatchup;
       p.lineupStatus = scoredGame.lineupStatus;
+      p.inputQuality = inputQuality;
       p.pace = scoredGame.pace;
       p.opponent = p.isHome ? awayAbbr : homeAbbr;
       p.modelProb = p.gameProb;
+      if (sourcePlayer) {
+        p.dataSources = sourcePlayer.dataSources || {};
+        p.openingHistorySamples = sourcePlayer.openingHistorySamples || 0;
+        p.openingShotAttempts = sourcePlayer.openingShotAttempts || 0;
+        p.openingShotMakes = sourcePlayer.openingShotMakes || 0;
+        p.openingStartTypes = sourcePlayer.openingStartTypes || {};
+      }
       allPlayers.push(p);
     }
 
@@ -1078,6 +1243,7 @@ export function buildLiveNBASnapshot(scoreboardGames, { centerOverrides = {}, ga
 
   return {
     generatedAt: new Date().toISOString(),
+    modelVersion: FIRST_BASKET_MODEL_VERSION,
     sport: 'nba',
     source: {
       mode: 'live',
@@ -1085,6 +1251,7 @@ export function buildLiveNBASnapshot(scoreboardGames, { centerOverrides = {}, ga
       gamesCount: scoredGames.length,
       timestamp: Date.now(),
     },
+    market: marketStatus || { provider: 'the-odds-api', status: 'not_requested' },
     meta: {
       date: dateStr,
       label: `NBA Slate (${scoredGames.length} Games)`,

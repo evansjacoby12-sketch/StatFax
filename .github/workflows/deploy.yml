@@ -291,9 +291,39 @@ jobs:
           npm run nfl:slate
           npm run nfl:audit
 
+      # Restore the prospective first-basket ledger and odds snapshot so the
+      # scheduled slate run can append pre-tip evidence and avoid repeated
+      # paid odds pulls inside the configured refresh window.
+      - name: Restore NBA first-basket state
+        env:
+          AWS_ACCESS_KEY_ID:     ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ACCOUNT_ID:         ${{ secrets.R2_ACCOUNT_ID }}
+          R2_BUCKET:             ${{ vars.R2_BUCKET }}
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+        run: |
+          if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$R2_ACCOUNT_ID" ] || [ -z "$R2_BUCKET" ]; then
+            echo "NBA first-basket durable state restore skipped — R2 is not configured."
+            exit 0
+          fi
+          ENDPOINT="https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com"
+          mkdir -p data/first-basket-log dist/nba
+          for f in predictions.jsonl results.jsonl; do
+            aws s3 cp "s3://$R2_BUCKET/nba/first-basket-log/$f" "data/first-basket-log/$f.tmp" --endpoint-url "$ENDPOINT" 2>/dev/null || true
+            if [ -s "data/first-basket-log/$f.tmp" ]; then mv "data/first-basket-log/$f.tmp" "data/first-basket-log/$f"; fi
+          done
+          aws s3 cp "s3://$R2_BUCKET/nba/first-basket-odds.json" "dist/nba/first-basket-odds.json" --endpoint-url "$ENDPOINT" 2>/dev/null || true
+          aws s3 cp "s3://$R2_BUCKET/nba/feature-cache.json" "dist/nba/feature-cache.json" --endpoint-url "$ENDPOINT" 2>/dev/null || true
+
       - name: Generate NBA slate
+        env:
+          ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+          ODDS_REFRESH_MINUTES: ${{ vars.ODDS_REFRESH_MINUTES || '1440' }}
         run: |
           npm run nba:slate
+          TODAY_CT=$(TZ=America/Chicago date +%F)
+          npm run nba:reconcile -- --date "$TODAY_CT"
 
       # Publish rolling state back to R2 (S3-compatible). daily.json is held
       # until the deterministic data-health watchdog has run below. This also lets the NEXT
@@ -335,6 +365,23 @@ jobs:
               --content-type application/json --cache-control no-cache \
               && echo "R2: published nba/daily.json" || echo "R2: failed to publish nba/daily.json (non-blocking)"
           fi
+          if [ -f "dist/nba/first-basket-odds.json" ]; then
+            aws s3 cp "dist/nba/first-basket-odds.json" "s3://$R2_BUCKET/nba/first-basket-odds.json" --endpoint-url "$ENDPOINT" \
+              --content-type application/json --cache-control no-cache \
+              && echo "R2: published nba/first-basket-odds.json" || echo "R2: failed to publish nba/first-basket-odds.json (non-blocking)"
+          fi
+          if [ -f "dist/nba/feature-cache.json" ]; then
+            aws s3 cp "dist/nba/feature-cache.json" "s3://$R2_BUCKET/nba/feature-cache.json" --endpoint-url "$ENDPOINT" \
+              --content-type application/json --cache-control no-cache \
+              && echo "R2: published nba/feature-cache.json" || echo "R2: failed to publish nba/feature-cache.json (non-blocking)"
+          fi
+          for f in predictions.jsonl results.jsonl; do
+            if [ -f "data/first-basket-log/$f" ]; then
+              aws s3 cp "data/first-basket-log/$f" "s3://$R2_BUCKET/nba/first-basket-log/$f" --endpoint-url "$ENDPOINT" \
+                --content-type application/x-ndjson --cache-control no-cache \
+                && echo "R2: published nba/first-basket-log/$f" || echo "R2: failed to publish nba/first-basket-log/$f (non-blocking)"
+            fi
+          done
           for f in backtest.json tracking.json preseason.json preseason-participation.json readiness.json history.json; do
             if [ -f "dist/nfl/$f" ]; then
               aws s3 cp "dist/nfl/$f" "s3://$R2_BUCKET/nfl/$f" --endpoint-url "$ENDPOINT" \

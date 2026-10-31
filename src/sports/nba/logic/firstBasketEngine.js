@@ -15,6 +15,8 @@
 
 import { getJumperProfile, predictJumpBallMatchup, TIP_WIN_CONVERSION_RATE } from '../data/jumpBalls.js';
 
+export const FIRST_BASKET_MODEL_VERSION = 'nba-first-basket-v5';
+
 // ─── Constants & Rules ─────────────────────────────────────────────────────────
 
 export const SETTLEMENT_RULES = {
@@ -586,6 +588,7 @@ export function scoreGameFirstBasket({
   awayJumper = null,
   marketOdds = {},      // { [playerId]: { draftkings, fanduel, betmgm, caesars } or string }
   closingLines = {},    // benchmark lines: { [playerId]: { opening, closing, movement } or string }
+  inputQuality = null,
   settlementRule = SETTLEMENT_RULES.FIRST_FIELD_GOAL,
   homeOppDefense = {},
   awayOppDefense = {},
@@ -595,6 +598,7 @@ export function scoreGameFirstBasket({
   simIterations = 5000,
   seed = null,
 }) {
+  const recommendationEligible = inputQuality?.recommendationEligible === true;
   // 1. Opening Tip Matchup with sample-size Bayesian shrinkage & reach differential
   const homeJumperName = typeof homeJumper === 'string'
     ? homeJumper
@@ -694,7 +698,7 @@ export function scoreGameFirstBasket({
       for (const [bookName, quote] of Object.entries(rawOdds)) {
         if (!quote) continue;
         const implied = americanOddsToProb(quote);
-        const edge = computeOddsEdge(player.gameProb, quote);
+        const edge = recommendationEligible ? computeOddsEdge(player.gameProb, quote) : null;
         const quoteNum = parseInt(String(quote).replace('+', ''), 10);
 
         multiBookComparison[bookName] = {
@@ -712,7 +716,7 @@ export function scoreGameFirstBasket({
     } else if (rawOdds) {
       bestOdds = String(rawOdds);
       bestBook = 'consensus';
-      bestEdge = computeOddsEdge(player.gameProb, bestOdds);
+      bestEdge = recommendationEligible ? computeOddsEdge(player.gameProb, bestOdds) : null;
       books = { draftkings: bestOdds, fanduel: bestOdds };
       multiBookComparison.draftkings = { odds: bestOdds, implied: Math.round((americanOddsToProb(bestOdds) || 0) * 1000) / 10, edge: bestEdge };
       multiBookComparison.fanduel = { odds: bestOdds, implied: Math.round((americanOddsToProb(bestOdds) || 0) * 1000) / 10, edge: bestEdge };
@@ -720,7 +724,8 @@ export function scoreGameFirstBasket({
 
     const fairGameOdds = probToAmericanOdds(player.gameProb);
     const fairTeamOdds = player.fairOdds;
-    const kellyUnits = bestOdds ? calculateQuarterKelly(player.gameProb, bestOdds) : null;
+    const kellyUnits = bestOdds && recommendationEligible
+      ? calculateQuarterKelly(player.gameProb, bestOdds) : null;
 
     // Line movement & closing line benchmark
     const rawBenchmark = closingLines[player.id] || closingLines[player.name?.toLowerCase()] || null;
@@ -733,9 +738,6 @@ export function scoreGameFirstBasket({
     } else if (rawBenchmark) {
       closingBenchmark = String(rawBenchmark);
       lineMovement = { opening: closingBenchmark, closing: closingBenchmark, movement: '0' };
-    } else if (bestOdds) {
-      closingBenchmark = bestOdds;
-      lineMovement = { opening: bestOdds, closing: bestOdds, movement: 'Flat' };
     }
 
     // Rich narrative explanations
@@ -786,6 +788,22 @@ export function scoreGameFirstBasket({
       kellyUnits,
       closingBenchmark,
       lineMovement,
+      recommendationEligible,
+      recommendationBlocks: !inputQuality
+        ? ['input_quality_missing']
+        : !recommendationEligible
+        ? [
+            !inputQuality.lineupConfirmed && 'starting_lineup_unconfirmed',
+            inputQuality.playerSeasonStatCoverage < 0.8 && 'insufficient_current_player_stats',
+            inputQuality.zoneRateCoverage < 0.8 && 'missing_player_zone_shooting_rates',
+            inputQuality.teamMatchupCoverage < 1 && 'incomplete_team_matchup_context',
+            inputQuality.minimumOpeningHistorySamples < 5 && 'insufficient_opening_play_history',
+            inputQuality.openingHistoryAgeSeasons > 1 && 'stale_opening_possession_history',
+            inputQuality.openingSequenceContextSource !== 'observed' && 'opening_sequence_rates_not_observed',
+            !inputQuality.liveOddsAvailable && 'live_first_basket_odds_unavailable',
+          ].filter(Boolean)
+        : [],
+      inputQuality,
       settlementRule,
       eli5,
       eli15,

@@ -216,12 +216,10 @@ Authority: `fb-model/` layout (`ingest/`, `features/`, `model/`, `sim/`, `eval/`
 4. **Simulation Layer (`fb-model/sim/simulate.py`)**:
    - Monte Carlo simulator executing 10,000+ iterations with parameter posterior sampling (tip win, shot shares, make rates, and team rates sampled from posterior distributions on every run).
    - Reports empirical win frequency, batch standard error, and 90% credible intervals $[q_{0.05}, q_{0.95}]$.
-5. **Walk-Forward Evaluation & Calibration (`fb-model/eval/`)**:
-   - `backtest.py`: 120-game walk-forward historical backtest.
-     - Multi-class Log Loss: Model **2.0949** vs. Market Close **2.2460** vs. Naive Baseline **2.3026** ($+0.2077$ edge over naive).
-     - Multi-class Brier Score: Model **0.8602** vs. Market Close **0.8876**.
-     - Betting Performance: 195 triggered $+EV$ bets, $16.41\%$ hit rate at average $+550$ odds, $+83.69\%$ average CLV, $+84.40\text{u}$ net profit ($+43.28\%$ ROI).
-   - `calibration.py`: Reliability evaluation across 1,200 player-game samples. Expected Calibration Error (ECE) is **2.09%**, Maximum Calibration Error (MCE) is $6.23\%$. Calibration plot saved to `fb-model/data/calibration_curve.png`.
+5. **Evaluation (`fb-model/eval/`)**:
+   - The prior 120-game report and calibration figures are retrospective artifacts, not valid out-of-sample evidence. The legacy backtest reads current player/team aggregates for historical games, and its market rows are not time-aligned with those games.
+   - `backtest.py` now fails closed until the evaluator can consume game-dated pregame feature and market snapshots. It must not publish ROI, CLV, Brier, or log-loss claims from the legacy tables.
+   - `tools/firstBasketLog.mjs` is the prospective evaluation path: only predictions logged before tip qualify, and games with actual-vs-modeled starter mismatches remain visible for diagnosis but are excluded from aggregate metrics and learned feedback.
 6. **Slate Execution (`fb-model/run_slate.py`)**:
    - Pulls confirmed starting lineups ~30 min before tip, executes analytical chain and 10,000-sim Monte Carlo draws, benchmarks against multi-book odds, sizes positions with Quarter-Kelly, and exports ranked picks to `fb-model/data/slate_picks.json`. Supports `--settlement` (`FIRST_FIELD_GOAL` vs `FIRST_POINT_SCORED`) and `--nop-center` (`missi` vs `jordan`).
 
@@ -268,7 +266,41 @@ Authority: `fb-model/` layout (`ingest/`, `features/`, `model/`, `sim/`, `eval/`
   - Deterministic PRNG (`createPrng`) ensures test reproducibility.
   - Sum of player simulation wins strictly equals 5,000 across all active players in a game.
   - Node.js micro-benchmark: 5,000 trials execute in ~4.0ms with zero memory leaks.
+
+### NBA First Basket Evaluation Integrity Gate (2026-10-30)
+
+- The legacy Python backtest is blocked from producing a report because its current aggregate features and game-linked odds cannot reconstruct pre-tip information for the historical game dates. Previously published Python backtest metrics are superseded and must not be used to claim predictive or betting edge.
+- Prospective log scoring excludes starter-mismatched games from summary metrics and learned feedback while retaining their per-game diagnostics. Predictions, results, and actual starter lists should continue to be captured for every slate.
   - All 635 test suite assertions passing (`npm test`).
+
+### NBA First Basket Live Data and Eligibility Gate (2026-10-30)
+
+- **Version:** `nba-first-basket-v4`. This is a scoring/input-quality policy change; older snapshots remain identifiable by their recorded model version.
+- **Current inputs:** `fetch-nba-slate.mjs` overlays ESPN current-season player statistics and team opponent 3PT/pace context onto the slate. Player 3PT percentage is shrunk toward the league prior with an 18-attempt prior. The six-hour feature cache is persisted through R2 for scheduled runs; failed/missing stats remain missing and count against coverage.
+- **Market:** first-basket quotes come only from The Odds API `player_first_basket` event market when `ODDS_API_KEY` is configured and the subscription returns the market. A quote is usable only when the market update is at most 15 minutes old. There is no synthetic or consensus-price fallback. The provider refresh cache can reduce requests, but cached quotes still fail the freshness gate when old.
+- **Fail-closed recommendations:** edge, Kelly sizing, top-pick selection, generated parlays, and slip insertion are blocked unless the pregame lineup is confirmed, at least 80% of active candidates have current player stats and verified player zone rates, both teams have matchup stats, both teams have at least five opening-shot samples, and fresh market quotes are present. Missing opening-play and player-zone sources therefore leave the model in projection-only mode; current team/player season aggregates do not substitute for those features.
+- **Prospective evidence:** every changed live pregame snapshot is logged before tip with `date + gameId + playerId` identity and model version; results are reconciled with actual ESPN starters. Doubleheaders stay distinct. Mismatched or missing starter evidence is diagnostic only and excluded from metrics and learning. R2 workflow state restores and persists the logs and odds cache.
+- **Limitations / validation gate:** this change does not claim improved predictive performance. Promotion requires prospective, date-ordered outcomes under the evaluator gates above. Local live price availability depends on the Odds API key and market entitlement; without it, no market-backed call can qualify.
+- **Rollback:** revert this version's eligibility gating and current-season stat overlays in `firstBasketEngine.js`, `NBAService.js`, `fetch-nba-slate.mjs`, and the UI eligibility checks, preserving v4 prediction logs as versioned evidence.
+
+### NBA First Basket Verified Zone and Opening History Inputs (2026-10-30)
+
+- **Version:** `nba-first-basket-v5`, preserving v4 snapshots as a separate evaluation cohort.
+- **Hypothesis and fields:** use NBA Stats shot-location FGM/FGA counts to replace roster-only rim, mid, and 3PT conversion priors when all zones meet minimum evidence; shrink each zone with stated priors. Use PBP Stats first-team-possession shot attempts and start types to blend opening-shot shares with the roster prior. Add `zoneFG`, zone attempts/source, opening shot count/outcome/start-type, `openingHistorySeason`, and input freshness to snapshots and prospective evaluation records.
+- **Zone implementation:** request `LeagueDashPlayerShotLocations` once per season; aggregate restricted-area + non-RA paint, mid-range, and the three 3PT zones into rim/mid/three rates with prior sample sizes 30/20/30. Require at least five attempts in each zone to count a player as verified, retain raw attempts and source, and join NBA Stats rows to ESPN candidates by normalized name when provider IDs differ. Missing or malformed data stays unavailable. The NBA Stats `ShotChartDetail` coordinates are suitable for deeper audit but unnecessary for these aggregate rates.
+- **Opening-history implementation:** request PBP Stats structured shot records by NBA team ID for the first 120 seconds of Q1, trying the current season and prior season. Game-wide possession numbers 1 and 2 identify the two teams' opening possessions; retain each team's earliest field-goal attempt with full player identity, result, and `start_type` catalyst. Treat 500-shot responses as truncated. Blend observed player opening-shot counts with roster shares using 20 prior samples and renormalize over active candidates. Require five observed samples from both teams and reject history older than the prior NBA season. Persist the 24-hour source cache through R2.
+- **Core scorer contract:** a direct `scoreGameFirstBasket` call without `inputQuality.recommendationEligible === true` returns no betting edge or Kelly size, even when odds are supplied.
+- **Data coverage observed during implementation:** the NBA Stats zone endpoint timed out in the live probe, so this checkout has no validated live zone coverage yet. The `nba_api` maintainers document that `stats.nba.com` may not respond to cloud-hosted IP ranges; this client uses the same endpoint directly from Node, so changing to the Python wrapper would not remove that upstream/network constraint. See [nba_api rate limits and hosting](https://github.com/swar/nba_api#rate-limits-and-hosting). The PBP Stats structured shot endpoint returned BOS/LAL data for 2026-27 and 2025-26 (73 and 74 first-shot samples respectively in the two-season probe). The pipeline stores the exact source seasons and requires at least five opening-shot samples per team before this feature qualifies.
+- **Validation:** 41 focused NBA first-basket tests pass, including mocked zone/PBP provider parsing, possession selection, shot/miss and catalyst extraction, capped-response rejection, ESPN/NBA name join, snapshot contract, and integration. UI smoke and production build pass. No predictive-performance claim is made before date-ordered v5 outcomes accumulate.
+- **Rollback:** set the version to v4 and remove the zone/opening overlays in `first-basket-context.mjs` and `NBAService.js`; retain v5 snapshots/logs and caches as an immutable separate cohort.
+
+### NBA First Basket BetLab Pricing and Stake Integrity (2026-10-30)
+
+- **Policy refinement:** BetLab recipe inclusion and rank use model probabilities only. Cross-game joint probability remains the independent product; quotes, EV, and Kelly do not influence the board. Model fair odds are omitted from recipes. Price-based fields are not used for recipe selection.
+- **Projection eligibility contract:** NBA game quality includes `projectionEligible`, requiring confirmed lineup, at least 80% player season-stat and verified zone coverage, both team matchup inputs, and current/prior-season opening history with at least five samples. This allows model-only recipe display without the fresh-market-quote requirement. `recommendationEligible` still requires all projection inputs plus fresh sportsbook odds and remains the sole path for actionable picks/slip insertion.
+- **Tag quality:** tip and perimeter strategy tags require observed tip probability and shot-mix evidence; position-based synthetic shot-mix defaults and neutral 50% tip defaults do not qualify a recipe. EV and longshot price strategies are removed from BetLab.
+- **Validation / limits:** focused combo and snapshot-contract tests cover model-only probabilities, price independence, invalid probability rejection, and the explicit projection/action eligibility split. The joint probability still assumes independence across games.
+- **Rollback:** revert `firstBasketCombos.js`, `NBAService.js`, and this policy note. Preserve the separate `projectionEligible` evidence while recommendation eligibility remains price-gated.
 
 ## Required proof for a production model change
 

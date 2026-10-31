@@ -111,6 +111,8 @@ test('firstBasketEngine: game first basket joint distribution sums to 1.0 across
   // Total game probability across all players must equal ~1.00
   const totalGameProb = gameResult.players.reduce((acc, p) => acc + p.gameProb, 0);
   assert.ok(Math.abs(totalGameProb - 1.0) < 0.02, `Game probs must sum to ~1.0, got ${totalGameProb}`);
+  assert.ok(gameResult.players.every(p => !p.recommendationEligible && p.edgePct == null && p.kellyUnits == null),
+    'Unqualified engine calls must not emit edges or Kelly sizes');
 
   // Home team with tip advantage should have higher aggregate first basket probability
   const homeAgg = gameResult.players.filter(p => p.isHome).reduce((acc, p) => acc + p.gameProb, 0);
@@ -162,6 +164,19 @@ test('demoSlate and NBAService: snapshot validity and loading', async () => {
   assert.ok(top1.tipMatchup);
   assert.ok(top1.eli5);
   assert.ok(top1.eli15);
+});
+
+test('NBA v5 snapshot contract requires per-game quality and player game identity', () => {
+  assert.throws(() => validateNBASnapshot({
+    sport: 'nba', modelVersion: 'nba-first-basket-v5', source: { mode: 'live' },
+    market: {}, games: [{ gameId: '1', status: 'SCHEDULED' }],
+    players: [{ id: 'p1', gameId: '1' }],
+  }), /input-quality evidence/);
+  assert.throws(() => validateNBASnapshot({
+    sport: 'nba', modelVersion: 'nba-first-basket-v5', source: { mode: 'live' }, market: {},
+    games: [{ gameId: '1', status: 'SCHEDULED', inputQuality: { recommendationEligible: false } }],
+    players: [{ id: 'p1', gameId: '1', inputQuality: {} }],
+  }), /eligibility evidence is incomplete/);
 });
 
 test('firstBasket: tip-off Bayesian shrinkage and reach differential prior', () => {

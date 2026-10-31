@@ -23,6 +23,34 @@ from features.rates import calculate_context_adjusters
 
 DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "fb_database.sqlite")
 
+
+class BacktestNotEvaluable(RuntimeError):
+    """Raised when stored inputs cannot support a leakage-safe historical test."""
+
+
+def validate_temporal_data(conn: sqlite3.Connection) -> None:
+    """Fail closed unless features and prices are stored as pregame snapshots.
+
+    The legacy schema has one current aggregate per player/team and one odds
+    row per game/player. Those tables cannot reconstruct what was known before
+    each historical game, even if their rows contain an ``updated_at`` field.
+    """
+    tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    feature_table = "player_early_shot_shares"
+    if feature_table not in tables:
+        raise BacktestNotEvaluable("Leakage-safe backtest blocked: no as-of feature history is stored.")
+    feature_columns = {r[1] for r in conn.execute(f'PRAGMA table_info("{feature_table}")')}
+    if "game_id" not in feature_columns or "captured_at" not in feature_columns:
+        raise BacktestNotEvaluable(
+            "Leakage-safe backtest blocked: player_early_shot_shares is a current aggregate, "
+            "not a game-dated pregame feature snapshot. The evaluator still reads current "
+            "player/team aggregates and cannot safely score historical games."
+        )
+    raise BacktestNotEvaluable(
+        "Leakage-safe backtest blocked: the scoring path has not been implemented to consume "
+        "game-dated feature and market snapshots. No historical performance report was produced."
+    )
+
 def run_walk_forward_backtest(
     sportsbook: str = "DraftKings",
     min_edge_pct: float = 0.02, # Bet only if model prob > market implied prob + 2%
@@ -33,6 +61,14 @@ def run_walk_forward_backtest(
     """
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
+
+    # Run before scoring or writing a report. The previous implementation
+    # read present-day aggregates while iterating historical outcomes.
+    try:
+        validate_temporal_data(conn)
+    except BacktestNotEvaluable:
+        conn.close()
+        raise
 
     # Fetch all games that have first_scores and derived_tips
     query = """

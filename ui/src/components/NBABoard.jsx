@@ -107,7 +107,9 @@ export default function NBABoard({
         awayOppDefense: g.awayOppDefense || {},
         settlementRule,
         lineupStatus: g.lineupStatus,
+        inputQuality: g.inputQuality,
         pace: g.pace,
+        simIterations: g.simTelemetry?.iterations || 5000,
       })
     })
 
@@ -132,6 +134,8 @@ export default function NBABoard({
         date: g.date,
         tipMatchup: g.tipMatchup,
         lineupStatus: g.lineupStatus,
+        inputQuality: g.inputQuality,
+        recommendationEligible: snapshot?.source?.mode === 'live' && Boolean(p.recommendationEligible),
         pace: g.pace,
         gamePickRank: rankInGame + 1,
         isTop5InGame: true,
@@ -142,15 +146,22 @@ export default function NBABoard({
   }, [games])
 
 
-  // Top Model Pick: player with highest combined score and positive EV edge
+  // Only a fully qualified, live-input candidate may be called actionable.
   const topPick = useMemo(() => {
-    if (!players.length) return null
-    return [...players].sort((a, b) => {
+    const qualified = players.filter(p => p.recommendationEligible)
+    if (!qualified.length) return null
+    return [...qualified].sort((a, b) => {
       const aVal = (a.gameProb || 0) * (1 + (a.edgePct > 0 ? a.edgePct / 100 : 0))
       const bVal = (b.gameProb || 0) * (1 + (b.edgePct > 0 ? b.edgePct / 100 : 0))
       return bVal - aVal
     })[0]
   }, [players])
+
+  const readinessBlocks = useMemo(() => [...new Set(games.flatMap(g => g.inputQuality?.recommendationBlocks || []))], [games])
+  const confirmedLineups = games.filter(g => g.lineupStatus?.confirmed).length
+  const meanTipConversion = games.length
+    ? games.reduce((sum, g) => sum + (g.tipMatchup?.homeScoresFirstProb ?? g.tipMatchup?.teamAScoresFirstProb ?? 0.5), 0) / games.length
+    : null
 
   // Filtered Players
   const filteredPlayers = useMemo(() => {
@@ -179,6 +190,7 @@ export default function NBABoard({
     setSlipLegs((prev) => {
       const exists = prev.some((l) => l.id === player.id)
       if (exists) return prev.filter((l) => l.id !== player.id)
+      if (!player.recommendationEligible) return prev
       return [...prev, player]
     })
   }
@@ -210,14 +222,16 @@ export default function NBABoard({
 
   // Generated 2-Leg Parlay Combo Board
   const comboBoard = useMemo(() => {
-    return generateTwoLegBoard(games)
+    return generateTwoLegBoard(games.filter(g => g.inputQuality?.projectionEligible))
   }, [games])
 
-  // Filtered Combos for Bet Lab
+  // Keep the recipe surface focused; the full candidate board remains available for filters/counts.
   const displayedCombos = useMemo(() => {
     if (!comboBoard?.combos) return []
-    if (comboStrategyFilter === 'all') return comboBoard.combos.slice(0, 12)
-    return comboBoard.combos.filter((c) => c.tags.includes(comboStrategyFilter)).slice(0, 12)
+    const matching = comboStrategyFilter === 'all'
+      ? comboBoard.combos
+      : comboBoard.combos.filter((c) => c.tags.includes(comboStrategyFilter))
+    return matching.slice(0, 4)
   }, [comboBoard, comboStrategyFilter])
 
   // Live custom 2-leg parlay combo
@@ -303,8 +317,8 @@ export default function NBABoard({
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <span className="nba-chip-pill" style={{ background: 'rgba(52, 211, 153, 0.15)', borderColor: 'rgba(52, 211, 153, 0.3)', color: '#34d399' }}>
-            <Icon name="CheckCircle" size={12} /> Starters Confirmed (~30m Pre-Tip)
+          <span className="nba-chip-pill" style={{ background: confirmedLineups === games.length && games.length ? 'rgba(52, 211, 153, 0.15)' : 'rgba(251, 191, 36, 0.12)', borderColor: confirmedLineups === games.length && games.length ? 'rgba(52, 211, 153, 0.3)' : 'rgba(251, 191, 36, 0.3)', color: confirmedLineups === games.length && games.length ? '#34d399' : '#fbbf24' }}>
+            <Icon name={confirmedLineups === games.length && games.length ? 'CheckCircle' : 'AlertTriangle'} size={12} /> {confirmedLineups}/{games.length} Official Lineups Confirmed
           </span>
           <span className="nba-chip-pill" style={{ color: '#94a3b8' }}>
             Late Run Active
@@ -326,7 +340,7 @@ export default function NBABoard({
         <span className="nba-summary-divider" />
         <span className="nba-summary-item">
           <Icon name="Zap" size={13} />
-          <span>Tip Conversion Advantage: <strong>64%</strong></span>
+          <span>Team Scores First: <strong>{meanTipConversion == null ? '—' : `${(meanTipConversion * 100).toFixed(0)}%`}</strong></span>
         </span>
         <span className="nba-summary-divider" />
         <span className="nba-summary-item">
@@ -334,6 +348,23 @@ export default function NBABoard({
           <span>+EV Edges Found: <strong>{players.filter((p) => p.edgePct > 0).length}</strong></span>
         </span>
       </div>
+
+      {snapshot?.source?.mode === 'live' && !topPick && (
+        <div role="status" style={{ margin: '0.75rem 0 1rem', padding: '0.85rem 1rem', borderRadius: 10, border: '1px solid rgba(251, 191, 36, 0.3)', background: 'rgba(120, 82, 20, 0.14)', color: '#fef3c7', fontSize: '0.84rem' }}>
+          <strong>Projection only — no qualified betting calls.</strong>{' '}
+          {readinessBlocks.length
+            ? readinessBlocks.map(code => ({
+                starting_lineup_unconfirmed: 'official starters not confirmed',
+                insufficient_current_player_stats: 'too few current-season player stats',
+                missing_player_zone_shooting_rates: 'player zone shooting rates are still priors',
+                incomplete_team_matchup_context: 'team matchup data is incomplete',
+                insufficient_opening_play_history: 'opening-play history is not available',
+                opening_sequence_rates_not_observed: 'opening sequence rates are league priors',
+                live_first_basket_odds_unavailable: 'fresh first-basket odds are unavailable',
+              }[code] || code)).join(' · ')
+            : 'The live data and evaluation gates have not cleared.'}
+        </div>
+      )}
 
       {/* VIEW 1: SIGNALS BOARD */}
       {view === 'signals' && (
@@ -876,6 +907,7 @@ export default function NBABoard({
                               <button
                                 type="button"
                                 className={`nba-slip-add-btn ${inSlip ? 'in-slip' : ''}`}
+                                disabled={!player.recommendationEligible}
                                 onClick={(e) => toggleSlipLeg(player, e)}
                               >
                                 <Icon name={inSlip ? 'Check' : 'Plus'} size={13} />
@@ -1064,6 +1096,7 @@ export default function NBABoard({
                       <button
                         type="button"
                         className={`nba-slip-add-btn ${inSlip ? 'in-slip' : ''}`}
+                        disabled={!player.recommendationEligible}
                         onClick={(e) => toggleSlipLeg(player, e)}
                       >
                         <Icon name={inSlip ? 'Check' : 'Plus'} size={13} />
@@ -1301,8 +1334,7 @@ export default function NBABoard({
                 First Basket Bet Lab · 2-Leg Parlays
               </h2>
               <p style={{ fontSize: '0.88rem', color: '#94a3b8', margin: 0 }}>
-                Cross-game First Basket doubles modeled with independent joint probability ($P_1 \times P_2$),
-                compounded sportsbook payouts (+3000 to +6000), EV edge, and Quarter-Kelly bankroll allocation.
+                Model-only cross-game projections ranked by the independent joint probability ($P_1 \times P_2$). Prices do not affect which combinations appear or their order.
               </p>
             </div>
 
@@ -1313,7 +1345,7 @@ export default function NBABoard({
                 className={`nba-settlement-btn ${betLabSubView === 'recipes' ? 'active' : ''}`}
                 onClick={() => setBetLabSubView('recipes')}
               >
-                <Icon name="Layers" size={14} /> Curated 2-Leg Recipes ({comboBoard.totalAvailable})
+                <Icon name="Layers" size={14} /> Curated 2-Leg Recipes ({displayedCombos.length} shown)
               </button>
               <button
                 type="button"
@@ -1355,6 +1387,7 @@ export default function NBABoard({
                 <div className="nba-combo-recipes-grid">
                   {displayedCombos.map((combo, idx) => {
                     const isAdded = combo.legs.every((l) => slipLegs.some((sl) => sl.id === l.id))
+                    const canAddToSlip = combo.legs.every((leg) => leg.recommendationEligible)
                     const stratMeta = NBA_COMBO_STRATEGIES.find((s) => combo.tags.includes(s.id)) || NBA_COMBO_STRATEGIES[0]
                     const accentColor = combo.grade === 'PRIME' ? 'var(--prime)' : combo.grade === 'STRONG' ? '#38bdf8' : '#34d399'
 
@@ -1387,7 +1420,7 @@ export default function NBABoard({
                                     {leg.name}
                                   </div>
                                   <div style={{ fontSize: '0.74rem', color: '#94a3b8' }}>
-                                    {leg.team} vs {leg.opponent} · {leg.position} · {Math.round((leg.earlyShotShare || 0.25) * 100)}% Early Look
+                                  {leg.team} vs {leg.opponent} · {leg.position} · {Math.round((leg.earlyShotShare || 0.25) * 100)}% Early Look
                                   </div>
                                 </div>
                               </div>
@@ -1396,7 +1429,7 @@ export default function NBABoard({
                                   {(leg.gameProb * 100).toFixed(1)}%
                                 </div>
                                 <div className="mono" style={{ fontSize: '0.78rem', color: '#38bdf8', fontWeight: 700 }}>
-                                  {leg.bookOdds || leg.fairGameOdds}
+                                  Model pick
                                 </div>
                               </div>
                             </div>
@@ -1410,16 +1443,8 @@ export default function NBABoard({
                             <strong style={{ color: accentColor }}>{combo.jointProbPct}%</strong>
                           </div>
                           <div>
-                            <small>Parlay Price</small>
-                            <strong style={{ color: '#38bdf8' }}>{combo.compoundedAmerican}</strong>
-                          </div>
-                          <div>
-                            <small>Model Fair</small>
-                            <strong style={{ color: '#94a3b8' }}>{combo.fairAmerican}</strong>
-                          </div>
-                          <div>
-                            <small>Kelly Size</small>
-                            <strong style={{ color: '#34d399' }}>{combo.kellyUnits}u</strong>
+                            <small>Model basis</small>
+                            <strong style={{ color: '#94a3b8' }}>P₁ × P₂</strong>
                           </div>
                         </div>
 
@@ -1433,6 +1458,7 @@ export default function NBABoard({
                             type="button"
                             className={`nba-parlay-add-btn ${isAdded ? 'active' : ''}`}
                             onClick={() => loadComboIntoSlip(combo)}
+                            disabled={!canAddToSlip}
                             style={{
                               width: '100%',
                               padding: '0.65rem 1rem',
@@ -1451,7 +1477,7 @@ export default function NBABoard({
                             }}
                           >
                             <Icon name={isAdded ? 'Check' : 'Plus'} size={14} />
-                            {isAdded ? '2-Leg Parlay in Slip' : `Load ${combo.compoundedAmerican} 2-Leg Parlay`}
+                            {isAdded ? '2-Leg Parlay in Slip' : canAddToSlip ? 'Add 2-Leg Pair to Slip' : 'Projection only · slip unavailable'}
                           </button>
                         </footer>
                       </article>
@@ -1605,16 +1631,8 @@ export default function NBABoard({
                         <strong style={{ color: 'var(--prime)' }}>{liveCustomCombo.jointProbPct}%</strong>
                       </div>
                       <div>
-                        <small>Compounded Payout</small>
-                        <strong style={{ color: '#38bdf8' }}>{liveCustomCombo.compoundedAmerican}</strong>
-                      </div>
-                      <div>
-                        <small>Fair Model Odds</small>
-                        <strong style={{ color: '#94a3b8' }}>{liveCustomCombo.fairAmerican}</strong>
-                      </div>
-                      <div>
-                        <small>Recommended Stake</small>
-                        <strong style={{ color: '#34d399' }}>{liveCustomCombo.kellyUnits}u (Kelly)</strong>
+                        <small>Probability model</small>
+                        <strong style={{ color: '#94a3b8' }}>P₁ × P₂</strong>
                       </div>
                     </div>
                   </div>

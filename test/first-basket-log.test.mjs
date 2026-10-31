@@ -57,11 +57,26 @@ test('lineup mismatches are reported both ways', () => {
   assert.deepEqual(s.lineupMismatch.AAA.notStarting, ['Bob Beta']);
 });
 
+test('lineup-mismatched games stay visible but are excluded from metrics and learned feedback', () => {
+  const prediction = snap();
+  const result = {
+    date: prediction.date, game: prediction.game, scorer: 'Ann Alpha',
+    starters: parseStarters('AAA=Ann Alpha,Zed Newguy'),
+  };
+  const scored = scoreLog([prediction], [result]);
+  assert.equal(scored.scored.length, 1);
+  assert.equal(scored.excludedLineupMismatch, 1);
+  assert.equal(scored.eligibleScored.length, 0);
+  assert.equal(scored.summary.length, 0);
+  assert.equal(learnFromLog([prediction], [result]).gamesScored, 0);
+});
+
 test('scoreLog keeps the latest snapshot per version, flags flips, ignores backfill', () => {
   const early = snap({ loggedAt: '1' });
   const late = snap({ loggedAt: '2', players: snap().players.map(p => ({ ...p, pJoint: p.name === 'Dee Delta' ? 0.9 : 0.1 })) });
   const backfill = snap({ modelVersion: 'post', preTip: false });
-  const results = [{ date: '2026-10-29', game: 'AAA@BBB', scorer: 'Dee Delta' }];
+  const results = [{ date: '2026-10-29', game: 'AAA@BBB', scorer: 'Dee Delta',
+    starters: { AAA: ['Ann Alpha', 'Bob Beta'], BBB: ['Cal Gamma Jr.', 'Dee Delta'] } }];
   const r = scoreLog([early, late, backfill], results);
   assert.equal(r.scored.length, 1);                      // backfill excluded, one version left
   assert.equal(r.scored[0].topPick, 'Dee Delta');        // latest snapshot of v1 used
@@ -72,7 +87,8 @@ test('scoreLog keeps the latest snapshot per version, flags flips, ignores backf
 
 test('learnFromLog tracks player hits, O/E ratios and jumper feedback', () => {
   const p = snap();
-  const results = [{ date: '2026-10-29', game: 'AAA@BBB', scorer: 'Cal Gamma', tipWinner: 'BBB' }];
+  const results = [{ date: '2026-10-29', game: 'AAA@BBB', scorer: 'Cal Gamma', tipWinner: 'BBB',
+    starters: { AAA: ['Ann Alpha', 'Bob Beta'], BBB: ['Cal Gamma Jr.', 'Dee Delta'] } }];
   const l = learnFromLog([p], results);
   assert.equal(l.gamesScored, 1);
   const cal = l.allPlayers.find(x => x.name.includes('Cal Gamma'));
@@ -80,5 +96,27 @@ test('learnFromLog tracks player hits, O/E ratios and jumper feedback', () => {
   assert.ok(cal.oeRatio > 1.0);
   assert.ok(cal.learnedAdjustment > 1.0);
   assert.equal(l.positionAnalysis.SF.hits, 1);
+});
+
+test('gameId keeps same-matchup doubleheaders separate in evaluation', () => {
+  const one = snap({ gameId: 'event-1' });
+  const two = snap({ gameId: 'event-2', players: snap().players.map(p => ({
+    ...p, pJoint: p.name === 'Dee Delta' ? 0.7 : p.name === 'Ann Alpha' ? 0.1 : 0.1,
+  })) });
+  const actualStarters = { AAA: ['Ann Alpha', 'Bob Beta'], BBB: ['Cal Gamma Jr.', 'Dee Delta'] };
+  const results = [
+    { date: one.date, game: one.game, gameId: 'event-1', scorer: 'Ann Alpha', starters: actualStarters },
+    { date: two.date, game: two.game, gameId: 'event-2', scorer: 'Dee Delta', starters: actualStarters },
+  ];
+  const out = scoreLog([one, two], results);
+  assert.equal(out.scored.length, 2);
+  assert.deepEqual(out.scored.map(x => x.gameId).sort(), ['event-1', 'event-2']);
+});
+
+test('missing actual starter evidence blocks aggregate metrics', () => {
+  const prediction = snap();
+  const out = scoreLog([prediction], [{ date: prediction.date, game: prediction.game, scorer: 'Ann Alpha' }]);
+  assert.equal(out.scored[0].lineupEvidenceMissing, true);
+  assert.equal(out.eligibleScored.length, 0);
 });
 

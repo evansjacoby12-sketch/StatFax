@@ -20,6 +20,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } fr
 import { dirname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { execSync } from 'node:child_process';
+import { FIRST_BASKET_MODEL_VERSION } from '../src/sports/nba/logic/firstBasketEngine.js';
 
 const DEFAULT_DIR = 'data/first-basket-log';
 const PROB_FLOOR = 0.005; // scorer outside the model gets this probability in log loss
@@ -88,10 +89,79 @@ function appendJsonl(file, rec) {
   appendFileSync(file, JSON.stringify(rec) + '\n');
 }
 
+const gameDateInChicago = iso => new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'America/Chicago', year: 'numeric', month: '2-digit', day: '2-digit',
+}).format(new Date(iso || Date.now()));
+
+function liveSnapshotRecords(snapshot, version = FIRST_BASKET_MODEL_VERSION) {
+  if (snapshot?.sport !== 'nba' || snapshot?.source?.mode !== 'live') return [];
+  return (snapshot.games || []).filter(g => !g.isLive && !g.isFinal && g.status !== 'LIVE' && g.status !== 'FINAL')
+    .map(game => {
+      const players = (snapshot.players || []).filter(p => p.gameId === game.gameId);
+      if (!players.length) return null;
+      const home = game.homeTeam?.abbr;
+      const away = game.awayTeam?.abbr;
+      const tip = game.tipMatchup || {};
+      return {
+        type: 'prediction',
+        loggedAt: new Date().toISOString(),
+        date: gameDateInChicago(game.date),
+        game: `${away}@${home}`,
+        gameId: String(game.gameId),
+        away, home, modelVersion: version, preTip: true,
+        note: 'Captured automatically from the live pregame slate pipeline.',
+        lineupStatus: game.lineupStatus || null,
+        inputQuality: game.inputQuality || null,
+        tip: {
+          tipProbHome: tip.homeTipProb ?? tip.tipProbA ?? null,
+          homeScoresFirst: tip.homeScoresFirstProb ?? tip.teamAScoresFirstProb ?? null,
+        },
+        players: players.map(p => ({
+          name: p.name, team: p.team, position: p.position,
+          pCredit: p.teamProb, pJoint: p.gameProb,
+          starter: Boolean(p.isStarter), marketOdds: p.books || null,
+          earlyShotShare: p.earlyShotShare ?? null,
+          zoneFG: p.zoneFG || null,
+          openingHistorySamples: p.openingHistorySamples ?? null,
+          openingShotAttempts: p.openingShotAttempts ?? null,
+          openingShotMakes: p.openingShotMakes ?? null,
+          openingStartTypes: p.openingStartTypes || null,
+          dataSources: p.dataSources || null,
+        })),
+      };
+    }).filter(Boolean);
+}
+
+/** Append only changed, pre-tip live slate snapshots for prospective evaluation. */
+export function appendPregamePredictions(snapshot, { dir = DEFAULT_DIR, version = FIRST_BASKET_MODEL_VERSION } = {}) {
+  const file = resolve(dir, 'predictions.jsonl');
+  const prior = readJsonl(file);
+  const records = liveSnapshotRecords(snapshot, version);
+  let written = 0;
+  for (const record of records) {
+    const prev = [...prior].reverse().find(p => p.type === 'prediction' &&
+      p.date === record.date && p.modelVersion === record.modelVersion &&
+      ((p.gameId && p.gameId === record.gameId) || (!p.gameId && p.game === record.game)));
+    const signature = r => JSON.stringify({
+      players: r.players.map(p => [p.name, p.pJoint, p.marketOdds, p.earlyShotShare, p.zoneFG,
+        p.openingHistorySamples, p.openingShotAttempts, p.openingShotMakes, p.openingStartTypes, p.dataSources]),
+      lineupStatus: r.lineupStatus,
+      inputQuality: r.inputQuality,
+      tip: r.tip,
+    });
+    if (prev && signature(prev) === signature(record)) continue;
+    appendJsonl(file, record);
+    prior.push(record);
+    written++;
+  }
+  return { considered: records.length, written, path: file };
+}
+
 const localDate = () => new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD in local time
 const pct = (x, d = 1) => (x == null || Number.isNaN(x) ? '—' : (x * 100).toFixed(d) + '%');
 const mean = a => (a.length ? a.reduce((s, x) => s + x, 0) / a.length : NaN);
 const num = (x, d = 3) => (Number.isFinite(x) ? x.toFixed(d) : '—');
+const identityKey = record => `${record.date}|${record.gameId ? `id:${record.gameId}` : `game:${record.game}`}`;
 
 function gitVersion() {
   try {
@@ -114,7 +184,7 @@ export function scoreSnapshot(snap, result) {
   const rank = hit ? 1 + players.filter(x => x.p > hit.p).length : null;
 
   const out = {
-    date: snap.date, game: snap.game, modelVersion: snap.modelVersion,
+    date: snap.date, game: snap.game, gameId: snap.gameId ?? result.gameId ?? null, modelVersion: snap.modelVersion,
     scorer: result.scorer, matched: hit ? hit.name : null, outsideModel: !hit,
     pActual, nPlayers: n,
     logLoss: -Math.log(Math.max(pActual, PROB_FLOOR)),
@@ -134,9 +204,12 @@ export function scoreSnapshot(snap, result) {
   if (snap.tip && hit) {
     out.teamFirstBrier = (snap.tip.homeScoresFirst - (hit.team === snap.home ? 1 : 0)) ** 2;
   }
-  if (result.starters) {
+  const modelTeams = new Set(players.map(p => p.team).filter(Boolean));
+  const actualTeams = result.starters || null;
+  out.lineupEvidenceMissing = !actualTeams || [...modelTeams].some(team => !Array.isArray(actualTeams[team]));
+  if (actualTeams) {
     out.lineupMismatch = {};
-    for (const [team, names] of Object.entries(result.starters)) {
+    for (const [team, names] of Object.entries(actualTeams)) {
       const teamPlayers = players.filter(x => x.team === team);
       const notInModel = names.filter(nm => !matchPlayer(teamPlayers, nm));
       const notStarting = teamPlayers.filter(tp => !names.some(nm => matchPlayer([tp], nm))).map(tp => tp.name);
@@ -184,16 +257,22 @@ function positionCheck(scored) {
 }
 
 export function scoreLog(predictions, results, { includeBackfill = false, version = null } = {}) {
-  const resByKey = new Map();
-  for (const r of results) resByKey.set(`${r.date}|${r.game}`, r); // newest result wins
+  const resultsById = new Map();
+  const resultsByGame = new Map();
+  for (const r of results) {
+    if (r.gameId) resultsById.set(`${r.date}|id:${r.gameId}`, r);
+    resultsByGame.set(`${r.date}|game:${r.game}`, r);
+  }
+  const resultFor = record => (record.gameId && resultsById.get(identityKey(record))) ||
+    resultsByGame.get(`${record.date}|game:${record.game}`);
 
   const preds = predictions.filter(p =>
     (includeBackfill || p.preTip !== false) && (!version || p.modelVersion === version));
 
-  const latest = new Map();   // date|game|version -> last snapshot logged
-  const topPicks = new Map(); // date|game -> top pick of every snapshot, in order
+  const latest = new Map();   // date|gameId|version -> last snapshot logged
+  const topPicks = new Map(); // date|gameId -> top pick history
   for (const p of preds) {
-    const key = `${p.date}|${p.game}`;
+    const key = identityKey(p);
     latest.set(`${key}|${p.modelVersion}`, p);
     const top = p.players.reduce((a, b) => (b.pJoint > a.pJoint ? b : a)).name;
     if (!topPicks.has(key)) topPicks.set(key, []);
@@ -203,32 +282,40 @@ export function scoreLog(predictions, results, { includeBackfill = false, versio
   const scored = [];
   const unscored = new Set();
   for (const snap of latest.values()) {
-    const res = resByKey.get(`${snap.date}|${snap.game}`);
+    const res = resultFor(snap);
     if (res) scored.push(scoreSnapshot(snap, res));
     else unscored.add(`${snap.date} ${snap.game}`);
   }
 
+  // A prediction for the wrong starting five is not a valid evaluation of
+  // the model that was actually available at tip. Keep it visible for
+  // diagnosis, but exclude it from performance summaries and learned priors.
+  const eligibleScored = scored.filter(s => !s.lineupEvidenceMissing &&
+    (!s.lineupMismatch || Object.keys(s.lineupMismatch).length === 0));
+
   const flips = [];
   for (const [key, seq] of topPicks) {
     if (new Set(seq).size > 1) {
-      flips.push({ key, picks: seq.filter((t, i) => i === 0 || t !== seq[i - 1]), resolved: resByKey.has(key) });
+      flips.push({ key, picks: seq.filter((t, i) => i === 0 || t !== seq[i - 1]), resolved: resultsById.has(key) || resultsByGame.has(key) });
     }
   }
 
   return {
-    scored, flips, unscored: [...unscored],
-    summary: summarize(scored), calibration: calibrate(scored), position: positionCheck(scored),
+    scored, eligibleScored, excludedLineupMismatch: scored.length - eligibleScored.length,
+    flips, unscored: [...unscored],
+    summary: summarize(eligibleScored), calibration: calibrate(eligibleScored), position: positionCheck(eligibleScored),
     tip: {
-      games: scored.filter(s => s.tipBrier != null).length,
-      tipBrier: mean(scored.filter(s => s.tipBrier != null).map(s => s.tipBrier)),
-      teamFirstBrier: mean(scored.filter(s => s.teamFirstBrier != null).map(s => s.teamFirstBrier)),
+      games: eligibleScored.filter(s => s.tipBrier != null).length,
+      tipBrier: mean(eligibleScored.filter(s => s.tipBrier != null).map(s => s.tipBrier)),
+      teamFirstBrier: mean(eligibleScored.filter(s => s.teamFirstBrier != null).map(s => s.teamFirstBrier)),
     },
   };
 }
 
 export function formatReport(r) {
   const L = [];
-  L.push(`First-basket backtest: ${r.scored.length} scored game-snapshot(s)`);
+  L.push(`First-basket evaluation: ${r.scored.length} scored game-snapshot(s), ${r.eligibleScored.length} eligible`);
+  if (r.excludedLineupMismatch) L.push(`Excluded from metrics and learning: ${r.excludedLineupMismatch} game(s) with missing or mismatched starter evidence`);
   if (!r.scored.length) {
     L.push('Nothing to score yet. Log a pre-tip snapshot AND a result for the same date + game.');
   }
@@ -285,7 +372,7 @@ export function formatReport(r) {
     for (const f of r.flips) L.push(`${f.key.replace('|', ' ')}: ${f.picks.join(' -> ')}`);
   }
   if (r.unscored.length) L.push('', `Awaiting results: ${r.unscored.join(', ')}`);
-  const nGames = new Set(r.scored.map(s => `${s.date}|${s.game}`)).size;
+  const nGames = new Set(r.eligibleScored.map(identityKey)).size;
   if (nGames < MIN_GAMES) {
     L.push('', `CAUTION: only ${nGames} distinct game(s) scored. Below ~${MIN_GAMES}, every number here is mostly luck.`);
   }
@@ -296,7 +383,7 @@ export function formatReport(r) {
 
 export function learnFromLog(predictions, results, { includeBackfill = false } = {}) {
   const scoredData = scoreLog(predictions, results, { includeBackfill });
-  const scored = scoredData.scored;
+  const scored = scoredData.eligibleScored;
 
   const playerStats = {};
   const jumperStats = {};
@@ -337,10 +424,10 @@ export function learnFromLog(predictions, results, { includeBackfill = false } =
   }
 
   // Tally jumper tip records from predictions and results
-  const resByKey = new Map();
-  for (const r of results) resByKey.set(`${r.date}|${r.game}`, r);
+  const resByKey = new Map(results.map(r => [identityKey(r), r]));
+  const resByGame = new Map(results.map(r => [`${r.date}|game:${r.game}`, r]));
   for (const p of predictions) {
-    const res = resByKey.get(`${p.date}|${p.game}`);
+    const res = resByKey.get(identityKey(p)) || resByGame.get(`${p.date}|game:${p.game}`);
     if (res && res.tipWinner && p.tip?.homeJumper && p.tip?.awayJumper) {
       const homeWon = res.tipWinner === p.home;
       const awayWon = res.tipWinner === p.away;
@@ -474,7 +561,7 @@ export async function reconcileFromESPN(date = localDate(), dir = DEFAULT_DIR) {
 
   const resFile = resolve(dir, 'results.jsonl');
   const existing = readJsonl(resFile);
-  const existingKeys = new Set(existing.map(r => `${r.date}|${r.game}`));
+  const existingKeys = new Set(existing.map(identityKey));
   const reconciled = [];
 
   const TEAM_ALIASES = { NO: 'NOP', GS: 'GSW', NY: 'NYK', SA: 'SAS', UTAH: 'UTA', WSH: 'WAS', PHO: 'PHX', BK: 'BKN' };
@@ -487,9 +574,10 @@ export async function reconcileFromESPN(date = localDate(), dir = DEFAULT_DIR) {
     const away = normAbbr(rawAway);
     const home = normAbbr(rawHome);
     const game = `${away}@${home}`;
-    const key = `${date}|${game}`;
+    const gameId = String(e.id);
+    const key = `${date}|id:${gameId}`;
 
-    if (existingKeys.has(key)) {
+    if (existingKeys.has(key) || existingKeys.has(`${date}|game:${game}`)) {
       console.log(`[reconcile] ${key} already logged, skipping.`);
       continue;
     }
@@ -542,7 +630,9 @@ export async function reconcileFromESPN(date = localDate(), dir = DEFAULT_DIR) {
       starters = {};
       for (const t of sum.boxscore.players) {
         const tAbbr = normAbbr(t.team.abbreviation);
-        starters[tAbbr] = (t.statistics?.[0]?.athletes || []).slice(0, 5).map(a => a.athlete.displayName);
+        const actualStarters = (t.statistics?.[0]?.athletes || []).filter(a => a.starter === true)
+          .map(a => a.athlete.displayName).filter(Boolean);
+        if (actualStarters.length === 5) starters[tAbbr] = actualStarters;
       }
     }
 
@@ -551,6 +641,7 @@ export async function reconcileFromESPN(date = localDate(), dir = DEFAULT_DIR) {
       loggedAt: new Date().toISOString(),
       date,
       game,
+      gameId,
       scorer,
       tipWinner,
       starters,
@@ -654,6 +745,7 @@ async function main(argv) {
     const [away, home] = args.game.split('@').map(s => s.trim().toUpperCase());
     const rec = {
       type: 'result', loggedAt: new Date().toISOString(), date, game: `${away}@${home}`,
+      gameId: typeof args['game-id'] === 'string' ? args['game-id'] : null,
       scorer: args.scorer, tipWinner: typeof args['tip-winner'] === 'string' ? args['tip-winner'].toUpperCase() : null,
       starters: args.starters ? parseStarters(args.starters) : null,
       note: typeof args.note === 'string' ? args.note : null,
@@ -669,7 +761,12 @@ async function main(argv) {
       version: typeof args.version === 'string' ? args.version : null,
     });
     if (args.json) {
-      const slim = { ...report, scored: report.scored.map(({ players, ...rest }) => rest) };
+      const slim = {
+        ...report,
+        eligibleGames: report.eligibleScored.length,
+        scored: report.scored.map(({ players, ...rest }) => rest),
+      };
+      delete slim.eligibleScored;
       console.log(JSON.stringify(slim, null, 2));
     } else {
       console.log(formatReport(report));

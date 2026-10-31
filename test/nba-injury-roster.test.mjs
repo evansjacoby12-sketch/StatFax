@@ -133,7 +133,17 @@ test('NBA Daily Lineups: buildLiveNBASnapshot replaces injured starters, adjusts
     },
   };
 
-  const snapshot = buildLiveNBASnapshot(mockScoreboard, { gameSummaries: mockSummaries });
+  const snapshot = buildLiveNBASnapshot(mockScoreboard, {
+    gameSummaries: mockSummaries,
+    zoneStatsByPlayerId: {
+      'name:al horford': {
+        rim: { made: 7, attempts: 10, pct: 0.7 },
+        mid: { made: 4, attempts: 10, pct: 0.4 },
+        three: { made: 4, attempts: 10, pct: 0.4 },
+        source: 'nba_stats_leaguedashplayershotlocations', season: '2026-27',
+      },
+    },
+  });
   assert.ok(snapshot, 'Snapshot should be created');
   assert.equal(snapshot.games.length, 1);
 
@@ -149,6 +159,8 @@ test('NBA Daily Lineups: buildLiveNBASnapshot replaces injured starters, adjusts
   assert.ok(horford, 'Al Horford should be promoted to the starting lineup');
   assert.equal(horford.isReplacement, true);
   assert.equal(horford.replacedPlayer, 'Kristaps Porzingis');
+  assert.equal(horford.dataSources.rimAndMidRates, 'nba_stats_zone_shooting');
+  assert.equal(horford.dataSources.zoneAttempts.rim, 10);
 
   // 3. Opening tip matchup must feature Al Horford for GSW and Walker Kessler for LAL
   assert.equal(game.tipMatchup.homeJumper, 'Al Horford');
