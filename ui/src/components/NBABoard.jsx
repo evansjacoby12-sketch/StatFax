@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import Icon from './Icon.jsx'
+import NBATeamLogo from './NBATeamLogo.jsx'
 import CommandTabs from './CommandTabs.jsx'
 import { SPORT_UI } from '../lib/sportUi.js'
 import NBA_DEMO_SNAPSHOT from '../../../src/sports/nba/data/demoSlate.js'
@@ -393,10 +394,7 @@ export default function NBABoard({
                       borderColor: NBA_TEAM_COLORS[topPick.team] || 'rgba(255,255,255,0.2)',
                     }}
                   >
-                    <img
-                      src={`https://a.espncdn.com/i/teamlogos/nba/500/scoreboard/${topPick.team.toLowerCase()}.png`}
-                      alt={topPick.team}
-                    />
+                    <NBATeamLogo team={topPick.team} />
                   </div>
                   <div>
                     <h2 className="nba-hero-player-name">{topPick.name}</h2>
@@ -606,12 +604,8 @@ export default function NBABoard({
                     <div className="nba-game-section-header">
                       <div className="nba-game-matchup-title">
                         <div className="nba-game-team-logos">
-                          {g.awayTeam?.logo && (
-                            <img src={g.awayTeam.logo} alt={g.awayTeam.abbr} className="nba-game-team-logo" />
-                          )}
-                          {g.homeTeam?.logo && (
-                            <img src={g.homeTeam.logo} alt={g.homeTeam.abbr} className="nba-game-team-logo" />
-                          )}
+                          <NBATeamLogo team={g.awayTeam} className="nba-game-team-logo" />
+                          <NBATeamLogo team={g.homeTeam} className="nba-game-team-logo" />
                         </div>
                         <div className="nba-game-names-wrap">
                           <h2 className="nba-game-matchup-heading">
@@ -747,10 +741,7 @@ export default function NBABoard({
                               <div className="nba-card-top">
                                 <div className="nba-card-player-info">
                                   <div className="nba-team-badge-circle">
-                                    <img
-                                      src={`https://a.espncdn.com/i/teamlogos/nba/500/scoreboard/${player.team.toLowerCase()}.png`}
-                                      alt={player.team}
-                                    />
+                                    <NBATeamLogo team={player.team} />
                                   </div>
                                   <div>
                                     <h3 className="nba-card-player-name">{player.name}</h3>
@@ -941,10 +932,7 @@ export default function NBABoard({
                       <div className="nba-card-top">
                         <div className="nba-card-player-info">
                           <div className="nba-team-badge-circle">
-                            <img
-                              src={`https://a.espncdn.com/i/teamlogos/nba/500/scoreboard/${player.team.toLowerCase()}.png`}
-                              alt={player.team}
-                            />
+                            <NBATeamLogo team={player.team} />
                           </div>
                           <div>
                             <h3 className="nba-card-player-name">{player.name}</h3>
@@ -1153,7 +1141,7 @@ export default function NBABoard({
                       className="nba-team-badge-circle"
                       style={{ borderColor: NBA_TEAM_COLORS[g.awayTeam.abbr] }}
                     >
-                      <img src={g.awayTeam.logo} alt={g.awayTeam.abbr} />
+                      <NBATeamLogo team={g.awayTeam} src={g.awayTeam.logo} />
                     </div>
                     <div>
                       <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#ffffff' }}>
@@ -1190,7 +1178,7 @@ export default function NBABoard({
                       className="nba-team-badge-circle"
                       style={{ borderColor: NBA_TEAM_COLORS[g.homeTeam.abbr] }}
                     >
-                      <img src={g.homeTeam.logo} alt={g.homeTeam.abbr} />
+                      <NBATeamLogo team={g.homeTeam} src={g.homeTeam.logo} />
                     </div>
                     <div>
                       <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#ffffff' }}>

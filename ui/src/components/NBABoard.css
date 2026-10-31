@@ -366,6 +366,25 @@
   object-fit: contain;
 }
 
+.nba-team-logo-fallback {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  overflow: hidden;
+  background: rgba(30, 41, 59, 0.9);
+  color: #e2e8f0;
+  font-size: 0.58rem;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+
+.nba-team-badge-circle .nba-team-logo-fallback {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+}
+
 .nba-card-player-name {
   font-size: 1.05rem;
   font-weight: 700;
@@ -1078,6 +1097,11 @@
   width: 28px;
   height: 28px;
   object-fit: contain;
+}
+
+.nba-game-team-logo.nba-team-logo-fallback {
+  border-radius: 50%;
+  font-size: 0.52rem;
 }
 
 .nba-game-names-wrap {
