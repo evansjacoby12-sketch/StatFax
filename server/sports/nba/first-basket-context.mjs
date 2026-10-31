@@ -1,6 +1,9 @@
 const NBA_STATS_URL = 'https://stats.nba.com/stats/leaguedashplayershotlocations';
+const NBA_TEAM_STATS_URL = 'https://stats.nba.com/stats/leaguedashteamstats';
 const PBP_STATS_URL = 'https://api.pbpstats.com/get-shots/nba';
 const NBA_TEAM_IDS = { ATL:1610612737, BOS:1610612738, BKN:1610612751, CHA:1610612766, CHI:1610612741, CLE:1610612739, DAL:1610612742, DEN:1610612743, DET:1610612765, GSW:1610612744, HOU:1610612745, IND:1610612754, LAC:1610612746, LAL:1610612747, MEM:1610612763, MIA:1610612748, MIL:1610612749, MIN:1610612750, NOP:1610612740, NYK:1610612752, OKC:1610612760, ORL:1610612753, PHI:1610612755, PHX:1610612756, POR:1610612757, SAC:1610612758, SAS:1610612759, TOR:1610612761, UTA:1610612762, WAS:1610612764 };
+const NBA_TEAM_ABBR_ALIASES = { UTAH: 'UTA', NO: 'NOP', SA: 'SAS', GS: 'GSW', NY: 'NYK' };
+export const canonicalNbaTeamAbbr = abbr => NBA_TEAM_ABBR_ALIASES[String(abbr || '').toUpperCase()] || String(abbr || '').toUpperCase();
 
 const ZONES = ['Restricted Area', 'In The Paint (Non-RA)', 'Mid-Range', 'Left Corner 3', 'Right Corner 3', 'Above the Break 3', 'Backcourt'];
 const norm = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
@@ -46,6 +49,26 @@ export function parseNbaZoneStats(payload) {
       season: payload.season || null,
     };
     if (norm(playerName)) out[`name:${norm(playerName)}`] = out[id];
+  }
+  return out;
+}
+
+/** Parse official NBA advanced team rows into pace keyed by StatFax abbreviation. */
+export function parseNbaTeamPace(payload) {
+  const sets = payload?.resultSets || payload?.resultSet || [];
+  const list = Array.isArray(sets) ? sets : [sets];
+  const set = list.find(row => row.name === 'LeagueDashTeamStats') || list[0] || null;
+  const headers = set?.headers || [];
+  const rows = set?.rowSet || [];
+  const index = name => headers.findIndex(header => String(header).toUpperCase() === name);
+  const teamIdIndex = index('TEAM_ID'), paceIndex = index('PACE');
+  if (teamIdIndex < 0 || paceIndex < 0) return {};
+  const abbrById = Object.fromEntries(Object.entries(NBA_TEAM_IDS).map(([abbr, id]) => [String(id), abbr]));
+  const out = {};
+  for (const row of rows) {
+    const abbr = abbrById[String(row[teamIdIndex])];
+    const pace = n(row[paceIndex]);
+    if (abbr && pace != null && pace > 0 && pace < 130) out[abbr] = pace;
   }
   return out;
 }
@@ -131,13 +154,26 @@ export async function fetchFirstBasketContext(games, {
   zoneCached = {}, openingCached = {}, timeoutMs = 60000,
 } = {}) {
   const requestJson = async (url, init = {}) => {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), timeoutMs);
-    try {
-      const res = await fetchImpl(url, { ...init, signal: controller.signal });
-      if (!res.ok) throw new Error(`provider HTTP ${res.status}`);
-      return await res.json();
-    } finally { clearTimeout(timeout); }
+    let lastError;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const res = await fetchImpl(url, { ...init, signal: controller.signal });
+        if (!res.ok) {
+          const error = new Error(`provider HTTP ${res.status}`);
+          error.status = res.status;
+          error.retryable = res.status === 429 || res.status >= 500;
+          throw error;
+        }
+        return await res.json();
+      } catch (error) {
+        lastError = error;
+        if (error.retryable === false) break;
+        if (attempt < 2) await new Promise(resolve => setTimeout(resolve, error.status === 429 || error.status === 503 ? Math.min(8000, 1500 * (2 ** attempt)) : 300 * (attempt + 1)));
+      } finally { clearTimeout(timeout); }
+    }
+    throw lastError;
   };
     let zoneStatsByPlayerId = zoneCached;
     let zoneStatus = Object.keys(zoneCached).length ? 'cached' : 'unavailable';
@@ -157,6 +193,22 @@ export async function fetchFirstBasketContext(games, {
       } catch { zoneStatsByPlayerId = zoneCached; zoneStatus = 'unavailable'; }
     }
 
+    let teamPaceByTeam = {};
+    let teamPaceStatus = 'unavailable';
+    try {
+      const url = new URL(NBA_TEAM_STATS_URL);
+      const params = {
+        College: '', Conference: '', Country: '', DateFrom: '', DateTo: '', Division: '', DraftPick: '', DraftYear: '', GameScope: '', GameSegment: '', LastNGames: '0', LeagueID: '00', Location: '', MeasureType: 'Advanced', Month: '0', OpponentTeamID: '0', Outcome: '', PORound: '', PaceAdjust: 'N', PerMode: 'PerGame', Period: '0', PlayerExperience: '', PlayerPosition: '', PlusMinus: 'N', Rank: 'N', Season: season, SeasonSegment: '', SeasonType: 'Regular Season', ShotClockRange: '', StarterBench: '', TeamID: '0', VsConference: '', VsDivision: '',
+      };
+      for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
+      teamPaceByTeam = parseNbaTeamPace(await requestJson(url, { headers: {
+        Accept: 'application/json', Referer: 'https://www.nba.com/', Origin: 'https://www.nba.com',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126.0 Safari/537.36',
+        'x-nba-stats-origin': 'stats', 'x-nba-stats-token': 'true',
+      } }));
+      teamPaceStatus = Object.keys(teamPaceByTeam).length ? 'ok' : 'empty';
+    } catch { teamPaceStatus = 'unavailable'; }
+
     let openingByPlayer = { ...openingCached.byPlayer };
     let openingSamples = Number(openingCached.sampleCount) || 0;
     let openingStatus = openingCached.status || 'unavailable';
@@ -165,9 +217,11 @@ export async function fetchFirstBasketContext(games, {
     let openingByTeam = openingCached.byTeam || {};
     let openingHistorySeason = openingCached.dataSeason || null;
     const teams = [...new Map((games || []).flatMap(g => [g.homeTeam, g.awayTeam])
-      .filter(t => t?.abbr && NBA_TEAM_IDS[t.abbr]).map(t => [t.abbr, { ...t, id: NBA_TEAM_IDS[t.abbr] }])).values()];
+      .filter(t => t?.abbr && NBA_TEAM_IDS[canonicalNbaTeamAbbr(t.abbr)])
+      .map(t => [t.abbr, { ...t, canonicalAbbr: canonicalNbaTeamAbbr(t.abbr), id: NBA_TEAM_IDS[canonicalNbaTeamAbbr(t.abbr)] }])).values()];
     const cachedTeams = openingFresh ? openingByTeam : {};
     const teamsToFetch = teams.filter(t => !cachedTeams[t.abbr]);
+    let openingFailures = [];
     if (openingFresh) {
       Object.assign(openingByPlayer, openingCached.byPlayer || {});
       openingSamples = Number(openingCached.sampleCount) || 0;
@@ -225,7 +279,7 @@ export async function fetchFirstBasketContext(games, {
       const queue = teamsToFetch.slice(1).map((team, index) => ({ team, index: index + 1 }));
       const teamResults = new Array(teamsToFetch.length);
       if (probeResult) teamResults[0] = probeResult;
-      else teamResults[0] = { status: 'rejected' };
+      else teamResults[0] = { status: 'rejected', reason: new Error('No supported PBP Stats season response for probe team') };
       const worker = async () => {
         while (queue.length) {
           const { team, index } = queue.shift();
@@ -238,7 +292,7 @@ export async function fetchFirstBasketContext(games, {
           } catch (reason) { teamResults[index] = { status: 'rejected', reason }; }
         }
       };
-      await Promise.all(Array.from({ length: Math.min(5, teamsToFetch.length) }, worker));
+      await Promise.all(Array.from({ length: Math.min(2, teamsToFetch.length) }, worker));
       let okTeams = 0;
       let truncated = false;
       for (let i = 0; i < teamResults.length; i++) {
@@ -255,6 +309,9 @@ export async function fetchFirstBasketContext(games, {
         if (item.value.sampleCount > 0) openingByTeam[teamsToFetch[i].abbr] = { ...item.value, season: openingHistorySeason };
       }
       openingStatus = truncated ? 'truncated' : okTeams === teamsToFetch.length ? 'ok' : okTeams ? 'partial' : 'unavailable';
+      openingFailures = teamResults.map((item, index) => item?.status === 'rejected'
+        ? { team: teamsToFetch[index]?.abbr || null, reason: item.reason?.message || 'PBP Stats request failed' }
+        : null).filter(Boolean);
     }
     if (openingStatus !== 'truncated' && teams.length) {
       const covered = teams.filter(t => openingByTeam[t.abbr]?.status === 'ok').length;
@@ -263,9 +320,10 @@ export async function fetchFirstBasketContext(games, {
     }
     return {
       zoneStatsByPlayerId, zoneStatus, zoneSeason: season,
+      teamPaceByTeam, teamPaceStatus, teamPaceSeason: season,
       openingByPlayer: openingStatus === 'truncated' ? {} : openingByPlayer,
       openingStatus, openingSamples: openingStatus === 'truncated' ? 0 : openingSamples,
-      openingByTeam: openingStatus === 'truncated' ? {} : openingByTeam,
+      openingByTeam: openingStatus === 'truncated' ? {} : openingByTeam, openingFailures,
       openingSeason: season, openingHistorySeason, openingFetchedAt: new Date().toISOString(),
     };
 }

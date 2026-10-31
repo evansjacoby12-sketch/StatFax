@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { fetchFirstBasketContext, nbaSeasonForDate, parseNbaZoneStats, parsePbpOpeningShots } from '../server/sports/nba/first-basket-context.mjs';
+import { canonicalNbaTeamAbbr, fetchFirstBasketContext, nbaSeasonForDate, parseNbaTeamPace, parseNbaZoneStats, parsePbpOpeningShots } from '../server/sports/nba/first-basket-context.mjs';
 
 test('NBA official shot-zone rows become count-backed rates', () => {
   const zones = ['Restricted Area', 'In The Paint (Non-RA)', 'Mid-Range', 'Left Corner 3', 'Right Corner 3', 'Above the Break 3', 'Backcourt'];
@@ -16,6 +16,17 @@ test('NBA official shot-zone rows become count-backed rates', () => {
   assert.equal(parsed['123'].mid.pct, 0.3);
   assert.equal(parsed['123'].three.made, 15);
   assert.equal(parsed['123'].season, '2026-27');
+});
+
+test('NBA official advanced team rows provide real pace and normalize ESPN team aliases', () => {
+  const parsed = parseNbaTeamPace({ resultSets: [{
+    name: 'LeagueDashTeamStats', headers: ['TEAM_ID', 'TEAM_NAME', 'PACE'],
+    rowSet: [[1610612762, 'Utah Jazz', 101.8], [1610612738, 'Boston Celtics', 100.7]],
+  }] });
+  assert.deepEqual(parsed, { UTA: 101.8, BOS: 100.7 });
+  assert.equal(canonicalNbaTeamAbbr('UTAH'), 'UTA');
+  assert.equal(canonicalNbaTeamAbbr('NO'), 'NOP');
+  assert.equal(canonicalNbaTeamAbbr('SA'), 'SAS');
 });
 
 test('PBP Stats first-possession parser selects possession 1 or 2 and captures first-shot tempo', () => {
@@ -74,6 +85,10 @@ test('context fetch combines official zone data and both teams opening history',
   const calls = [];
   const fetchImpl = async url => {
     calls.push(String(url));
+    if (String(url).includes('leaguedashteamstats')) return { ok: true, json: async () => ({ resultSets: [{
+      name: 'LeagueDashTeamStats', headers: ['TEAM_ID', 'TEAM_NAME', 'PACE'],
+      rowSet: [[1610612738, 'Boston Celtics', 101.2], [1610612747, 'Los Angeles Lakers', 99.7]],
+    }] }) };
     if (String(url).includes('stats.nba.com')) return { ok: true, json: async () => ({ resultSets: [{ name: 'ShotLocations', headers: zoneHeaders, rowSet: [zoneRow] }] }) };
     return { ok: true, json: async () => ({ results: [
       { gid: 'g1', period: 1, poss_num: 1, player: 'Jayson Tatum', player_id: 1628369, start_time: 720, shot_time: 700, made: true, start_type: 'OffDeadBall' },
@@ -84,6 +99,8 @@ test('context fetch combines official zone data and both teams opening history',
   });
   assert.equal(context.zoneStatus, 'ok');
   assert.equal(context.zoneStatsByPlayerId['123'].rim.attempts, 20);
+  assert.equal(context.teamPaceStatus, 'ok');
+  assert.deepEqual(context.teamPaceByTeam, { BOS: 101.2, LAL: 99.7 });
   assert.equal(context.openingStatus, 'ok');
   assert.equal(context.openingByTeam.BOS.byPlayer['jayson tatum'].attempts, 2);
   assert.equal(context.openingByTeam.LAL.sampleCount, 2);

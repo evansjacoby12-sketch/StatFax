@@ -525,7 +525,10 @@ test('confirmed lineups receive the shrunk PBP opening-shot share', () => {
     gameSummaries: { [game.gameId]: { boxscore: { players: [teamBlock('BOS', home), teamBlock('NYK', away)] } } },
     playerStatsById: statsById,
     zoneStatsByPlayerId: zonesById,
-    teamStatsByTeam: { BOS: { pace: 99, opp3PtPct: 0.35 }, NYK: { pace: 101, opp3PtPct: 0.37 } },
+    teamStatsByTeam: {
+      BOS: { pace: 99, paceSource: 'nba_stats_leaguedashteamstats_advanced', paceSeason: '2026-27', opp3PtPct: 0.35 },
+      NYK: { pace: 101, paceSource: 'nba_stats_leaguedashteamstats_advanced', paceSeason: '2026-27', opp3PtPct: 0.37 },
+    },
     openingTendenciesByTeam: { BOS: history(home), NYK: history(away) },
   });
   const teamPlayers = snapshot.players.filter(p => p.isHome);
@@ -535,6 +538,12 @@ test('confirmed lineups receive the shrunk PBP opening-shot share', () => {
   assert.equal(observedOpener.dataSources.earlyShotShare, 'pbpstats_season_l5_l10_blended');
   assert.equal(observedOpener.openingRoleRecent.applied, true);
   assert.equal(snapshot.games[0].inputQuality.recentOpeningRoleCoverage, 1);
+  assert.equal(snapshot.games[0].pace, 100);
+  assert.deepEqual(snapshot.games[0].paceEvidence, {
+    source: 'nba_stats_leaguedashteamstats_advanced', season: '2026-27', coverage: 1,
+    home: { team: 'BOS', pace: 99, source: 'nba_stats_leaguedashteamstats_advanced' },
+    away: { team: 'NYK', pace: 101, source: 'nba_stats_leaguedashteamstats_advanced' },
+  });
   assert.equal(observedOpener.zoneFG.rim, 62);
   assert.ok(!observedOpener.recommendationBlocks.includes('opening_sequence_rates_not_observed'));
   assert.equal(snapshot.games[0].probabilitySource, 'monte_carlo_possession_sequence_v1');

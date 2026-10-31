@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import NBAService, { buildLiveNBASnapshot, validateNBASnapshot } from '../../../src/sports/nba/api/NBAService.js';
 import NBA_DEMO_SNAPSHOT from '../../../src/sports/nba/data/demoSlate.js';
 import { fetchFirstBasketOddsForGames } from './first-basket-odds.mjs';
-import { fetchFirstBasketContext } from './first-basket-context.mjs';
+import { canonicalNbaTeamAbbr, fetchFirstBasketContext } from './first-basket-context.mjs';
 import { appendPregamePredictions } from '../../../tools/firstBasketLog.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -61,6 +61,9 @@ export async function fetchNBASlate({ outPath = OUTPUT_PATH } = {}) {
         openingCached: featureCache.opening || {},
       });
       console.log(`[fetch-nba-slate] Shot zones: ${nbaContext.zoneStatus}; opening-possession history: ${nbaContext.openingStatus}`);
+      if (nbaContext.openingFailures?.length) {
+        console.warn(`[fetch-nba-slate] PBP Stats opening history unavailable for ${nbaContext.openingFailures.map(x => x.team).join(', ')}: ${nbaContext.openingFailures.map(x => x.reason).filter(Boolean).slice(0, 3).join('; ')}`);
+      }
       const teamEntries = [...new Map(scoreboard.flatMap(g => [
         [g.homeTeam?.abbr, g.homeTeam?.id], [g.awayTeam?.abbr, g.awayTeam?.id],
       ]).filter(([abbr, id]) => abbr && id)).entries()];
@@ -71,6 +74,22 @@ export async function fetchNBASlate({ outPath = OUTPUT_PATH } = {}) {
           [abbr, await NBAService.getTeamSeasonStats(id)]));
         for (const [abbr, stats] of batch) teamStatsByTeam[abbr] = stats;
       }
+      for (const [abbr] of teamEntries) {
+        const officialPace = nbaContext.teamPaceByTeam?.[canonicalNbaTeamAbbr(abbr)];
+        if (Number.isFinite(officialPace)) {
+          teamStatsByTeam[abbr] = {
+            ...(teamStatsByTeam[abbr] || {}),
+            pace: officialPace,
+            paceSource: 'nba_stats_leaguedashteamstats_advanced',
+            paceSeason: nbaContext.teamPaceSeason,
+          };
+        } else if (teamStatsByTeam[abbr]) {
+          teamStatsByTeam[abbr] = {
+            ...teamStatsByTeam[abbr], pace: null, paceSource: null, paceSeason: nbaContext.teamPaceSeason,
+          };
+        }
+      }
+      console.log(`[fetch-nba-slate] Team pace: ${nbaContext.teamPaceStatus} (${Object.keys(nbaContext.teamPaceByTeam || {}).length}/30 NBA Stats teams)`);
       await fs.mkdir(path.dirname(featureCachePath), { recursive: true });
       await fs.writeFile(featureCachePath, JSON.stringify({
         fetchedAt: cacheFresh ? featureCache.fetchedAt : new Date().toISOString(),

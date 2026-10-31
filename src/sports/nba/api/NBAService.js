@@ -1188,9 +1188,20 @@ export function buildLiveNBASnapshot(scoreboardGames, {
       .filter(history => Number(history?.recentRole?.last10?.sampleGames) >= 5 && Number(history?.recentRole?.last10?.shotCount) > 0).length / 2;
     const recentOpeningRoleSamples = Math.min(...[homeOpening, awayOpening].map(history => Number(history?.recentRole?.last10?.sampleGames) || 0));
     const openingDataStatus = openingTeamCoverage === 1 ? 'ok' : openingTeamCoverage > 0 ? 'partial' : 'unavailable';
+    const paceValue = stats => Number.isFinite(stats?.pace) ? stats.pace : null;
+    const paceCoverage = [homeTeamStats, awayTeamStats].filter(stats => paceValue(stats) != null).length / 2;
+    const paceEvidence = {
+      source: paceCoverage === 1 && [homeTeamStats, awayTeamStats].every(stats => stats.paceSource === 'nba_stats_leaguedashteamstats_advanced')
+        ? 'nba_stats_leaguedashteamstats_advanced' : paceCoverage ? 'partial_or_legacy' : 'unavailable',
+      season: homeTeamStats?.paceSeason && homeTeamStats.paceSeason === awayTeamStats?.paceSeason ? homeTeamStats.paceSeason : null,
+      coverage: paceCoverage,
+      home: { team: homeAbbr, pace: paceValue(homeTeamStats), source: homeTeamStats?.paceSource || null },
+      away: { team: awayAbbr, pace: paceValue(awayTeamStats), source: awayTeamStats?.paceSource || null },
+    };
     const inputQuality = {
       playerSeasonStatCoverage: statCoverage,
       teamMatchupCoverage: [homeTeamStats, awayTeamStats].filter(Boolean).length / 2,
+      paceCoverage,
       zoneRateCoverage,
       lineupConfirmed,
       openingTendencySource: openingTeamCoverage === 1 ? 'pbpstats_observed' : 'roster_prior',
@@ -1249,10 +1260,7 @@ export function buildLiveNBASnapshot(scoreboardGames, {
         status: g.isLive ? 'LIVE' : g.isFinal ? 'FINAL' : lineupConfirmed ? 'CONFIRMED' : 'PROJECTED',
         source: isConfirmedLineup ? 'espn_official_boxscore' : 'statfax_projected',
       },
-      pace: [homeTeamStats?.pace, awayTeamStats?.pace].filter(Number.isFinite).length
-        ? [homeTeamStats?.pace, awayTeamStats?.pace].filter(Number.isFinite).reduce((a, b) => a + b, 0) /
-          [homeTeamStats?.pace, awayTeamStats?.pace].filter(Number.isFinite).length
-        : null,
+      pace: paceCoverage === 1 ? (homeTeamStats.pace + awayTeamStats.pace) / 2 : null,
       homeOppDefense: deriveDefense(awayTeamStats),
       awayOppDefense: deriveDefense(homeTeamStats),
     });
@@ -1265,6 +1273,7 @@ export function buildLiveNBASnapshot(scoreboardGames, {
     scoredGame.isFinal = Boolean(g.isFinal);
     scoredGame.marketOdds = acceptedMarketOdds;
     scoredGame.inputQuality = inputQuality;
+    scoredGame.paceEvidence = paceEvidence;
     scoredGame.openingTempoShadow = openingTempoShadow;
     for (const p of scoredGame.players) {
       const sourcePlayer = playerPool.find(x => String(x.id) === String(p.id) || x.name === p.name);
