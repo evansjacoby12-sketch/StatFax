@@ -112,6 +112,14 @@ function openingHistoryAge(history, currentSeasonStartYear) {
   return years.length ? Math.max(currentSeasonStartYear - Math.min(...years), 0) : null;
 }
 
+export function nbaDateKeyInZone(date = new Date(), timeZone = 'America/Chicago') {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone, year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(date);
+  const part = type => parts.find(item => item.type === type)?.value || '';
+  return `${part('year')}${part('month')}${part('day')}`;
+}
+
 // ---------- public API ----------
 
 export const NBAService = {
@@ -123,10 +131,8 @@ export const NBAService = {
    * as a hard dependency for the NBA daily view.
    */
   async getScoreboard() {
-    // Use the USER'S LOCAL date for the scoreboard query, not ESPN's
-    // default. ESPN's default /scoreboard follows ESPN's clock (Eastern)
-    // which can be ahead of or behind the user's "today" — we'd show
-    // yesterday's games or skip tonight's depending on time-of-day.
+    // The production slate and user-facing board use Chicago dates. Always
+    // pin this timezone because scheduled refreshes run on UTC hosts.
     //
     // Passing ?dates=YYYYMMDD anchored to the user's local date returns
     // exactly the games happening "today" from their perspective.
@@ -136,12 +142,10 @@ export const NBAService = {
     // games yet — fall through to tomorrow's date so the user still
     // sees the upcoming slate rather than an empty screen at 2am.
     const localDateStr = (offsetDays = 0) => {
-      const d = new Date();
-      d.setDate(d.getDate() + offsetDays);
-      const y = d.getFullYear();
-      const m = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      return `${y}${m}${day}`;
+      const today = nbaDateKeyInZone(new Date(), 'America/Chicago');
+      const d = new Date(Date.UTC(Number(today.slice(0, 4)), Number(today.slice(4, 6)) - 1, Number(today.slice(6, 8))));
+      d.setUTCDate(d.getUTCDate() + offsetDays);
+      return `${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, '0')}${String(d.getUTCDate()).padStart(2, '0')}`;
     };
 
     const todayStr = localDateStr(0);
@@ -1239,7 +1243,8 @@ export function buildLiveNBASnapshot(scoreboardGames, {
   allPlayers.sort((a, b) => b.gameProb - a.gameProb);
   allPlayers.forEach((p, idx) => { p.slateRank = idx + 1; });
 
-  const dateStr = new Date().toISOString().split('T')[0];
+  const dateStr = nbaDateKeyInZone(new Date(), 'America/Chicago');
+  const metaDate = `${dateStr.slice(0, 4)}-${dateStr.slice(4, 6)}-${dateStr.slice(6, 8)}`;
 
   return {
     generatedAt: new Date().toISOString(),
@@ -1253,7 +1258,7 @@ export function buildLiveNBASnapshot(scoreboardGames, {
     },
     market: marketStatus || { provider: 'the-odds-api', status: 'not_requested' },
     meta: {
-      date: dateStr,
+      date: metaDate,
       label: `NBA Slate (${scoredGames.length} Games)`,
       games: scoredGames.length,
       settlementStandard: 'DraftKings / FanDuel First Field Goal (Tip-Ins Count · Made FTs Do Not)',

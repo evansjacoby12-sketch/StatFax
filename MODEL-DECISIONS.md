@@ -302,6 +302,11 @@ Authority: `fb-model/` layout (`ingest/`, `features/`, `model/`, `sim/`, `eval/`
 - **Validation / limits:** focused combo and snapshot-contract tests cover model-only probabilities, price independence, invalid probability rejection, and the explicit projection/action eligibility split. The joint probability still assumes independence across games.
 - **Rollback:** revert `firstBasketCombos.js`, `NBAService.js`, and this policy note. Preserve the separate `projectionEligible` evidence while recommendation eligibility remains price-gated.
 
+### NBA Slate Date Boundary (2026-10-30)
+
+- NBA slate query dates and snapshot metadata use `America/Chicago`, independent of the deployment host timezone. ESPN event timestamps remain UTC for identity and sorting, while tip display remains Eastern. This keeps late Central-time games on the correct local slate after UTC midnight.
+- Validation covers the Chicago date transition around UTC midnight. Rollback: revert `nbaDateKeyInZone` use in `NBAService.js` and restore the prior host-local date selection.
+
 ## Required proof for a production model change
 
 1. State the hypothesis and exact fields changed.

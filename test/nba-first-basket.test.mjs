@@ -23,7 +23,12 @@ import {
 } from '../src/sports/nba/logic/firstBasketEngine.js';
 
 import { NBA_DEMO_SNAPSHOT } from '../src/sports/nba/data/demoSlate.js';
-import { loadNBASnapshot, validateNBASnapshot } from '../src/sports/nba/api/NBAService.js';
+import { loadNBASnapshot, validateNBASnapshot, nbaDateKeyInZone } from '../src/sports/nba/api/NBAService.js';
+
+test('NBA slate date follows Chicago time across UTC midnight', () => {
+  assert.equal(nbaDateKeyInZone(new Date('2026-10-31T01:51:00Z')), '20261030');
+  assert.equal(nbaDateKeyInZone(new Date('2026-10-31T06:00:00Z')), '20261031');
+});
 
 test('jumpBalls: jumper lookup and rating profiles', () => {
   const wemby = getJumperProfile('Victor Wembanyama');
