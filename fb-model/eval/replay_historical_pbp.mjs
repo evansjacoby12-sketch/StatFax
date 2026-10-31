@@ -383,7 +383,7 @@ async function fetchPbpOpening(cache, seasons) {
   return new Map(fetched);
 }
 
-async function run({ start='2024-10-22', testStart='2024-11-01', end='2026-10-30', iterations=10000,
+export async function run({ start='2024-10-22', testStart='2024-11-01', end='2026-10-30', iterations=10000,
   output='fb-model/data/first-basket-historical-replay-2024-11-through-2026-10.json' } = {}) {
   const cache=await readCache();
   const events=await fetchScoreboards(start,end,cache);
@@ -444,7 +444,8 @@ async function run({ start='2024-10-22', testStart='2024-11-01', end='2026-10-30
       syntheticArchive:'fb-model/data/fb_database.sqlite was excluded because its ingestion script generates randomized play-by-play and seeds fixed example lineups.',
     },
     modeling:{
-      comparison:'same date-ordered 10,000-trial possession simulation and prior-only player/defense/tip inputs; v7 adds the production L5/L10 opening-role blend to v6 season-role shares',
+      comparison:`same date-ordered ${iterations.toLocaleString('en-US')}-trial possession simulation and prior-only player/defense/tip inputs; v7 adds the production L5/L10 opening-role blend to v6 season-role shares`,
+      iterations,
       l5L10Blend:'35% L5 + 65% L10 recent share; recent blend weight rises from 5% at five games to 10% at ten games',
       otherInputs:'player shot-zone mix and makes from prior ESPN play-by-play only, shrunk to league priors; tip rates from prior historical opening jump balls only; neutral early-turnover/OREB priors',
       marketOddsUsed:false,
@@ -469,7 +470,14 @@ async function run({ start='2024-10-22', testStart='2024-11-01', end='2026-10-30
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  run().then(({report,path})=>{
+  const options={};
+  const names={'--start':'start','--test-start':'testStart','--end':'end','--iterations':'iterations','--output':'output'};
+  for(let i=2;i<process.argv.length;i++) {
+    const key=names[process.argv[i]];
+    if(!key || process.argv[i+1]==null) throw new Error(`Unknown or incomplete argument: ${process.argv[i]}`);
+    options[key]=key==='iterations' ? Number(process.argv[++i]) : process.argv[++i];
+  }
+  run(options).then(({report,path})=>{
     console.log(JSON.stringify({path,fetchedGames:report.fetchedGames,scoredGames:report.scoredGames,
       v6:report.versionMetrics.v6,v7:report.versionMetrics.v7,
       changedTopPicks:report.topPickChangedGames,topPickChanges:report.topPickChanges},null,2));
