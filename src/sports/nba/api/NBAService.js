@@ -33,6 +33,7 @@
 
 import NBA_DEMO_SNAPSHOT from '../data/demoSlate.js';
 import { scoreGameFirstBasket, FIRST_BASKET_MODEL_VERSION } from '../logic/firstBasketEngine.js';
+import { blendRecentOpeningRole } from '../logic/openingRoleForm.js';
 import { getJumpBallMatchup } from '../data/jumpBalls.js';
 import { getStartersForTeam, TEAM_ABBR_ALIASES } from '../data/teamRosters.js';
 import { findPositionalReplacement, getFullRosterForTeam } from '../data/fullRosters.js';
@@ -813,20 +814,20 @@ export function validateNBASnapshot(snapshot) {
   }
   if (snapshot.source?.mode === 'live' && snapshot.modelVersion === FIRST_BASKET_MODEL_VERSION) {
     if (!Array.isArray(snapshot.games) || !snapshot.market || !snapshot.players.every(p => p.gameId != null && p.inputQuality)) {
-      throw new Error('Invalid NBA v6 snapshot: live players require game identity and input-quality evidence');
+      throw new Error('Invalid NBA v7 snapshot: live players require game identity and input-quality evidence');
     }
     if (!snapshot.games.every(g => g.gameId != null && g.inputQuality && g.status)) {
-      throw new Error('Invalid NBA v6 snapshot: live games require identity, status, and input-quality evidence');
+      throw new Error('Invalid NBA v7 snapshot: live games require identity, status, and input-quality evidence');
     }
     if (!snapshot.games.every(g => typeof g.inputQuality.projectionEligible === 'boolean' && typeof g.inputQuality.recommendationEligible === 'boolean' &&
-      ['playerSeasonStatCoverage', 'teamMatchupCoverage', 'zoneRateCoverage', 'openingTeamCoverage', 'minimumOpeningHistorySamples', 'jumpBallCoverage'].every(k => Number.isFinite(g.inputQuality[k])) &&
+      ['playerSeasonStatCoverage', 'teamMatchupCoverage', 'zoneRateCoverage', 'openingTeamCoverage', 'minimumOpeningHistorySamples', 'jumpBallCoverage', 'recentOpeningRoleCoverage', 'recentOpeningRoleSamples'].every(k => Number.isFinite(g.inputQuality[k])) &&
       ['ok', 'partial', 'unavailable'].includes(g.inputQuality.openingDataStatus) && typeof g.inputQuality.zoneSource === 'string')) {
-      throw new Error('Invalid NBA v6 snapshot: eligibility evidence is incomplete');
+      throw new Error('Invalid NBA v7 snapshot: eligibility evidence is incomplete');
     }
     if (!snapshot.games.every(g => g.probabilitySource === 'monte_carlo_possession_sequence_v1' &&
       Number.isInteger(g.simTelemetry?.iterations) && g.simTelemetry.iterations > 0 && g.simTelemetry.unresolvedTrials === 0 &&
       g.simTelemetry.homeWins + g.simTelemetry.awayWins === g.simTelemetry.iterations)) {
-      throw new Error('Invalid NBA v6 snapshot: possession simulation probability evidence is incomplete');
+      throw new Error('Invalid NBA v7 snapshot: possession simulation probability evidence is incomplete');
     }
     if (!snapshot.games.every(g => g.openingTempoShadow == null || (
       g.openingTempoShadow.featureVersion === 1 &&
@@ -837,7 +838,7 @@ export function validateNBASnapshot(snapshot) {
         (g.openingTempoShadow[side].meanSecondsToFirstShot == null || Number.isFinite(g.openingTempoShadow[side].meanSecondsToFirstShot)) &&
         Number.isInteger(g.openingTempoShadow[side].sampleCount) && g.openingTempoShadow[side].sampleCount >= 0)
     ))) {
-      throw new Error('Invalid NBA v6 snapshot: opening tempo shadow evidence is malformed');
+      throw new Error('Invalid NBA v7 snapshot: opening tempo shadow evidence is malformed');
     }
   }
   return snapshot;
@@ -957,7 +958,7 @@ export function buildLiveNBASnapshot(scoreboardGames, {
           openingShotAttempts: opening?.attempts || 0, openingShotMakes: opening?.made || 0,
           openingStartTypes: opening?.startTypes || {},
           dataSources: { ...(withZones.dataSources || {}), seasonStats: 'unavailable',
-            earlyShotShare: openingUsable ? 'pbpstats_shrunk_with_roster_prior' : 'roster_prior',
+            earlyShotShare: player.openingRoleRecent?.applied ? 'pbpstats_season_l5_l10_blended' : openingUsable ? 'pbpstats_season_shrunk_with_roster_prior' : 'roster_prior',
             openingPossessions: openingUsable ? 'pbpstats' : openingHistory ? 'stale_or_incomplete' : 'unavailable' } };
       }
       const attempts = Math.max(0, (stats.threesAttemptedPerGame || 0) * stats.gamesPlayed);
@@ -982,7 +983,7 @@ export function buildLiveNBASnapshot(scoreboardGames, {
           seasonGames: stats.gamesPlayed,
           threePointAttempts: attempts,
           threePointPct: shrunkThree,
-          earlyShotShare: openingUsable ? 'pbpstats_shrunk_with_roster_prior' : 'roster_prior',
+          earlyShotShare: player.openingRoleRecent?.applied ? 'pbpstats_season_l5_l10_blended' : openingUsable ? 'pbpstats_season_shrunk_with_roster_prior' : 'roster_prior',
           openingPossessions: openingUsable ? 'pbpstats' : openingHistory ? 'stale_or_incomplete' : 'unavailable',
         },
       };
@@ -1013,7 +1014,9 @@ export function buildLiveNBASnapshot(scoreboardGames, {
         const history = openingTendenciesByTeam[tAbbr];
         const historyAge = openingHistoryAge(history, currentSeasonStartYear);
         const historyN = Number(history?.sampleCount) || 0;
-        if (history?.status !== 'ok' || historyAge == null || historyAge > 1 || historyN <= 0) return;
+        if (history?.status !== 'ok' || historyAge == null || historyAge > 1 || historyN <= 0) {
+          return blendRecentOpeningRole(activeStarters, null);
+        }
         const priorWeight = 20;
         const posteriorShares = activeStarters.map(player => {
           const observed = history.byPlayer?.[normalizeOpeningPlayerName(player.name)];
@@ -1023,6 +1026,7 @@ export function buildLiveNBASnapshot(scoreboardGames, {
         });
         const sum = posteriorShares.reduce((a, b) => a + b, 0);
         if (sum > 0) activeStarters.forEach((player, index) => { player.earlyShotShare = posteriorShares[index] / sum; });
+        return blendRecentOpeningRole(activeStarters, history.recentRole);
       };
       const baselineStarters = getStartersForTeam(tAbbr, { centerChoice }) || [
         { id: `${tAbbr}-1`, name: `${tAbbr} PG`, position: 'PG', earlyShotShare: 0.28, shotMix: { rim: 0.3, mid: 0.3, three: 0.4 }, seasonUsage: 25 },
@@ -1068,8 +1072,8 @@ export function buildLiveNBASnapshot(scoreboardGames, {
             s.earlyShotShare = Math.round(((s.earlyShotShare || 0.2) / totalShare) * 1000) / 1000;
           });
         }
-        applyOpeningHistoryShares(activeStarters);
-        return enrichWithSeasonStats(activeStarters, tAbbr);
+        const roleAdjustedStarters = applyOpeningHistoryShares(activeStarters);
+        return enrichWithSeasonStats(roleAdjustedStarters, tAbbr);
       }
 
       // Case B: Projected starters with injury checks & next-man-up substitutions
@@ -1102,9 +1106,9 @@ export function buildLiveNBASnapshot(scoreboardGames, {
         });
       }
 
-      applyOpeningHistoryShares(activeStarters);
+      const roleAdjustedStarters = applyOpeningHistoryShares(activeStarters);
 
-      return enrichWithSeasonStats(activeStarters, tAbbr);
+      return enrichWithSeasonStats(roleAdjustedStarters, tAbbr);
     };
 
     const rawHomeStarters = resolveTeamStarters(homeAbbr, homeCenterChoice);
@@ -1180,6 +1184,9 @@ export function buildLiveNBASnapshot(scoreboardGames, {
     };
     const openingTeamCoverage = [homeOpening, awayOpening]
       .filter((x, i) => x?.status === 'ok' && [homeOpeningAge, awayOpeningAge][i] != null && [homeOpeningAge, awayOpeningAge][i] <= 1).length / 2;
+    const recentOpeningRoleCoverage = [homeOpening, awayOpening]
+      .filter(history => Number(history?.recentRole?.last10?.sampleGames) >= 5 && Number(history?.recentRole?.last10?.shotCount) > 0).length / 2;
+    const recentOpeningRoleSamples = Math.min(...[homeOpening, awayOpening].map(history => Number(history?.recentRole?.last10?.sampleGames) || 0));
     const openingDataStatus = openingTeamCoverage === 1 ? 'ok' : openingTeamCoverage > 0 ? 'partial' : 'unavailable';
     const inputQuality = {
       playerSeasonStatCoverage: statCoverage,
@@ -1191,6 +1198,8 @@ export function buildLiveNBASnapshot(scoreboardGames, {
       openingDataStatus,
       openingTeamCoverage,
       openingHistoryAgeSeasons,
+      recentOpeningRoleCoverage,
+      recentOpeningRoleSamples,
       jumpBallCoverage,
       openingHistorySeason: homeOpening?.season && homeOpening.season === awayOpening?.season ? String(homeOpening.season) : null,
       openingTeamSamples: { [homeAbbr]: homeOpening?.sampleCount || 0, [awayAbbr]: awayOpening?.sampleCount || 0 },
@@ -1270,6 +1279,7 @@ export function buildLiveNBASnapshot(scoreboardGames, {
       p.modelProb = p.gameProb;
       if (sourcePlayer) {
         p.dataSources = sourcePlayer.dataSources || {};
+        p.openingRoleRecent = sourcePlayer.openingRoleRecent || null;
         p.openingHistorySamples = sourcePlayer.openingHistorySamples || 0;
         p.openingShotAttempts = sourcePlayer.openingShotAttempts || 0;
         p.openingShotMakes = sourcePlayer.openingShotMakes || 0;

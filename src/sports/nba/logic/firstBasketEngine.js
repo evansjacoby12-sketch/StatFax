@@ -15,7 +15,7 @@
 
 import { predictJumpBallMatchup, TIP_WIN_POSSESSION_RATE } from '../data/jumpBalls.js';
 
-export const FIRST_BASKET_MODEL_VERSION = 'nba-first-basket-v6';
+export const FIRST_BASKET_MODEL_VERSION = 'nba-first-basket-v7';
 
 // ─── Constants & Rules ─────────────────────────────────────────────────────────
 
@@ -309,6 +309,7 @@ export function evaluateTeamPossessionSequence({
       grade,
       fairOdds,
       earlyShotShare: r.earlyShare,
+      openingRoleRecent: r.player.openingRoleRecent || null,
       seasonUsage: r.seasonUsage,
       expectedMakeRate: Math.round(r.expectedMakeRate * 1000) / 10,
       ftRate: Number.isFinite(r.player.ftRate) ? r.player.ftRate : 0.28,

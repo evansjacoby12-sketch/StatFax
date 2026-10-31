@@ -175,19 +175,19 @@ test('demoSlate and NBAService: snapshot validity and loading', async () => {
   assert.ok(top1.eli15);
 });
 
-test('NBA v6 snapshot contract requires per-game quality, simulation evidence, and player game identity', () => {
+test('NBA v7 snapshot contract requires recent-role quality, simulation evidence, and player game identity', () => {
   assert.throws(() => validateNBASnapshot({
-    sport: 'nba', modelVersion: 'nba-first-basket-v6', source: { mode: 'live' },
+    sport: 'nba', modelVersion: 'nba-first-basket-v7', source: { mode: 'live' },
     market: {}, games: [{ gameId: '1', status: 'SCHEDULED' }],
     players: [{ id: 'p1', gameId: '1' }],
   }), /input-quality evidence/);
   assert.throws(() => validateNBASnapshot({
-    sport: 'nba', modelVersion: 'nba-first-basket-v6', source: { mode: 'live' }, market: {},
+    sport: 'nba', modelVersion: 'nba-first-basket-v7', source: { mode: 'live' }, market: {},
     games: [{ gameId: '1', status: 'SCHEDULED', inputQuality: { recommendationEligible: false } }],
     players: [{ id: 'p1', gameId: '1', inputQuality: {} }],
   }), /eligibility evidence is incomplete/);
   const shadowSnapshot = {
-    sport: 'nba', modelVersion: 'nba-first-basket-v6', source: { mode: 'live' }, market: {},
+    sport: 'nba', modelVersion: 'nba-first-basket-v7', source: { mode: 'live' }, market: {},
     games: [{
       gameId: '1', status: 'SCHEDULED',
       probabilitySource: 'monte_carlo_possession_sequence_v1',
@@ -197,6 +197,7 @@ test('NBA v6 snapshot contract requires per-game quality, simulation evidence, a
         playerSeasonStatCoverage: 0, teamMatchupCoverage: 0, zoneRateCoverage: 0,
         openingTeamCoverage: 0, minimumOpeningHistorySamples: 0,
         jumpBallCoverage: 0,
+        recentOpeningRoleCoverage: 0, recentOpeningRoleSamples: 0,
         openingDataStatus: 'unavailable', zoneSource: 'unavailable',
       },
       openingTempoShadow: {
@@ -445,7 +446,7 @@ test('firstBasket: 5000-trial Monte Carlo simulation engine per game', () => {
   assert.ok(topPick.eli15.includes('possession simulation:'));
 });
 
-test('v6 ranked probabilities respond to verified zone rates and reflect the simulation', () => {
+test('v7 ranked probabilities respond to verified zone rates and reflect the simulation', () => {
   const player = (id, team, zoneFG) => ({
     id, name: id, team, position: 'C', isStarter: true, earlyShotShare: 1,
     shotMix: { rim: 1, mid: 0, three: 0 }, zoneFG,
@@ -512,7 +513,12 @@ test('confirmed lineups receive the shrunk PBP opening-shot share', () => {
   }]));
   const history = players => {
     const byPlayer = { [players[0].name.toLowerCase()]: { attempts: 8, made: 5 } };
+    const recentByPlayer = { [players[0].name.toLowerCase()]: 20 };
     return { status: 'ok', season: '2026-27', sampleCount: 10, byPlayer,
+      recentRole: {
+        last5: { sampleGames: 5, shotCount: 10, byPlayer: { [players[0].name.toLowerCase()]: 10 } },
+        last10: { sampleGames: 10, shotCount: 20, byPlayer: recentByPlayer },
+      },
       openingTempo: { sampleCount: 10, totalSeconds: 180, meanSeconds: 18 } };
   };
   const snapshot = buildLiveNBASnapshot([game], {
@@ -526,7 +532,9 @@ test('confirmed lineups receive the shrunk PBP opening-shot share', () => {
   const observedOpener = teamPlayers.find(p => p.name === home[0].name);
   assert.ok(snapshot.games[0].lineupStatus.confirmed);
   assert.ok(observedOpener.earlyShotShare > 0.30, `PBP-shrunk share should be applied, got ${observedOpener.earlyShotShare}`);
-  assert.equal(observedOpener.dataSources.earlyShotShare, 'pbpstats_shrunk_with_roster_prior');
+  assert.equal(observedOpener.dataSources.earlyShotShare, 'pbpstats_season_l5_l10_blended');
+  assert.equal(observedOpener.openingRoleRecent.applied, true);
+  assert.equal(snapshot.games[0].inputQuality.recentOpeningRoleCoverage, 1);
   assert.equal(observedOpener.zoneFG.rim, 62);
   assert.ok(!observedOpener.recommendationBlocks.includes('opening_sequence_rates_not_observed'));
   assert.equal(snapshot.games[0].probabilitySource, 'monte_carlo_possession_sequence_v1');

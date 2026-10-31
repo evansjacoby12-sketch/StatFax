@@ -169,7 +169,7 @@ Live authority: `src/sports/nba/logic/firstBasketEngine.js`, `src/sports/nba/dat
     $$\text{Rate}_{\text{regressed}} = \frac{n \times \text{Rate}_{\text{obs}} + m \times \text{Prior}_{\text{reach}}}{n + m}$$
   - Standing reach differential adjusts jumper Elo by 15 points per inch ($\Delta \text{Prior} \approx 2.2\%/\text{inch}$).
   - Sample size tiers: `HIGH` ($\ge 40$ tips), `MEDIUM` (15-39 tips), `LOW_SHRUNK` ($<15$ tips).
-  - The team winning the opening tip retains the first possession at an approximate 98% rate. Current v6 team-first probability is derived from the matchup's simulated possession sequence; the former fixed tip-to-first-score conversion is no longer used for live rankings.
+  - The team winning the opening tip retains the first possession at an approximate 98% rate. Current v7 team-first probability is derived from the matchup's simulated possession sequence; the former fixed tip-to-first-score conversion is no longer used for live rankings.
   - Confirmed lineups badge tracks official starting 5s filed ~30 minutes before tip-off, enabling late model runs.
 - **First-Possession Markov Sequence (Play-by-Play Tendencies)**:
   - 1. *Possession Security*: 12.5% baseline early turnover rate deducted before shot attempts, adjusted for opponent ball pressure (`oppDefense.foulTurnoverForced`).
@@ -326,6 +326,14 @@ Authority: `fb-model/` layout (`ingest/`, `features/`, `model/`, `sim/`, `eval/`
 - **Snapshot contract:** live v6 snapshots must include the simulation source, positive iteration count, zero unresolved trials, and team win counts summing to iterations. Missing/invalid simulations fail snapshot validation.
 - **Validation / promotion:** focused regression tests cover zone-rate sensitivity, confirmed-lineup PBP share blending, unknown-jumper fallbacks, simulation probability parity, and pace invariance. This is a scoring-policy change, not a claim of improved predictive performance. Keep v6 in prospective evaluation until its date-ordered top-pick, Brier/log-loss, calibration, and coverage evidence is sufficient; do not fit from the legacy retrospective Python backtest.
 - **Rollback:** restore `nba-first-basket-v5`, the prior analytical ranking and eligibility contract, and matching v5 snapshot validation/UI. Retain v6 snapshots as a separate immutable cohort.
+
+### NBA First Basket Recent Opening-Role Blend v7 (2026-10-30)
+
+- **Version and hypothesis:** `nba-first-basket-v7` adds a small, recent-form adjustment to opening-shot role. A player's share of team field-goal attempts during the first two team possessions can shift with lineup and coaching changes; last-five/last-ten games can help reflect that, but those samples are sparse and noisy.
+- **Fields and source:** PBP Stats shot results now retain date-ordered player attempt counts for each team's most recent 5 and 10 games in the active season. Current season is isolated from the older season blend. Opening cache schema 3 forces refresh so an older cache cannot masquerade as recent form. Players expose `openingRoleRecent` and game quality exposes recent-window coverage/sample counts.
+- **Scoring rule:** With at least five dated games and nonzero tracked attempts in L10, normalize starter shares within each recent window. The L5/L10 composite is 35% L5 and 65% L10. Blend it into the existing season-shrunk PBP/roster share at a weight that grows from 5% at five games to a maximum 10% at ten games. If recent data are missing, invalid, or below five games, recent form has zero weight and the prior share remains unchanged. No points, makes, odds, or streak narrative enter this signal.
+- **Contract and evaluation:** v7 live snapshots require finite recent-role coverage and sample metadata. The signal is logged into prospective records so v6 and v7 cohorts remain distinct. This is an experimental scoring adjustment, not evidence of improved results; assess date-ordered outcomes, calibration, and top-pick ranking as the v7 sample grows.
+- **Validation / rollback:** parser tests verify date ordering and L5/L10 counts; focused model tests verify the capped blend, normalized shares, and no-op behavior for missing/thin data. Roll back to v6 by removing `openingRoleForm` from starter preparation, restoring model version `nba-first-basket-v6` and snapshot contract, and returning the opening cache schema to 2. Retain v7 results as a separate cohort.
 
 ## Required proof for a production model change
 

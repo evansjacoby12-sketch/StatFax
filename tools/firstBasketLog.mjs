@@ -122,6 +122,7 @@ function liveSnapshotRecords(snapshot, version = FIRST_BASKET_MODEL_VERSION) {
           pCredit: p.teamProb, pJoint: p.gameProb,
           starter: Boolean(p.isStarter), marketOdds: p.books || null,
           earlyShotShare: p.earlyShotShare ?? null,
+          openingRoleRecent: p.openingRoleRecent || null,
           zoneFG: p.zoneFG || null,
           openingHistorySamples: p.openingHistorySamples ?? null,
           openingShotAttempts: p.openingShotAttempts ?? null,
@@ -144,7 +145,7 @@ export function appendPregamePredictions(snapshot, { dir = DEFAULT_DIR, version 
       p.date === record.date && p.modelVersion === record.modelVersion &&
       ((p.gameId && p.gameId === record.gameId) || (!p.gameId && p.game === record.game)));
     const signature = r => JSON.stringify({
-      players: r.players.map(p => [p.name, p.pJoint, p.marketOdds, p.earlyShotShare, p.zoneFG,
+      players: r.players.map(p => [p.name, p.pJoint, p.marketOdds, p.earlyShotShare, p.openingRoleRecent, p.zoneFG,
         p.openingHistorySamples, p.openingShotAttempts, p.openingShotMakes, p.openingStartTypes, p.dataSources]),
       lineupStatus: r.lineupStatus,
       inputQuality: r.inputQuality,

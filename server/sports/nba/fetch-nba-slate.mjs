@@ -78,7 +78,7 @@ export async function fetchNBASlate({ outPath = OUTPUT_PATH } = {}) {
         teamStats: teamStatsByTeam,
         zoneStats: nbaContext.zoneStatsByPlayerId,
         opening: {
-          schemaVersion: 2,
+          schemaVersion: 3,
           byPlayer: nbaContext.openingByPlayer,
           byTeam: nbaContext.openingByTeam,
           sampleCount: nbaContext.openingSamples,

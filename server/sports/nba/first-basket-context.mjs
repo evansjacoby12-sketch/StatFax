@@ -51,10 +51,10 @@ export function parseNbaZoneStats(payload) {
 }
 
 /** Aggregate a team's first Q1 shot from the game's first two alternating possessions. */
-export function parsePbpOpeningShots(payload, { maxShots = 500 } = {}) {
+export function parsePbpOpeningShots(payload, { maxShots = 500, season = null } = {}) {
   const shots = payload?.results;
-  if (!Array.isArray(shots)) return { status: 'invalid', byPlayer: {}, sampleCount: 0, openingTempo: { sampleCount: 0, totalSeconds: 0, meanSeconds: null } };
-  if (shots.length >= maxShots) return { status: 'truncated', byPlayer: {}, sampleCount: shots.length, openingTempo: { sampleCount: 0, totalSeconds: 0, meanSeconds: null } };
+  if (!Array.isArray(shots)) return { status: 'invalid', byPlayer: {}, sampleCount: 0, season, openingTempo: { sampleCount: 0, totalSeconds: 0, meanSeconds: null } };
+  if (shots.length >= maxShots) return { status: 'truncated', byPlayer: {}, sampleCount: shots.length, season, openingTempo: { sampleCount: 0, totalSeconds: 0, meanSeconds: null } };
   const firstByTeamPossession = new Map();
   for (const shot of shots) {
     const possessionNo = Number(shot.poss_num);
@@ -71,6 +71,7 @@ export function parsePbpOpeningShots(payload, { maxShots = 500 } = {}) {
   }
   const byPlayer = {};
   const sampleGames = new Set();
+  const shotsByGame = new Map();
   const firstShotSeconds = [];
   for (const { shot } of firstByTeamPossession.values()) {
     const key = norm(shot.player);
@@ -78,6 +79,9 @@ export function parsePbpOpeningShots(payload, { maxShots = 500 } = {}) {
     sampleGames.add(String(shot.gid));
     const item = byPlayer[key] ||= { name: shot.player, playerId: String(shot.player_id), attempts: 0, made: 0, misses: 0, startTypes: {} };
     item.attempts++;
+    const gameShots = shotsByGame.get(String(shot.gid)) || [];
+    gameShots.push({ key, gameDate: String(shot.game_date || ''), gameId: String(shot.gid) });
+    shotsByGame.set(String(shot.gid), gameShots);
     if (shot.made) item.made++; else item.misses++;
     const startType = String(shot.start_type || 'unknown');
     item.startTypes[startType] = (item.startTypes[startType] || 0) + 1;
@@ -87,8 +91,25 @@ export function parsePbpOpeningShots(payload, { maxShots = 500 } = {}) {
     if (Number.isFinite(elapsed) && elapsed >= 0 && elapsed <= 120) firstShotSeconds.push(elapsed);
   }
   const totalSeconds = firstShotSeconds.reduce((sum, value) => sum + value, 0);
+  const recentGames = [...shotsByGame.entries()]
+    .map(([gameId, gameShots]) => ({ gameId, gameDate: gameShots.find(row => row.gameDate)?.gameDate || '', gameShots }))
+    .sort((a, b) => b.gameDate.localeCompare(a.gameDate) || b.gameId.localeCompare(a.gameId));
+  const recentRole = {};
+  for (const [label, gameLimit] of [['last5', 5], ['last10', 10]]) {
+    const selectedGames = recentGames.slice(0, gameLimit);
+    const counts = {};
+    for (const game of selectedGames) {
+      for (const { key } of game.gameShots) counts[key] = (counts[key] || 0) + 1;
+    }
+    recentRole[label] = {
+      sampleGames: selectedGames.length,
+      shotCount: selectedGames.reduce((sum, game) => sum + game.gameShots.length, 0),
+      byPlayer: counts,
+    };
+  }
   return {
-    status: sampleGames.size ? 'ok' : 'empty', byPlayer, sampleCount: sampleGames.size,
+    status: sampleGames.size ? 'ok' : 'empty', byPlayer, sampleCount: sampleGames.size, season,
+    recentRole,
     openingTempo: {
       sampleCount: firstShotSeconds.length,
       totalSeconds,
@@ -140,7 +161,7 @@ export async function fetchFirstBasketContext(games, {
     let openingSamples = Number(openingCached.sampleCount) || 0;
     let openingStatus = openingCached.status || 'unavailable';
     const cacheAge = Date.now() - Date.parse(openingCached.fetchedAt || '');
-    const openingFresh = Number(openingCached.schemaVersion) === 2 && openingCached.season === season && Number.isFinite(cacheAge) && cacheAge >= 0 && cacheAge < 24 * 60 * 60 * 1000;
+    const openingFresh = Number(openingCached.schemaVersion) === 3 && openingCached.season === season && Number.isFinite(cacheAge) && cacheAge >= 0 && cacheAge < 24 * 60 * 60 * 1000;
     let openingByTeam = openingCached.byTeam || {};
     let openingHistorySeason = openingCached.dataSeason || null;
     const teams = [...new Map((games || []).flatMap(g => [g.homeTeam, g.awayTeam])
@@ -170,7 +191,7 @@ export async function fetchFirstBasketContext(games, {
       for (const candidateSeason of candidateSeasons) {
         try {
           const url = makePbpUrl(probeTeam, candidateSeason);
-          const parsed = parsePbpOpeningShots(await requestJson(url, { headers: { Accept: 'application/json' } }));
+          const parsed = parsePbpOpeningShots(await requestJson(url, { headers: { Accept: 'application/json' } }), { season: candidateSeason });
           if (parsed.status !== 'invalid' && parsed.status !== 'truncated') {
             supportedSeasons.push(candidateSeason);
             probeResults.push(parsed);
@@ -180,7 +201,8 @@ export async function fetchFirstBasketContext(games, {
       }
       openingHistorySeason = supportedSeasons.join(',') || null;
       const mergeResults = results => {
-        const combined = { status: 'ok', byPlayer: {}, sampleCount: 0, openingTempo: { sampleCount: 0, totalSeconds: 0, meanSeconds: null } };
+        const currentSeasonResult = results.find(result => result.season === season);
+        const combined = { status: 'ok', byPlayer: {}, sampleCount: 0, recentRole: currentSeasonResult?.recentRole || {}, openingTempo: { sampleCount: 0, totalSeconds: 0, meanSeconds: null } };
         for (const result of results) {
           if (result.status === 'truncated') return { status: 'truncated', byPlayer: {}, sampleCount: result.sampleCount };
           if (result.status === 'invalid') continue;
@@ -210,7 +232,7 @@ export async function fetchFirstBasketContext(games, {
           try {
             const seasonResults = [];
             for (const dataSeason of supportedSeasons) {
-              seasonResults.push(parsePbpOpeningShots(await requestJson(makePbpUrl(team, dataSeason), { headers: { Accept: 'application/json' } })));
+              seasonResults.push(parsePbpOpeningShots(await requestJson(makePbpUrl(team, dataSeason), { headers: { Accept: 'application/json' } }), { season: dataSeason }));
             }
             teamResults[index] = { status: 'fulfilled', value: mergeResults(seasonResults) };
           } catch (reason) { teamResults[index] = { status: 'rejected', reason }; }

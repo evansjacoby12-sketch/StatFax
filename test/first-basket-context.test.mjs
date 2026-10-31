@@ -35,6 +35,24 @@ test('PBP Stats first-possession parser selects possession 1 or 2 and captures f
   assert.deepEqual(result.openingTempo, { sampleCount: 2, totalSeconds: 50, meanSeconds: 25 });
 });
 
+test('PBP Stats parser builds date-ordered L5 and L10 opening-role windows', () => {
+  const results = Array.from({ length: 12 }, (_, index) => ({
+    gid: `g${String(index + 1).padStart(2, '0')}`,
+    game_date: `2026-10-${String(index + 1).padStart(2, '0')}`,
+    period: 1, poss_num: 1,
+    player: index >= 7 ? 'Recent Lead' : 'Season Lead',
+    player_id: index >= 7 ? 2 : 1,
+    start_time: 720, shot_time: 700, made: true,
+  }));
+  const result = parsePbpOpeningShots({ results });
+  assert.equal(result.recentRole.last5.sampleGames, 5);
+  assert.equal(result.recentRole.last5.shotCount, 5);
+  assert.equal(result.recentRole.last5.byPlayer['recent lead'], 5);
+  assert.equal(result.recentRole.last10.sampleGames, 10);
+  assert.equal(result.recentRole.last10.byPlayer['recent lead'], 5);
+  assert.equal(result.recentRole.last10.byPlayer['season lead'], 5);
+});
+
 test('PBP Stats capped responses are rejected as incomplete', () => {
   const result = parsePbpOpeningShots({ results: Array.from({ length: 500 }, () => ({})) });
   assert.equal(result.status, 'truncated');
